@@ -1,0 +1,5 @@
+*~
+OBJ.*
+*.rej
+*.bak
+*.o.cmd
