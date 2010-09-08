@@ -1,5 +1,9 @@
 *~
+*.a
+*.a.cmd
 OBJ.*
 *.rej
 *.bak
 *.o.cmd
+*.o
+*.swp
