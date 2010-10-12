@@ -29,6 +29,9 @@
 #include <netinet/ip_icmp.h>
 #include "libbb.h"
 
+
+#define ATLAS 1
+
 #if ENABLE_PING6
 #include <netinet/icmp6.h>
 /* I see RENUMBERED constants in bits/in.h - !!?
@@ -307,7 +310,9 @@ static void print_stats_and_exit(int junk) NORETURN;
 static void print_stats_and_exit(int junk UNUSED_PARAM)
 {
 	signal(SIGINT, SIG_IGN);
-
+#ifdef ATLAS
+        printf("%lu %lu %lu", ntransmitted, nreceived, nrepeats);
+#else
 	printf("\n--- %s ping statistics ---\n", hostname);
 	printf("%lu packets transmitted, ", ntransmitted);
 	printf("%lu packets received, ", nreceived);
@@ -316,12 +321,19 @@ static void print_stats_and_exit(int junk UNUSED_PARAM)
 	if (ntransmitted)
 		ntransmitted = (ntransmitted - nreceived) * 100 / ntransmitted;
 	printf("%lu%% packet loss\n", ntransmitted);
+
+#endif 
 	if (tmin != UINT_MAX) {
 		unsigned tavg = tsum / (nreceived + nrepeats);
-		printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
+#ifdef ATLAS
+		printf(" %u.%03u %u.%03u %u.%03u\n",
+#else
+		 printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
+#endif /*ifdef ATLAS */
 			tmin / 1000, tmin % 1000,
 			tavg / 1000, tavg % 1000,
 			tmax / 1000, tmax % 1000);
+
 	}
 	/* if condition is true, exit with 1 -- 'failure' */
 	exit(nreceived == 0 || (deadline && nreceived < pingcount));
@@ -701,12 +713,20 @@ static void ping6(len_and_sockaddr *lsa)
 
 static void ping(len_and_sockaddr *lsa)
 {
-	printf("PING %s (%s)", hostname, dotted);
+#ifdef ATLAS
+	time_t mytime;
+	mytime = time(NULL);
+        printf("%lu %s %s %d ", mytime, hostname, dotted, datalen);
+#else
+        printf("PING %s (%s)", hostname, dotted);
+#endif
 	if (source_lsa) {
 		printf(" from %s",
 			xmalloc_sockaddr2dotted_noport(&source_lsa->u.sa));
 	}
+#ifndef ATLAS
 	printf(": %d data bytes\n", datalen);
+#endif
 
 #if ENABLE_PING6
 	if (lsa->u.sa.sa_family == AF_INET6)
