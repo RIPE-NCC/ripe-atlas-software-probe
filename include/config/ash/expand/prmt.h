@@ -1,0 +1,1 @@
+#define CONFIG_ASH_EXPAND_PRMT 1

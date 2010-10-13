@@ -1,0 +1,1 @@
+#define CONFIG_MKTEMP 1

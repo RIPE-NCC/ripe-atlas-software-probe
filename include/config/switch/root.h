@@ -1,0 +1,1 @@
+#define CONFIG_SWITCH_ROOT 1

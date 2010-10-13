@@ -47,6 +47,15 @@ config ARPING
 	help
 	  Ping hosts by ARP packets.
 
+config ATLASINIT
+        bool "atlasinit"
+        default y
+        help
+         RIPE NCC Atals initialization and parsing applicaton. antony@rip.net.
+         Aug 2010.
+
+
+
 config BRCTL
 	bool "brctl"
 	default n
@@ -567,6 +576,8 @@ config FEATURE_IPCALC_LONG_OPTIONS
 	depends on IPCALC && GETOPT_LONG
 	help
 	  Support long options for the ipcalc applet.
+
+
 
 config NAMEIF
 	bool "nameif"

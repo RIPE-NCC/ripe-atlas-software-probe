@@ -1,0 +1,1 @@
+#define CONFIG_DELGROUP 1

@@ -1,0 +1,1 @@
+#define CONFIG_UDPSVD 1

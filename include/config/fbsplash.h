@@ -1,0 +1,1 @@
+#define CONFIG_FBSPLASH 1

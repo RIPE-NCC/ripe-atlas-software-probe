@@ -1,0 +1,1 @@
+#define CONFIG_HUSH_TICK 1

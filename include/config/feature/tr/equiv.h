@@ -1,0 +1,1 @@
+#define CONFIG_FEATURE_TR_EQUIV 1

@@ -1,0 +1,1 @@
+#define CONFIG_FEATURE_AWK_LIBM 1

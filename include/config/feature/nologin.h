@@ -1,0 +1,1 @@
+#define CONFIG_FEATURE_NOLOGIN 1

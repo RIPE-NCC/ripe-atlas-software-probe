@@ -1,0 +1,1 @@
+#define CONFIG_KBD_MODE 1

@@ -1,0 +1,1 @@
+#define CONFIG_LOCALE_SUPPORT 1

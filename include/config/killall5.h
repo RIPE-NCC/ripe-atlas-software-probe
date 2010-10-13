@@ -1,0 +1,1 @@
+#define CONFIG_KILLALL5 1

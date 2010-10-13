@@ -1,0 +1,1 @@
+#define CONFIG_FEATURE_INETD_RPC 1

@@ -1,0 +1,6076 @@
+# vi: set sw=4 ts=4:
+
+=head1 NAME
+
+BusyBox - The Swiss Army Knife of Embedded Linux
+
+=head1 SYNTAX
+
+ busybox <applet> [arguments...]  # or
+
+ <applet> [arguments...]	    # if symlinked
+
+=head1 DESCRIPTION
+
+BusyBox combines tiny versions of many common UNIX utilities into a single
+small executable. It provides minimalist replacements for most of the utilities
+you usually find in GNU coreutils, util-linux, etc. The utilities in BusyBox
+generally have fewer options than their full-featured GNU cousins; however, the
+options that are included provide the expected functionality and behave very
+much like their GNU counterparts.
+
+BusyBox has been written with size-optimization and limited resources in mind.
+It is also extremely modular so you can easily include or exclude commands (or
+features) at compile time. This makes it easy to customize your embedded
+systems. To create a working system, just add /dev, /etc, and a Linux kernel.
+BusyBox provides a fairly complete POSIX environment for any small or embedded
+system.
+
+BusyBox is extremely configurable.  This allows you to include only the
+components you need, thereby reducing binary size. Run 'make config' or 'make
+menuconfig' to select the functionality that you wish to enable.  Then run
+'make' to compile BusyBox using your configuration.
+
+After the compile has finished, you should use 'make install' to install
+BusyBox. This will install the 'bin/busybox' binary, in the target directory
+specified by CONFIG_PREFIX. CONFIG_PREFIX can be set when configuring BusyBox,
+or you can specify an alternative location at install time (i.e., with a
+command line like 'make CONFIG_PREFIX=/tmp/foo install'). If you enabled
+any applet installation scheme (either as symlinks or hardlinks), these will
+also be installed in the location pointed to by CONFIG_PREFIX.
+
+=head1 USAGE
+
+BusyBox is a multi-call binary.  A multi-call binary is an executable program
+that performs the same job as more than one utility program.  That means there
+is just a single BusyBox binary, but that single binary acts like a large
+number of utilities.  This allows BusyBox to be smaller since all the built-in
+utility programs (we call them applets) can share code for many common
+operations.
+
+You can also invoke BusyBox by issuing a command as an argument on the
+command line.  For example, entering
+
+	/bin/busybox ls
+
+will also cause BusyBox to behave as 'ls'.
+
+Of course, adding '/bin/busybox' into every command would be painful.  So most
+people will invoke BusyBox using links to the BusyBox binary.
+
+For example, entering
+
+	ln -s /bin/busybox ls
+	./ls
+
+will cause BusyBox to behave as 'ls' (if the 'ls' command has been compiled
+into BusyBox).  Generally speaking, you should never need to make all these
+links yourself, as the BusyBox build system will do this for you when you run
+the 'make install' command.
+
+If you invoke BusyBox with no arguments, it will provide you with a list of the
+applets that have been compiled into your BusyBox binary.
+
+=head1 COMMON OPTIONS
+
+Most BusyBox applets support the B<--help> argument to provide a terse runtime
+description of their behavior.  If the CONFIG_FEATURE_VERBOSE_USAGE option has
+been enabled, more detailed usage information will also be available.
+
+=head1 COMMANDS
+
+Currently available applets include:
+
+	[, [[, addgroup, adduser, adjtimex, ar, arp, arping, ash, awk, 
+	basename, bbconfig, bbsh, blkid, brctl, bunzip2, busybox, bzcat, 
+	bzip2, cal, cat, catv, chat, chattr, chcon, chgrp, chmod, chown, 
+	chpasswd, chpst, chroot, chrt, chvt, cksum, clear, cmp, comm, cp, 
+	cpio, crond, crontab, cryptpw, cttyhack, cut, date, dc, dd, 
+	deallocvt, delgroup, deluser, depmod, devfsd, devmem, df, 
+	dhcprelay, diff, dirname, dmesg, dnsd, dos2unix, dpkg, dpkg_deb, 
+	du, dumpkmap, dumpleases, e2fsck, echo, ed, egrep, eject, env, 
+	envdir, envuidgid, ether_wake, expand, expr, fakeidentd, false, 
+	fbset, fbsplash, fdflush, fdformat, fdisk, fgrep, find, findfs, 
+	fold, free, freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, 
+	getenforce, getopt, getsebool, getty, grep, gunzip, gzip, halt, 
+	hd, hdparm, head, hexdump, hostid, hostname, httpd, hush, 
+	hwclock, id, ifconfig, ifdown, ifenslave, ifup, inetd, init, 
+	inotifyd, insmod, install, ip, ipaddr, ipcalc, ipcrm, ipcs, 
+	iplink, iproute, iprule, iptunnel, kbd_mode, kill, killall, 
+	killall5, klogd, lash, last, length, less, linux32, linux64, 
+	linuxrc, ln, load_policy, loadfont, loadkmap, logger, login, 
+	logname, logread, losetup, lpd, lpq, lpr, ls, lsattr, lsmod, 
+	lzmacat, makedevs, makemime, man, matchpathcon, md5sum, mdev, 
+	mesg, microcom, mkdir, mke2fs, mkfifo, mkfs_minix, mknod, mkswap, 
+	mktemp, modprobe, more, mount, mountpoint, msh, mt, mv, nameif, 
+	nc, netstat, nice, nmeter, nohup, nslookup, od, openvt, parse, 
+	passwd, patch, pgrep, pidof, ping, ping6, pipe_progress, 
+	pivot_root, pkill, popmaildir, poweroff, printenv, printf, ps, 
+	pscan, pwd, raidautorun, rdate, rdev, readahead, readlink, 
+	readprofile, realpath, reboot, reformime, renice, reset, resize, 
+	restorecon, rm, rmdir, rmmod, route, rpm, rpm2cpio, rtcwake, 
+	run_parts, runcon, runlevel, runsv, runsvdir, rx, script, sed, 
+	selinuxenabled, sendmail, seq, sestatus, setarch, setconsole, 
+	setenforce, setfiles, setfont, setkeycodes, setlogcons, 
+	setsebool, setsid, setuidgid, sh, sha1sum, showkey, slattach, 
+	sleep, softlimit, sort, split, start_stop_daemon, stat, strings, 
+	stty, su, sulogin, sum, sv, svlogd, swapoff, swapon, switch_root, 
+	sync, sysctl, syslogd, tac, tail, tar, taskset, tc, tcpsvd, tee, 
+	telnet, telnetd, test, tftp, tftpd, time, top, touch, tr, 
+	traceroute, true, tty, ttysize, tune2fs, udhcpc, udhcpd, udpsvd, 
+	umount, uname, uncompress, unexpand, uniq, unix2dos, unlzma, 
+	unzip, uptime, usleep, uudecode, uuencode, vconfig, vi, vlock, 
+	watch, watchdog, wc, wget, which, who, whoami, xargs, yes, zcat, zcip
+
+=head1 COMMAND DESCRIPTIONS
+
+=over 4
+
+=item B<addgroup  >
+
+addgroup   [B<-g> GID] [user_name] group_name
+
+Add a group or add an user to a group
+
+Options:
+
+	-g GID	Group id
+
+
+
+=item B<adduser   >
+
+adduser    [OPTIONS] user_name
+
+Add an user
+
+Options:
+
+	-h DIR		Home directory
+	-g GECOS	GECOS field
+	-s SHELL	Login shell
+	-G GROUP	Add user to existing group
+	-S		Create a system user
+	-D		Do not assign a password
+	-H		Do not create home directory
+
+
+
+=item B<adjtimex  >
+
+adjtimex   [B<-q>] [B<-o> offset] [B<-f> frequency] [B<-p> timeconstant] [B<-t> tick]
+
+Read and optionally set system timebase parameters. See adjtimex(2).
+
+Options:
+
+	-q		Quiet
+	-o offset	Time offset, microseconds
+	-f frequency	Frequency adjust, integer kernel units (65536 is 1ppm)
+			(positive values make clock run faster)
+	-t tick		Microseconds per tick, usually 10000
+	-p timeconstant
+
+
+
+=item B<ar        >
+
+ar         [B<-o>] [B<-v>] [B<-p>] [B<-t>] [B<-x>] ARCHIVE FILES
+
+Extract or list FILES from an ar archive
+
+Options:
+
+	-o	Preserve original dates
+	-p	Extract to stdout
+	-t	List
+	-x	Extract
+	-v	Verbose
+
+
+
+=item B<arp       >
+
+arp        
+[B<-vn>]	[B<-H> type] [B<-i> if] B<-a> [hostname]
+[B<-v>]		  [B<-i> if] B<-d> hostname [pub]
+[B<-v>]	[B<-H> type] [B<-i> if] B<-s> hostname hw_addr [temp]
+[B<-v>]	[B<-H> type] [B<-i> if] B<-s> hostname hw_addr [netmask nm] pub
+[B<-v>]	[B<-H> type] [B<-i> if] B<-Ds> hostname ifa [netmask nm] pub
+
+
+Manipulate ARP cache
+
+Options:
+
+	-a		Display (all) hosts
+	-s		Set new ARP entry
+	-d		Delete a specified entry
+	-v		Verbose
+	-n		Don't resolve names
+	-i IF		Network interface
+	-D		Read <hwaddr> from given device
+	-A, -p AF	Protocol family
+	-H HWTYPE	Hardware address type
+
+
+
+=item B<arping    >
+
+arping     [B<-fqbDUA>] [B<-c> count] [B<-w> timeout] [B<-I> dev] [B<-s> sender] target
+
+Send ARP requests/replies
+
+Options:
+
+	-f		Quit on first ARP reply
+	-q		Quiet
+	-b		Keep broadcasting, don't go unicast
+	-D		Duplicated address detection mode
+	-U		Unsolicited ARP mode, update your neighbors
+	-A		ARP answer mode, update your neighbors
+	-c N		Stop after sending N ARP requests
+	-w timeout	Time to wait for ARP reply, in seconds
+	-I dev		Interface to use (default eth0)
+	-s sender	Sender IP address
+	target		Target IP address
+
+
+
+=item B<ash       >
+
+ash        #define ash_full_usage 
+
+
+
+
+
+=item B<awk       >
+
+awk        [OPTION]... [program-text] [FILE...]
+
+Options:
+
+	-v var=val	Set variable
+	-F sep		Use sep as field separator
+	-f file		Read program from file
+
+
+
+=item B<basename  >
+
+basename   FILE [SUFFIX]
+
+Strip directory path and suffixes from FILE.
+If specified, also remove any trailing SUFFIX.
+
+Example:
+
+	$ basename /usr/local/bin/foo
+	foo
+	$ basename /usr/local/bin/
+	bin
+	$ basename /foo/bar.txt .txt
+	bar
+
+
+
+=item B<bbconfig  >
+
+bbconfig          
+
+Print the config file which built busybox
+
+
+
+=item B<bbsh      >
+
+bbsh       [FILE]...
+or: bbsh B<-c> command [args]...
+
+The bbsh shell (command interpreter)
+
+
+
+=item B<blkid     >
+
+blkid             
+
+Print UUIDs of all filesystems.
+
+
+
+=item B<brctl     >
+
+brctl      COMMAND [BRIDGE [INTERFACE]]
+
+Manage ethernet bridges.
+
+Commands:
+
+	show			Show a list of bridges
+	addbr BRIDGE		Create BRIDGE
+	delbr BRIDGE		Delete BRIDGE
+	addif BRIDGE IFACE	Add IFACE to BRIDGE
+	delif BRIDGE IFACE	Delete IFACE from BRIDGE
+	setageing BRIDGE TIME		Set ageing time
+	setfd BRIDGE TIME		Set bridge forward delay
+	sethello BRIDGE TIME		Set hello time
+	setmaxage BRIDGE TIME		Set max message age
+	setpathcost BRIDGE COST		Set path cost
+	setportprio BRIDGE PRIO		Set port priority
+	setbridgeprio BRIDGE PRIO	Set bridge priority
+	stp BRIDGE [1|0]		STP on/off
+
+
+
+=item B<bunzip2   >
+
+bunzip2    [OPTION]... [FILE]
+
+Uncompress FILE (or standard input if FILE is '-' or omitted)
+
+Options:
+
+	-c	Write to standard output
+	-f	Force
+
+
+
+=item B<busybox   >
+
+busybox    
+
+
+
+Hello world!
+
+
+
+
+=item B<bzcat     >
+
+bzcat      FILE
+
+Uncompress to stdout
+
+
+
+=item B<bzip2     >
+
+bzip2      [OPTION]... [FILE]...
+
+Compress FILE(s) with bzip2 algorithm.
+When FILE is '-' or unspecified, reads standard input. Implies B<-c>.
+
+Options:
+
+	-c	Write to standard output
+	-d	Decompress
+	-f	Force
+	-1..-9	Compression level
+
+
+
+=item B<cal       >
+
+cal        [B<-jy>] [[month] year]
+
+Display a calendar
+
+Options:
+
+	-j	Use julian dates
+	-y	Display the entire year
+
+
+
+=item B<cat       >
+
+cat        [B<-u>] [FILE]...
+
+Concatenate FILE(s) and print them to stdout
+
+Options:
+
+	-u	Use unbuffered i/o (ignored)
+
+Example:
+
+	$ cat /proc/uptime
+	110716.72 17.67
+
+
+
+=item B<catv      >
+
+catv       [B<-etv>] [FILE]...
+
+Display nonprinting characters as ^x or M-x
+
+Options:
+
+	-e	End each line with $
+	-t	Show tabs as ^I
+	-v	Don't use ^x or M-x escapes
+
+
+
+=item B<chat      >
+
+chat       EXPECT [SEND [EXPECT [SEND...]]]
+
+Useful for interacting with a modem connected to stdin/stdout.
+A script consists of one or more "expect-send" pairs of strings,
+each pair is a pair of arguments. Example:
+chat '' ATZ OK ATD123456 CONNECT '' ogin: pppuser word: ppppass '~'
+
+
+
+=item B<chattr    >
+
+chattr     [B<-R>] [-+=AacDdijsStTu] [B<-v> version] files...
+
+Change file attributes on an ext2 fs
+
+Modifiers:
+
+	-	Remove attributes
+	+	Add attributes
+	=	Set attributes
+Attributes:
+
+	A	Don't track atime
+	a	Append mode only
+	c	Enable compress
+	D	Write dir contents synchronously
+	d	Do not backup with dump
+	i	Cannot be modified (immutable)
+	j	Write all data to journal first
+	s	Zero disk storage when deleted
+	S	Write file contents synchronously
+	t	Disable tail-merging of partial blocks with other files
+	u	Allow file to be undeleted
+Options:
+
+	-R	Recursively list subdirectories
+	-v	Set the file's version/generation number
+
+
+
+=item B<chcon     >
+
+chcon      [OPTIONS] CONTEXT FILE...
+	chcon [OPTIONS] [B<-u> USER] [B<-r> ROLE] [B<-l> RANGE] [B<-t> TYPE] FILE...
+	chcon [OPTIONS] -B<-reference>=RFILE FILE...
+
+Change the security context of each FILE to CONTEXT
+
+	-v,--verbose		Verbose
+	-c,--changes		Report changes made
+	-h,--no-dereference	Affect symlinks instead of their targets
+	-f,--silent,--quiet	Suppress most error messages
+	--reference=RFILE	Use RFILE's group instead of using a CONTEXT value
+	-u,--user=USER		Set user/role/type/range in the target
+	-r,--role=ROLE		security context
+	-t,--type=TYPE
+	-l,--range=RANGE
+	-R,--recursive		Recurse subdirectories	
+
+
+
+=item B<chgrp     >
+
+chgrp      [B<-RhLHPcvf>]... GROUP FILE...
+
+Change the group membership of each FILE to GROUP
+
+Options:
+
+	-R	Recurse directories
+	-h	Affect symlinks instead of symlink targets
+	-L	Traverse all symlinks to directories
+	-H	Traverse symlinks on command line only
+	-P	Do not traverse symlinks (default)
+	-c	List changed files
+	-v	Verbose
+	-f	Hide errors
+
+Example:
+
+	$ ls -l /tmp/foo
+	-r--r--r--    1 andersen andersen        0 Apr 12 18:25 /tmp/foo
+	$ chgrp root /tmp/foo
+	$ ls -l /tmp/foo
+	-r--r--r--    1 andersen root            0 Apr 12 18:25 /tmp/foo
+
+
+
+=item B<chmod     >
+
+chmod      [B<-Rcvf>] MODE[,MODE]... FILE...
+
+Each MODE is one or more of the letters ugoa, one of the
+symbols +-= and one or more of the letters rwxst
+
+Options:
+
+	-R	Recurse directories
+	-c	List changed files
+	-v	List all files
+	-f	Hide errors
+
+Example:
+
+	$ ls -l /tmp/foo
+	-rw-rw-r--    1 root     root            0 Apr 12 18:25 /tmp/foo
+	$ chmod u+x /tmp/foo
+	$ ls -l /tmp/foo
+	-rwxrw-r--    1 root     root            0 Apr 12 18:25 /tmp/foo*
+	$ chmod 444 /tmp/foo
+	$ ls -l /tmp/foo
+	-r--r--r--    1 root     root            0 Apr 12 18:25 /tmp/foo
+
+
+
+=item B<chown     >
+
+chown      [B<-RhLHPcvf>]... OWNER[<.|:>[GROUP]] FILE...
+
+Change the owner and/or group of each FILE to OWNER and/or GROUP
+
+Options:
+
+	-R	Recurse directories
+	-h	Affect symlinks instead of symlink targets
+	-L	Traverse all symlinks to directories
+	-H	Traverse symlinks on command line only
+	-P	Do not traverse symlinks (default)
+	-c	List changed files
+	-v	List all files
+	-f	Hide errors
+
+Example:
+
+	$ ls -l /tmp/foo
+	-r--r--r--    1 andersen andersen        0 Apr 12 18:25 /tmp/foo
+	$ chown root /tmp/foo
+	$ ls -l /tmp/foo
+	-r--r--r--    1 root     andersen        0 Apr 12 18:25 /tmp/foo
+	$ chown root.root /tmp/foo
+	ls -l /tmp/foo
+	-r--r--r--    1 root     root            0 Apr 12 18:25 /tmp/foo
+
+
+
+=item B<chpasswd  >
+
+chpasswd   [-B<-md5>|-B<-encrypted>]
+
+Read user:password information from stdin and update /etc/passwd accordingly.
+
+Options:
+
+	-e,--encrypted	Supplied passwords are in encrypted form
+	-m,--md5	Use MD5 encryption instead of DES	
+
+
+
+=item B<chpst     >
+
+chpst      [B<-vP012>] [B<-u> USER[:GRP]] [B<-U> USER[:GRP]] [B<-e> DIR]
+	[-/ DIR] [B<-n> NICE] [B<-m> BYTES] [B<-d> BYTES] [B<-o> N]
+	[B<-p> N] [B<-f> BYTES] [B<-c> BYTES] PROG ARGS
+
+Change the process state and run PROG
+
+Options:
+
+	-u USER[:GRP]	Set uid and gid
+	-U USER[:GRP]	Set $UID and $GID in environment
+	-e DIR		Set environment variables as specified by files
+			in DIR: file=1st_line_of_file
+	-/ DIR		Chroot to DIR
+	-n NICE		Add NICE to nice value
+	-m BYTES	Same as -d BYTES -s BYTES -l BYTES
+	-d BYTES	Limit data segment
+	-o N		Limit number of open files per process
+	-p N		Limit number of processes per uid
+	-f BYTES	Limit output file sizes
+	-c BYTES	Limit core file size
+	-v		Verbose
+	-P		Create new process group
+	-0		Close standard input
+	-1		Close standard output
+	-2		Close standard error
+
+
+
+=item B<chroot    >
+
+chroot     NEWROOT [COMMAND...]
+
+Run COMMAND with root directory set to NEWROOT
+
+Example:
+
+	$ ls -l /bin/ls
+	lrwxrwxrwx    1 root     root          12 Apr 13 00:46 /bin/ls -> /BusyBox
+	# mount /dev/hdc1 /mnt -t minix
+	# chroot /mnt
+	# ls -l /bin/ls
+	-rwxr-xr-x    1 root     root        40816 Feb  5 07:45 /bin/ls*
+
+
+
+=item B<chrt      >
+
+chrt       [OPTION]... [prio] [pid | command [arg]...]
+
+Manipulate real-time attributes of a process
+
+Options:
+
+	-p	Operate on pid
+	-r	Set scheduling policy to SCHED_RR
+	-f	Set scheduling policy to SCHED_FIFO
+	-o	Set scheduling policy to SCHED_OTHER
+	-m	Show min and max priorities
+
+Example:
+
+	$ chrt -r 4 sleep 900; x=$!
+	$ chrt -f -p 3 $x
+	You need CAP_SYS_NICE privileges to set scheduling attributes of a process
+
+
+
+=item B<chvt      >
+
+chvt       N
+
+Change the foreground virtual terminal to /dev/ttyN
+
+
+
+=item B<cksum     >
+
+cksum      FILES...
+
+Calculate the CRC32 checksums of FILES
+
+
+
+=item B<clear     >
+
+clear             
+
+Clear screen
+
+
+
+=item B<cmp       >
+
+cmp        [B<-l>] [B<-s>] FILE1 [FILE2 [SKIP1 [SKIP2]]]
+
+Compares FILE1 vs stdin if FILE2 is not specified
+
+Options:
+
+	-l	Write the byte numbers (decimal) and values (octal)
+		for all differing bytes
+	-s	Quiet
+
+
+
+=item B<comm      >
+
+comm       [B<-123>] FILE1 FILE2
+
+Compare FILE1 to FILE2, or to stdin if - is specified
+
+Options:
+
+	-1	Suppress lines unique to FILE1
+	-2	Suppress lines unique to FILE2
+	-3	Suppress lines common to both files
+
+
+
+=item B<cp        >
+
+cp         [OPTION]... SOURCE DEST
+
+Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY
+
+Options:
+
+	-a	Same as -dpR
+	-c	Preserve security context
+	-d,-P	Preserve links
+	-H,-L	Dereference all symlinks (default)
+	-p	Preserve file attributes if possible
+	-f	Force overwrite
+	-i	Prompt before overwrite
+	-R,-r	Recurse directories
+	-l,-s	Create (sym)links
+
+
+
+=item B<cpio      >
+
+cpio       -[dimotuv][F cpiofile][H newc]
+
+Extract or list files from a cpio archive, or create a cpio archive
+Main operation mode:
+
+	d	Make leading directories
+	i	Extract
+	m	Preserve mtime
+	o	Create
+	H newc	Define format
+	t	List
+	v	Verbose
+	u	Unconditional overwrite
+	F	Input from file
+
+
+
+=item B<crond     >
+
+crond      B<-fbS> B<-l> N B<-d> N B<-L> LOGFILE B<-c> DIR
+
+	-f	Foreground
+	-b	Background (default)
+	-S	Log to syslog (default)
+	-l	Set log level. 0 is the most verbose, default 8
+	-d	Set log level, log to stderr
+	-L	Log to file
+	-c	Working dir
+
+
+
+=item B<crontab   >
+
+crontab    [B<-c> DIR] [B<-u> USER] [B<-ler>]|[FILE]
+
+	-c	Crontab directory
+	-u	User
+	-l	List crontab
+	-e	Edit crontab
+	-r	Delete crontab
+	FILE	Replace crontab by FILE ('-': stdin)
+
+
+
+=item B<cryptpw   >
+
+cryptpw    [B<-a> des|md5] [string]
+
+Output crypted string.
+If string isn't supplied on cmdline, read it from stdin.
+
+Options:
+
+	-a	Algorithm to use (default: md5)
+
+
+
+=item B<cttyhack  >
+
+cttyhack   #define cttyhack_full_usage 
+
+
+
+
+
+=item B<cut       >
+
+cut        [OPTION]... [FILE]...
+
+Print selected fields from each input FILE to standard output
+
+Options:
+
+	-b LIST	Output only bytes from LIST
+	-c LIST	Output only characters from LIST
+	-d CHAR	Use CHAR instead of tab as the field delimiter
+	-s	Output only the lines containing delimiter
+	-f N	Print only these fields
+	-n	Ignored
+
+Example:
+
+	$ echo "Hello world" | cut -f 1 -d ' '
+	Hello
+	$ echo "Hello world" | cut -f 2 -d ' '
+	world
+
+
+
+=item B<date      >
+
+date       [OPTION]... [+FMT] [TIME]
+
+Display time (using +FMT), or set time
+
+Options:
+
+	-u		Work in UTC (don't convert to local time)
+	-R		Output RFC-822 compliant date string
+	-I[SPEC]	Output ISO-8601 compliant date string
+			SPEC='date' (default) for date only,
+			'hours', 'minutes', or 'seconds' for date and
+			time to the indicated precision
+	-d TIME		Display TIME, not 'now'
+	-r FILE		Display last modification time of FILE
+	[-s] TIME	Set time to TIME
+	-D FMT		Use FMT for str->date conversion
+
+Recognized formats for TIME:
+
+	hh:mm[:ss]
+	[YYYY.]MM.DD-hh:mm[:ss]
+	YYYY-MM-DD hh:mm[:ss]
+	MMDDhhmm[[YY]YY][.ss]
+
+Example:
+
+	$ date
+	Wed Apr 12 18:52:41 MDT 2000
+
+
+
+=item B<dc        >
+
+dc         expression...
+
+Tiny RPN calculator. Operations:
++, add, -, sub, *, mul, /, div, %, mod, **, exp, and, or, not, eor,
+p - print top of the stack (without altering the stack),
+f - print entire stack, o - pop the value and set output radix
+(value must be 10 or 16).
+Examples: 'dc 2 2 add' -> 4, 'dc 8 8 * 2 2 + /' -> 16.
+
+Example:
+
+	$ dc 2 2 + p
+	4
+	$ dc 8 8 \* 2 2 + / p
+	16
+	$ dc 0 1 and p
+	0
+	$ dc 0 1 or p
+	1
+	$ echo 72 9 div 8 mul p | dc
+	64
+
+
+
+=item B<dd        >
+
+dd         [if=FILE] [of=FILE] [ibs=N] [obs=N] [bs=N] [count=N] [skip=N]
+	[seek=N] [conv=notrunc|noerror|sync|fsync]
+
+Copy a file with converting and formatting
+
+Options:
+
+	if=FILE		Read from FILE instead of stdin
+	of=FILE		Write to FILE instead of stdout
+	bs=N		Read and write N bytes at a time
+	ibs=N		Read N bytes at a time
+	obs=N		Write N bytes at a time
+	count=N		Copy only N input blocks
+	skip=N		Skip N input blocks
+	seek=N		Skip N output blocks
+	conv=notrunc	Don't truncate output file
+	conv=noerror	Continue after read errors
+	conv=sync	Pad blocks with zeros
+	conv=fsync	Physically write data out before finishing
+
+Numbers may be suffixed by c (x1), w (x2), b (x512), kD (x1000), k (x1024),
+MD (x1000000), M (x1048576), GD (x1000000000) or G (x1073741824)
+
+Example:
+
+	$ dd if=/dev/zero of=/dev/ram1 bs=1M count=4
+	4+0 records in
+	4+0 records out
+
+
+
+=item B<deallocvt >
+
+deallocvt  [N]
+
+Deallocate unused virtual terminal /dev/ttyN
+
+
+
+=item B<delgroup  >
+
+delgroup   [USER] GROUP
+
+Delete group GROUP from the system or user USER from group GROUP
+
+
+
+=item B<deluser   >
+
+deluser    USER
+
+Delete USER from the system
+
+
+
+=item B<depmod    >
+
+depmod     #define depmod_full_usage 
+
+
+
+
+
+=item B<devfsd    >
+
+devfsd     mntpnt [B<-v>][B<-fg>][B<-np>]
+
+Manage devfs permissions and old device name symlinks
+
+Options:
+
+	mntpnt	The mount point where devfs is mounted
+	-v	Print the protocol version numbers for devfsd
+		and the kernel-side protocol version and exit
+	-fg	Run in foreground
+	-np	Exit after parsing the configuration file
+		and processing synthetic REGISTER events,
+		do not poll for events
+
+
+
+=item B<devmem    >
+
+devmem     ADDRESS [WIDTH [VALUE]]
+
+Read/write from physical address
+
+	ADDRESS	Address to act upon
+	WIDTH	Width (8/16/...)
+	VALUE	Data to be written
+
+
+
+=item B<df        >
+
+df         [B<-Pkmhai>] [B<-B> SIZE] [FILESYSTEM...]
+
+Print filesystem usage statistics
+
+Options:
+
+	-P	POSIX output format
+	-k	1024-byte blocks (default)
+	-m	1M-byte blocks
+	-h	Human readable (e.g. 1K 243M 2G)
+	-a	Show all filesystems
+	-i	Inodes
+	-B SIZE	Blocksize
+
+Example:
+
+	$ df
+	Filesystem           1K-blocks      Used Available Use% Mounted on
+	/dev/sda3              8690864   8553540    137324  98% /
+	/dev/sda1                64216     36364     27852  57% /boot
+	$ df /dev/sda3
+	Filesystem           1K-blocks      Used Available Use% Mounted on
+	/dev/sda3              8690864   8553540    137324  98% /
+	$ POSIXLY_CORRECT=sure df /dev/sda3
+	Filesystem         512B-blocks      Used Available Use% Mounted on
+	/dev/sda3             17381728  17107080    274648  98% /
+	$ POSIXLY_CORRECT=yep df -P /dev/sda3
+	Filesystem          512-blocks      Used Available Capacity Mounted on
+	/dev/sda3             17381728  17107080    274648      98% /
+
+
+
+=item B<dhcprelay >
+
+dhcprelay  [client1,client2,...] [server_device]
+
+Relay dhcp requests from client devices to server device.
+Pass clients as CSV
+
+
+
+=item B<diff      >
+
+diff       [B<-abdiNqrTstw>] [B<-L> LABEL] [B<-S> FILE] [B<-U> LINES] FILE1 FILE2
+
+Compare files line by line and output the differences between them.
+This implementation supports unified diffs only.
+
+Options:
+
+	-a	Treat all files as text
+	-b	Ignore changes in the amount of whitespace
+	-d	Try hard to find a smaller set of changes
+	-i	Ignore case differences
+	-L	Use LABEL instead of the filename in the unified header
+	-N	Treat absent files as empty
+	-q	Output only whether files differ
+	-r	Recursively compare subdirectories
+	-S	Start with FILE when comparing directories
+	-T	Make tabs line up by prefixing a tab when necessary
+	-s	Report when two files are the same
+	-t	Expand tabs to spaces in output
+	-U	Output LINES lines of context
+	-w	Ignore all whitespace
+
+
+
+=item B<dirname   >
+
+dirname    FILENAME
+
+Strip non-directory suffix from FILENAME
+
+Example:
+
+	$ dirname /tmp/foo
+	/tmp
+	$ dirname /tmp/foo/
+	/tmp
+
+
+
+=item B<dmesg     >
+
+dmesg      [B<-c>] [B<-n> LEVEL] [B<-s> SIZE]
+
+Print or control the kernel ring buffer
+
+Options:
+
+	-c		Clear ring buffer after printing
+	-n LEVEL	Set console logging level
+	-s SIZE		Buffer size
+
+
+
+=item B<dnsd      >
+
+dnsd       [B<-c> config] [B<-t> seconds] [B<-p> port] [B<-i> iface-ip] [B<-d>]
+
+Small static DNS server daemon
+
+Options:
+
+	-c	Config filename
+	-t	TTL in seconds
+	-p	Listening port
+	-i	Listening ip (default all)
+	-d	Daemonize
+
+
+
+=item B<dos2unix  >
+
+dos2unix   [option] [FILE]
+
+Convert FILE from dos to unix format.
+When no file is given, use stdin/stdout.
+
+Options:
+
+	-u	dos2unix
+	-d	unix2dos
+
+
+
+=item B<dpkg      >
+
+dpkg       [B<-ilCPru>] [B<-F> option] package_name
+
+Install, remove and manage Debian packages
+
+Options:
+
+	-i		Install the package
+	-l		List of installed packages
+	-C		Configure an unpackaged package
+	-F depends	Ignore dependency problems
+	-P		Purge all files of a package
+	-r		Remove all but the configuration files for a package
+	-u		Unpack a package, but don't configure it
+
+
+
+=item B<dpkg-deb  >
+
+dpkg-deb   [B<-cefxX>] FILE [argument]
+
+Perform actions on Debian packages (.debs)
+
+Options:
+
+	-c	List contents of filesystem tree
+	-e	Extract control files to [argument] directory
+	-f	Display control field name starting with [argument]
+	-x	Extract packages filesystem tree to directory
+	-X	Verbose extract
+
+Example:
+
+	$ dpkg-deb -X ./busybox_0.48-1_i386.deb /tmp
+
+
+
+=item B<du        >
+
+du         [B<-aHLdclsxhmk>] [FILE]...
+
+Summarize disk space used for each FILE and/or directory.
+Disk space is printed in units of 1024 bytes.
+
+Options:
+
+	-a	Show file sizes too
+	-H	Follow symlinks on command line
+	-L	Follow all symlinks
+	-d N	Limit output to directories (and files with -a) of depth < N
+	-c	Show grand total
+	-l	Count sizes many times if hard linked
+	-s	Display only a total for each argument
+	-x	Skip directories on different filesystems
+	-h	Sizes in human readable format (e.g., 1K 243M 2G )
+	-m	Sizes in megabytes
+	-k	Sizes in kilobytes (default)
+
+Example:
+
+	$ du
+	16      ./CVS
+	12      ./kernel-patches/CVS
+	80      ./kernel-patches
+	12      ./tests/CVS
+	36      ./tests
+	12      ./scripts/CVS
+	16      ./scripts
+	12      ./docs/CVS
+	104     ./docs
+	2417    .
+
+
+
+=item B<dumpkmap  >
+
+dumpkmap   > keymap
+
+Print a binary keyboard translation table to standard output
+
+Example:
+
+	$ dumpkmap > keymap
+
+
+
+=item B<dumpleases>
+
+dumpleases [B<-r>|B<-a>] [B<-f> LEASEFILE]
+
+Display DHCP leases granted by udhcpd
+
+Options:
+
+	-f,--file=FILE	Leases file to load
+	-r,--remaining	Interpret lease times as time remaining
+	-a,--absolute	Interpret lease times as expire time	
+
+
+
+=item B<e2fsck    >
+
+e2fsck     [B<-panyrcdfvstDFSV>] [B<-b> superblock] [B<-B> blocksize] [B<-I> inode_buffer_blocks] [B<-P> process_inode_size] [B<-l>|B<-L> bad_blocks_file] [B<-C> fd] [B<-j> external_journal] [B<-E> extended-options] device
+
+Check ext2/ext3 file system
+
+Options:
+
+	-p		Automatic repair (no questions)
+	-n		Make no changes to the filesystem
+	-y		Assume 'yes' to all questions
+	-c		Check for bad blocks and add them to the badblock list
+	-f		Force checking even if filesystem is marked clean
+	-v		Verbose
+	-b superblock	Use alternative superblock
+	-B blocksize	Force blocksize when looking for superblock
+	-j journal	Set location of the external journal
+	-l file		Add to badblocks list
+	-L file		Set badblocks list
+
+
+
+=item B<echo      >
+
+echo       [B<-neE>] [ARG...]
+
+Print the specified ARGs to stdout
+
+Options:
+
+	-n	Suppress trailing newline
+	-e	Interpret backslash-escaped characters (i.e., \t=tab)
+	-E	Disable interpretation of backslash-escaped characters
+
+Example:
+
+	$ echo "Erik is cool"
+	Erik is cool
+	$ echo -e "Erik\nis\ncool"
+	Erik
+	is
+	cool
+	$ echo "Erik\nis\ncool"
+	Erik\nis\ncool
+
+
+
+=item B<ed        >
+
+ed         #define ed_full_usage 
+
+
+
+
+
+=item B<egrep     >
+
+egrep      #define egrep_full_usage 
+
+
+
+
+
+=item B<eject     >
+
+eject      [B<-t>] [B<-T>] [DEVICE]
+
+Eject specified DEVICE (or default /dev/cdrom)
+
+Options:
+
+	-s	SCSI device
+	-t	Close tray
+	-T	Open/close tray (toggle)
+
+
+
+=item B<env       >
+
+env        [B<-iu>] [-] [name=value]... [command]
+
+Print the current environment or run a program after setting
+up the specified environment
+
+Options:
+
+	-, -i	Start with an empty environment
+	-u	Remove variable from the environment
+
+
+
+=item B<envdir    >
+
+envdir     dir prog args
+
+Set various environment variables as specified by files
+in the directory dir and run PROG
+
+
+
+=item B<envuidgid >
+
+envuidgid  account prog args
+
+Set $UID to account's uid and $GID to account's gid and run PROG
+
+
+
+=item B<ether-wake>
+
+ether-wake [B<-b>] [B<-i> iface] [B<-p> aa:bb:cc:dd[:ee:ff]] MAC
+
+Send a magic packet to wake up sleeping machines.
+MAC must be a station address (00:11:22:33:44:55) or
+a hostname with a known 'ethers' entry.
+
+Options:
+
+	-b		Send wake-up packet to the broadcast address
+	-i iface	Interface to use (default eth0)
+	-p pass		Append four or six byte password PW to the packet
+
+
+
+=item B<expand    >
+
+expand     [B<-i>] [B<-t> NUM] [FILE|-]
+
+Convert tabs to spaces, writing to standard output.
+
+Options:
+
+	-i,--initial	Do not convert tabs after non blanks
+	-t,--tabs=N	Tabstops every N chars	
+
+
+
+=item B<expr      >
+
+expr       EXPRESSION
+
+Print the value of EXPRESSION to standard output.
+
+EXPRESSION may be:
+
+	ARG1 | ARG2	ARG1 if it is neither null nor 0, otherwise ARG2
+	ARG1 & ARG2	ARG1 if neither argument is null or 0, otherwise 0
+	ARG1 < ARG2	1 if ARG1 is less than ARG2, else 0. Similarly:
+	ARG1 <= ARG2
+	ARG1 = ARG2
+	ARG1 != ARG2
+	ARG1 >= ARG2
+	ARG1 > ARG2
+	ARG1 + ARG2	Sum of ARG1 and ARG2. Similarly:
+	ARG1 - ARG2
+	ARG1 * ARG2
+	ARG1 / ARG2
+	ARG1 % ARG2
+	STRING : REGEXP		Anchored pattern match of REGEXP in STRING
+	match STRING REGEXP	Same as STRING : REGEXP
+	substr STRING POS LENGTH Substring of STRING, POS counted from 1
+	index STRING CHARS	Index in STRING where any CHARS is found, or 0
+	length STRING		Length of STRING
+	quote TOKEN		Interpret TOKEN as a string, even if
+				it is a keyword like 'match' or an
+				operator like '/'
+	(EXPRESSION)		Value of EXPRESSION
+
+Beware that many operators need to be escaped or quoted for shells.
+Comparisons are arithmetic if both ARGs are numbers, else
+lexicographical. Pattern matches return the string matched between
+\( and \) or null; if \( and \) are not used, they return the number
+of characters matched or 0.
+
+
+
+=item B<fakeidentd>
+
+fakeidentd [B<-fiw>] [B<-b> ADDR] [STRING]
+
+Provide fake ident (auth) service
+
+Options:
+
+	-f	Run in foreground
+	-i	Inetd mode
+	-w	Inetd 'wait' mode
+	-b ADDR	Bind to specified address
+	STRING	Ident answer string (default is 'nobody')
+
+
+
+=item B<false     >
+
+false             
+
+Return an exit code of FALSE (1)
+
+Example:
+
+	$ false
+	$ echo $?
+	1
+
+
+
+=item B<fbset     >
+
+fbset      [options] [mode]
+
+Show and modify frame buffer settings
+
+Example:
+
+	$ fbset
+	mode "1024x768-76"
+		# D: 78.653 MHz, H: 59.949 kHz, V: 75.694 Hz
+		geometry 1024 768 1024 768 16
+		timings 12714 128 32 16 4 128 4
+		accel false
+		rgba 5/11,6/5,5/0,0/0
+	endmode
+
+
+
+=item B<fbsplash  >
+
+fbsplash   B<-s> IMGFILE [B<-c>] [B<-d> DEV] [B<-i> INIFILE] [B<-f> CMD]
+
+Options:
+
+	-s	Image
+	-c	Hide cursor
+	-d	Framebuffer device (default /dev/fb0)
+	-i	Config file (var=value):
+			BAR_LEFT,BAR_TOP,BAR_WIDTH,BAR_HEIGHT
+			BAR_R,BAR_G,BAR_B
+	-f	Control pipe (else exit after drawing image)
+			commands: 'NN' (% for progress bar) or 'exit'
+
+
+
+=item B<fdflush   >
+
+fdflush    DEVICE
+
+Force floppy disk drive to detect disk change
+
+
+
+=item B<fdformat  >
+
+fdformat   [B<-n>] DEVICE
+
+Format floppy disk
+
+Options:
+
+	-n	Don't verify after format
+
+
+
+=item B<fdisk     >
+
+fdisk      [B<-uls>] [B<-C> CYLINDERS] [B<-H> HEADS] [B<-S> SECTORS] [B<-b> SSZ] DISK
+
+Change partition table
+
+Options:
+
+	-u		Start and End are in sectors (instead of cylinders)
+	-l		Show partition table for each DISK, then exit
+	-s		Show partition sizes in kb for each DISK, then exit
+	-b 2048		(for certain MO disks) use 2048-byte sectors
+	-C CYLINDERS	Set number of cylinders/heads/sectors
+	-H HEADS
+
+	-S SECTORS
+
+
+
+=item B<fgrep     >
+
+fgrep      #define fgrep_full_usage 
+
+
+
+
+
+=item B<find      >
+
+find       [PATH...] [EXPRESSION]
+
+Search for files. The default PATH is the current directory,
+default EXPRESSION is 'B<-print>'
+
+EXPRESSION may consist of:
+
+	-follow		Dereference symlinks
+	-xdev		Don't descend directories on other filesystems
+	-maxdepth N	Descend at most N levels. -maxdepth 0 applies
+			tests/actions to command line arguments only
+	-name PATTERN	File name (w/o directory name) matches PATTERN
+	-iname PATTERN	Case insensitive -name
+	-path PATTERN	Path matches PATTERN
+	-regex PATTERN	Path matches regex PATTERN
+	-type X		File type is X (X is one of: f,d,l,b,c,...)
+	-perm NNN	Permissions match any of (+NNN), all of (-NNN),
+			or exactly (NNN)
+	-mtime DAYS	Modified time is greater than (+N), less than (-N),
+			or exactly (N) days
+	-mmin MINS	Modified time is greater than (+N), less than (-N),
+			or exactly (N) minutes
+	-newer FILE	Modified time is more recent than FILE's
+	-inum N		File has inode number N
+	-user NAME	File is owned by user NAME (numeric user ID allowed)
+	-group NAME	File belongs to group NAME (numeric group ID allowed)
+	-depth		Process directory name after traversing it
+	-size N[bck]	File size is N (c:bytes,k:kbytes,b:512 bytes(def.)).
+			+/-N: file size is bigger/smaller than N
+	-print		Print (default and assumed)
+	-print0		Delimit output with null characters rather than
+			newlines	USE_FEATURE_FIND_CONTEXT ( 
+	-context	File has specified security context") 	 
+	-exec CMD ARG ;	Execute CMD with all instances of {} replaced by the
+			matching files
+	-prune		Stop traversing current subtree
+	-delete		Delete files, turns on -depth option
+	(EXPR)		Group an expression
+
+Example:
+
+	$ find / -name passwd
+	/etc/passwd
+
+
+
+=item B<findfs    >
+
+findfs     LABEL=label or UUID=uuid
+
+Find a filesystem device based on a label or UUID.
+
+Example:
+
+	$ findfs LABEL=MyDevice
+
+
+
+=item B<fold      >
+
+fold       [B<-bs>] [B<-w> WIDTH] [FILE]
+
+Wrap input lines in each FILE (standard input by default), writing to
+standard output
+
+Options:
+
+	-b	Count bytes rather than columns
+	-s	Break at spaces
+	-w	Use WIDTH columns instead of 80
+
+
+
+=item B<free      >
+
+free              
+
+Display the amount of free and used system memory
+
+Example:
+
+	$ free
+	              total         used         free       shared      buffers
+	  Mem:       257628       248724         8904        59644        93124
+	 Swap:       128516         8404       120112
+	Total:       386144       257128       129016
+
+
+
+=item B<freeramdisk>
+
+freeramdisk DEVICE
+
+Free all memory used by the specified ramdisk
+
+Example:
+
+	$ freeramdisk /dev/ram2
+
+
+
+=item B<fsck      >
+
+fsck       [B<-ANPRTV>] [B<-C> fd] [B<-t> fstype] [fs-options] [filesys...]
+
+Check and repair filesystems
+
+Options:
+
+	-A	Walk /etc/fstab and check all filesystems
+	-N	Don't execute, just show what would be done
+	-P	With -A, check filesystems in parallel
+	-R	With -A, skip the root filesystem
+	-T	Don't show title on startup
+	-V	Verbose
+	-C n	Write status information to specified filedescriptor
+	-t type	List of filesystem types to check
+
+
+
+=item B<fsck.minix>
+
+fsck.minix [B<-larvsmf>] /dev/name
+
+Check MINIX filesystem
+
+Options:
+
+	-l	List all filenames
+	-r	Perform interactive repairs
+	-a	Perform automatic repairs
+	-v	Verbose
+	-s	Output superblock information
+	-m	Show "mode not cleared" warnings
+	-f	Force file system check
+
+
+
+=item B<ftpget    >
+
+ftpget     [options] remote-host local-file remote-file
+
+Retrieve a remote file via FTP
+
+Options:
+
+	-c,--continue	Continue previous transfer
+	-v,--verbose	Verbose
+	-u,--username	Username
+	-p,--password	Password
+	-P,--port	Port number	
+
+
+
+=item B<ftpput    >
+
+ftpput     [options] remote-host remote-file local-file
+
+Store a local file on a remote machine via FTP
+
+Options:
+
+	-v,--verbose	Verbose
+	-u,--username	Username
+	-p,--password	Password
+	-P,--port	Port number	
+
+
+
+=item B<fuser     >
+
+fuser      [options] FILE or PORT/PROTO
+
+Find processes which use FILEs or PORTs
+
+Options:
+
+	-m	Find processes which use same fs as FILEs
+	-4	Search only IPv4 space
+	-6	Search only IPv6 space
+	-s	Silent: just exit with 0 if any processes are found
+	-k	Kill found processes (otherwise display PIDs)
+	-SIGNAL	Signal to send (default: TERM)
+
+
+
+=item B<getenforce>
+
+getenforce #define getenforce_full_usage 
+
+
+
+
+
+=item B<getopt    >
+
+getopt     [OPTIONS]...
+
+Parse command options
+
+	-a,--alternative		Allow long options starting with single -
+	-l,--longoptions=longopts	Long options to be recognized
+	-n,--name=progname		The name under which errors are reported
+	-o,--options=optstring		Short options to be recognized
+	-q,--quiet			Disable error reporting by getopt(3)
+	-Q,--quiet-output		No normal output
+	-s,--shell=shell		Set shell quoting conventions
+	-T,--test			Test for getopt(1) version
+	-u,--unquoted			Don't quote the output	
+
+Example:
+
+	$ cat getopt.test
+	#!/bin/sh
+	GETOPT=`getopt -o ab:c:: --long a-long,b-long:,c-long:: \
+	       -n 'example.busybox' -- "$@"`
+	if [ $? != 0 ]; then  exit 1; fi
+	eval set -- "$GETOPT"
+	while true; do
+	 case $1 in
+	   -a|--a-long) echo "Option a"; shift;;
+	   -b|--b-long) echo "Option b, argument '$2'"; shift 2;;
+	   -c|--c-long)
+	     case "$2" in
+	       "") echo "Option c, no argument"; shift 2;;
+	       *)  echo "Option c, argument '$2'"; shift 2;;
+	     esac;;
+	   --) shift; break;;
+	   *) echo "Internal error!"; exit 1;;
+	 esac
+	done
+
+
+
+=item B<getsebool >
+
+getsebool  B<-a> or getsebool boolean...
+
+	-a	Show all SELinux booleans
+
+
+
+=item B<getty     >
+
+getty      [OPTIONS] BAUD_RATE TTY [TERMTYPE]
+
+Open a tty, prompt for a login name, then invoke /bin/login
+
+Options:
+
+	-h		Enable hardware (RTS/CTS) flow control
+	-i		Do not display /etc/issue before running login
+	-L		Local line, do not do carrier detect
+	-m		Get baud rate from modem's CONNECT status message
+	-w		Wait for a CR or LF before sending /etc/issue
+	-n		Do not prompt the user for a login name
+	-f issue_file	Display issue_file instead of /etc/issue
+	-l login_app	Invoke login_app instead of /bin/login
+	-t timeout	Terminate after timeout if no username is read
+	-I initstring	Init string to send before anything else
+	-H login_host	Log login_host into the utmp file as the hostname
+
+
+
+=item B<grep      >
+
+grep       [B<-HhrilLnqvsoweFEABC>] PATTERN [FILEs...]
+
+Search for PATTERN in each FILE or standard input
+
+Options:
+
+	-H	Prefix output lines with filename where match was found
+	-h	Suppress the prefixing filename on output
+	-r	Recurse subdirectories
+	-i	Ignore case distinctions
+	-l	List names of files that match
+	-L	List names of files that do not match
+	-n	Print line number with output lines
+	-q	Quiet. Return 0 if PATTERN is found, 1 otherwise
+	-v	Select non-matching lines
+	-s	Suppress file open/read error messages
+	-c	Only print count of matching lines
+	-o	Show only the part of a line that matches PATTERN
+	-m MAX	Match up to MAX times per file
+	-w	Match whole words only
+	-F	PATTERN is a set of newline-separated strings
+	-E	PATTERN is an extended regular expression
+	-e PTRN	Pattern to match
+	-f FILE	Read pattern from file
+	-A	Print NUM lines of trailing context
+	-B	Print NUM lines of leading context
+	-C	Print NUM lines of output context
+
+Example:
+
+	$ grep root /etc/passwd
+	root:x:0:0:root:/root:/bin/bash
+	$ grep ^[rR]oo. /etc/passwd
+	root:x:0:0:root:/root:/bin/bash
+
+
+
+=item B<gunzip    >
+
+gunzip     [OPTION]... [FILE]...
+
+Uncompress FILEs (or standard input)
+
+Options:
+
+	-c	Write to standard output
+	-f	Force
+	-t	Test file integrity
+
+Example:
+
+	$ ls -la /tmp/BusyBox*
+	-rw-rw-r--    1 andersen andersen   557009 Apr 11 10:55 /tmp/BusyBox-0.43.tar.gz
+	$ gunzip /tmp/BusyBox-0.43.tar.gz
+	$ ls -la /tmp/BusyBox*
+	-rw-rw-r--    1 andersen andersen  1761280 Apr 14 17:47 /tmp/BusyBox-0.43.tar
+
+
+
+=item B<gzip      >
+
+gzip       [OPTION]... [FILE]...
+
+Compress FILEs (or standard input)
+
+Options:
+
+	-c	Write to standard output
+	-d	Decompress
+	-f	Force
+
+Example:
+
+	$ ls -la /tmp/busybox*
+	-rw-rw-r--    1 andersen andersen  1761280 Apr 14 17:47 /tmp/busybox.tar
+	$ gzip /tmp/busybox.tar
+	$ ls -la /tmp/busybox*
+	-rw-rw-r--    1 andersen andersen   554058 Apr 14 17:49 /tmp/busybox.tar.gz
+
+
+
+=item B<halt      >
+
+halt       [B<-d> delay] [B<-n>] [B<-f>] [B<-w>]
+
+Halt the system
+
+Options:
+
+	-d	Delay interval for halting
+	-n	No call to sync()
+	-f	Force halt (don't go through init)
+	-w	Only write a wtmp record
+
+
+
+=item B<hd        >
+
+hd         FILE...
+
+hd is an alias for hexdump B<-C>
+
+
+
+=item B<hdparm    >
+
+hdparm     [options] [device] ..
+
+Options:
+
+	-a	Get/set fs readahead
+	-A	Set drive read-lookahead flag (0/1)
+	-b	Get/set bus state (0 == off, 1 == on, 2 == tristate)
+	-B	Set Advanced Power Management setting (1-255)
+	-c	Get/set IDE 32-bit IO setting
+	-C	Check IDE power mode status
+	-d	Get/set using_dma flag
+	-D	Enable/disable drive defect-mgmt
+	-f	Flush buffer cache for device on exit
+	-g	Display drive geometry
+	-h	Display terse usage information
+	-i	Display drive identification
+	-I	Detailed/current information directly from drive
+	-k	Get/set keep_settings_over_reset flag (0/1)
+	-K	Set drive keep_features_over_reset flag (0/1)
+	-L	Set drive doorlock (0/1) (removable harddisks only)
+	-m	Get/set multiple sector count
+	-n	Get/set ignore-write-errors flag (0/1)
+	-p	Set PIO mode on IDE interface chipset (0,1,2,3,4,...)
+	-P	Set drive prefetch count/*   "
+	-q	Change next setting quietly" - not supported ib bbox */ 
+	-Q	Get/set DMA tagged-queuing depth (if supported)
+	-r	Get/set readonly flag (DANGEROUS to set)
+	-R	Register an IDE interface (DANGEROUS)
+	-S	Set standby (spindown) timeout
+	-t	Perform device read timings
+	-T	Perform cache read timings
+	-u	Get/set unmaskirq flag (0/1)
+	-U	Un-register an IDE interface (DANGEROUS)
+	-v	Defaults; same as -mcudkrag for IDE drives
+	-V	Display program version and exit immediately
+	-w	Perform device reset (DANGEROUS)
+	-W	Set drive write-caching flag (0/1) (DANGEROUS)
+	-x	Tristate device for hotswap (0/1) (DANGEROUS)
+	-X	Set IDE xfer mode (DANGEROUS)
+	-y	Put IDE drive in standby mode
+	-Y	Put IDE drive to sleep
+	-Z	Disable Seagate auto-powersaving mode
+	-z	Re-read partition table
+
+
+
+=item B<head      >
+
+head       [OPTION]... [FILE]...
+
+Print first 10 lines of each FILE to standard output.
+With more than one FILE, precede each with a header giving the
+file name. With no FILE, or when FILE is -, read standard input.
+
+Options:
+
+	-n NUM	Print first NUM lines instead of first 10
+	-c NUM	Output the first NUM bytes
+	-q	Never output headers giving file names
+	-v	Always output headers giving file names
+
+Example:
+
+	$ head -n 2 /etc/passwd
+	root:x:0:0:root:/root:/bin/bash
+	daemon:x:1:1:daemon:/usr/sbin:/bin/sh
+
+
+
+=item B<hexdump   >
+
+hexdump    [B<-bcCdefnosvxR>] FILE...
+
+Display file(s) or standard input in a user specified format
+
+Options:
+
+	-b		One-byte octal display
+	-c		One-byte character display
+	-C		Canonical hex+ASCII, 16 bytes per line
+	-d		Two-byte decimal display
+	-e FORMAT STRING
+	-f FORMAT FILE
+	-n LENGTH	Interpret only LENGTH bytes of input
+	-o		Two-byte octal display
+	-s OFFSET	Skip OFFSET bytes
+	-v		Display all input data
+	-x		Two-byte hexadecimal display
+	-R		Reverse of 'hexdump -Cv'
+
+
+
+=item B<hostid    >
+
+hostid            
+
+Print out a unique 32-bit identifier for the machine
+
+
+
+=item B<hostname  >
+
+hostname   [OPTION] [hostname | B<-F> FILE]
+
+Get or set hostname or DNS domain name
+
+Options:
+
+	-s	Short
+	-i	Addresses for the hostname
+	-d	DNS domain name
+	-f	Fully qualified domain name
+	-F FILE	Use the contents of FILE to specify the hostname
+
+Example:
+
+	$ hostname
+	sage
+
+
+
+=item B<httpd     >
+
+httpd      [B<-c> conffile] [B<-p> [ip:]port] [B<-i>] [B<-f>] [B<-v>[v]] [B<-u> user[:grp]] [B<-r> realm] [B<-m> pass] [B<-h> home] [B<-d>/B<-e> string]
+
+Listen for incoming HTTP requests
+
+Options:
+
+	-c FILE		Configuration file (default httpd.conf)
+	-p [IP:]PORT	Bind to ip:port (default *:80)
+	-i		Inetd mode
+	-f		Do not daemonize
+	-v[v]		Verbose
+	-u USER[:GRP]	Set uid/gid after binding to port
+	-r REALM	Authentication Realm for Basic Authentication
+	-m PASS		Crypt PASS with md5 algorithm
+	-h HOME		Home directory (default .)
+	-e STRING	HTML encode STRING
+	-d STRING	URL decode STRING
+
+
+
+=item B<hush      >
+
+hush       #define hush_full_usage 
+
+
+
+
+
+=item B<hwclock   >
+
+hwclock    	 [B<-r>|-B<-show>] [B<-s>|-B<-hctosys>] [B<-w>|-B<-systohc>] [B<-l>|-B<-localtime>] [B<-u>|-B<-utc>] [B<-f> FILE]	
+
+Query and set hardware clock (RTC)
+
+Options:
+
+	-r	Show hardware clock time
+	-s	Set system time from hardware clock
+	-w	Set hardware clock to system time
+	-u	Hardware clock is in UTC
+	-l	Hardware clock is in local time
+	-f FILE	Use specified device (e.g. /dev/rtc2)
+
+
+
+=item B<id        >
+
+id         [OPTIONS]... [USER]
+
+Print information about USER or the current user
+
+Options:
+
+	-Z	Print the security context
+	-u	Print user ID
+	-g	Print group ID
+	-G	Print supplementary group IDs
+	-n	Print name instead of a number
+	-r	Print real user ID instead of effective ID
+
+Example:
+
+	$ id
+	uid=1000(andersen) gid=1000(andersen)
+
+
+
+=item B<ifconfig  >
+
+ifconfig   [B<-a>] interface [address]
+
+Configure a network interface
+
+Options:
+
+	[add ADDRESS[/PREFIXLEN]]
+	[del ADDRESS[/PREFIXLEN]]
+	[[-]broadcast [ADDRESS]] [[-]pointopoint [ADDRESS]]
+	[netmask ADDRESS] [dstaddr ADDRESS]
+	[outfill NN] [keepalive NN]
+	[hw ether|infiniband ADDRESS] [metric NN] [mtu NN]
+	[[-]trailers] [[-]arp] [[-]allmulti]
+	[multicast] [[-]promisc] [txqueuelen NN] [[-]dynamic]
+	[mem_start NN] [io_addr NN] [irq NN]
+	[up|down] ...
+
+
+
+=item B<ifdown    >
+
+ifdown     [B<-ainmvf>] ifaces...
+
+Options:
+
+	-a	De/configure all interfaces automatically
+	-i FILE	Use FILE for interface definitions
+	-n	Print out what would happen, but don't do it
+		(note: doesn't disable mappings)
+	-m	Don't run any mappings
+	-v	Print out what would happen before doing it
+	-f	Force de/configuration
+
+
+
+=item B<ifenslave >
+
+ifenslave  [B<-cdf>] master-iface <slave-iface...>
+
+Configure network interfaces for parallel routing
+
+Options:
+
+	-c, --change-active	Change active slave
+	-d, --detach		Remove slave interface from bonding device
+	-f, --force		Force, even if interface is not Ethernet/*   "
+	-r, --receive-slave	Create a receive-only slave" */
+
+Example:
+
+	To create a bond device, simply follow these three steps :
+	- ensure that the required drivers are properly loaded :
+	  # modprobe bonding ; modprobe <3c59x|eepro100|pcnet32|tulip|...>
+	- assign an IP address to the bond device :
+	  # ifconfig bond0 <addr> netmask <mask> broadcast <bcast>
+	- attach all the interfaces you need to the bond device :
+	  # ifenslave bond0 eth0 eth1 eth2
+	  If bond0 didn't have a MAC address, it will take eth0's. Then, all
+	  interfaces attached AFTER this assignment will get the same MAC addr.
+	
+	  To detach a dead interface without setting the bond device down :
+	   # ifenslave -d bond0 eth1
+	
+	  To set the bond device down and automatically release all the slaves :
+	   # ifconfig bond0 down
+	
+	  To change active slave :
+	   # ifenslave -c bond0 eth0
+
+
+
+=item B<ifup      >
+
+ifup       [B<-ainmvf>] ifaces...
+
+Options:
+
+	-a	De/configure all interfaces automatically
+	-i FILE	Use FILE for interface definitions
+	-n	Print out what would happen, but don't do it
+		(note: doesn't disable mappings)
+	-m	Don't run any mappings
+	-v	Print out what would happen before doing it
+	-f	Force de/configuration
+
+
+
+=item B<inetd     >
+
+inetd      [B<-fe>] [B<-q> N] [B<-R> N] [CONFFILE]
+
+Listen for network connections and launch programs
+
+Options:
+
+	-f	Run in foreground
+	-e	Log to stderr
+	-q N    Socket listen queue (default: 128)
+	-R N	Pause services after N connects/min
+		(default: 0 - disabled)
+
+
+
+=item B<init      >
+
+init              
+
+Init is the parent of all processes
+
+This version of init is designed to be run only by the kernel.
+
+BusyBox init doesn't support multiple runlevels. The runlevels field of
+the /etc/inittab file is completely ignored by BusyBox init. If you want
+runlevels, use sysvinit.
+
+BusyBox init works just fine without an inittab. If no inittab is found,
+it has the following default behavior:
+
+	::sysinit:/etc/init.d/rcS
+	::askfirst:/bin/sh
+	::ctrlaltdel:/sbin/reboot
+	::shutdown:/sbin/swapoff -a
+	::shutdown:/bin/umount -a -r
+	::restart:/sbin/init
+
+if it detects that /dev/console is _not_ a serial console, it will also run:
+
+	tty2::askfirst:/bin/sh
+	tty3::askfirst:/bin/sh
+	tty4::askfirst:/bin/sh
+
+If you choose to use an /etc/inittab file, the inittab entry format is as follows:
+
+	<id>:<runlevels>:<action>:<process>
+
+	<id>:
+
+		WARNING: This field has a non-traditional meaning for BusyBox init!
+		The id field is used by BusyBox init to specify the controlling tty for
+		the specified process to run on. The contents of this field are
+		appended to "/dev/" and used as-is. There is no need for this field to
+		be unique, although if it isn't you may have strange results. If this
+		field is left blank, the controlling tty is set to the console. Also
+		note that if BusyBox detects that a serial console is in use, then only
+		entries whose controlling tty is either the serial console or /dev/null
+		will be run. BusyBox init does nothing with utmp. We don't need no
+		stinkin' utmp.
+
+	<runlevels>:
+
+		The runlevels field is completely ignored.
+
+	<action>:
+
+		Valid actions include: sysinit, respawn, askfirst, wait,
+		once, restart, ctrlaltdel, and shutdown.
+
+		The available actions can be classified into two groups: actions
+		that are run only once, and actions that are re-run when the specified
+		process exits.
+
+		Run only-once actions:
+
+			'sysinit' is the first item run on boot. init waits until all
+			sysinit actions are completed before continuing. Following the
+			completion of all sysinit actions, all 'wait' actions are run.
+			'wait' actions, like 'sysinit' actions, cause init to wait until
+			the specified task completes. 'once' actions are asynchronous,
+			therefore, init does not wait for them to complete. 'restart' is
+			the action taken to restart the init process. By default this should
+			simply run /sbin/init, but can be a script which runs pivot_root or it
+			can do all sorts of other interesting things. The 'ctrlaltdel' init
+			actions are run when the system detects that someone on the system
+			console has pressed the CTRL-ALT-DEL key combination. Typically one
+			wants to run 'reboot' at this point to cause the system to reboot.
+			Finally the 'shutdown' action specifies the actions to taken when
+			init is told to reboot. Unmounting filesystems and disabling swap
+			is a very good here.
+
+		Run repeatedly actions:
+
+			'respawn' actions are run after the 'once' actions. When a process
+			started with a 'respawn' action exits, init automatically restarts
+			it. Unlike sysvinit, BusyBox init does not stop processes from
+			respawning out of control. The 'askfirst' actions acts just like
+			respawn, except that before running the specified process it
+			displays the line "Please press Enter to activate this console."
+			and then waits for the user to press enter before starting the
+			specified process.
+
+		Unrecognized actions (like initdefault) will cause init to emit an
+		error message, and then go along with its business. All actions are
+		run in the order they appear in /etc/inittab.
+
+	<process>:
+
+		Specifies the process to be executed and its command line.
+
+Example /etc/inittab file:
+
+	# This is run first except when booting in single-user mode
+	#
+	::sysinit:/etc/init.d/rcS
+	
+	# /bin/sh invocations on selected ttys
+	#
+	# Start an "askfirst" shell on the console (whatever that may be)
+	::askfirst:-/bin/sh
+	# Start an "askfirst" shell on /dev/tty2-4
+	tty2::askfirst:-/bin/sh
+	tty3::askfirst:-/bin/sh
+	tty4::askfirst:-/bin/sh
+	
+	# /sbin/getty invocations for selected ttys
+	#
+	tty4::respawn:/sbin/getty 38400 tty4
+	tty5::respawn:/sbin/getty 38400 tty5
+	
+	
+	# Example of how to put a getty on a serial line (for a terminal)
+	#
+	#::respawn:/sbin/getty -L ttyS0 9600 vt100
+	#::respawn:/sbin/getty -L ttyS1 9600 vt100
+	#
+	# Example how to put a getty on a modem line
+	#::respawn:/sbin/getty 57600 ttyS2
+	
+	# Stuff to do when restarting the init process
+	::restart:/sbin/init
+	
+	# Stuff to do before rebooting
+	::ctrlaltdel:/sbin/reboot
+	::shutdown:/bin/umount -a -r
+	::shutdown:/sbin/swapoff -a
+
+
+
+
+=item B<inotifyd  >
+
+inotifyd   /user/space/agent dir/or/file/being/watched[:mask] ...
+
+Spawn userspace agent on filesystem changes.
+When a filesystem event matching the mask occurs
+on specified file/directory an userspace agent is spawned
+with the parameters:
+1. actual event(s)
+2. file/directory name
+3. name of subfile (if any), in case of watching a directory
+
+	a	File is accessed
+	c	File is modified
+	e	Metadata changed
+	w	Writtable file is closed
+	0	Unwrittable file is closed
+	r	File is opened
+	m	File is moved from X
+	y	File is moved to Y
+	n	Subfile is created
+	d	Subfile is deleted
+	D	Self is deleted
+	M	Self is moved
+
+
+
+=item B<insmod    >
+
+insmod     [OPTION]... MODULE [symbol=value]...
+
+Load the specified kernel modules into the kernel
+
+Options:
+
+	-f	Force module to load into the wrong kernel version
+	-k	Make module autoclean-able
+	-v	Verbose
+	-q	Quiet
+	-L	Lock to prevent simultaneous loads of a module
+	-m	Output load map to stdout
+	-o NAME	Set internal module name to NAME
+	-x	Do not export externs
+
+
+
+=item B<install   >
+
+install    [B<-cdDsp>] [B<-o> USER] [B<-g> GRP] [B<-m> MODE] [source] dest|directory
+
+Copy files and set attributes
+
+Options:
+
+	-c	Just copy (default)
+	-d	Create directories
+	-D	Create leading target directories
+	-s	Strip symbol table
+	-p	Preserve date
+	-o USER	Set ownership
+	-g GRP	Set group ownership
+	-m MODE	Set permissions
+	-Z	Set security context
+
+
+
+=item B<ip        >
+
+ip         [OPTIONS] {address | route | link | tunnel | rule} {COMMAND}
+
+ip [OPTIONS] OBJECT {COMMAND}
+where OBJECT := {address | route | link | tunnel | rule}
+OPTIONS := { B<-f>[amily] { inet | inet6 | link } | B<-o>[neline] }
+
+
+
+=item B<ipaddr    >
+
+ipaddr     { {add|del} IFADDR dev STRING | {show|flush}
+		[dev STRING] [to PREFIX] }
+
+ipaddr {add|delete} IFADDR dev STRING
+ipaddr {show|flush} [dev STRING] [scope SCOPE-ID]
+
+	[to PREFIX] [label PATTERN]
+	IFADDR := PREFIX | ADDR peer PREFIX
+	[broadcast ADDR] [anycast ADDR]
+	[label STRING] [scope SCOPE-ID]
+	SCOPE-ID := [host | link | global | NUMBER]
+
+
+
+=item B<ipcalc    >
+
+ipcalc     [OPTION]... ADDRESS[[/]NETMASK] [NETMASK]
+
+Calculate IP network settings from a IP address
+
+Options:
+
+	-b,--broadcast	Display calculated broadcast address
+	-n,--network	Display calculated network address
+	-m,--netmask	Display default netmask for IP
+	-p,--prefix	Display the prefix for IP/NETMASK
+	-h,--hostname	Display first resolved host name
+	-s,--silent	Don't ever display error messages	 	)
+
+
+
+=item B<ipcrm     >
+
+ipcrm      [B<-MQS> key] [B<-mqs> id]
+
+Upper-case options MQS remove an object by shmkey value.
+Lower-case options remove an object by shmid value.
+
+Options:
+
+	-mM	Remove memory segment after last detach
+	-qQ	Remove message queue
+	-sS	Remove semaphore
+
+
+
+=item B<ipcs      >
+
+ipcs       [[B<-smq>] B<-i> shmid] | [[B<-asmq>] [B<-tcplu>]]
+
+	-i	Show specific resource
+Resource specification:
+
+	-m	Shared memory segments
+	-q	Message queues
+	-s	Semaphore arrays
+	-a	All (default)
+Output format:
+
+	-t	Time
+	-c	Creator
+	-p	Pid
+	-l	Limits
+	-u	Summary
+
+
+
+=item B<iplink    >
+
+iplink     
+
+iplink set DEVICE { up | down | arp | multicast { on | off } |
+
+			dynamic { on | off } |
+			mtu MTU }
+iplink show [DEVICE]
+
+
+
+=item B<iproute   >
+
+iproute    { list | flush | { add | del | change | append |
+		replace | monitor } ROUTE }
+
+iproute { list | flush } SELECTOR
+iproute get ADDRESS [from ADDRESS iif STRING]
+
+			[oif STRING]  [tos TOS]
+iproute { add | del | change | append | replace | monitor } ROUTE
+
+			SELECTOR := [root PREFIX] [match PREFIX] [proto RTPROTO]
+			ROUTE := [TYPE] PREFIX [tos TOS] [proto RTPROTO]
+				[metric METRIC]
+
+
+
+=item B<iprule    >
+
+iprule     {[list | add | del] RULE}
+
+iprule [list | add | del] SELECTOR ACTION
+
+	SELECTOR := [from PREFIX] [to PREFIX] [tos TOS] [fwmark FWMARK]
+			[dev STRING] [pref NUMBER]
+	ACTION := [table TABLE_ID] [nat ADDRESS]
+			[prohibit | reject | unreachable]
+			[realms [SRCREALM/]DSTREALM]
+	TABLE_ID := [local | main | default | NUMBER]
+
+
+
+=item B<iptunnel  >
+
+iptunnel   { add | change | del | show } [NAME]
+	[mode { ipip | gre | sit }]
+	[remote ADDR] [local ADDR] [ttl TTL]
+
+iptunnel { add | change | del | show } [NAME]
+
+	[mode { ipip | gre | sit }] [remote ADDR] [local ADDR]
+	[[i|o]seq] [[i|o]key KEY] [[i|o]csum]
+	[ttl TTL] [tos TOS] [[no]pmtudisc] [dev PHYS_DEV]
+
+
+
+=item B<kbd_mode  >
+
+kbd_mode   [B<-a>|k|s|u] [B<-C> TTY]
+
+Report or set the keyboard mode
+
+Options set mode:
+
+	-a	Default (ASCII)
+	-k	Medium-raw (keyboard)
+	-s	Raw (scancode)
+	-u	Unicode (utf-8)
+	-C TTY	Affect TTY instead of /dev/tty
+
+
+
+=item B<kill      >
+
+kill       [B<-l>] [B<-SIG>] PID...
+
+Send a signal (default is TERM) to given PIDs
+
+Options:
+
+	-l	List all signal names and numbers/*   "
+	-s SIG	Yet another way of specifying SIG" */ 
+
+Example:
+
+	$ ps | grep apache
+	252 root     root     S [apache]
+	263 www-data www-data S [apache]
+	264 www-data www-data S [apache]
+	265 www-data www-data S [apache]
+	266 www-data www-data S [apache]
+	267 www-data www-data S [apache]
+	$ kill 252
+
+
+
+=item B<killall   >
+
+killall    [B<-l>] [B<-q>] [B<-SIG>] process-name...
+
+Send a signal (default is TERM) to given processes
+
+Options:
+
+	-l	List all signal names and numbers/*   "
+	-s SIG	Yet another way of specifying SIG" */ 
+	-q	Do not complain if no processes were killed
+
+Example:
+
+	$ killall apache
+
+
+
+=item B<killall5  >
+
+killall5   [B<-l>] [B<-SIG>]
+
+Send a signal (default is TERM) to all processes outside current session
+
+Options:
+
+	-l	List all signal names and numbers/*   "
+	-s SIG	Yet another way of specifying SIG" */ 
+
+
+
+=item B<klogd     >
+
+klogd      [B<-c> N] [B<-n>]
+
+Kernel logger
+
+Options:
+
+	-c N	Only messages with level < N are printed to console
+	-n	Run in foreground
+
+
+
+=item B<lash      >
+
+lash       [FILE]...
+or: sh B<-c> command [args]...
+
+lash is deprecated, please use hush
+
+
+
+=item B<last      >
+
+last       [B<-HW>] [B<-f> file]
+
+Show listing of the last users that logged into the system
+
+Options:/*   "
+
+	-H	Show header line" */ 
+	-W	Display with no host column truncation
+	-f file Read from file instead of /var/log/wtmp
+
+
+
+=item B<length    >
+
+length     STRING
+
+Print STRING's length
+
+Example:
+
+	$ length Hello
+	5
+
+
+
+=item B<less      >
+
+less       [B<-EMNmh>~I?] [FILE...]
+
+View a file or list of files. The position within files can be
+changed, and files can be manipulated in various ways.
+
+Options:
+
+	-E	Quit once the end of a file is reached
+	-M,-m	Display a status line containing the line numbers
+		and percentage through the file
+	-N	Prefix line numbers to each line
+	-I	Ignore case in all searches
+	-~	Suppress ~s displayed past the end of the file
+
+
+
+=item B<linux32   >
+
+linux32    #define linux32_full_usage 
+
+
+
+
+
+=item B<linux64   >
+
+linux64    #define linux64_full_usage 
+
+
+
+
+
+=item B<linuxrc   >
+
+linuxrc    #define linuxrc_full_usage 
+
+
+
+
+
+=item B<ln        >
+
+ln         [OPTION] TARGET... LINK_NAME|DIRECTORY
+
+Create a link named LINK_NAME or DIRECTORY to the specified TARGET.
+Use '--' to indicate that all following arguments are non-options.
+
+Options:
+
+	-s	Make symlinks instead of hardlinks
+	-f	Remove existing destination files
+	-n	Don't dereference symlinks - treat like normal file
+	-b	Make a backup of the target (if exists) before link operation
+	-S suf	Use suffix instead of ~ when making backup files
+
+Example:
+
+	$ ln -s BusyBox /tmp/ls
+	$ ls -l /tmp/ls
+	lrwxrwxrwx    1 root     root            7 Apr 12 18:39 ls -> BusyBox*
+
+
+
+=item B<load_policy>
+
+load_policy #define load_policy_full_usage 
+
+
+
+
+
+=item B<loadfont  >
+
+loadfont   < font
+
+Load a console font from standard input/*   "
+
+	-C TTY	Affect TTY instead of /dev/tty" */ 
+
+Example:
+
+	$ loadfont < /etc/i18n/fontname
+
+
+
+=item B<loadkmap  >
+
+loadkmap   < keymap
+
+Load a binary keyboard translation table from standard input
+/*   "
+
+	-C TTY	Affect TTY instead of /dev/tty" */ 
+
+Example:
+
+	$ loadkmap < /etc/i18n/lang-keymap
+
+
+
+=item B<logger    >
+
+logger     [OPTION]... [MESSAGE]
+
+Write MESSAGE to the system log. If MESSAGE is omitted, log stdin.
+
+Options:
+
+	-s	Log to stderr as well as the system log
+	-t TAG	Log using the specified tag (defaults to user name)
+	-p PRIO	Priority (numeric or facility.level pair)
+
+Example:
+
+	$ logger "hello"
+
+
+
+=item B<login     >
+
+login      [B<-p>] [B<-h> HOST] [[B<-f>] USER]
+
+Begin a new session on the system
+
+Options:
+
+	-f	Do not authenticate (user already authenticated)
+	-h	Name of the remote host
+	-p	Preserve environment
+
+
+
+=item B<logname   >
+
+logname           
+
+Print the name of the current user
+
+Example:
+
+	$ logname
+	root
+
+
+
+=item B<logread   >
+
+logread    [OPTION]...
+
+Show messages in syslogd's circular buffer
+
+Options:
+
+	-f	Output data as log grows
+
+
+
+=item B<losetup   >
+
+losetup    [B<-o> OFS] LOOPDEV FILE - associate loop devices
+	losetup B<-d> LOOPDEV - disassociate
+	losetup [B<-f>] - show
+
+Options:
+
+	-o OFS	Start OFS bytes into FILE
+	-f	Show first free loop device
+
+No arguments will display all current associations.
+One argument (losetup /dev/loop1) will display the current association
+(if any), or disassociate it (with -d). The display shows the offset
+and filename of the file the loop device is currently bound to.
+
+Two arguments (losetup /dev/loop1 file.img) create a new association,
+with an optional offset (-o 12345). Encryption is not yet supported.
+losetup -f will show the first loop free loop device
+
+
+
+
+
+=item B<lpd       >
+
+lpd        SPOOLDIR [HELPER [ARGS...]]
+
+SPOOLDIR must contain (symlinks to) device nodes or directories
+with names matching print queue names. In the first case, jobs are
+sent directly to the device. Otherwise each job is stored in queue
+directory and HELPER program is called. Name of file to print
+is passed in $DATAFILE variable.
+Example:
+
+	tcpsvd -E 0 515 softlimit -m 999999 lpd /var/spool ./print
+
+
+
+=item B<lpq       >
+
+lpq        [B<-P> queue[@host[:port]]] [B<-U> USERNAME] [B<-d> JOBID...] [B<-fs>]
+
+Options:
+
+	-P	lp service to connect to (else uses $PRINTER)
+	-d	Delete jobs
+	-f	Force any waiting job to be printed
+	-s	Short display
+
+
+
+=item B<lpr       >
+
+lpr        B<-P> queue[@host[:port]] B<-U> USERNAME B<-J> TITLE B<-Vmh> [FILE...]
+
+Options:
+
+	-P	lp service to connect to (else uses $PRINTER)
+	-m	Send mail on completion
+	-h	Print banner page too
+	-V	Verbose
+
+
+
+=item B<ls        >
+
+ls         [B<-1AacCdeFilnpLRrSsTtuvwxXhkK>] [filenames...]
+
+List directory contents
+
+Options:
+
+	-1	List in a single column
+	-A	Don't list . and ..
+	-a	Don't hide entries starting with .
+	-C	List by columns
+	-c	With -l: sort by ctime
+	--color[={always,never,auto}]	Control coloring
+	-d	List directory entries instead of contents
+	-e	List full date and time
+	-F	Append indicator (one of */=@|) to entries
+	-i	List inode numbers
+	-l	Long listing format
+	-n	List numeric UIDs and GIDs instead of names
+	-p	Append indicator (one of /=@|) to entries
+	-L	List entries pointed to by symlinks
+	-R	List subdirectories recursively
+	-r	Sort in reverse order
+	-S	Sort by file size
+	-s	List the size of each file, in blocks
+	-T NUM	Assume tabstop every NUM columns
+	-t	With -l: sort by modification time
+	-u	With -l: sort by access time
+	-v	Sort by version
+	-w NUM	Assume the terminal is NUM columns wide
+	-x	List by lines
+	-X	Sort by extension
+	-h	List sizes in human readable format (1K 243M 2G)
+	-k	List security context
+	-K	List security context in long format
+	-Z	List security context and permission
+
+
+
+=item B<lsattr    >
+
+lsattr     [B<-Radlv>] [files...]
+
+List file attributes on an ext2 fs
+
+Options:
+
+	-R	Recursively list subdirectories
+	-a	Do not hide entries starting with .
+	-d	List directory entries instead of contents
+	-l	List long flag names
+	-v	List the file's version/generation number
+
+
+
+=item B<lsmod     >
+
+lsmod             
+
+List the currently loaded kernel modules
+
+
+
+=item B<lzmacat   >
+
+lzmacat    FILE
+
+Uncompress to stdout
+
+
+
+=item B<makedevs  >
+
+makedevs   [B<-d> device_table] rootdir
+
+Create a range of special files as specified in a device table.
+Device table entries take the form of:
+<type> <mode> <uid> <gid> <major> <minor> <start> <inc> <count>
+Where name is the file name, type can be one of:
+
+	f	Regular file
+	d	Directory
+	c	Character device
+	b	Block device
+	p	Fifo (named pipe)
+uid is the user id for the target file, gid is the group id for the
+target file. The rest of the entries (major, minor, etc) apply to
+to device special files. A '-' may be used for blank entries.
+
+Example:
+
+	For example:
+	<name>    <type> <mode><uid><gid><major><minor><start><inc><count>
+	/dev         d   755    0    0    -      -      -      -    -
+	/dev/console c   666    0    0    5      1      -      -    -
+	/dev/null    c   666    0    0    1      3      0      0    -
+	/dev/zero    c   666    0    0    1      5      0      0    -
+	/dev/hda     b   640    0    0    3      0      0      0    -
+	/dev/hda     b   640    0    0    3      1      1      1    15
+	
+	Will Produce:
+	/dev
+	/dev/console
+	/dev/null
+	/dev/zero
+	/dev/hda
+	/dev/hda[0-15]
+
+
+
+=item B<makemime  >
+
+makemime   [OPTION]... [FILE]...
+
+Create MIME-encoded message
+
+Options:
+
+	-C      Charset
+	-e	Tranfer encoding. Ignored. base64 is assumed
+
+Other options are silently ignored.
+
+
+
+=item B<man       >
+
+man        [OPTION]... [MANPAGE]...
+
+Format and display manual page
+
+Options:
+
+	-a      Display all pages
+	-w	Show page locations
+
+
+
+=item B<matchpathcon>
+
+matchpathcon [B<-n>] [B<-N>] [B<-f> file_contexts_file] [B<-p> prefix] [B<-V>]
+
+	-n	Do not display path
+	-N	Do not use translations
+	-f	Use alternate file_context file
+	-p	Use prefix to speed translations
+	-V	Verify file context on disk matches defaults
+
+
+
+=item B<md5sum    >
+
+md5sum     [OPTION] [FILEs...]
+   or: md5sum [OPTION] B<-c> [FILE]
+
+Print or check MD5 checksums
+
+Options:
+
+	-c	Check MD5 sums against given list
+	-s	Don't output anything, status code shows success
+	-w	Warn about improperly formatted MD5 checksum lines
+
+Example:
+
+	$ md5sum < busybox
+	6fd11e98b98a58f64ff3398d7b324003
+	$ md5sum busybox
+	6fd11e98b98a58f64ff3398d7b324003  busybox
+	$ md5sum -c -
+	6fd11e98b98a58f64ff3398d7b324003  busybox
+	busybox: OK
+	^D
+
+
+
+=item B<mdev      >
+
+mdev       [B<-s>]
+
+	-s	Scan /sys and populate /dev during system boot
+
+Called with no options (via hotplug) it uses environment variables
+to determine which device to add/remove.
+
+	 The mdev config file contains lines that look like:
+  hd[a-z][0-9]* 0:3 660
+
+That's device name (with regex match), uid:gid, and permissions.
+
+Optionally, that can be followed (on the same line) by a special character
+and a command line to run after creating/before deleting the corresponding
+device(s). The environment variable $MDEV indicates the active device node
+(which is useful if it's a regex match). For example:
+
+  hdc root:cdrom 660  *ln -s $MDEV cdrom
+
+The special characters are @ (run after creating), $ (run before deleting),
+and * (run both after creating and before deleting). The commands run in
+the /dev directory, and use system() which calls /bin/sh.
+
+Config file parsing stops on the first matching line. If no config
+entry is matched, devices are created with default 0:0 660. (Make
+the last line match .* to override this.)
+
+
+
+
+
+=item B<mesg      >
+
+mesg       [y|n]
+
+Control write access to your terminal
+
+	y	Allow write access to your terminal
+	n	Disallow write access to your terminal
+
+
+
+=item B<microcom  >
+
+microcom   [B<-d> DELAY] [B<-t> TIMEOUT] [B<-s> SPEED] [B<-X>] TTY
+
+Copy bytes for stdin to TTY and from TTY to stdout
+
+Options:
+
+	-d	Wait up to DELAY ms for TTY output before sending every
+		next byte to it
+	-t	Exit if both stdin and TTY are silent for TIMEOUT ms
+	-s	Set serial line to SPEED
+	-X	Disable special meaning of NUL and Ctrl-X from stdin
+
+
+
+=item B<mkdir     >
+
+mkdir      [OPTION] DIRECTORY...
+
+Create DIRECTORY
+
+Options:
+
+	-m	Set permission mode (as in chmod), not rwxrwxrwx - umask
+	-p	No error if existing, make parent directories as needed
+	-Z	Set security context
+
+Example:
+
+	$ mkdir /tmp/foo
+	$ mkdir /tmp/foo
+	/tmp/foo: File exists
+	$ mkdir /tmp/foo/bar/baz
+	/tmp/foo/bar/baz: No such file or directory
+	$ mkdir -p /tmp/foo/bar/baz
+
+
+
+=item B<mke2fs    >
+
+mke2fs     [B<-c>|B<-l> filename] [B<-b> block-size] [B<-f> fragment-size] [B<-g> blocks-per-group] [B<-i> bytes-per-inode] [B<-j>] [B<-J> journal-options] [B<-N> number-of-inodes] [B<-n>] [B<-m> reserved-blocks-percentage] [B<-o> creator-os] [B<-O> feature[,...]] [B<-q>] [r fs-revision-level] [B<-E> extended-options] [B<-v>] [B<-F>] [B<-L> volume-label] [B<-M> last-mounted-directory] [B<-S>] [B<-T> filesystem-type] device [blocks-count]
+
+	-b size		Block size in bytes
+	-c		Check for bad blocks before creating
+	-E opts		Set extended options
+	-f size		Fragment size in bytes
+	-F		Force (ignore sanity checks)
+	-g num		Number of blocks in a block group
+	-i ratio	The bytes/inode ratio
+	-j		Create a journal (ext3)
+	-J opts		Set journal options (size/device)
+	-l file		Read bad blocks list from file
+	-L lbl		Set the volume label
+	-m percent	Percent of fs blocks to reserve for admin
+	-M dir		Set last mounted directory
+	-n		Do not actually create anything
+	-N num		Number of inodes to create
+	-o os		Set the 'creator os' field
+	-O features	Dir_index/filetype/has_journal/journal_dev/sparse_super
+	-q		Quiet
+	-r rev		Set filesystem revision
+	-S		Write superblock and group descriptors only
+	-T fs-type	Set usage type (news/largefile/largefile4)
+	-v		Verbose
+
+
+
+=item B<mkfifo    >
+
+mkfifo     [OPTIONS] name
+
+Create named pipe (identical to 'mknod name p')
+
+Options:
+
+	-m MODE	Mode (default a=rw)
+	-Z	Set security context
+
+
+
+=item B<mkfs.minix>
+
+mkfs.minix [B<-c> | B<-l> filename] [B<-nXX>] [B<-iXX>] /dev/name [blocks]
+
+Make a MINIX filesystem
+
+Options:
+
+	-c		Check device for bad blocks
+	-n [14|30]	Maximum length of filenames
+	-i INODES	Number of inodes for the filesystem
+	-l FILENAME	Read bad blocks list from FILENAME
+	-v		Make version 2 filesystem
+
+
+
+=item B<mknod     >
+
+mknod      [OPTIONS] NAME TYPE MAJOR MINOR
+
+Create a special file (block, character, or pipe)
+
+Options:
+
+	-m	Create the special file using the specified mode (default a=rw)
+TYPEs include:
+
+	b:	Make a block device
+	c or u:	Make a character device
+	p:	Make a named pipe (MAJOR and MINOR are ignored)
+	-Z	Set security context
+
+Example:
+
+	$ mknod /dev/fd0 b 2 0
+	$ mknod -m 644 /tmp/pipe p
+
+
+
+=item B<mkswap    >
+
+mkswap     DEVICE
+
+Prepare block device to be used as swap partition
+
+
+
+=item B<mktemp    >
+
+mktemp     [B<-dt>] [B<-p> DIR] [TEMPLATE]
+
+Create a temporary file with name based on TEMPLATE and print its name.
+TEMPLATE must end with XXXXXX (e.g. [/dir/]nameXXXXXX).
+
+Options:
+
+	-d	Make a directory instead of a file/*   "
+	-q	Fail silently if an error occurs" - we ignore it */ 
+	-t	Generate a path rooted in temporary directory
+	-p DIR	Use DIR as a temporary directory (implies -t)
+
+For B<-t> or B<-p>, directory is chosen as follows:
+$TMPDIR if set, else B<-p> DIR, else /tmp
+
+Example:
+
+	$ mktemp /tmp/temp.XXXXXX
+	/tmp/temp.mWiLjM
+	$ ls -la /tmp/temp.mWiLjM
+	-rw-------    1 andersen andersen        0 Apr 25 17:10 /tmp/temp.mWiLjM
+
+
+
+=item B<modprobe  >
+
+modprobe   [B<-knqrsv>] MODULE [symbol=value...]
+
+Options:
+
+	-k	Make module autoclean-able
+	-n	Dry run
+	-q	Quiet
+	-r	Remove module (stacks) or do autoclean
+	-s	Report via syslog instead of stderr
+	-v	Verbose
+	-b	Apply blacklist to module names too
+
+modprobe can (un)load a stack of modules, passing each module options (when
+loading). modprobe uses a configuration file to determine what option(s) to
+pass each module it loads.
+
+The configuration file is searched (in order) amongst:
+
+    /etc/modprobe.conf (2.6 only)
+    /etc/modules.conf
+    /etc/conf.modules (deprecated)
+
+They all have the same syntax (see below). If none is present, it is
+_not_ an error; each loaded module is then expected to load without
+options. Once a file is found, the others are tested for.
+
+/etc/modules.conf entry format:
+
+  alias <alias_name> <mod_name>
+    Makes it possible to modprobe alias_name, when there is no such module.
+    It makes sense if your mod_name is long, or you want a more representative
+    name for that module (eg. 'scsi' in place of 'aha7xxx').
+    This makes it also possible to use a different set of options (below) for
+    the module and the alias.
+    A module can be aliased more than once.
+
+  options <mod_name|alias_name> <symbol=value...>
+    When loading module mod_name (or the module aliased by alias_name), pass
+    the "symbol=value" pairs as option to that module.
+
+Sample /etc/modules.conf file:
+
+  options tulip irq=3
+  alias tulip tulip2
+  options tulip2 irq=4 io=0x308
+
+Other functionality offered by 'classic' modprobe is not available in
+this implementation.
+
+If module options are present both in the config file, and on the command line,
+then the options from the command line will be passed to the module _after_
+the options from the config file. That way, you can have defaults in the config
+file, and override them for a specific usage from the command line.
+
+
+Example:
+
+	(with the above /etc/modules.conf):
+	
+	$ modprobe tulip
+	   will load the module 'tulip' with default option 'irq=3'
+	
+	$ modprobe tulip irq=5
+	   will load the module 'tulip' with option 'irq=5', thus overriding the default
+	
+	$ modprobe tulip2
+	   will load the module 'tulip' with default options 'irq=4 io=0x308',
+	   which are the default for alias 'tulip2'
+	
+	$ modprobe tulip2 irq=8
+	   will load the module 'tulip' with default options 'irq=4 io=0x308 irq=8',
+	   which are the default for alias 'tulip2' overridden by the option 'irq=8'
+	
+	   from the command line
+	
+	$ modprobe tulip2 irq=2 io=0x210
+	   will load the module 'tulip' with default options 'irq=4 io=0x308 irq=4 io=0x210',
+	   which are the default for alias 'tulip2' overridden by the options 'irq=2 io=0x210'
+	
+	   from the command line
+
+
+
+=item B<more      >
+
+more       [FILE...]
+
+View FILE or standard input one screenful at a time
+
+Example:
+
+	$ dmesg | more
+
+
+
+=item B<mount     >
+
+mount      [flags] DEVICE NODE [B<-o> options,more-options]
+
+Mount a filesystem. Filesystem autodetection requires /proc be mounted.
+
+Options:
+
+	-a		Mount all filesystems in fstab
+	-f		Update /etc/mtab, but don't mount
+	-n		Don't update /etc/mtab
+	-r		Read-only mount
+	-t fs-type	Filesystem type
+	-w		Read-write mount (default)
+B<-o> option:
+
+	loop		Ignored (loop devices are autodetected)
+	[a]sync		Writes are asynchronous / synchronous
+	[no]atime	Disable / enable updates to inode access times
+	[no]diratime	Disable / enable atime updates to directories
+	[no]relatime	Disable / enable atime updates relative to modification time
+	[no]dev		Allow use of special device files / disallow them
+	[no]exec	Allow use of executable files / disallow them
+	[no]suid	Allow set-user-id-root programs / disallow them
+	[r]shared	Convert [recursively] to a shared subtree
+	[r]slave	Convert [recursively] to a slave subtree
+	[r]private	Convert [recursively] to a private subtree
+	[un]bindable	Make mount point [un]able to be bind mounted
+	bind		Bind a directory to an additional location
+	move		Relocate an existing mount point
+	remount		Remount a mounted filesystem, changing its flags
+	ro/rw		Mount for read-only / read-write
+
+There are EVEN MORE flags that are specific to each filesystem
+You'll have to see the written documentation for those filesystems
+
+Returns 0 for success, number of failed mounts for -a, or errno for one mount.
+
+Example:
+
+	$ mount
+	/dev/hda3 on / type minix (rw)
+	proc on /proc type proc (rw)
+	devpts on /dev/pts type devpts (rw)
+	$ mount /dev/fd0 /mnt -t msdos -o ro
+	$ mount /tmp/diskimage /opt -t ext2 -o loop
+	$ mount cd_image.iso mydir
+
+
+
+=item B<mountpoint>
+
+mountpoint [B<-q>] <[B<-d>] DIR | B<-x> DEVICE>
+
+mountpoint checks if the directory is a mountpoint
+
+Options:
+
+	-q	Quiet
+	-d	Print major/minor device number of the filesystem
+	-x	Print major/minor device number of the blockdevice
+
+Example:
+
+	$ mountpoint /proc
+	/proc is not a mountpoint
+	$ mountpoint /sys
+	/sys is a mountpoint
+
+
+
+=item B<msh       >
+
+msh        #define msh_full_usage 
+
+
+
+
+
+=item B<mt        >
+
+mt         [B<-f> device] opcode value
+
+Control magnetic tape drive operation
+
+Available Opcodes:
+
+bsf bsfm bsr bss datacompression drvbuffer eof eom erase
+fsf fsfm fsr fss load lock mkpart nop offline ras1 ras2
+ras3 reset retension rewind rewoffline seek setblk setdensity
+setpart tell unload unlock weof wset
+
+
+
+=item B<mv        >
+
+mv         [OPTION]... SOURCE DEST
+or: mv [OPTION]... SOURCE... DIRECTORY
+
+Rename SOURCE to DEST, or move SOURCE(s) to DIRECTORY
+
+Options:
+
+	-f	Don't prompt before overwriting
+	-i	Interactive, prompt before overwrite
+
+Example:
+
+	$ mv /tmp/foo /bin/bar
+
+
+
+=item B<nameif    >
+
+nameif     [B<-s>] [B<-c> FILE] [{IFNAME MACADDR}]
+
+Rename network interface while it in the down state
+
+Options:
+
+	-c FILE		Use configuration file (default is /etc/mactab)
+	-s		Use syslog (LOCAL0 facility)
+	IFNAME MACADDR	new_interface_name interface_mac_address
+
+Example:
+
+	$ nameif -s dmz0 00:A0:C9:8C:F6:3F
+	 or
+	$ nameif -c /etc/my_mactab_file
+
+
+
+=item B<nc        >
+
+nc         [B<-options>] hostname port  - connect
+nc [B<-options>] B<-l> B<-p> port [hostname] [port]  - listen
+
+Options:
+
+	-e prog [args]	Program to exec after connect (must be last)
+	-l		Listen mode, for inbound connects
+	-n		Don't do DNS resolution
+	-s addr		Local address
+	-p port		Local port
+	-u		UDP mode
+	-v		Verbose (cumulative: -vv)
+	-w secs		Timeout for connects and final net reads
+	-i sec		Delay interval for lines sent" /* ", ports scanned" */ 
+	-o file		Hex dump of traffic
+	-z		Zero-I/O mode (scanning)/*   "
+	-r		Randomize local and remote ports" */
+
+	 To use netcat as a terminal emulator on a serial port:
+
+$ stty 115200 -F /dev/ttyS0
+$ stty raw -echo -ctlecho && nc -f /dev/ttyS0
+
+
+Example:
+
+	$ nc foobar.somedomain.com 25
+	220 foobar ESMTP Exim 3.12 #1 Sat, 15 Apr 2000 00:03:02 -0600
+	help
+	214-Commands supported:
+	214-    HELO EHLO MAIL RCPT DATA AUTH
+	214     NOOP QUIT RSET HELP
+	quit
+	221 foobar closing connection
+
+
+
+=item B<netstat   >
+
+netstat    [B<-laentuwxrWp>]
+
+Display networking information
+
+Options:
+
+	-l	Display listening server sockets
+	-a	Display all sockets (default: connected)
+	-e	Display other/more information
+	-n	Don't resolve names
+	-t	Tcp sockets
+	-u	Udp sockets
+	-w	Raw sockets
+	-x	Unix sockets
+	-r	Display routing table
+	-W	Display with no column truncation
+	-p	Display PID/Program name for sockets
+
+
+
+=item B<nice      >
+
+nice       [B<-n> ADJUST] [COMMAND [ARG]...]
+
+Run a program with modified scheduling priority
+
+Options:
+
+	-n ADJUST	Adjust the scheduling priority by ADJUST
+
+
+
+=item B<nmeter    >
+
+nmeter     format_string
+
+Monitor system in real time
+
+Format specifiers:
+%Nc or %[cN]	Monitor CPU. N - bar size, default 10
+
+		(displays: S:system U:user N:niced D:iowait I:irq i:softirq)
+%[niface]	Monitor network interface 'iface'
+%m		Monitor allocated memory
+%[mf]		Monitor free memory
+%[mt]		Monitor total memory
+%s		Monitor allocated swap
+%f		Monitor number of used file descriptors
+%Ni		Monitor total/specific IRQ rate
+%x		Monitor context switch rate
+%p		Monitor forks
+%[pn]		Monitor # of processes
+%b		Monitor block io
+%Nt		Show time (with N decimal points)
+%Nd		Milliseconds between updates (default=1000)
+%r		Print <cr> instead of <lf> at EOL
+
+Example:
+
+	nmeter '%250d%t %20c int %i bio %b mem %m forks%p'
+
+
+
+=item B<nohup     >
+
+nohup      COMMAND [ARGS]
+
+Run a command immune to hangups, with output to a non-tty
+
+Example:
+
+	$ nohup make &
+
+
+
+=item B<nslookup  >
+
+nslookup   [HOST] [SERVER]
+
+Query the nameserver for the IP address of the given HOST
+optionally using a specified DNS server
+
+Example:
+
+	$ nslookup localhost
+	Server:     default
+	Address:    default
+	
+	Name:       debian
+	Address:    127.0.0.1
+
+
+
+=item B<od        >
+
+od         [B<-aBbcDdeFfHhIiLlOovXx>] [B<-t> TYPE] [FILE]
+
+Write an unambiguous representation, octal bytes by default, of FILE
+to standard output. With no FILE or when FILE is -, read standard input.
+
+
+
+=item B<openvt    >
+
+openvt     [B<-c> NUM] [B<-sw>] [COMMAND [ARGS]]
+
+Start COMMAND on a new virtual terminal
+
+Options:
+
+	-c	Use specified VT
+	-s	Switch to the VT/*   "
+	-l	Run COMMAND as login shell (by prepending '-')" */ 
+	-w	Wait for COMMAND to exit
+
+Example:
+
+	openvt 2 /bin/ash
+
+
+
+=item B<parse     >
+
+parse      [B<-n> maxtokens] [B<-m> mintokens] [B<-d> delims] [B<-f> flags] file ...
+
+[B<-n> maxtokens] [B<-m> mintokens] [B<-d> delims] [B<-f> flags] file ...
+
+
+
+=item B<passwd    >
+
+passwd     [OPTION] [name]
+
+Change user's password. If no name is specified,
+changes the password for the current user.
+
+Options:
+
+	-a	Algorithm to use for password (choices: des, md5)" /* ", sha1)" */ 
+	-d	Delete password for the account
+	-l	Lock (disable) account
+	-u	Unlock (re-enable) account
+
+
+
+=item B<patch     >
+
+patch      [B<-p> NUM] [B<-i> DIFF] [B<-R>]
+
+	-p NUM	Strip NUM leading components from file names
+	-i DIFF	Read DIFF instead of stdin
+	-R	Reverse patch
+
+Example:
+
+	$ patch -p1 < example.diff
+	$ patch -p0 -i example.diff
+
+
+
+=item B<pgrep     >
+
+pgrep      [B<-flnovx>] pattern
+
+Display process(es) selected by regex pattern
+
+Options:
+
+	-l	Show command name too
+	-f	Match against entire command line
+	-n	Show the newest process only
+	-o	Show the oldest process only
+	-v	Negate the matching
+	-x	Match whole name (not substring)
+
+
+
+=item B<pidof     >
+
+pidof      [NAME...]
+
+List PIDs of all processes with names that match NAMEs	USAGE_PIDOF 	 
+
+	-s	Show only one PID
+	-o PID	Omit given pid
+		Use %PPID to omit pid of pidof's parent
+
+Example:
+
+	$ pidof init
+	1
+	$ pidof /bin/sh
+	20351 5973 5950
+	$ pidof /bin/sh -o %PPID
+	20351 5950
+
+
+
+=item B<ping      >
+
+ping       [OPTION]... host
+
+Send ICMP ECHO_REQUEST packets to network hosts
+
+Options:
+
+	-4, -6		Force IPv4 or IPv6 hostname resolution
+	-c CNT		Send only CNT pings
+	-s SIZE		Send SIZE data bytes in packets (default=56)
+	-I iface/IP	Use interface or IP address as source
+	-W timeout	Seconds to wait for the first response (default:10)
+			(after all -c CNT packets are sent)
+	-w deadline	Seconds until ping exits (default:infinite)
+			(can exit earlier with -c CNT)
+	-q		Quiet, only displays output at start
+			and when finished
+
+Example:
+
+	$ ping localhost
+	PING slag (127.0.0.1): 56 data bytes
+	64 bytes from 127.0.0.1: icmp_seq=0 ttl=255 time=20.1 ms
+	
+	--- debian ping statistics ---
+	1 packets transmitted, 1 packets received, 0% packet loss
+	round-trip min/avg/max = 20.1/20.1/20.1 ms
+
+
+
+=item B<ping6     >
+
+ping6      [OPTION]... host
+
+Send ICMP ECHO_REQUEST packets to network hosts
+
+Options:
+
+	-c CNT		Send only CNT pings
+	-s SIZE		Send SIZE data bytes in packets (default=56)
+	-I iface/IP	Use interface or IP address as source
+	-q		Quiet, only displays output at start
+			and when finished
+
+Example:
+
+	$ ping6 ip6-localhost
+	PING ip6-localhost (::1): 56 data bytes
+	64 bytes from ::1: icmp6_seq=0 ttl=64 time=20.1 ms
+	
+	--- ip6-localhost ping statistics ---
+	1 packets transmitted, 1 packets received, 0% packet loss
+	round-trip min/avg/max = 20.1/20.1/20.1 ms
+
+
+
+=item B<pipe_progress>
+
+pipe_progress #define pipe_progress_full_usage 
+
+
+
+
+
+=item B<pivot_root>
+
+pivot_root NEW_ROOT PUT_OLD
+
+Move the current root file system to PUT_OLD and make NEW_ROOT
+the new root file system
+
+
+
+=item B<pkill     >
+
+pkill      [B<-l>] | [B<-fnovx>] [B<-signal>] pattern
+
+Send a signal to process(es) selected by regex pattern
+
+Options:
+
+	-l	List all signals
+	-f	Match against entire command line
+	-n	Signal the newest process only
+	-o	Signal the oldest process only
+	-v	Negate the matching
+	-x	Match whole name (not substring)
+
+
+
+=item B<popmaildir>
+
+popmaildir [OPTIONS] Maildir [connection-helper ...]
+
+Fetch content of remote mailbox to local maildir
+
+Options:
+
+	-b		Binary mode. Ignored
+	-d		Debug. Ignored
+	-m		Show used memory. Ignored
+	-V		Show version. Ignored
+	-c		Use tcpclient. Ignored
+	-a		Use APOP protocol. Implied. If server supports APOP -> use it
+	-s		Skip authorization
+	-T		Get messages with TOP instead with RETR
+	-k		Keep retrieved messages on the server
+	-t timeout	Set network timeout
+	-F "program arg1 arg2 ..."	Filter by program. May be multiple
+	-M "program arg1 arg2 ..."	Deliver by program
+	-R size		Remove old messages on the server >= size (in bytes). Ignored
+	-Z N1-N2	Remove messages from N1 to N2 (dangerous). Ignored
+	-L size		Do not retrieve new messages >= size (in bytes). Ignored
+	-H lines	Type specified number of lines of a message. Ignored
+
+Example:
+
+	$ popmaildir -k ~/Maildir -- nc pop.drvv.ru 110 [<password_file]
+	$ popmaildir ~/Maildir -- openssl s_client -quiet -connect pop.gmail.com:995 [<password_file]
+
+
+
+=item B<poweroff  >
+
+poweroff   [B<-d> delay] [B<-n>] [B<-f>]
+
+Halt and shut off power
+
+Options:
+
+	-d	Delay interval for halting
+	-n	No call to sync()
+	-f	Force power off (don't go through init)
+
+
+
+=item B<printenv  >
+
+printenv   [VARIABLES...]
+
+Print all or part of environment.
+If no environment VARIABLE specified, print them all.
+
+
+
+=item B<printf    >
+
+printf     FORMAT [ARGUMENT...]
+
+Format and print ARGUMENT(s) according to FORMAT,
+where FORMAT controls the output exactly as in C printf
+
+Example:
+
+	$ printf "Val=%d\n" 5
+	Val=5
+
+
+
+=item B<ps        >
+
+ps                
+
+Report process status
+
+	USAGE_PS 	 
+	-Z	Show SE Linux context
+	w	Wide output
+
+Example:
+
+	$ ps
+	  PID  Uid      Gid State Command
+	    1 root     root     S init
+	    2 root     root     S [kflushd]
+	    3 root     root     S [kupdate]
+	    4 root     root     S [kpiod]
+	    5 root     root     S [kswapd]
+	  742 andersen andersen S [bash]
+	  743 andersen andersen S -bash
+	  745 root     root     S [getty]
+	 2990 andersen andersen R ps
+
+
+
+=item B<pscan     >
+
+pscan      [B<-cb>] [B<-p> MIN_PORT] [B<-P> MAX_PORT] [B<-t> TIMEOUT] [B<-T> MIN_RTT] HOST
+
+Scan a host, print all open ports
+
+Options:
+
+	-c	Show closed ports too
+	-b	Show blocked ports too
+	-p	Scan from this port (default 1)
+	-P	Scan up to this port (default 1024)
+	-t	Timeout (default 5000 ms)
+	-T	Minimum rtt (default 5 ms, increase for congested hosts)
+
+
+
+=item B<pwd       >
+
+pwd               
+
+Print the full filename of the current working directory
+
+Example:
+
+	$ pwd
+	/root
+
+
+
+=item B<raidautorun>
+
+raidautorun DEVICE
+
+Tell the kernel to automatically search and start RAID arrays
+
+Example:
+
+	$ raidautorun /dev/md0
+
+
+
+=item B<rdate     >
+
+rdate      [B<-sp>] HOST
+
+Get and possibly set the system date and time from a remote HOST
+
+Options:
+
+	-s	Set the system date and time (default)
+	-p	Print the date and time
+
+
+
+=item B<rdev      >
+
+rdev              
+
+Print the device node associated with the filesystem mounted at '/'
+
+Example:
+
+	$ rdev
+	/dev/mtdblock9 /
+
+
+
+=item B<readahead >
+
+readahead  [FILE]...
+
+Preload FILE(s) in RAM cache so that subsequent reads for thosefiles do not block on disk I/O
+
+
+
+=item B<readlink  >
+
+readlink   [B<-f>] FILE
+
+Display the value of a symlink
+
+Options:
+
+	-f	Canonicalize by following all symlinks
+
+
+
+=item B<readprofile>
+
+readprofile [OPTIONS]...
+
+Options:
+
+	-m mapfile	(Default: /boot/System.map)
+	-p profile	(Default: /proc/profile)
+	-M mult		Set the profiling multiplier to mult
+	-i		Print only info about the sampling step
+	-v		Verbose
+	-a		Print all symbols, even if count is 0
+	-b		Print individual histogram-bin counts
+	-s		Print individual counters within functions
+	-r		Reset all the counters (root only)
+	-n		Disable byte order auto-detection
+
+
+
+=item B<realpath  >
+
+realpath   pathname...
+
+Return the absolute pathnames of given argument
+
+
+
+=item B<reboot    >
+
+reboot     [B<-d> delay] [B<-n>] [B<-f>]
+
+Reboot the system
+
+Options:
+
+	-d	Delay interval for rebooting
+	-n	No call to sync()
+	-f	Force reboot (don't go through init)
+
+
+
+=item B<reformime >
+
+reformime  [OPTION]... [FILE]...
+
+Parse MIME-encoded message
+
+Options:
+
+	-x prefix	Extract content of MIME sections to files
+	-X prog [args]	Filter content of MIME sections through prog.
+			Must be the last option
+
+Other options are silently ignored.
+
+
+
+=item B<renice    >
+
+renice     {{B<-n> INCREMENT} | PRIORITY} [[B<-p> | B<-g> | B<-u>] ID...]
+
+Change priority of running processes
+
+Options:
+
+	-n	Adjust current nice value (smaller is faster)
+	-p	Process id(s) (default)
+	-g	Process group id(s)
+	-u	Process user name(s) and/or id(s)
+
+
+
+=item B<reset     >
+
+reset             
+
+Reset the screen
+
+
+
+=item B<resize    >
+
+resize            
+
+Resize the screen
+
+
+
+=item B<restorecon>
+
+restorecon [B<-iFnrRv>] [B<-e> excludedir]... [B<-o> filename] [B<-f> filename | pathname]
+
+Reset security contexts of files in pathname
+
+	-i		Ignore files that do not exist
+	-f file		File with list of files to process. Use - for stdin
+	-e directory	Directory to exclude
+	-R,-r		Recurse directories
+	-n		Don't change any file labels
+	-o file		Save list of files with incorrect context
+	-v		Verbose
+	-vv		Show changed labels
+	-F		Force reset of context to match file_context
+			for customizable files, or the user section,
+			if it has changed
+
+
+
+=item B<rm        >
+
+rm         [OPTION]... FILE...
+
+Remove (unlink) the FILE(s). Use '--' to
+indicate that all following arguments are non-options.
+
+Options:
+
+	-i	Always prompt before removing
+	-f	Never prompt
+	-r,-R	Remove directories recursively
+
+Example:
+
+	$ rm -rf /tmp/foo
+
+
+
+=item B<rmdir     >
+
+rmdir      [OPTION]... DIRECTORY...
+
+Remove the DIRECTORY, if it is empty.
+
+Options:
+
+	-p|--parents	Include parents
+	-ignore-fail-on-non-empty     
+
+Example:
+
+	# rmdir /tmp/foo
+
+
+
+=item B<rmmod     >
+
+rmmod      [OPTION]... [MODULE]...
+
+Unload the specified kernel modules from the kernel
+
+Options:
+
+	-w	Wait until the module is no longer used
+	-f	Force unloading
+	-a	Remove all unused modules (recursively)
+
+Example:
+
+	$ rmmod tulip
+
+
+
+=item B<route     >
+
+route      [{add|del|delete}]
+
+Edit kernel routing tables
+
+Options:
+
+	-n	Don't resolve names
+	-e	Display other/more information
+	-A inet{6}	Select address family
+
+
+
+=item B<rpm       >
+
+rpm        B<-i> B<-q>[ildc]p package.rpm
+
+Manipulate RPM packages
+
+Options:
+
+	-i	Install package
+	-q	Query package
+	-p	Query uninstalled package
+	-i	Show information
+	-l	List contents
+	-d	List documents
+	-c	List config files
+
+
+
+=item B<rpm2cpio  >
+
+rpm2cpio   package.rpm
+
+Output a cpio archive of the rpm file
+
+
+
+=item B<rtcwake   >
+
+rtcwake    [B<-a> | B<-l> | B<-u>] [B<-d> DEV] [B<-m> MODE] [B<-s> SECS | B<-t> TIME]
+
+Enter a system sleep state until specified wakeup time
+
+	-a,--auto	 Read clock mode from adjtime
+	-l,--local	 Clock is set to local time
+	-u,--utc	 Clock is set to UTC time
+	-d,--device=DEV	 Specify the RTC device
+	-m,--mode=MODE	 Set the sleep state (default: standby)
+	-s,--seconds=SEC Set the timeout in SEC seconds from now
+	-t,--time=TIME	 Set the timeout to TIME seconds from epoch	
+
+
+
+=item B<run-parts >
+
+run-parts  [B<-t>] [B<-l>] [B<-a> ARG] [B<-u> MASK] DIRECTORY
+
+Run a bunch of scripts in a directory
+
+Options:
+
+	-t	Print what would be run, but don't actually run anything
+	-a ARG	Pass ARG as argument for every program
+	-u MASK	Set the umask to MASK before running every program
+	-l	Print names of all matching files even if they are not executable
+
+Example:
+
+	$ run-parts -a start /etc/init.d
+	$ run-parts -a stop=now /etc/init.d
+	
+	Let's assume you have a script foo/dosomething:
+	#!/bin/sh
+	for i in $*; do eval $i; done; unset i
+	case "$1" in
+	start*) echo starting something;;
+	stop*) set -x; shutdown -h $stop;;
+	esac
+	
+	Running this yields:
+	$run-parts -a stop=+4m foo/
+	+ shutdown -h +4m
+
+
+
+=item B<runcon    >
+
+runcon     [B<-c>] [B<-u> USER] [B<-r> ROLE] [B<-t> TYPE] [B<-l> RANGE] COMMAND [args]
+	runcon CONTEXT COMMAND [args]
+
+Run a program in a different security context
+
+	CONTEXT		Complete security context
+
+	-c,--compute	Compute process transition context before modifying
+	-t,--type=TYPE	Type (for same role as parent)
+	-u,--user=USER	User identity
+	-r,--role=ROLE	Role
+	-l,--range=RNG	Levelrange	
+
+
+
+=item B<runlevel  >
+
+runlevel   [utmp]
+
+
+
+Example:
+
+	$ runlevel /var/run/utmp
+	N 2
+
+
+
+=item B<runsv     >
+
+runsv      dir
+
+Start and monitor a service and optionally an appendant log service
+
+
+
+=item B<runsvdir  >
+
+runsvdir   [B<-P>] [B<-s> SCRIPT] dir
+
+Start a runsv process for each subdirectory. If it exits, restart it.
+
+	-P		Put each runsv in a new session
+	-s SCRIPT	Run SCRIPT <signo> after signal is processed
+
+
+
+=item B<rx        >
+
+rx         FILE
+
+Receive a file using the xmodem protocol
+
+Example:
+
+	$ rx /tmp/foo
+
+
+
+=item B<script    >
+
+script     [B<-afq>] [B<-c> COMMAND] [OUTFILE]
+
+Options:
+
+	-a	Append output
+	-c	Run COMMAND, not shell
+	-f	Flush output after each write
+	-q	Quiet
+
+
+
+=item B<sed       >
+
+sed        [B<-efinr>] pattern [files...]
+
+Options:
+
+	-e script	Add the script to the commands to be executed
+	-f scriptfile	Add scriptfile contents to the
+			commands to be executed
+	-i		Edit files in-place
+	-n		Suppress automatic printing of pattern space
+	-r		Use extended regular expression syntax
+
+If no B<-e> or B<-f> is given, the first non-option argument is taken as the sed
+script to interpret. All remaining arguments are names of input files; if no
+input files are specified, then the standard input is read. Source files
+will not be modified unless B<-i> option is given.
+
+Example:
+
+	$ echo "foo" | sed -e 's/f[a-zA-Z]o/bar/g'
+	bar
+
+
+
+=item B<selinuxenabled>
+
+selinuxenabled #define selinuxenabled_full_usage 
+
+
+
+
+
+=item B<sendmail  >
+
+sendmail   [OPTIONS] [rcpt]...
+
+Send an email
+
+Options:
+
+	-w timeout	Network timeout
+	-H [user:pass@]server[:port] Server
+	-S		Use openssl connection helper for secure servers
+	-N type		Request delivery notification. Type is ignored
+	-f sender	Sender
+	-F fullname	Sender full name. Overrides $NAME
+	-s subject	Subject
+	-j charset	Assume charset for body and subject (" CONFIG_FEATURE_MIME_CHARSET  
+	-a file		File to attach. May be multiple
+	-H "prog args..." Use external connection helper. E.g. openssl for secure servers
+	-S server[:port] Server     	) 	 
+	-c rcpt		Cc: recipient. May be multiple
+	-e rcpt		Errors-To: recipient
+
+
+
+=item B<seq       >
+
+seq        [first [increment]] last
+
+Print numbers from FIRST to LAST, in steps of INCREMENT.
+FIRST, INCREMENT default to 1
+
+Arguments:
+
+	LAST
+	FIRST LAST
+	FIRST INCREMENT LAST
+
+
+
+=item B<sestatus  >
+
+sestatus   [B<-vb>]
+
+	-v	Verbose
+	-b	Display current state of booleans
+
+
+
+=item B<setarch   >
+
+setarch    personality program [args...]
+
+Personality may be:
+
+	linux32		Set 32bit uname emulation
+	linux64		Set 64bit uname emulation
+
+
+
+=item B<setconsole>
+
+setconsole [B<-r>|-B<-reset>] [DEVICE]
+
+Redirect system console output to DEVICE (default: /dev/tty)
+
+Options:
+
+	-r	Reset output to /dev/console
+
+
+
+=item B<setenforce>
+
+setenforce [Enforcing | Permissive | 1 | 0]
+
+
+
+
+
+=item B<setfiles  >
+
+setfiles   [B<-dnpqsvW>] [B<-e> dir]... [B<-o> file] [B<-r> alt_root_path] [B<-c> policyfile] spec_file pathname
+
+Reset file contexts under pathname according to spec_file
+
+	-c file	Check the validity of the contexts against the specified binary policy
+	-d	Show which specification matched each file
+	-l	Log changes in file labels to syslog
+	-n	Don't change any file labels
+	-q	Suppress warnings
+	-r dir	Use an altenate root path
+	-e dir	Exclude directory
+	-F	Force reset of context to match file_context for customizable files
+	-o file	Save list of files with incorrect context
+	-s	Take a list of files from standard input (instead of command line)
+	-v	Show changes in file labels, if type or role are changing
+	-vv	Show changes in file labels, if type, role, or user are changing
+	-W	Display warnings about entries that had no matching files
+
+
+
+=item B<setfont   >
+
+setfont    FONT [B<-m> MAPFILE] [B<-C> TTY]
+
+Load a console font
+
+Options:
+
+	-m MAPFILE	Load console screen map
+	-C TTY		Affect TTY instead of /dev/tty
+
+Example:
+
+	$ setfont -m koi8-r /etc/i18n/fontname
+
+
+
+=item B<setkeycodes>
+
+setkeycodes SCANCODE KEYCODE...
+
+Set entries into the kernel's scancode-to-keycode map,
+allowing unusual keyboards to generate usable keycodes.
+
+SCANCODE may be either xx or e0xx (hexadecimal),
+and KEYCODE is given in decimal
+
+Example:
+
+	$ setkeycodes e030 127
+
+
+
+=item B<setlogcons>
+
+setlogcons N
+
+Redirect the kernel output to console N (0 for current)
+
+
+
+=item B<setsebool >
+
+setsebool  boolean value
+
+Change boolean setting
+
+
+
+=item B<setsid    >
+
+setsid     PROG [ARG...]
+
+Run PROG in a new session. PROG will have no controlling terminal
+and will not be affected by keyboard signals (Ctrl-C etc).
+See setsid(2) for details.
+
+
+
+=item B<setuidgid >
+
+setuidgid  account prog args
+
+Set uid and gid to account's uid and gid, removing all supplementary
+groups and run PROG
+
+
+
+=item B<sh        >
+
+sh         #define sh_full_usage 
+
+
+
+
+
+=item B<sha1sum   >
+
+sha1sum    [OPTION] [FILEs...]
+   or: sha1sum [OPTION] B<-c> [FILE]
+
+Print or check SHA1 checksums.
+
+Options:
+
+	-c	Check SHA1 sums against given list
+	-s	Don't output anything, status code shows success
+	-w	Warn about improperly formatted SHA1 checksum lines
+
+
+
+=item B<showkey   >
+
+showkey    [B<-a> | B<-k> | B<-s>]
+
+Show keys pressed
+
+Options:
+
+	-a	Display decimal/octal/hex values of the keys
+	-k	Display interpreted keycodes (default)
+	-s	Display raw scan-codes
+
+
+
+=item B<slattach  >
+
+slattach   [B<-cehmLF>] [B<-s> speed] [B<-p> protocol] DEVICEs
+
+Attach network interface(s) to serial line(s)
+
+Options:
+
+	-p	Set protocol (slip, cslip, slip6, clisp6 or adaptive)
+	-s	Set line speed
+	-e	Exit after initializing device
+	-h	Exit when the carrier is lost
+	-c	Execute a command when the line is hung up
+	-m	Do NOT initialize the line in raw 8 bits mode
+	-L	Enable 3-wire operation
+	-F	Disable RTS/CTS flow control
+
+
+
+=item B<sleep     >
+
+sleep      [N]...
+
+	 	 Pause for a time equal to the total of the args given, where each arg can
+have an optional suffix of (s)econds, (m)inutes, (h)ours, or (d)ays
+
+Example:
+
+	$ sleep 2
+	[2 second delay results]
+	$ sleep 1d 3h 22m 8s
+	[98528 second delay results]
+
+
+
+=item B<softlimit >
+
+softlimit  [B<-a> BYTES] [B<-m> BYTES] [B<-d> BYTES] [B<-s> BYTES] [B<-l> BYTES]
+	[B<-f> BYTES] [B<-c> BYTES] [B<-r> BYTES] [B<-o> N] [B<-p> N] [B<-t> N]
+	PROG ARGS
+
+Set soft resource limits, then run PROG
+
+Options:
+
+	-a BYTES	Limit total size of all segments
+	-m BYTES	Same as -d BYTES -s BYTES -l BYTES -a BYTES
+	-d BYTES	Limit data segment
+	-s BYTES	Limit stack segment
+	-l BYTES	Limit locked memory size
+	-o N		Limit number of open files per process
+	-p N		Limit number of processes per uid
+Options controlling file sizes:
+
+	-f BYTES	Limit output file sizes
+	-c BYTES	Limit core file size
+Efficiency opts:
+
+	-r BYTES	Limit resident set size
+	-t N		Limit CPU time, process receives
+			a SIGXCPU after N seconds
+
+
+
+=item B<sort      >
+
+sort       [B<-nrugMcszbdfimSTokt>] [B<-o> FILE] [B<-k> start[.offset][opts][,end[.offset][opts]] [B<-t> CHAR] [FILE]...
+
+Sort lines of text
+
+Options:
+
+	-b	Ignore leading blanks
+	-c	Check whether input is sorted
+	-d	Dictionary order (blank or alphanumeric only)
+	-f	Ignore case
+	-g	General numerical sort
+	-i	Ignore unprintable characters
+	-k	Sort key
+	-M	Sort month
+	-n	Sort numbers
+	-o	Output to file
+	-k	Sort by key
+	-t CHAR	Key separator
+	-r	Reverse sort order
+	-s	Stable (don't sort ties alphabetically)
+	-u	Suppress duplicate lines
+	-z	Lines are terminated by NUL, not newline
+	-mST	Ignored for GNU compatibility
+
+Example:
+
+	$ echo -e "e\nf\nb\nd\nc\na" | sort
+	a
+	b
+	c
+	d
+	e
+	f
+	$ echo -e "c 3\nb 2\nd 2" | $SORT -k 2,2n -k 1,1r
+	d 2
+	b 2
+	c 3
+
+
+
+=item B<split     >
+
+split      [OPTION] [INPUT [PREFIX]]
+
+Options:
+
+	-b n[k|m]	Split by bytes
+	-l n		Split by lines
+	-a n		Use n letters as suffix
+
+Example:
+
+	$ split TODO foo
+	$ cat TODO | split -a 2 -l 2 TODO_
+
+
+
+=item B<start-stop-daemon>
+
+start-stop-daemon [OPTIONS] [B<-S>|B<-K>] ... [-- arguments...]
+
+Search for matching processes, and then
+B<-K>: stop all matching processes.
+B<-S>: start a process unless a matching process is found.
+
+Process matching:
+
+	-u,--user USERNAME|UID	Match only this user's processes
+	-n,--name NAME		Match processes with NAME
+				in comm field in /proc/PID/stat
+	-x,--exec EXECUTABLE	Match processes with this command
+				in /proc/PID/cmdline
+	-p,--pidfile FILE	Match a process with PID from the file
+	All specified conditions must match
+B<-S> only:
+
+	-x,--exec EXECUTABLE	Program to run
+	-a,--startas NAME	Zeroth argument
+	-b,--background		Background
+	-N,--nicelevel N	Change nice level
+	-c,--chuid USER[:[GRP]]	Change to user/group
+	-m,--make-pidfile	Write PID to the pidfile specified by -p
+B<-K> only:
+
+	-s,--signal SIG		Signal to send
+	-t,--test		Match only, exit with 0 if a process is found
+Other:
+
+	-o,--oknodo		Exit with status 0 if nothing is done
+	-v,--verbose		Verbose
+	-q,--quiet		Quiet
+	-c USER[:[GRP]]	Change to user/group
+	-m		Write PID to the pidfile specified by -p
+B<-K> only:
+
+	-s SIG		Signal to send
+	-t		Match only, exit with 0 if a process is found
+Other:
+
+	-o		Exit with status 0 if nothing is done
+	-v		Verbose
+	-q		Quiet	) 
+
+
+
+=item B<stat      >
+
+stat       [OPTION] FILE...
+
+Display file (default) or filesystem status
+
+Options:
+
+	-c fmt	Use the specified format
+	-f	Display filesystem status
+	-L	Dereference links
+	-t	Display info in terse form
+	-Z	Print security context
+
+Valid format sequences for files:
+
+ %a	Access rights in octal
+ %A	Access rights in human readable form
+ %b	Number of blocks allocated (see %B)
+ %B	The size in bytes of each block reported by %b
+ %d	Device number in decimal
+ %D	Device number in hex
+ %f	Raw mode in hex
+ %F	File type
+ %g	Group ID of owner
+ %G	Group name of owner
+ %h	Number of hard links
+ %i	Inode number
+ %n	File name
+ %N	Quoted file name with dereference if symlink
+ %o	I/O block size
+ %s	Total size, in bytes
+ %t	Major device type in hex
+ %T	Minor device type in hex
+ %u	User ID of owner
+ %U	User name of owner
+ %x	Time of last access
+ %X	Time of last access as seconds since Epoch
+ %y	Time of last modification
+ %Y	Time of last modification as seconds since Epoch
+ %z	Time of last change
+ %Z	Time of last change as seconds since Epoch
+
+Valid format sequences for file systems:
+
+ %a	Free blocks available to non-superuser
+ %b	Total data blocks in file system
+ %c	Total file nodes in file system
+ %d	Free file nodes in file system
+ %f	Free blocks in file system
+ %C	Security context in SELinux
+ %i	File System ID in hex
+ %l	Maximum length of filenames
+ %n	File name
+ %s	Block size (for faster transfer)
+ %S	Fundamental block size (for block counts)
+ %t	Type in hex
+ %T	Type in human readable form
+
+
+
+=item B<strings   >
+
+strings    [B<-afo>] [B<-n> length] [file...]
+
+Display printable strings in a binary file
+
+Options:
+
+	-a	Scan whole file (default)
+	-f	Precede strings with filenames
+	-n N	At least N characters form a string (default 4)
+	-o	Precede strings with decimal offsets
+
+
+
+=item B<stty      >
+
+stty       [B<-a>|g] [B<-F> DEVICE] [SETTING]...
+
+Without arguments, prints baud rate, line discipline,
+and deviations from stty sane
+
+Options:
+
+	-F DEVICE	Open device instead of stdin
+	-a		Print all current settings in human-readable form
+	-g		Print in stty-readable form
+	[SETTING]	See manpage
+
+
+
+=item B<su        >
+
+su         [OPTION]... [-] [username]
+
+Change user id or become root
+
+Options:
+
+	-p, -m	Preserve environment
+	-c	Command to pass to 'sh -c'
+	-s	Shell to use instead of default shell
+
+
+
+=item B<sulogin   >
+
+sulogin    [OPTION]... [tty-device]
+
+Single user login
+
+Options:
+
+	-t	Timeout
+
+
+
+=item B<sum       >
+
+sum        [rs] [files...]
+
+Checksum and count the blocks in a file
+
+Options:
+
+	-r	Use BSD sum algorithm (1K blocks)
+	-s	Use System V sum algorithm (512byte blocks)
+
+
+
+=item B<sv        >
+
+sv         [B<-v>] [B<-w> sec] command service...
+
+Control services monitored by runsv supervisor.
+Commands (only first character is enough):
+
+status: query service status
+up: if service isn't running, start it. If service stops, restart it
+once: like 'up', but if service stops, don't restart it
+down: send TERM and CONT signals. If ./run exits, start ./finish
+
+	if it exists. After it stops, do not restart service
+exit: send TERM and CONT signals to service and log service. If they exit,
+
+	runsv exits too
+pause, cont, hup, alarm, interrupt, quit, 1, 2, term, kill: send
+STOP, CONT, HUP, ALRM, INT, QUIT, USR1, USR2, TERM, KILL signal to service
+
+
+
+=item B<svlogd    >
+
+svlogd     [B<-ttv>] [B<-r> c] [B<-R> abc] [B<-l> len] [B<-b> buflen] dir...
+
+Continuously read log data from standard input, optionally filter log messages, and write the data to one or more automatically rotated logs
+
+
+
+=item B<swapoff   >
+
+swapoff    [B<-a>] [DEVICE]
+
+Stop swapping on DEVICE
+
+Options:
+
+	-a	Stop swapping on all swap devices
+
+
+
+=item B<swapon    >
+
+swapon     [B<-a>] [B<-p> pri] [DEVICE]
+
+Start swapping on DEVICE
+
+Options:
+
+	-a	Start swapping on all swap devices
+	-p pri	Set swap device priority
+
+
+
+=item B<switch_root>
+
+switch_root [B<-c> /dev/console] NEW_ROOT NEW_INIT [ARGUMENTS_TO_INIT]
+
+Use from PID 1 under initramfs to free initramfs, chroot to NEW_ROOT,
+and exec NEW_INIT
+
+Options:
+
+	-c	Redirect console to device on new root
+
+
+
+=item B<sync      >
+
+sync              
+
+Write all buffered filesystem blocks to disk
+
+
+
+=item B<sysctl    >
+
+sysctl     [OPTIONS]... [VALUE]...
+
+Configure kernel parameters at runtime
+
+Options:
+
+	-n	Disable printing of key names
+	-e	Don't warn about unknown keys
+	-w	Change sysctl setting
+	-p FILE	Load sysctl settings from FILE (default /etc/sysctl.conf)
+	-a	Display all values
+	-A	Display all values in table form
+
+Example:
+
+	sysctl [-n] [-e] variable...
+	sysctl [-n] [-e] -w variable=value...
+	sysctl [-n] [-e] -a
+	sysctl [-n] [-e] -p file	(default /etc/sysctl.conf)
+	sysctl [-n] [-e] -A
+
+
+
+=item B<syslogd   >
+
+syslogd    [OPTION]...
+
+System logging utility.
+Note that this version of syslogd ignores /etc/syslog.conf.
+
+Options:
+
+	-n		Run in foreground
+	-O FILE		Log to given file (default=/var/log/messages)
+	-l n		Set local log level
+	-S		Smaller logging output
+	-s SIZE		Max size (KB) before rotate (default=200KB, 0=off)
+	-b NUM		Number of rotated logs to keep (default=1, max=99, 0=purge)
+	-R HOST[:PORT]	Log to IP or hostname on PORT (default PORT=514/UDP)
+	-L		Log locally and via network (default is network only if -R)
+	-D		Drop duplicates
+	-C[size(KiB)]	Log to shared mem buffer (read it using logread)	/* NB: -Csize shouldn't have space (because size is optional) */
+
+Example:
+
+	$ syslogd -R masterlog:514
+	$ syslogd -R 192.168.1.1:601
+
+
+
+=item B<tac       >
+
+tac        [FILE]...
+
+Concatenate FILE(s) and print them in reverse
+
+
+
+=item B<tail      >
+
+tail       [OPTION]... [FILE]...
+
+Print last 10 lines of each FILE to standard output.
+With more than one FILE, precede each with a header giving the
+file name. With no FILE, or when FILE is -, read standard input.
+
+Options:
+
+	-c N[kbm]	Output the last N bytes
+	-n N[kbm]	Print last N lines instead of last 10
+	-f		Output data as the file grows
+	-q		Never output headers giving file names
+	-s SEC		Wait SEC seconds between reads with -f
+	-v		Always output headers giving file names
+
+If the first character of N (bytes or lines) is a '+', output begins with
+the Nth item from the start of each file, otherwise, print the last N items
+in the file. N bytes may be suffixed by k (x1024), b (x512), or m (1024^2).
+
+Example:
+
+	$ tail -n 1 /etc/resolv.conf
+	nameserver 10.0.0.1
+
+
+
+=item B<tar       >
+
+tar        -[czjaZxtvO] [B<-X> FILE] [B<-f> TARFILE] [B<-C> DIR] [FILE(s)]...
+
+Create, extract, or list files from a tar file
+
+Options:
+
+	c	Create
+	x	Extract
+	t	List
+Archive format selection:
+
+	z	Filter the archive through gzip
+	j	Filter the archive through bzip2
+	a	Filter the archive through lzma
+	Z	Filter the archive through compress
+File selection:
+
+	f	Name of TARFILE or "-" for stdin
+	O	Extract to stdout
+	exclude	File to exclude
+	X	File with names to exclude
+	C	Change to directory DIR before operation
+	v	Verbose
+
+Example:
+
+	$ zcat /tmp/tarball.tar.gz | tar -xf -
+	$ tar -cf /tmp/tarball.tar /usr/local
+
+
+
+=item B<taskset   >
+
+taskset    [B<-p>] [mask] [pid | command [arg]...]
+
+Set or get CPU affinity
+
+Options:
+
+	-p	Operate on an existing PID
+
+Example:
+
+	$ taskset 0x7 ./dgemm_test&
+	$ taskset -p 0x1 $!
+	pid 4790's current affinity mask: 7
+	pid 4790's new affinity mask: 1
+	$ taskset 0x7 /bin/sh -c './taskset -p 0x1 $$'
+	pid 6671's current affinity mask: 1
+	pid 6671's new affinity mask: 1
+	$ taskset -p 1
+	pid 1's current affinity mask: 3
+
+
+
+=item B<tc        >
+
+tc         	/*"[OPTIONS] "*/"OBJECT CMD [dev STRING]
+
+OBJECT: {qdisc|class|filter}
+CMD: {add|del|change|replace|show}
+
+qdisc [ handle QHANDLE ] [ root | ingress | parent CLASSID ]
+
+	/* "	[ estimator INTERVAL TIME_CONSTANT ]
+" */ 	[ [ QDISC_KIND ] [ help | OPTIONS ] ]
+
+	QDISC_KIND := { [p|b]fifo | tbf | prio | cbq | red | etc. }
+qdisc show [ dev STRING ] [ingress]
+class [ classid CLASSID ] [ root | parent CLASSID ]
+
+	[ [ QDISC_KIND ] [ help | OPTIONS ] ]
+class show [ dev STRING ] [ root | parent CLASSID ]
+filter [ pref PRIO ] [ protocol PROTO ]
+
+	/* "	[ estimator INTERVAL TIME_CONSTANT ]
+" */ 	[ root | classid CLASSID ] [ handle FILTERID ]
+
+	[ [ FILTER_TYPE ] [ help | OPTIONS ] ]
+filter show [ dev STRING ] [ root | parent CLASSID ]
+
+
+
+=item B<tcpsvd    >
+
+tcpsvd     [B<-hEv>] [B<-c> n] [B<-C> n:msg] [B<-b> n] [B<-u> user] [B<-l> name] ip port prog...
+
+Create TCP socket, bind it to ip:port and listen
+for incoming connection. Run PROG for each connection.
+
+ip		IP to listen on. '0' = all
+port		Port to listen on
+prog [arg]	Program to run
+B<-l> name		Local hostname (else looks up local hostname in DNS)
+B<-u> user[:group]	Change to user/group after bind
+B<-c> n		Handle up to n connections simultaneously
+B<-b> n		Allow a backlog of approximately n TCP SYNs
+B<-C> n[:msg]	Allow only up to n connections from the same IP
+
+		New connections from this IP address are closed
+		immediately. 'msg' is written to the peer before close
+B<-h>		Look up peer's hostname
+B<-E>		Do not set up environment variables
+B<-v>		Verbose
+
+
+
+=item B<tee       >
+
+tee        [OPTION]... [FILE]...
+
+Copy standard input to each FILE, and also to standard output
+
+Options:
+
+	-a	Append to the given FILEs, do not overwrite
+	-i	Ignore interrupt signals (SIGINT)
+
+Example:
+
+	$ echo "Hello" | tee /tmp/foo
+	$ cat /tmp/foo
+	Hello
+
+
+
+=item B<telnet    >
+
+telnet     HOST [PORT]
+
+Connect to telnet server
+
+
+
+=item B<telnetd   >
+
+telnetd    [OPTION]
+
+Handle incoming telnet connections
+
+Options:
+
+	-l LOGIN	Exec LOGIN on connect
+	-f issue_file	Display issue_file instead of /etc/issue
+	-K		Close connection as soon as login exits
+			(normally wait until all programs close slave pty)
+	-p PORT		Port to listen on
+	-b ADDR		Address to bind to
+	-F		Run in foreground
+	-i		Run as inetd subservice
+
+
+
+=item B<test      >
+
+test       EXPRESSION ]
+
+Check file types, compare values etc. Return a 0/1 exit code
+depending on logical value of EXPRESSION
+
+Example:
+
+	$ test 1 -eq 2
+	$ echo $?
+	1
+	$ test 1 -eq 1
+	$ echo $?
+	0
+	$ [ -d /etc ]
+	$ echo $?
+	0
+	$ [ -d /junk ]
+	$ echo $?
+	1
+
+
+
+=item B<tftp      >
+
+tftp       [OPTION]... HOST [PORT]
+
+Transfer a file from/to tftp server
+
+Options:
+
+	-l FILE	Local FILE
+	-r FILE	Remote FILE
+	-g	Get file
+	-p	Put file
+	-b SIZE	Transfer blocks of SIZE octets
+
+
+
+=item B<tftpd     >
+
+tftpd      [B<-cr>] [B<-u> USER] [DIR]
+
+Transfer a file on tftp client's request.
+
+tftpd should be used as an inetd service.
+tftpd's line for inetd.conf:
+
+	69 dgram udp nowait root tftpd tftpd /files/to/serve
+It also can be ran from udpsvd:
+
+	udpsvd -vE 0.0.0.0 69 tftpd /files/to/serve
+
+Options:
+
+	-r	Prohibit upload
+	-c	Allow file creation via upload
+	-u	Access files as USER
+
+
+
+=item B<time      >
+
+time       [OPTION]... COMMAND [ARGS...]
+
+Run the program COMMAND with arguments ARGS. When COMMAND finishes,
+COMMAND's resource usage information is displayed.
+
+Options:
+
+	-v	Verbose
+
+
+
+=item B<top       >
+
+top        [B<-b>] [B<-nCOUNT>] [B<-dSECONDS>]
+
+Provide a view of process activity in real time.
+Read the status of all processes from /proc each SECONDS
+and show the status for however many processes will fit on the screen.
+
+
+
+=item B<touch     >
+
+touch      [B<-c>] FILE [FILE...]
+
+Update the last-modified date on the given FILE[s]
+
+Options:
+
+	-c	Do not create any files
+
+Example:
+
+	$ ls -l /tmp/foo
+	/bin/ls: /tmp/foo: No such file or directory
+	$ touch /tmp/foo
+	$ ls -l /tmp/foo
+	-rw-rw-r--    1 andersen andersen        0 Apr 15 01:11 /tmp/foo
+
+
+
+=item B<tr        >
+
+tr         [B<-cds>] STRING1 [STRING2]
+
+Translate, squeeze, and/or delete characters from
+standard input, writing to standard output
+
+Options:
+
+	-c	Take complement of STRING1
+	-d	Delete input characters coded STRING1
+	-s	Squeeze multiple output characters of STRING2 into one character
+
+Example:
+
+	$ echo "gdkkn vnqkc" | tr [a-y] [b-z]
+	hello world
+
+
+
+=item B<traceroute>
+
+traceroute [B<-FIldnrv>] [B<-f> 1st_ttl] [B<-m> max_ttl] [B<-p> port#] [B<-q> nqueries]
+	[B<-s> src_addr] [B<-t> tos] [B<-w> wait] [B<-g> gateway] [B<-i> iface]
+	[B<-z> pausemsecs] HOST [data size]
+
+Trace the route to HOST
+
+Options:
+
+	-F	Set the don't fragment bit
+	-I	Use ICMP ECHO instead of UDP datagrams
+	-l	Display the ttl value of the returned packet
+	-d	Set SO_DEBUG options to socket
+	-n	Print hop addresses numerically rather than symbolically
+	-r	Bypass the normal routing tables and send directly to a host
+	-v	Verbose
+	-m max_ttl	Max time-to-live (max number of hops)
+	-p port#	Base UDP port number used in probes
+			(default is 33434)
+	-q nqueries	Number of probes per 'ttl' (default 3)
+	-s src_addr	IP address to use as the source address
+	-t tos		Type-of-service in probe packets (default 0)
+	-w wait		Time in seconds to wait for a response
+			(default 3 sec)
+	-g		Loose source route gateway (8 max)
+
+
+
+=item B<true      >
+
+true              
+
+Return an exit code of TRUE (0)
+
+Example:
+
+	$ true
+	$ echo $?
+	0
+
+
+
+=item B<tty       >
+
+tty               
+
+Print file name of standard input's terminal
+
+Options:
+
+	-s	Print nothing, only return exit status
+
+Example:
+
+	$ tty
+	/dev/tty2
+
+
+
+=item B<ttysize   >
+
+ttysize    [w] [h]
+
+Print dimension(s) of standard input's terminal, on error return 80x25
+
+
+
+=item B<tune2fs   >
+
+tune2fs    [B<-c> max-mounts-count] [B<-e> errors-behavior] [B<-g> group] [B<-i> interval[d|m|w]] [B<-j>] [B<-J> journal-options] [B<-l>] [B<-s> sparse-flag] [B<-m> reserved-blocks-percent] [B<-o> [^]mount-options[,...]] [B<-r> reserved-blocks-count] [B<-u> user] [B<-C> mount-count] [B<-L> volume-label] [B<-M> last-mounted-dir] [B<-O> [^]feature[,...]] [B<-T> last-check-time] [B<-U> UUID] device
+
+Adjust filesystem options on ext[23] filesystems
+
+
+
+=item B<udhcpc    >
+
+udhcpc     [B<-Cfbnqtvo>] [B<-c> CID] [B<-V> VCLS] [B<-H> HOSTNAME] [B<-i> INTERFACE]
+	[B<-p> pidfile] [B<-r> IP] [B<-s> script] [B<-O> dhcp-option]... [B<-P> N]
+
+	 	-V,--vendorclass=CLASSID	Vendor class identifier
+	-i,--interface=INTERFACE	Interface to use (default eth0)
+	-H,-h,--hostname=HOSTNAME	Client hostname
+	-c,--clientid=CLIENTID	Client identifier
+	-C,--clientid-none	Suppress default client identifier
+	-p,--pidfile=file	Create pidfile
+	-r,--request=IP		IP address to request
+	-s,--script=file	Run file at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT 
+	-t,--retries=N		Send up to N request packets
+	-T,--timeout=N		Try to get a lease for N seconds (default 3)
+	-A,--tryagain=N		Wait N seconds (default 20) after failure
+	-O,--request-option=OPT	Request DHCP option OPT (cumulative)
+	-o,--no-default-options	Do not request any options (unless -O is also given)
+	-f,--foreground	Run in foreground
+	-b,--background	Background if lease is not immediately obtained
+	-S,--syslog	Log to syslog too
+	-n,--now	Exit with failure if lease is not immediately obtained
+	-q,--quit	Quit after obtaining lease
+	-R,--release	Release IP on quit
+	-P,--client-port N  Use port N instead of default 68
+	-a,--arping	Use arping to validate offered address	) 	
+	-t N		Send up to N request packets
+	-T N		Try to get a lease for N seconds (default 3)
+	-A N		Wait N seconds (default 20) after failure
+	-O OPT		Request DHCP option OPT (cumulative)
+	-o		Do not request any options (unless -O is also given)
+	-f		Run in foreground
+	-b		Background if lease is not immediately obtained
+	-S		Log to syslog too
+	-n		Exit with failure if lease is not immediately obtained
+	-q		Quit after obtaining lease
+	-R		Release IP on quit
+	-P N		Use port N instead of default 68
+	-a		Use arping to validate offered address	)
+
+
+
+=item B<udhcpd    >
+
+udhcpd     [B<-fS>] [B<-P> N] [configfile]
+
+DHCP server
+
+	-f	Run in foreground
+	-S	Log to syslog too
+	-P N	Use port N instead of default 67
+
+
+
+=item B<udpsvd    >
+
+udpsvd     [B<-hEv>] [B<-c> n] [B<-u> user] [B<-l> name] ip port prog
+
+Create UDP socket, bind it to ip:port and wait
+for incoming packets. Run PROG for each packet,
+redirecting all further packets with same peer ip:port to it
+
+ip		IP to listen on. '0' = all
+port		Port to listen on
+prog [arg]	Program to run
+B<-l> name		Local hostname (else looks up local hostname in DNS)
+B<-u> user[:group]	Change to user/group after bind
+B<-c> n		Handle up to n connections simultaneously
+B<-h>		Look up peer's hostname
+B<-E>		Do not set up environment variables
+B<-v>		Verbose
+
+
+
+=item B<umount    >
+
+umount     [flags] FILESYSTEM|DIRECTORY
+
+Unmount file systems
+
+Options:
+
+	-a	Unmount all file systems in /etc/mtab
+	-n	Don't erase /etc/mtab entries
+	-r	Try to remount devices as read-only if mount is busy
+	-l	Lazy umount (detach filesystem)
+	-f	Force umount (i.e., unreachable NFS server)
+	-d	Free loop device if it has been used
+
+Example:
+
+	$ umount /dev/hdc1
+
+
+
+=item B<uname     >
+
+uname      [B<-amnrspv>]
+
+Print system information.
+
+Options:
+
+	-a	Print all
+	-m	The machine (hardware) type
+	-n	Hostname
+	-r	OS release
+	-s	OS name (default)
+	-p	Processor type
+	-v	OS version
+
+Example:
+
+	$ uname -a
+	Linux debian 2.4.23 #2 Tue Dec 23 17:09:10 MST 2003 i686 GNU/Linux
+
+
+
+=item B<uncompress>
+
+uncompress [B<-c>] [B<-f>] [name...]
+
+Uncompress .Z file[s]
+
+Options:
+
+	-c	Extract to stdout
+	-f	Overwrite an existing file
+
+
+
+=item B<unexpand  >
+
+unexpand   [B<-f>][B<-a>][B<-t> NUM] [FILE|-]
+
+Convert spaces to tabs, writing to standard output.
+
+Options:
+
+	-a,--all	Convert all blanks
+	-f,--first-only	Convert only leading blanks
+	-t,--tabs=N	Tabstops every N chars	
+
+
+
+=item B<uniq      >
+
+uniq       [B<-fscduw>]... [INPUT [OUTPUT]]
+
+Discard duplicate lines
+
+Options:
+
+	-c	Prefix lines by the number of occurrences
+	-d	Only print duplicate lines
+	-u	Only print unique lines
+	-f N	Skip first N fields
+	-s N	Skip first N chars (after any skipped fields)
+	-w N	Compare N characters in line
+
+Example:
+
+	$ echo -e "a\na\nb\nc\nc\na" | sort | uniq
+	a
+	b
+	c
+
+
+
+=item B<unix2dos  >
+
+unix2dos   [option] [FILE]
+
+Convert FILE from unix to dos format.
+When no file is given, use stdin/stdout.
+
+Options:
+
+	-u	dos2unix
+	-d	unix2dos
+
+
+
+=item B<unlzma    >
+
+unlzma     [OPTION]... [FILE]
+
+Uncompress FILE (or standard input if FILE is '-' or omitted)
+
+Options:
+
+	-c	Write to standard output
+	-f	Force
+
+
+
+=item B<unzip     >
+
+unzip      [B<-opts>[modifiers]] file[.zip] [list] [B<-x> xlist] [B<-d> exdir]
+
+Extract files from ZIP archives
+
+Options:
+
+	-l	List archive contents (with -q for short form)
+	-n	Never overwrite existing files (default)
+	-o	Overwrite files without prompting
+	-p	Send output to stdout
+	-q	Quiet
+	-x	Exclude these files
+	-d	Extract files into this directory
+
+
+
+=item B<uptime    >
+
+uptime            
+
+Display the time since the last boot
+
+Example:
+
+	$ uptime
+	  1:55pm  up  2:30, load average: 0.09, 0.04, 0.00
+
+
+
+=item B<usleep    >
+
+usleep     N
+
+Pause for N microseconds
+
+Example:
+
+	$ usleep 1000000
+	[pauses for 1 second]
+
+
+
+=item B<uudecode  >
+
+uudecode   [B<-o> outfile] [infile]
+
+Uudecode a file
+Finds outfile name in uuencoded source unless B<-o> is given
+
+Example:
+
+	$ uudecode -o busybox busybox.uu
+	$ ls -l busybox
+	-rwxr-xr-x   1 ams      ams        245264 Jun  7 21:35 busybox
+
+
+
+=item B<uuencode  >
+
+uuencode   [B<-m>] [infile] stored_filename
+
+Uuencode a file to stdout
+
+Options:
+
+	-m	Use base64 encoding per RFC1521
+
+Example:
+
+	$ uuencode busybox busybox
+	begin 755 busybox
+	<encoded file snipped>
+	$ uudecode busybox busybox > busybox.uu
+	$
+
+
+
+=item B<vconfig   >
+
+vconfig    COMMAND [OPTIONS]...
+
+Create and remove virtual ethernet devices
+
+Options:
+
+	add		[interface-name] [vlan_id]
+	rem		[vlan-name]
+	set_flag	[interface-name] [flag-num] [0 | 1]
+	set_egress_map	[vlan-name] [skb_priority] [vlan_qos]
+	set_ingress_map	[vlan-name] [skb_priority] [vlan_qos]
+	set_name_type	[name-type]
+
+
+
+=item B<vi        >
+
+vi         [OPTION] [FILE]...
+
+Edit FILE
+
+Options:
+
+	-c	Initial command to run ($EXINIT also available)
+	-R	Read-only - do not write to the file
+	-H	Short help regarding available features
+
+
+
+=item B<vlock     >
+
+vlock      [OPTIONS]
+
+Lock a virtual terminal. A password is required to unlock.
+
+Options:
+
+	-a	Lock all VTs
+
+
+
+=item B<watch     >
+
+watch      [B<-n> seconds] [B<-t>] COMMAND...
+
+Execute a program periodically
+
+Options:
+
+	-n	Loop period in seconds (default 2)
+	-t	Don't print header
+
+Example:
+
+	$ watch date
+	Mon Dec 17 10:31:40 GMT 2000
+	Mon Dec 17 10:31:42 GMT 2000
+	Mon Dec 17 10:31:44 GMT 2000
+
+
+
+=item B<watchdog  >
+
+watchdog   [B<-t> N[ms]] [B<-T> N[ms]] [B<-F>] DEV
+
+Periodically write to watchdog device DEV
+
+Options:
+
+	-T N	Reboot after N seconds if not reset (default 60)
+	-t N	Reset every N seconds (default 30)
+	-F	Run in foreground
+
+Use 500ms to specify period in milliseconds
+
+
+
+=item B<wc        >
+
+wc         [OPTION]... [FILE]...
+
+Print line, word, and byte counts for each FILE, and a total line if
+more than one FILE is specified. With no FILE, read standard input.
+
+Options:
+
+	-c	Print the byte counts
+	-l	Print the newline counts
+	-L	Print the length of the longest line
+	-w	Print the word counts
+
+Example:
+
+	$ wc /etc/passwd
+	     31      46    1365 /etc/passwd
+
+
+
+=item B<wget      >
+
+wget       	 [B<-c>|-B<-continue>] [B<-s>|-B<-spider>] [B<-q>|-B<-quiet>] [B<-O>|-B<-output>-document file]
+	[-B<-header> 'header: value'] [B<-Y>|-B<-proxy> on/off] [B<-P> DIR]
+	[B<-U>|-B<-user>-agent agent] url	
+
+Retrieve files via HTTP or FTP
+
+Options:
+
+	-s	Spider mode - only check file existence
+	-c	Continue retrieval of aborted transfer
+	-q	Quiet
+	-P	Set directory prefix to DIR
+	-O	Save to filename ('-' for stdout)
+	-U	Adjust 'User-Agent' field
+	-Y	Use proxy ('on' or 'off')
+
+
+
+=item B<which     >
+
+which      [COMMAND...]
+
+Locate a COMMAND
+
+Example:
+
+	$ which login
+	/bin/login
+
+
+
+=item B<who       >
+
+who        [B<-a>]
+
+Show who is logged on
+
+Options:
+
+	-a	show all
+
+
+
+=item B<whoami    >
+
+whoami            
+
+Print the user name associated with the current effective user id
+
+
+
+=item B<xargs     >
+
+xargs      [OPTIONS] [COMMAND] [ARGS...]
+
+Execute COMMAND on every item given by standard input
+
+Options:
+
+	-p	Ask user whether to run each command
+	-r	Do not run command if input is empty
+	-0	Input is separated by NUL characters
+	-t	Print the command on stderr before execution
+	-e[STR]	STR stops input processing
+	-n N	Pass no more than N args to COMMAND
+	-s N	Pass command line of no more than N bytes
+	-x	Exit if size is exceeded
+
+Example:
+
+	$ ls | xargs gzip
+	$ find . -name '*.c' -print | xargs rm
+
+
+
+=item B<yes       >
+
+yes        [OPTION]... [STRING]...
+
+Repeatedly output a line with all specified STRING(s), or 'y'
+
+
+
+=item B<zcat      >
+
+zcat       FILE
+
+Uncompress to stdout
+
+
+
+=item B<zcip      >
+
+zcip       [OPTIONS] ifname script
+
+Manage a ZeroConf IPv4 link-local address
+
+Options:
+
+	-f		Run in foreground
+	-q		Quit after obtaining address
+	-r 169.254.x.x	Request this address first
+	-v		Verbose
+
+With no B<-q>, runs continuously monitoring for ARP conflicts,
+exits only on I/O errors (link down etc)
+
+
+
+=back
+
+=head1 LIBC NSS
+
+GNU Libc (glibc) uses the Name Service Switch (NSS) to configure the behavior
+of the C library for the local environment, and to configure how it reads
+system data, such as passwords and group information.  This is implemented
+using an /etc/nsswitch.conf configuration file, and using one or more of the
+/lib/libnss_* libraries.  BusyBox tries to avoid using any libc calls that make
+use of NSS.  Some applets however, such as login and su, will use libc functions
+that require NSS.
+
+If you enable CONFIG_USE_BB_PWD_GRP, BusyBox will use internal functions to
+directly access the /etc/passwd, /etc/group, and /etc/shadow files without
+using NSS.  This may allow you to run your system without the need for
+installing any of the NSS configuration files and libraries.
+
+When used with glibc, the BusyBox 'networking' applets will similarly require
+that you install at least some of the glibc NSS stuff (in particular,
+/etc/nsswitch.conf, /lib/libnss_dns*, /lib/libnss_files*, and /lib/libresolv*).
+
+Shameless Plug: As an alternative, one could use a C library such as uClibc.  In
+addition to making your system significantly smaller, uClibc does not require the
+use of any NSS support files or libraries.
+
+=head1 MAINTAINER
+
+Denis Vlasenko <vda.linux@googlemail.com>
+
+=head1 AUTHORS
+
+The following people have contributed code to BusyBox whether they know it or
+not.  If you have written code included in BusyBox, you should probably be
+listed here so you can obtain your bit of eternal glory.  If you should be
+listed here, or the description of what you have done needs more detail, or is
+incorect, please send in an update.
+
+
+=for html <br>
+
+Emanuele Aina <emanuele.aina@tiscali.it>
+	run-parts
+
+=for html <br>
+
+Erik Andersen <andersen@codepoet.org>
+
+    Tons of new stuff, major rewrite of most of the
+    core apps, tons of new apps as noted in header files.
+    Lots of tedious effort writing these boring docs that
+    nobody is going to actually read.
+
+=for html <br>
+
+Laurence Anderson <l.d.anderson@warwick.ac.uk>
+
+    rpm2cpio, unzip, get_header_cpio, read_gz interface, rpm
+
+=for html <br>
+
+Jeff Angielski <jeff@theptrgroup.com>
+
+    ftpput, ftpget
+
+=for html <br>
+
+Edward Betts <edward@debian.org>
+
+    expr, hostid, logname, whoami
+
+=for html <br>
+
+John Beppu <beppu@codepoet.org>
+
+    du, nslookup, sort
+
+=for html <br>
+
+Brian Candler <B.Candler@pobox.com>
+
+    tiny-ls(ls)
+
+=for html <br>
+
+Randolph Chung <tausq@debian.org>
+
+    fbset, ping, hostname
+
+=for html <br>
+
+Dave Cinege <dcinege@psychosis.com>
+
+    more(v2), makedevs, dutmp, modularization, auto links file,
+    various fixes, Linux Router Project maintenance
+
+=for html <br>
+
+Jordan Crouse <jordan@cosmicpenguin.net>
+
+	ipcalc
+
+=for html <br>
+
+Magnus Damm <damm@opensource.se>
+
+    tftp client insmod powerpc support
+
+=for html <br>
+
+Larry Doolittle <ldoolitt@recycle.lbl.gov>
+
+    pristine source directory compilation, lots of patches and fixes.
+
+=for html <br>
+
+Glenn Engel <glenne@engel.org>
+
+    httpd
+
+=for html <br>
+
+Gennady Feldman <gfeldman@gena01.com>
+
+    Sysklogd (single threaded syslogd, IPC Circular buffer support,
+    logread), various fixes.
+
+=for html <br>
+
+Karl M. Hegbloom <karlheg@debian.org>
+
+    cp_mv.c, the test suite, various fixes to utility.c, &c.
+
+=for html <br>
+
+Daniel Jacobowitz <dan@debian.org>
+
+    mktemp.c
+
+=for html <br>
+
+Matt Kraai <kraai@alumni.cmu.edu>
+
+    documentation, bugfixes, test suite
+
+=for html <br>
+
+Stephan Linz <linz@li-pro.net>
+
+	ipcalc, Red Hat equivalence
+
+=for html <br>
+
+John Lombardo <john@deltanet.com>
+
+    tr
+
+=for html <br>
+
+Glenn McGrath <bug1@iinet.net.au>
+
+    Common unarchving code and unarchiving applets, ifupdown, ftpgetput,
+    nameif, sed, patch, fold, install, uudecode.
+    Various bugfixes, review and apply numerous patches.
+
+=for html <br>
+
+Manuel Novoa III <mjn3@codepoet.org>
+
+    cat, head, mkfifo, mknod, rmdir, sleep, tee, tty, uniq, usleep, wc, yes,
+    mesg, vconfig, make_directory, parse_mode, dirname, mode_string,
+    get_last_path_component, simplify_path, and a number trivial libbb routines
+
+    also bug fixes, partial rewrites, and size optimizations in
+    ash, basename, cal, cmp, cp, df, du, echo, env, ln, logname, md5sum, mkdir,
+    mv, realpath, rm, sort, tail, touch, uname, watch, arith, human_readable,
+    interface, dutmp, ifconfig, route
+
+=for html <br>
+
+Vladimir Oleynik <dzo@simtreas.ru>
+
+    cmdedit; xargs(current), httpd(current);
+    ports: ash, crond, fdisk, inetd, stty, traceroute, top;
+    locale, various fixes
+    and irreconcilable critic of everything not perfect.
+
+=for html <br>
+
+Bruce Perens <bruce@pixar.com>
+
+    Original author of BusyBox in 1995, 1996. Some of his code can
+    still be found hiding here and there...
+
+=for html <br>
+
+Tim Riker <Tim@Rikers.org>
+
+    bug fixes, member of fan club
+
+=for html <br>
+
+Kent Robotti <robotti@metconnect.com>
+
+    reset, tons and tons of bug reports and patches.
+
+=for html <br>
+
+Chip Rosenthal <chip@unicom.com>, <crosenth@covad.com>
+
+    wget - Contributed by permission of Covad Communications
+
+=for html <br>
+
+Pavel Roskin <proski@gnu.org>
+
+    Lots of bugs fixes and patches.
+
+=for html <br>
+
+Gyepi Sam <gyepi@praxis-sw.com>
+
+    Remote logging feature for syslogd
+
+=for html <br>
+
+Linus Torvalds <torvalds@transmeta.com>
+
+    mkswap, fsck.minix, mkfs.minix
+
+=for html <br>
+
+Mark Whitley <markw@codepoet.org>
+
+    grep, sed, cut, xargs(previous),
+    style-guide, new-applet-HOWTO, bug fixes, etc.
+
+=for html <br>
+
+Charles P. Wright <cpwright@villagenet.com>
+
+    gzip, mini-netcat(nc)
+
+=for html <br>
+
+Enrique Zanardi <ezanardi@ull.es>
+
+    tarcat (since removed), loadkmap, various fixes, Debian maintenance
+
+=for html <br>
+
+Tito Ragusa <farmatito@tiscali.it>
+
+	devfsd and size optimizations in strings, openvt and deallocvt.
+
+=cut
+

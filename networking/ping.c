@@ -29,7 +29,6 @@
 #include <netinet/ip_icmp.h>
 #include "libbb.h"
 
-
 #define ATLAS 1
 
 #if ENABLE_PING6
@@ -310,6 +309,7 @@ static void print_stats_and_exit(int junk) NORETURN;
 static void print_stats_and_exit(int junk UNUSED_PARAM)
 {
 	signal(SIGINT, SIG_IGN);
+
 #ifdef ATLAS
         printf("%lu %lu %lu", ntransmitted, nreceived, nrepeats);
 #else
@@ -321,19 +321,17 @@ static void print_stats_and_exit(int junk UNUSED_PARAM)
 	if (ntransmitted)
 		ntransmitted = (ntransmitted - nreceived) * 100 / ntransmitted;
 	printf("%lu%% packet loss\n", ntransmitted);
-
-#endif 
+#endif
 	if (tmin != UINT_MAX) {
 		unsigned tavg = tsum / (nreceived + nrepeats);
 #ifdef ATLAS
 		printf(" %u.%03u %u.%03u %u.%03u\n",
 #else
-		 printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
-#endif /*ifdef ATLAS */
+		printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
+#endif 
 			tmin / 1000, tmin % 1000,
 			tavg / 1000, tavg % 1000,
 			tmax / 1000, tmax % 1000);
-
 	}
 	/* if condition is true, exit with 1 -- 'failure' */
 	exit(nreceived == 0 || (deadline && nreceived < pingcount));
@@ -539,7 +537,7 @@ static void unpack4(char *buf, int sz, struct sockaddr_in *from)
 	}
 }
 #if ENABLE_PING6
-static void unpack6(char *packet, int sz, /*struct sockaddr_in6 *from,*/ int hoplimit)
+static void unpack6(char *packet, int sz, struct sockaddr_in6 *from, int hoplimit)
 {
 	struct icmp6_hdr *icmppkt;
 	char buf[INET6_ADDRSTRLEN];
@@ -559,8 +557,13 @@ static void unpack6(char *packet, int sz, /*struct sockaddr_in6 *from,*/ int hop
 		if (sz >= sizeof(struct icmp6_hdr) + sizeof(uint32_t))
 			tp = (uint32_t *) &icmppkt->icmp6_data8[4];
 		unpack_tail(sz, tp,
+#if 1	/* NSS, fixed for IPv6 ready logo */
+			inet_ntop(AF_INET6, &from->sin6_addr,
+					buf, sizeof(buf)),
+#else
 			inet_ntop(AF_INET6, &pingaddr.sin6.sin6_addr,
 					buf, sizeof(buf)),
+#endif
 			recv_seq, hoplimit);
 	} else if (icmppkt->icmp6_type != ICMP6_ECHO_REQUEST) {
 		bb_error_msg("warning: got ICMP %d (%s)",
@@ -704,7 +707,7 @@ static void ping6(len_and_sockaddr *lsa)
 				hoplimit = *(int*)CMSG_DATA(mp);
 			}
 		}
-		unpack6(packet, c, /*&from,*/ hoplimit);
+		unpack6(packet, c, &from, hoplimit);
 		if (pingcount && nreceived >= pingcount)
 			break;
 	}
@@ -714,12 +717,12 @@ static void ping6(len_and_sockaddr *lsa)
 static void ping(len_and_sockaddr *lsa)
 {
 #ifdef ATLAS
-	time_t mytime;
-	mytime = time(NULL);
+        time_t mytime;
+        mytime = time(NULL);
         printf("%lu %s %s %d ", mytime, hostname, dotted, datalen);
 #else
-        printf("PING %s (%s)", hostname, dotted);
-#endif
+	printf("PING %s (%s)", hostname, dotted);
+#endif /*i ifdef ATLAS */
 	if (source_lsa) {
 		printf(" from %s",
 			xmalloc_sockaddr2dotted_noport(&source_lsa->u.sa));

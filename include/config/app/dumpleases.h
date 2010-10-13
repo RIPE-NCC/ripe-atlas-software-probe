@@ -1,0 +1,1 @@
+#define CONFIG_APP_DUMPLEASES 1

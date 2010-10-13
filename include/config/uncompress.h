@@ -1,0 +1,1 @@
+#define CONFIG_UNCOMPRESS 1

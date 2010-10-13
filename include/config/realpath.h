@@ -1,0 +1,1 @@
+#define CONFIG_REALPATH 1
