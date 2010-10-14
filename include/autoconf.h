@@ -2,7 +2,7 @@
  * Automatically generated C config: don't edit
  * Busybox version: 1.13.3
  */
-#define AUTOCONF_TIMESTAMP "2010-09-08 11:07:03 CEST"
+#define AUTOCONF_TIMESTAMP "2010-10-13 13:43:24 CEST"
 
 #define CONFIG_HAVE_DOT_CONFIG 1
 #define ENABLE_HAVE_DOT_CONFIG 1
@@ -2136,6 +2136,10 @@
 #define ENABLE_ARPING 1
 #define USE_ARPING(...) __VA_ARGS__
 #define SKIP_ARPING(...)
+#define CONFIG_ATLASINIT 1
+#define ENABLE_ATLASINIT 1
+#define USE_ATLASINIT(...) __VA_ARGS__
+#define SKIP_ATLASINIT(...)
 #define CONFIG_BRCTL 1
 #define ENABLE_BRCTL 1
 #define USE_BRCTL(...) __VA_ARGS__

@@ -516,6 +516,7 @@ static const char *const bbconfig_config =
 "# CONFIG_VERBOSE_RESOLUTION_ERRORS is not set\n"
 "CONFIG_ARP=y\n"
 "CONFIG_ARPING=y\n"
+"CONFIG_ATLASINIT=y\n"
 "CONFIG_BRCTL=y\n"
 "CONFIG_FEATURE_BRCTL_FANCY=y\n"
 "CONFIG_FEATURE_BRCTL_SHOW=y\n"

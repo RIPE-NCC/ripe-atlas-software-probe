@@ -2388,6 +2388,12 @@
      "\n	-a      Display all pages" \
      "\n	-w	Show page locations" \
 
+#define atlasinit_trivial_usage \
+	"[OPTION]...[MANPAGE]..."
+
+#define atlasinit_full_usage \
+	"atlasinit filename"
+
 #define matchpathcon_trivial_usage \
        "[-n] [-N] [-f file_contexts_file] [-p prefix] [-V]"
 #define matchpathcon_full_usage "\n\n" \
@@ -4322,7 +4328,7 @@
        "hello world\n"
 
 #define traceroute_trivial_usage \
-       "[-FIldnrv] [-f 1st_ttl] [-m max_ttl] [-p port#] [-q nqueries]\n" \
+       "[-FIldnrv46] [-f 1st_ttl] [-m max_ttl] [-p port#] [-q nqueries]\n" \
        "	[-s src_addr] [-t tos] [-w wait] [-g gateway] [-i iface]\n" \
        "	[-z pausemsecs] HOST [data size]"
 #define traceroute_full_usage "\n\n" \

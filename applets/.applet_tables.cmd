@@ -215,6 +215,7 @@ deps_applets/applet_tables := \
     $(wildcard include/config/applet.h) \
     $(wildcard include/config/ing.h) \
     $(wildcard include/config/ename.h) \
+    $(wildcard include/config/asinit.h) \
     $(wildcard include/config/onfig.h) \
     $(wildcard include/config/h.h) \
     $(wildcard include/config/id.h) \

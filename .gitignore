@@ -7,3 +7,5 @@ OBJ.*
 *.o.cmd
 *.o
 *.swp
+busybox
+busybox_unstripped*

@@ -114,30 +114,30 @@ been enabled, more detailed usage information will also be available.</p>
 <h1><a name="commands">COMMANDS</a></h1>
 <p>Currently available applets include:</p>
 <pre>
-        [, [[, addgroup, adduser, adjtimex, ar, arp, arping, ash, awk, 
-        basename, bbconfig, bbsh, blkid, brctl, bunzip2, busybox, bzcat, 
-        bzip2, cal, cat, catv, chat, chattr, chcon, chgrp, chmod, chown, 
-        chpasswd, chpst, chroot, chrt, chvt, cksum, clear, cmp, comm, cp, 
-        cpio, crond, crontab, cryptpw, cttyhack, cut, date, dc, dd, 
-        deallocvt, delgroup, deluser, depmod, devfsd, devmem, df, 
-        dhcprelay, diff, dirname, dmesg, dnsd, dos2unix, dpkg, dpkg_deb, 
-        du, dumpkmap, dumpleases, e2fsck, echo, ed, egrep, eject, env, 
-        envdir, envuidgid, ether_wake, expand, expr, fakeidentd, false, 
-        fbset, fbsplash, fdflush, fdformat, fdisk, fgrep, find, findfs, 
-        fold, free, freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, 
-        getenforce, getopt, getsebool, getty, grep, gunzip, gzip, halt, 
-        hd, hdparm, head, hexdump, hostid, hostname, httpd, hush, 
-        hwclock, id, ifconfig, ifdown, ifenslave, ifup, inetd, init, 
-        inotifyd, insmod, install, ip, ipaddr, ipcalc, ipcrm, ipcs, 
-        iplink, iproute, iprule, iptunnel, kbd_mode, kill, killall, 
-        killall5, klogd, lash, last, length, less, linux32, linux64, 
-        linuxrc, ln, load_policy, loadfont, loadkmap, logger, login, 
-        logname, logread, losetup, lpd, lpq, lpr, ls, lsattr, lsmod, 
-        lzmacat, makedevs, makemime, man, matchpathcon, md5sum, mdev, 
-        mesg, microcom, mkdir, mke2fs, mkfifo, mkfs_minix, mknod, mkswap, 
-        mktemp, modprobe, more, mount, mountpoint, msh, mt, mv, nameif, 
-        nc, netstat, nice, nmeter, nohup, nslookup, od, openvt, parse, 
-        passwd, patch, pgrep, pidof, ping, ping6, pipe_progress, 
+        [, [[, addgroup, adduser, adjtimex, ar, arp, arping, ash, 
+        atlasinit, awk, basename, bbconfig, bbsh, blkid, brctl, bunzip2, 
+        busybox, bzcat, bzip2, cal, cat, catv, chat, chattr, chcon, 
+        chgrp, chmod, chown, chpasswd, chpst, chroot, chrt, chvt, cksum, 
+        clear, cmp, comm, cp, cpio, crond, crontab, cryptpw, cttyhack, 
+        cut, date, dc, dd, deallocvt, delgroup, deluser, depmod, devfsd, 
+        devmem, df, dhcprelay, diff, dirname, dmesg, dnsd, dos2unix, 
+        dpkg, dpkg_deb, du, dumpkmap, dumpleases, e2fsck, echo, ed, 
+        egrep, eject, env, envdir, envuidgid, ether_wake, expand, expr, 
+        fakeidentd, false, fbset, fbsplash, fdflush, fdformat, fdisk, 
+        fgrep, find, findfs, fold, free, freeramdisk, fsck, fsck_minix, 
+        ftpget, ftpput, fuser, getenforce, getopt, getsebool, getty, 
+        grep, gunzip, gzip, halt, hd, hdparm, head, hexdump, hostid, 
+        hostname, httpd, hush, hwclock, id, ifconfig, ifdown, ifenslave, 
+        ifup, inetd, init, inotifyd, insmod, install, ip, ipaddr, ipcalc, 
+        ipcrm, ipcs, iplink, iproute, iprule, iptunnel, kbd_mode, kill, 
+        killall, killall5, klogd, lash, last, length, less, linux32, 
+        linux64, linuxrc, ln, load_policy, loadfont, loadkmap, logger, 
+        login, logname, logread, losetup, lpd, lpq, lpr, ls, lsattr, 
+        lsmod, lzmacat, makedevs, makemime, man, matchpathcon, md5sum, 
+        mdev, mesg, microcom, mkdir, mke2fs, mkfifo, mkfs_minix, mknod, 
+        mkswap, mktemp, modprobe, more, mount, mountpoint, msh, mt, mv, 
+        nameif, nc, netstat, nice, nmeter, nohup, nslookup, od, openvt, 
+        parse, passwd, patch, pgrep, pidof, ping, ping6, pipe_progress, 
         pivot_root, pkill, popmaildir, poweroff, printenv, printf, ps, 
         pscan, pwd, raidautorun, rdate, rdev, readahead, readlink, 
         readprofile, realpath, reboot, reformime, renice, reset, resize, 
@@ -255,6 +255,12 @@ been enabled, more detailed usage information will also be available.</p>
 
 <dd>
 <p>ash        #define ash_full_usage</p>
+</dd>
+<dt><strong><a name="atlasinit" class="item"><strong>atlasinit </strong></a></strong></dt>
+
+<dd>
+<p>atlasinit  [OPTION]...[MANPAGE]...</p>
+<p>atlasinit filename</p>
 </dd>
 <dt><strong><a name="awk" class="item"><strong>awk       </strong></a></strong></dt>
 
@@ -4426,7 +4432,7 @@ standard input, writing to standard output</p>
 <dt><strong><a name="traceroute" class="item"><strong>traceroute</strong></a></strong></dt>
 
 <dd>
-<p><table cellspacing="0" cellpadding="0"><tr><td>traceroute [<strong>-FIldnrv</strong>] [<strong>-f</strong> 1st_ttl] [<strong>-m</strong> max_ttl] [<strong>-p</strong> port#] [<strong>-q</strong> nqueries]
+<p><table cellspacing="0" cellpadding="0"><tr><td>traceroute [<strong>-FIldnrv46</strong>] [<strong>-f</strong> 1st_ttl] [<strong>-m</strong> max_ttl] [<strong>-p</strong> port#] [<strong>-q</strong> nqueries]
 <tr><td><td>[<strong>-s</strong> src_addr] [<strong>-t</strong> tos] [<strong>-w</strong> wait] [<strong>-g</strong> gateway] [<strong>-i</strong> iface]
 <tr><td><td>[<strong>-z</strong> pausemsecs] HOST [data size]</table></p>
 <p>Trace the route to HOST</p>
