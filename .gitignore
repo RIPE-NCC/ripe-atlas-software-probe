@@ -9,3 +9,7 @@ OBJ.*
 *.swp
 busybox
 busybox_unstripped*
+.busybox_unstripped.cmd
+.indent.pro
+.kconfig.d
+.kernelrelease
