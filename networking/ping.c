@@ -226,7 +226,7 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 /* full(er) version */
 
-#define OPT_STRING ("qvc:s:w:W:I:4" USE_PING6("6"))
+#define OPT_STRING ("qvc:s:w:W:I:A:4" USE_PING6("6"))
 enum {
 	OPT_QUIET = 1 << 0,
 	OPT_VERBOSE = 1 << 1,
@@ -235,8 +235,9 @@ enum {
 	OPT_w = 1 << 4,
 	OPT_W = 1 << 5,
 	OPT_I = 1 << 6,
-	OPT_IPV4 = 1 << 7,
-	OPT_IPV6 = (1 << 8) * ENABLE_PING6,
+	OPT_A = 1 << 7,
+	OPT_IPV4 = 1 << 8,
+	OPT_IPV6 = (1 << 9) * ENABLE_PING6,
 };
 
 
@@ -244,6 +245,7 @@ struct globals {
 	int pingsock;
 	int if_index;
 	char *str_I;
+	char *str_Atlas;
 	len_and_sockaddr *source_lsa;
 	unsigned datalen;
 	unsigned pingcount; /* must be int-sized */
@@ -270,6 +272,7 @@ struct globals {
 #define if_index     (G.if_index    )
 #define source_lsa   (G.source_lsa  )
 #define str_I        (G.str_I       )
+#define str_Atlas    (G.str_Atlas      )
 #define datalen      (G.datalen     )
 #define ntransmitted (G.ntransmitted)
 #define nreceived    (G.nreceived   )
@@ -719,7 +722,7 @@ static void ping(len_and_sockaddr *lsa)
 #ifdef ATLAS
         time_t mytime;
         mytime = time(NULL);
-        printf("%lu %s %s %d ", mytime, hostname, dotted, datalen);
+        printf("%s %lu %s %s %d ", str_Atlas, mytime, hostname, dotted, datalen);
 #else
 	printf("PING %s (%s)", hostname, dotted);
 #endif /*i ifdef ATLAS */
@@ -750,9 +753,15 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 	/* exactly one argument needed; -v and -q don't mix; -c NUM, -w NUM, -W NUM */
 	opt_complementary = "=1:q--v:v--q:c+:w+:W+";
-	opt = getopt32(argv, OPT_STRING, &pingcount, &str_s, &deadline, &timeout, &str_I);
+	opt = getopt32(argv, OPT_STRING, &pingcount, &str_s, &deadline, &timeout, &str_I, &str_Atlas);
 	if (opt & OPT_s)
 		datalen = xatou16(str_s); // -s
+	if(opt & OPT_A) 
+	{
+	}	
+	else 	
+		str_Atlas = NULL;
+
 	if (opt & OPT_I) { // -I
 		if_index = if_nametoindex(str_I);
 		if (!if_index) {
