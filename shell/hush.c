@@ -760,7 +760,13 @@ static int builtin_help(char **argv);
 static int builtin_pwd(char **argv);
 static int builtin_read(char **argv);
 static int builtin_test(char **argv);
-static int builtin_testadd(char **argv);
+static int builtin_add(char **argv);
+static int builtin_sub(char **argv);
+static int builtin_d4route(char **argv);
+static int builtin_rchoose(char **argv);
+static int builtin_ssleep(char **argv);
+static int builtin_buddyinfo(char **argv);
+static int builtin_epoch(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -797,8 +803,10 @@ static const struct built_in_command bltins[] = {
 	BLTIN(":"     , builtin_true, "No-op"),
 	BLTIN("["     , builtin_test, "Test condition"),
 	BLTIN("[["    , builtin_test, "Test condition"),
-	BLTIN("["     , builtin_testadd, "Test Add AA"),
-	BLTIN("[["    , builtin_testadd, "Test Add AA"),
+	BLTIN("["     , builtin_add, "Add two integers"),
+	BLTIN("[["    , builtin_add, "Add two integers"), 
+	BLTIN("["     , builtin_sub, "Substract two integers"),
+	BLTIN("[["    , builtin_sub, "Substract two integers"),
 
 #if ENABLE_HUSH_JOB
 	BLTIN("bg"    , builtin_fg_bg, "Resume a job in the background"),
@@ -810,6 +818,11 @@ static const struct built_in_command bltins[] = {
 #if ENABLE_HUSH_LOOPS
 	BLTIN("continue", builtin_continue, "Start new loop iteration"),
 #endif
+	BLTIN("d4route"  , builtin_d4route, "0 if no v4 default route 1 if thereis"),
+	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
+	BLTIN("ssleep"  , builtin_ssleep, "builtin sleep"),
+	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
+	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -826,7 +839,8 @@ static const struct built_in_command bltins[] = {
 	BLTIN("shift" , builtin_shift, "Shift positional parameters"),
 //	BLTIN("trap"  , builtin_not_written, "Trap signals"),
 	BLTIN("test"  , builtin_test, "Test condition"),
-	BLTIN("testadd"  , builtin_testadd, "Test AA Add int"),
+	BLTIN("add"   , builtin_add, "Add two integers."),
+	BLTIN("sub"   , builtin_sub, "Subtract two integers."),
 //	BLTIN("ulimit", builtin_not_written, "Control resource limits"),
 	BLTIN("umask" , builtin_umask, "Set file creation mask"),
 	BLTIN("unset" , builtin_unset, "Unset environment variable"),
@@ -4431,7 +4445,70 @@ static int builtin_true(char **argv UNUSED_PARAM)
 	return 0;
 }
 
-static int builtin_testadd(char **argv)
+static int builtin_ssleep (char **argv)
+{
+ unsigned duration;
+ duration = xatou(argv[1]);
+ sleep(duration);
+ return EXIT_SUCCESS;
+
+}
+
+static int builtin_buddyinfo(char **argv)
+{
+	FILE *fp = xfopen_for_read("/proc/buddyinfo");
+	char aa[10];
+	fscanf(fp, "%s", aa);
+	fscanf(fp, "%s", aa);
+	fscanf(fp, "%s", aa);
+	fscanf(fp, "%s", aa);
+
+	int i=0; 
+	int j = 0;
+	printf ("RESULT 19001.0 ongoing  %d", (int)time(0));
+	for (j=0; j< 12; j++)
+	{
+		fscanf(fp, "%d ", &i);
+		printf("%-3d ", i);
+	}	
+	printf ("\n");
+	fclose(fp);
+	 return EXIT_SUCCESS;
+}
+
+
+static int builtin_d4route (char **argv)
+{
+	char devname[64], flags[16], *sdest, *sgw;
+	unsigned long d, g, m;
+        int flgs, ref, use, metric, mtu, win, ir;
+	 
+	struct sockaddr_in s_addr;
+
+	 FILE *fp = xfopen_for_read("/proc/net/route");
+	if (fscanf(fp, "%*[^\n]\n") < 0) { /* Skip the first line. */	
+		fclose (fp);
+		return EXIT_FAILURE;
+	}
+	int r = 0;
+       while ((r = fscanf(fp, "%63s%lx%lx%X%d%d%d%lx%d%d%d\n", devname, &d, &g, &flgs, &ref, &use, &metric, &m, &mtu, &win, &ir)) == 11)
+	{
+		if ( (d == 0 ) && (m == 0) )
+		{
+			memset(&s_addr, 0, sizeof(struct sockaddr_in));
+			s_addr.sin_family = AF_INET;
+			s_addr.sin_addr.s_addr = g;
+			sgw =  INET_rresolve(&s_addr, ( 0x0fff | 0x4000), m); /* Host instead of net */
+			printf("%-15.15s\n", sgw);
+			free(sgw);
+			return EXIT_SUCCESS;
+		}
+	}
+	fclose (fp);
+	return EXIT_FAILURE;
+}
+
+static int builtin_add(char **argv)
 {
 	char *p;
 	int r1;
@@ -4443,6 +4520,53 @@ static int builtin_testadd(char **argv)
 	r1 = strtol(opnd1, &p, 10);
 	r2 = strtol(opnd2, &p, 10);
 	return ((r1+r2));
+} 
+
+static int builtin_epoch (char **argv)
+{ 
+	char *p;
+        int r1 = 0;
+        char * opnd1;
+        opnd1 = argv[1];
+	if(argv[1])
+        	r1 = strtol(opnd1, &p, 10);
+	if(r1 > 0 )
+	{
+		int r2  = time(0) - r1;
+		printf("%d\n", r2);
+	}
+	printf ("%d\n", (time(0)));
+	return EXIT_SUCCESS;
+}
+
+static int builtin_rchoose(char **argv)
+{
+	srand (time (0));
+	int argc = 0;
+        while (*argv) {
+                argc++;
+                argv++;
+        }
+	argv -= argc;
+	argv++;
+	int r = rand();
+	r %= 2;
+	printf ("%s\n", argv[r]);
+}
+
+static int builtin_sub(char **argv)
+{
+	char *p;
+	int r1;
+	int r2;
+	char * opnd1;
+	char * opnd2;
+	opnd1 = argv[1];
+	opnd2 = argv[2];
+	r1 = strtol(opnd1, &p, 10);
+	r2 = strtol(opnd2, &p, 10);
+	printf ("%d\n", (r1-r2));
+	return ((r1-r2));
 }
 
 static int builtin_test(char **argv)
