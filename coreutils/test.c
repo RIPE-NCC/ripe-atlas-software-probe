@@ -42,7 +42,7 @@
 	unary-operator ::= "-r"|"-w"|"-x"|"-f"|"-d"|"-c"|"-b"|"-p"|
 		"-u"|"-g"|"-k"|"-s"|"-t"|"-z"|"-n"|"-o"|"-O"|"-G"|"-L"|"-S";
 
-	binary-operator ::= "="|"=="|"!="|"-eq"|"-ne"|"-ge"|"-gt"|"-le"|"-lt"|
+	binary-operator ::= "="|"=="|"!="|"-eq"|"-ne"|"-ge"|"-gt"|"-ad"|"-le"|"-lt"|
 			"-nt"|"-ot"|"-ef";
 	operand ::= <any legal UNIX file name>
 */
@@ -82,6 +82,7 @@ enum token {
 	INTNE,
 	INTGE,
 	INTGT,
+	INTAD,
 	INTLE,
 	INTLT,
 	UNOT,
@@ -154,6 +155,7 @@ static const char *const TOKSTR[] = {
 	"INTNE",
 	"INTGE",
 	"INTGT",
+	"INTAD'
 	"INTLE",
 	"INTLT",
 	"UNOT",
@@ -216,6 +218,7 @@ static const struct operator_t ops[] = {
 	{ "-ge", INTGE  , BINOP  },
 	{ "-gt", INTGT  , BINOP  },
 	{ "-le", INTLE  , BINOP  },
+	{ "-ad", INTAD  , BINOP  },
 	{ "-lt", INTLT  , BINOP  },
 	{ "-nt", FILNT  , BINOP  },
 	{ "-ot", FILOT  , BINOP  },
@@ -383,6 +386,8 @@ static int binop(void)
 			return val1 >= val2;
 		if (op->op_num == INTGT)
 			return val1 >  val2;
+		if (op->op_num == INTAD)
+			return 7;
 		if (op->op_num == INTLE)
 			return val1 <= val2;
 		if (op->op_num == INTLT)

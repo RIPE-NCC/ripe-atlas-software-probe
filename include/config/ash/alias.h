@@ -1,1 +1,1 @@
-#define CONFIG_ASH_ALIAS 1
+#undef CONFIG_ASH_ALIAS

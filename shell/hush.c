@@ -763,6 +763,7 @@ static int builtin_test(char **argv);
 static int builtin_add(char **argv);
 static int builtin_sub(char **argv);
 static int builtin_d4route(char **argv);
+static int builtin_findpid(char **argv);
 static int builtin_rchoose(char **argv);
 static int builtin_ssleep(char **argv);
 static int builtin_buddyinfo(char **argv);
@@ -819,6 +820,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("continue", builtin_continue, "Start new loop iteration"),
 #endif
 	BLTIN("d4route"  , builtin_d4route, "0 if no v4 default route 1 if thereis"),
+	BLTIN("findpid"  , builtin_findpid, "Find pid by name returns the first pid"),
 	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
 	BLTIN("ssleep"  , builtin_ssleep, "builtin sleep"),
 	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
@@ -4476,6 +4478,16 @@ static int builtin_buddyinfo(char **argv)
 	 return EXIT_SUCCESS;
 }
 
+static int builtin_findpid (char **argv) 
+{
+	if(! argv[1] )
+		return 0;
+	pid_t *pidlist = find_pid_by_name(argv[1]);
+	if (pidlist[0] > 0)
+		return (int) pidlist[0];
+	else 
+	 return 0;
+}
 
 static int builtin_d4route (char **argv)
 {
@@ -4552,10 +4564,12 @@ static int builtin_rchoose(char **argv)
 	int r = rand();
 	r %= 2;
 	printf ("%s\n", argv[r]);
+	return fflush(stdout);
 }
 
 static int builtin_sub(char **argv)
 {
+	char cBuf[16];
 	char *p;
 	int r1;
 	int r2;
@@ -4566,7 +4580,7 @@ static int builtin_sub(char **argv)
 	r1 = strtol(opnd1, &p, 10);
 	r2 = strtol(opnd2, &p, 10);
 	printf ("%d\n", (r1-r2));
-	return ((r1-r2));
+	return (fflush(stdout));
 }
 
 static int builtin_test(char **argv)

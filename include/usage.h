@@ -2394,6 +2394,12 @@
 #define atlasinit_full_usage \
 	"atlasinit filename"
 
+#define atlasserial_trivial_usage \
+	"[OPTION]...[MANPAGE]..."
+
+#define atlasserial_full_usage \
+	"atlasserial -l loglevel "
+
 #define matchpathcon_trivial_usage \
        "[-n] [-N] [-f file_contexts_file] [-p prefix] [-V]"
 #define matchpathcon_full_usage "\n\n" \

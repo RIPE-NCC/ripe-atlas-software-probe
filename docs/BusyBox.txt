@@ -77,45 +77,46 @@ COMMANDS
     Currently available applets include:
 
             [, [[, addgroup, adduser, adjtimex, ar, arp, arping, ash, 
-            atlasinit, awk, basename, bbconfig, bbsh, blkid, brctl, bunzip2, 
-            busybox, bzcat, bzip2, cal, cat, catv, chat, chattr, chcon, 
-            chgrp, chmod, chown, chpasswd, chpst, chroot, chrt, chvt, cksum, 
-            clear, cmp, comm, cp, cpio, crond, crontab, cryptpw, cttyhack, 
-            cut, date, dc, dd, deallocvt, delgroup, deluser, depmod, devfsd, 
-            devmem, df, dhcprelay, diff, dirname, dmesg, dnsd, dos2unix, 
-            dpkg, dpkg_deb, du, dumpkmap, dumpleases, e2fsck, echo, ed, 
-            egrep, eject, env, envdir, envuidgid, ether_wake, expand, expr, 
-            fakeidentd, false, fbset, fbsplash, fdflush, fdformat, fdisk, 
-            fgrep, find, findfs, fold, free, freeramdisk, fsck, fsck_minix, 
-            ftpget, ftpput, fuser, getenforce, getopt, getsebool, getty, 
-            grep, gunzip, gzip, halt, hd, hdparm, head, hexdump, hostid, 
-            hostname, httpd, hush, hwclock, id, ifconfig, ifdown, ifenslave, 
-            ifup, inetd, init, inotifyd, insmod, install, ip, ipaddr, ipcalc, 
-            ipcrm, ipcs, iplink, iproute, iprule, iptunnel, kbd_mode, kill, 
-            killall, killall5, klogd, lash, last, length, less, linux32, 
-            linux64, linuxrc, ln, load_policy, loadfont, loadkmap, logger, 
-            login, logname, logread, losetup, lpd, lpq, lpr, ls, lsattr, 
-            lsmod, lzmacat, makedevs, makemime, man, matchpathcon, md5sum, 
-            mdev, mesg, microcom, mkdir, mke2fs, mkfifo, mkfs_minix, mknod, 
-            mkswap, mktemp, modprobe, more, mount, mountpoint, msh, mt, mv, 
-            nameif, nc, netstat, nice, nmeter, nohup, nslookup, od, openvt, 
-            parse, passwd, patch, pgrep, pidof, ping, ping6, pipe_progress, 
-            pivot_root, pkill, popmaildir, poweroff, printenv, printf, ps, 
-            pscan, pwd, raidautorun, rdate, rdev, readahead, readlink, 
-            readprofile, realpath, reboot, reformime, renice, reset, resize, 
-            restorecon, rm, rmdir, rmmod, route, rpm, rpm2cpio, rtcwake, 
-            run_parts, runcon, runlevel, runsv, runsvdir, rx, script, sed, 
-            selinuxenabled, sendmail, seq, sestatus, setarch, setconsole, 
-            setenforce, setfiles, setfont, setkeycodes, setlogcons, 
-            setsebool, setsid, setuidgid, sh, sha1sum, showkey, slattach, 
-            sleep, softlimit, sort, split, start_stop_daemon, stat, strings, 
-            stty, su, sulogin, sum, sv, svlogd, swapoff, swapon, switch_root, 
-            sync, sysctl, syslogd, tac, tail, tar, taskset, tc, tcpsvd, tee, 
-            telnet, telnetd, test, tftp, tftpd, time, top, touch, tr, 
-            traceroute, true, tty, ttysize, tune2fs, udhcpc, udhcpd, udpsvd, 
-            umount, uname, uncompress, unexpand, uniq, unix2dos, unlzma, 
-            unzip, uptime, usleep, uudecode, uuencode, vconfig, vi, vlock, 
-            watch, watchdog, wc, wget, which, who, whoami, xargs, yes, zcat, zcip
+            atlasinit, atlasserial, awk, basename, bbconfig, bbsh, blkid, 
+            brctl, bunzip2, busybox, bzcat, bzip2, cal, cat, catv, chat, 
+            chattr, chcon, chgrp, chmod, chown, chpasswd, chpst, chroot, 
+            chrt, chvt, cksum, clear, cmp, comm, cp, cpio, crond, crontab, 
+            cryptpw, cttyhack, cut, date, dc, dd, deallocvt, delgroup, 
+            deluser, depmod, devfsd, devmem, df, dhcprelay, diff, dirname, 
+            dmesg, dnsd, dos2unix, dpkg, dpkg_deb, du, dumpkmap, dumpleases, 
+            e2fsck, echo, ed, egrep, eject, env, envdir, envuidgid, 
+            ether_wake, expand, expr, fakeidentd, false, fbset, fbsplash, 
+            fdflush, fdformat, fdisk, fgrep, find, findfs, fold, free, 
+            freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, getenforce, 
+            getopt, getsebool, getty, grep, gunzip, gzip, halt, hd, hdparm, 
+            head, hexdump, hostid, hostname, httpd, hush, hwclock, id, 
+            ifconfig, ifdown, ifenslave, ifup, inetd, init, inotifyd, insmod, 
+            install, ip, ipaddr, ipcalc, ipcrm, ipcs, iplink, iproute, 
+            iprule, iptunnel, kbd_mode, kill, killall, killall5, klogd, lash, 
+            last, length, less, linux32, linux64, linuxrc, ln, load_policy, 
+            loadfont, loadkmap, logger, login, logname, logread, losetup, 
+            lpd, lpq, lpr, ls, lsattr, lsmod, lzmacat, makedevs, makemime, 
+            man, matchpathcon, md5sum, mdev, mesg, microcom, mkdir, mke2fs, 
+            mkfifo, mkfs_minix, mknod, mkswap, mktemp, modprobe, more, mount, 
+            mountpoint, msh, mt, mv, nameif, nc, netstat, nice, nmeter, 
+            nohup, nslookup, od, openvt, parse, passwd, patch, pgrep, pidof, 
+            ping, ping6, pipe_progress, pivot_root, pkill, popmaildir, 
+            poweroff, printenv, printf, ps, pscan, pwd, raidautorun, rdate, 
+            rdev, readahead, readlink, readprofile, realpath, reboot, 
+            reformime, renice, reset, resize, restorecon, rm, rmdir, rmmod, 
+            route, rpm, rpm2cpio, rtcwake, run_parts, runcon, runlevel, 
+            runsv, runsvdir, rx, script, sed, selinuxenabled, sendmail, seq, 
+            sestatus, setarch, setconsole, setenforce, setfiles, setfont, 
+            setkeycodes, setlogcons, setsebool, setsid, setuidgid, sh, 
+            sha1sum, showkey, slattach, sleep, softlimit, sort, split, 
+            start_stop_daemon, stat, strings, stty, su, sulogin, sum, sv, 
+            svlogd, swapoff, swapon, switch_root, sync, sysctl, syslogd, tac, 
+            tail, tar, taskset, tc, tcpsvd, tee, telnet, telnetd, test, tftp, 
+            tftpd, time, top, touch, tr, traceroute, true, tty, ttysize, 
+            tune2fs, udhcpc, udhcpd, udpsvd, umount, uname, uncompress, 
+            unexpand, uniq, unix2dos, unlzma, unzip, uptime, usleep, 
+            uudecode, uuencode, vconfig, vi, vlock, watch, watchdog, wc, 
+            wget, which, who, whoami, xargs, yes, zcat, zcip
 
 COMMAND DESCRIPTIONS
     addgroup
@@ -212,6 +213,11 @@ COMMAND DESCRIPTIONS
         atlasinit [OPTION]...[MANPAGE]...
 
         atlasinit filename
+
+    atlasserial
+        atlasserial [OPTION]...[MANPAGE]...
+
+        atlasserial -l loglevel
 
     awk awk [OPTION]... [program-text] [FILE...]
 
@@ -4962,852 +4968,852 @@ POD ERRORS
     Hey! The above document had some coding errors, which are explained
     below:
 
-    Around line 129:
+    Around line 130:
         Unterminated B<...> sequence
 
-    Around line 141:
+    Around line 142:
         Unterminated B<...> sequence
 
-    Around line 159:
+    Around line 160:
         Unterminated B<...> sequence
 
-    Around line 176:
+    Around line 177:
         Unterminated B<...> sequence
 
-    Around line 192:
+    Around line 193:
         Unterminated B<...> sequence
 
-    Around line 218:
+    Around line 219:
         Unterminated B<...> sequence
 
-    Around line 240:
+    Around line 241:
         Unterminated B<...> sequence
 
-    Around line 256:
+    Around line 265:
         Unterminated B<...> sequence
 
-    Around line 268:
+    Around line 277:
         Unterminated B<...> sequence
 
-    Around line 286:
-        Unterminated B<...> sequence
-
-    Around line 294:
+    Around line 295:
         Unterminated B<...> sequence
 
     Around line 303:
         Unterminated B<...> sequence
 
-    Around line 311:
+    Around line 312:
         Unterminated B<...> sequence
 
-    Around line 335:
+    Around line 320:
         Unterminated B<...> sequence
 
-    Around line 348:
+    Around line 344:
         Unterminated B<...> sequence
 
-    Around line 359:
+    Around line 357:
         Unterminated B<...> sequence
 
-    Around line 367:
+    Around line 368:
         Unterminated B<...> sequence
 
-    Around line 383:
+    Around line 376:
         Unterminated B<...> sequence
 
-    Around line 396:
+    Around line 392:
         Unterminated B<...> sequence
 
-    Around line 413:
+    Around line 405:
         Unterminated B<...> sequence
 
-    Around line 427:
+    Around line 422:
         Unterminated B<...> sequence
 
-    Around line 438:
+    Around line 436:
         Unterminated B<...> sequence
 
-    Around line 469:
+    Around line 447:
         Unterminated B<...> sequence
 
-    Around line 490:
+    Around line 478:
         Unterminated B<...> sequence
 
-    Around line 517:
+    Around line 499:
         Unterminated B<...> sequence
 
-    Around line 544:
+    Around line 526:
         Unterminated B<...> sequence
 
-    Around line 574:
+    Around line 553:
         Unterminated B<...> sequence
 
-    Around line 587:
+    Around line 583:
         Unterminated B<...> sequence
 
-    Around line 617:
+    Around line 596:
         Unterminated B<...> sequence
 
-    Around line 634:
+    Around line 626:
         Unterminated B<...> sequence
 
-    Around line 656:
+    Around line 643:
         Unterminated B<...> sequence
 
-    Around line 664:
+    Around line 665:
         Unterminated B<...> sequence
 
-    Around line 672:
+    Around line 673:
         Unterminated B<...> sequence
 
-    Around line 680:
+    Around line 681:
         Unterminated B<...> sequence
 
-    Around line 694:
+    Around line 689:
         Unterminated B<...> sequence
 
-    Around line 708:
+    Around line 703:
         Unterminated B<...> sequence
 
-    Around line 728:
+    Around line 717:
         Unterminated B<...> sequence
 
-    Around line 747:
+    Around line 737:
         Unterminated B<...> sequence
 
-    Around line 761:
+    Around line 756:
         Unterminated B<...> sequence
 
-    Around line 774:
+    Around line 770:
         Unterminated B<...> sequence
 
-    Around line 787:
+    Around line 783:
         Unterminated B<...> sequence
 
-    Around line 795:
+    Around line 796:
         Unterminated B<...> sequence
 
-    Around line 819:
+    Around line 804:
         Unterminated B<...> sequence
 
-    Around line 852:
+    Around line 828:
         Unterminated B<...> sequence
 
-    Around line 878:
+    Around line 861:
         Unterminated B<...> sequence
 
-    Around line 919:
+    Around line 887:
         Unterminated B<...> sequence
 
-    Around line 927:
+    Around line 928:
         Unterminated B<...> sequence
 
-    Around line 935:
+    Around line 936:
         Unterminated B<...> sequence
 
-    Around line 943:
+    Around line 944:
         Unterminated B<...> sequence
 
-    Around line 961:
+    Around line 952:
         Unterminated B<...> sequence
 
-    Around line 973:
+    Around line 970:
         Unterminated B<...> sequence
 
-    Around line 1016:
+    Around line 982:
         Unterminated B<...> sequence
 
-    Around line 1042:
+    Around line 1025:
         Unterminated B<...> sequence
 
-    Around line 1057:
+    Around line 1051:
         Unterminated B<...> sequence
 
-    Around line 1071:
+    Around line 1066:
         Unterminated B<...> sequence
 
-    Around line 1087:
+    Around line 1080:
         Unterminated B<...> sequence
 
-    Around line 1101:
+    Around line 1096:
         Unterminated B<...> sequence
 
-    Around line 1119:
+    Around line 1110:
         Unterminated B<...> sequence
 
-    Around line 1139:
+    Around line 1128:
         Unterminated B<...> sequence
 
-    Around line 1176:
+    Around line 1148:
         Unterminated B<...> sequence
 
-    Around line 1202:
+    Around line 1185:
         Unterminated B<...> sequence
 
-    Around line 1224:
+    Around line 1211:
         Unterminated B<...> sequence
 
-    Around line 1249:
+    Around line 1233:
         Unterminated B<...> sequence
 
-    Around line 1257:
+    Around line 1258:
         Unterminated B<...> sequence
 
-    Around line 1265:
+    Around line 1266:
         Unterminated B<...> sequence
 
-    Around line 1279:
+    Around line 1274:
         Unterminated B<...> sequence
 
-    Around line 1293:
+    Around line 1288:
         Unterminated B<...> sequence
 
-    Around line 1326:
+    Around line 1302:
         Unterminated B<...> sequence
 
-    Around line 1339:
+    Around line 1335:
         Unterminated B<...> sequence
 
-    Around line 1394:
+    Around line 1348:
         Unterminated B<...> sequence
 
-    Around line 1408:
+    Around line 1403:
         Unterminated B<...> sequence
 
-    Around line 1427:
+    Around line 1417:
         Unterminated B<...> sequence
 
-    Around line 1444:
+    Around line 1436:
         Unterminated B<...> sequence
 
-    Around line 1452:
+    Around line 1453:
         Unterminated B<...> sequence
 
-    Around line 1464:
+    Around line 1461:
         Unterminated B<...> sequence
 
-    Around line 1483:
+    Around line 1473:
         Unterminated B<...> sequence
 
-    Around line 1491:
+    Around line 1492:
         Unterminated B<...> sequence
 
-    Around line 1539:
+    Around line 1500:
         Unterminated B<...> sequence
 
-    Around line 1551:
+    Around line 1548:
         Unterminated B<...> sequence
 
-    Around line 1566:
+    Around line 1560:
         Unterminated B<...> sequence
 
-    Around line 1594:
+    Around line 1575:
         Unterminated B<...> sequence
 
-    Around line 1631:
+    Around line 1603:
         Unterminated B<...> sequence
 
-    Around line 1647:
+    Around line 1640:
         Unterminated B<...> sequence
 
-    Around line 1662:
+    Around line 1656:
         Unterminated B<...> sequence
 
-    Around line 1687:
+    Around line 1671:
         Unterminated B<...> sequence
 
-    Around line 1735:
+    Around line 1696:
         Unterminated B<...> sequence
 
-    Around line 1757:
+    Around line 1744:
         Unterminated B<...> sequence
 
-    Around line 1796:
+    Around line 1766:
         Unterminated B<...> sequence
 
-    Around line 1818:
+    Around line 1805:
         Unterminated B<...> sequence
 
-    Around line 1840:
+    Around line 1827:
         Unterminated B<...> sequence
 
-    Around line 1855:
+    Around line 1849:
         Unterminated B<...> sequence
 
-    Around line 1863:
+    Around line 1864:
         Unterminated B<...> sequence
 
-    Around line 1911:
+    Around line 1872:
         Unterminated B<...> sequence
 
-    Around line 1934:
+    Around line 1920:
         Unterminated B<...> sequence
 
-    Around line 1957:
+    Around line 1943:
         Unterminated B<...> sequence
 
-    Around line 1965:
+    Around line 1966:
         Unterminated B<...> sequence
 
-    Around line 1986:
+    Around line 1974:
         Unterminated B<...> sequence
 
-    Around line 2008:
+    Around line 1995:
         Unterminated B<...> sequence
 
-    Around line 2016:
+    Around line 2017:
         Unterminated B<...> sequence
 
-    Around line 2033:
+    Around line 2025:
         Unterminated B<...> sequence
 
-    Around line 2055:
+    Around line 2042:
         Unterminated B<...> sequence
 
-    Around line 2076:
+    Around line 2064:
         Unterminated B<...> sequence
 
-    Around line 2128:
+    Around line 2085:
         Unterminated B<...> sequence
 
-    Around line 2144:
+    Around line 2137:
         Unterminated B<...> sequence
 
-    Around line 2160:
+    Around line 2153:
         Unterminated B<...> sequence
 
-    Around line 2295:
+    Around line 2169:
         Unterminated B<...> sequence
 
-    Around line 2322:
+    Around line 2304:
         Unterminated B<...> sequence
 
-    Around line 2341:
+    Around line 2331:
         Unterminated B<...> sequence
 
-    Around line 2361:
+    Around line 2350:
         Unterminated B<...> sequence
 
-    Around line 2371:
+    Around line 2370:
         Unterminated B<...> sequence
 
-    Around line 2387:
+    Around line 2380:
         Unterminated B<...> sequence
 
-    Around line 2404:
+    Around line 2396:
         Unterminated B<...> sequence
 
-    Around line 2419:
+    Around line 2413:
         Unterminated B<...> sequence
 
-    Around line 2440:
+    Around line 2428:
         Unterminated B<...> sequence
 
-    Around line 2452:
+    Around line 2449:
         Unterminated B<...> sequence
 
-    Around line 2469:
+    Around line 2461:
         Unterminated B<...> sequence
 
-    Around line 2484:
+    Around line 2478:
         Unterminated B<...> sequence
 
-    Around line 2498:
+    Around line 2493:
         Unterminated B<...> sequence
 
-    Around line 2514:
+    Around line 2507:
         Unterminated B<...> sequence
 
-    Around line 2538:
+    Around line 2523:
         Unterminated B<...> sequence
 
-    Around line 2556:
+    Around line 2547:
         Unterminated B<...> sequence
 
-    Around line 2569:
+    Around line 2565:
         Unterminated B<...> sequence
 
-    Around line 2582:
+    Around line 2578:
         Unterminated B<...> sequence
 
     Around line 2591:
         Unterminated B<...> sequence
 
-    Around line 2605:
+    Around line 2600:
         Unterminated B<...> sequence
 
-    Around line 2618:
+    Around line 2614:
         Unterminated B<...> sequence
 
-    Around line 2636:
+    Around line 2627:
         Unterminated B<...> sequence
 
-    Around line 2644:
+    Around line 2645:
         Unterminated B<...> sequence
 
-    Around line 2652:
+    Around line 2653:
         Unterminated B<...> sequence
 
-    Around line 2660:
+    Around line 2661:
         Unterminated B<...> sequence
 
-    Around line 2691:
+    Around line 2669:
         Unterminated B<...> sequence
 
-    Around line 2705:
+    Around line 2700:
         Unterminated B<...> sequence
 
-    Around line 2720:
+    Around line 2714:
         Unterminated B<...> sequence
 
-    Around line 2738:
+    Around line 2729:
         Unterminated B<...> sequence
 
-    Around line 2752:
+    Around line 2747:
         Unterminated B<...> sequence
 
-    Around line 2765:
+    Around line 2761:
         Unterminated B<...> sequence
 
-    Around line 2777:
+    Around line 2774:
         Unterminated B<...> sequence
 
-    Around line 2801:
+    Around line 2786:
         Unterminated B<...> sequence
 
-    Around line 2816:
+    Around line 2810:
         Unterminated B<...> sequence
 
-    Around line 2829:
+    Around line 2825:
         Unterminated B<...> sequence
 
-    Around line 2842:
+    Around line 2838:
         Unterminated B<...> sequence
 
-    Around line 2882:
+    Around line 2851:
         Unterminated B<...> sequence
 
-    Around line 2898:
+    Around line 2891:
         Unterminated B<...> sequence
 
-    Around line 2906:
+    Around line 2907:
         Unterminated B<...> sequence
 
-    Around line 2914:
+    Around line 2915:
         Unterminated B<...> sequence
 
-    Around line 2953:
+    Around line 2923:
         Unterminated B<...> sequence
 
-    Around line 2968:
+    Around line 2962:
         Unterminated B<...> sequence
 
-    Around line 2993:
+    Around line 2977:
         Unterminated B<...> sequence
 
-    Around line 3019:
+    Around line 3002:
         Unterminated B<...> sequence
 
-    Around line 3052:
+    Around line 3028:
         Unterminated B<...> sequence
 
-    Around line 3063:
+    Around line 3061:
         Unterminated B<...> sequence
 
-    Around line 3079:
+    Around line 3072:
         Unterminated B<...> sequence
 
-    Around line 3102:
+    Around line 3088:
         Unterminated B<...> sequence
 
-    Around line 3131:
+    Around line 3111:
         Unterminated B<...> sequence
 
-    Around line 3160:
+    Around line 3140:
         Unterminated B<...> sequence
 
-    Around line 3183:
+    Around line 3169:
         Unterminated B<...> sequence
 
-    Around line 3191:
+    Around line 3192:
         Unterminated B<...> sequence
 
-    Around line 3217:
+    Around line 3200:
         Unterminated B<...> sequence
 
-    Around line 3302:
+    Around line 3226:
         Unterminated B<...> sequence
 
-    Around line 3314:
+    Around line 3311:
         Unterminated B<...> sequence
 
-    Around line 3385:
+    Around line 3323:
         Unterminated B<...> sequence
 
-    Around line 3393:
+    Around line 3394:
         Unterminated B<...> sequence
 
-    Around line 3408:
+    Around line 3402:
         Unterminated B<...> sequence
 
-    Around line 3426:
+    Around line 3417:
         Unterminated B<...> sequence
 
-    Around line 3446:
+    Around line 3435:
         Unterminated B<...> sequence
 
-    Around line 3485:
+    Around line 3455:
         Unterminated B<...> sequence
 
-    Around line 3507:
+    Around line 3494:
         Unterminated B<...> sequence
 
-    Around line 3519:
+    Around line 3516:
         Unterminated B<...> sequence
 
-    Around line 3550:
+    Around line 3528:
         Unterminated B<...> sequence
 
-    Around line 3562:
+    Around line 3559:
         Unterminated B<...> sequence
 
-    Around line 3580:
+    Around line 3571:
         Unterminated B<...> sequence
 
     Around line 3589:
         Unterminated B<...> sequence
 
-    Around line 3608:
+    Around line 3598:
         Unterminated B<...> sequence
 
-    Around line 3616:
+    Around line 3617:
         Unterminated B<...> sequence
 
-    Around line 3632:
+    Around line 3625:
         Unterminated B<...> sequence
 
-    Around line 3647:
+    Around line 3641:
         Unterminated B<...> sequence
 
-    Around line 3664:
+    Around line 3656:
         Unterminated B<...> sequence
 
-    Around line 3685:
+    Around line 3673:
         Unterminated B<...> sequence
 
-    Around line 3716:
+    Around line 3694:
         Unterminated B<...> sequence
 
-    Around line 3759:
+    Around line 3725:
         Unterminated B<...> sequence
 
-    Around line 3808:
+    Around line 3768:
         Unterminated B<...> sequence
 
-    Around line 3822:
+    Around line 3817:
         Unterminated B<...> sequence
 
     Around line 3831:
         Unterminated B<...> sequence
 
-    Around line 3845:
+    Around line 3840:
         Unterminated B<...> sequence
 
-    Around line 3871:
+    Around line 3854:
         Unterminated B<...> sequence
 
-    Around line 3888:
+    Around line 3880:
         Unterminated B<...> sequence
 
-    Around line 3913:
+    Around line 3897:
         Unterminated B<...> sequence
 
-    Around line 3926:
+    Around line 3922:
         Unterminated B<...> sequence
 
-    Around line 3947:
+    Around line 3935:
         Unterminated B<...> sequence
 
-    Around line 3978:
+    Around line 3956:
         Unterminated B<...> sequence
 
-    Around line 3986:
+    Around line 3987:
         Unterminated B<...> sequence
 
-    Around line 4016:
+    Around line 3995:
         Unterminated B<...> sequence
 
-    Around line 4031:
+    Around line 4025:
         Unterminated B<...> sequence
 
-    Around line 4039:
+    Around line 4040:
         Unterminated B<...> sequence
 
-    Around line 4067:
+    Around line 4048:
         Unterminated B<...> sequence
 
-    Around line 4086:
+    Around line 4076:
         Unterminated B<...> sequence
 
-    Around line 4103:
+    Around line 4095:
         Unterminated B<...> sequence
 
-    Around line 4121:
+    Around line 4112:
         Unterminated B<...> sequence
 
-    Around line 4135:
+    Around line 4130:
         Unterminated B<...> sequence
 
-    Around line 4153:
+    Around line 4144:
         Unterminated B<...> sequence
 
-    Around line 4161:
+    Around line 4162:
         Unterminated B<...> sequence
 
-    Around line 4209:
+    Around line 4170:
         Unterminated B<...> sequence
 
-    Around line 4226:
+    Around line 4218:
         Unterminated B<...> sequence
 
-    Around line 4239:
+    Around line 4235:
         Unterminated B<...> sequence
 
-    Around line 4247:
+    Around line 4248:
         Unterminated B<...> sequence
 
-    Around line 4258:
+    Around line 4256:
         Unterminated B<...> sequence
 
-    Around line 4270:
+    Around line 4267:
         Unterminated B<...> sequence
 
-    Around line 4283:
+    Around line 4279:
         Unterminated B<...> sequence
 
-    Around line 4316:
+    Around line 4292:
         Unterminated B<...> sequence
 
-    Around line 4340:
+    Around line 4325:
         Unterminated B<...> sequence
 
-    Around line 4355:
+    Around line 4349:
         Unterminated B<...> sequence
 
     Around line 4364:
         Unterminated B<...> sequence
 
-    Around line 4395:
+    Around line 4373:
         Unterminated B<...> sequence
 
-    Around line 4417:
+    Around line 4404:
         Unterminated B<...> sequence
 
-    Around line 4466:
+    Around line 4426:
         Unterminated B<...> sequence
 
-    Around line 4485:
+    Around line 4475:
         Unterminated B<...> sequence
 
-    Around line 4493:
+    Around line 4494:
         Unterminated B<...> sequence
 
-    Around line 4508:
+    Around line 4502:
         Unterminated B<...> sequence
 
-    Around line 4522:
+    Around line 4517:
         Unterminated B<...> sequence
 
-    Around line 4541:
+    Around line 4531:
         Unterminated B<...> sequence
 
-    Around line 4586:
+    Around line 4550:
         Unterminated B<...> sequence
 
-    Around line 4628:
+    Around line 4595:
         Unterminated B<...> sequence
 
-    Around line 4693:
+    Around line 4637:
         Unterminated B<...> sequence
 
-    Around line 4754:
+    Around line 4702:
         Unterminated B<...> sequence
 
-    Around line 4769:
+    Around line 4763:
         Unterminated B<...> sequence
 
-    Around line 4785:
+    Around line 4778:
         Unterminated B<...> sequence
 
-    Around line 4799:
+    Around line 4794:
         Unterminated B<...> sequence
 
-    Around line 4811:
+    Around line 4808:
         Unterminated B<...> sequence
 
-    Around line 4824:
+    Around line 4820:
         Unterminated B<...> sequence
 
-    Around line 4845:
+    Around line 4833:
         Unterminated B<...> sequence
 
-    Around line 4853:
+    Around line 4854:
         Unterminated B<...> sequence
 
-    Around line 4865:
+    Around line 4862:
         Unterminated B<...> sequence
 
-    Around line 4891:
+    Around line 4874:
         Unterminated B<...> sequence
 
-    Around line 4899:
+    Around line 4900:
         Unterminated B<...> sequence
 
-    Around line 4924:
+    Around line 4908:
         Unterminated B<...> sequence
 
-    Around line 4951:
+    Around line 4933:
         Unterminated B<...> sequence
 
-    Around line 4959:
+    Around line 4960:
         Unterminated B<...> sequence
 
-    Around line 4987:
+    Around line 4968:
         Unterminated B<...> sequence
 
-    Around line 5020:
+    Around line 4996:
         Unterminated B<...> sequence
 
-    Around line 5044:
+    Around line 5029:
         Unterminated B<...> sequence
 
-    Around line 5072:
+    Around line 5053:
         Unterminated B<...> sequence
 
-    Around line 5096:
+    Around line 5081:
         Unterminated B<...> sequence
 
-    Around line 5115:
+    Around line 5105:
         Unterminated B<...> sequence
 
-    Around line 5123:
+    Around line 5124:
         Unterminated B<...> sequence
 
-    Around line 5142:
+    Around line 5132:
         Unterminated B<...> sequence
 
-    Around line 5166:
+    Around line 5151:
         Unterminated B<...> sequence
 
-    Around line 5182:
+    Around line 5175:
         Unterminated B<...> sequence
 
-    Around line 5204:
+    Around line 5191:
         Unterminated B<...> sequence
 
-    Around line 5217:
+    Around line 5213:
         Unterminated B<...> sequence
 
-    Around line 5227:
+    Around line 5226:
         Unterminated B<...> sequence
 
-    Around line 5247:
+    Around line 5236:
         Unterminated B<...> sequence
 
-    Around line 5296:
+    Around line 5256:
         Unterminated B<...> sequence
 
-    Around line 5310:
+    Around line 5305:
         Unterminated B<...> sequence
 
-    Around line 5327:
+    Around line 5319:
         Unterminated B<...> sequence
 
-    Around line 5335:
+    Around line 5336:
         Unterminated B<...> sequence
 
-    Around line 5343:
+    Around line 5344:
         Unterminated B<...> sequence
 
-    Around line 5385:
+    Around line 5352:
         Unterminated B<...> sequence
 
-    Around line 5397:
+    Around line 5394:
         Unterminated B<...> sequence
 
-    Around line 5417:
+    Around line 5406:
         Unterminated B<...> sequence
 
-    Around line 5438:
+    Around line 5426:
         Unterminated B<...> sequence
 
-    Around line 5474:
+    Around line 5447:
         Unterminated B<...> sequence
 
-    Around line 5488:
+    Around line 5483:
         Unterminated B<...> sequence
 
-    Around line 5512:
+    Around line 5497:
         Unterminated B<...> sequence
 
-    Around line 5526:
+    Around line 5521:
         Unterminated B<...> sequence
 
-    Around line 5539:
+    Around line 5535:
         Unterminated B<...> sequence
 
-    Around line 5557:
+    Around line 5548:
         Unterminated B<...> sequence
 
-    Around line 5570:
+    Around line 5566:
         Unterminated B<...> sequence
 
-    Around line 5583:
+    Around line 5579:
         Unterminated B<...> sequence
 
-    Around line 5598:
+    Around line 5592:
         Unterminated B<...> sequence
 
-    Around line 5618:
+    Around line 5607:
         Unterminated B<...> sequence
 
-    Around line 5635:
+    Around line 5627:
         Unterminated B<...> sequence
 
-    Around line 5649:
+    Around line 5644:
         Unterminated B<...> sequence
 
-    Around line 5661:
+    Around line 5658:
         Unterminated B<...> sequence
 
-    Around line 5681:
+    Around line 5670:
         Unterminated B<...> sequence
 
-    Around line 5697:
+    Around line 5690:
         Unterminated B<...> sequence
 
-    Around line 5718:
+    Around line 5706:
         Unterminated B<...> sequence
 
-    Around line 5738:
+    Around line 5727:
         Unterminated B<...> sequence
 
-    Around line 5751:
+    Around line 5747:
         Unterminated B<...> sequence
 
-    Around line 5763:
+    Around line 5760:
         Unterminated B<...> sequence
 
-    Around line 5771:
+    Around line 5772:
         Unterminated B<...> sequence
 
-    Around line 5795:
+    Around line 5780:
         Unterminated B<...> sequence
 
-    Around line 5803:
+    Around line 5804:
         Unterminated B<...> sequence
 
-    Around line 5811:
+    Around line 5812:
+        Unterminated B<...> sequence
+
+    Around line 5820:
         Unterminated B<...> sequence
 

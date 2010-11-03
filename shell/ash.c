@@ -244,6 +244,7 @@ extern struct globals_misc *const ash_ptr_to_globals_misc;
 	physdir = nullstr; \
 } while (0)
 
+static int testadd_main(char **argv);
 
 /* ============ Utility functions */
 static int isdigit_str9(const char *str)
@@ -8601,11 +8602,14 @@ static int ulimitcmd(int, char **);
 #define echocmd   echo_main
 #define printfcmd printf_main
 #define testcmd   test_main
+#define testadd   testadd_main
 
 /* Keep these in proper order since it is searched via bsearch() */
 static const struct builtincmd builtintab[] = {
 	{ BUILTIN_SPEC_REG      ".", dotcmd },
 	{ BUILTIN_SPEC_REG      ":", truecmd },
+	{ BUILTIN_REGULAR       "[", testadd },
+	{ BUILTIN_REGULAR       "[[", testadd },
 #if ENABLE_ASH_BUILTIN_TEST
 	{ BUILTIN_REGULAR       "[", testcmd },
 #if ENABLE_ASH_BASH_COMPAT
@@ -8661,6 +8665,7 @@ static const struct builtincmd builtintab[] = {
 	{ BUILTIN_SPEC_REG      "set", setcmd },
 	{ BUILTIN_SPEC_REG      "shift", shiftcmd },
 	{ BUILTIN_SPEC_REG      "source", dotcmd },
+	{ BUILTIN_REGULAR       "test", testadd },
 #if ENABLE_ASH_BUILTIN_TEST
 	{ BUILTIN_REGULAR       "test", testcmd },
 #endif
@@ -13760,3 +13765,18 @@ int main(int argc, char **argv)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+
+static int testadd_main(char **argv)
+{
+        char *p;
+        int r1;
+        int r2;
+        char * opnd1;
+        char * opnd2;
+        opnd1 = argv[1];
+        opnd2 = argv[2];
+        r1 = strtol(opnd1, &p, 10);
+        r2 = strtol(opnd2, &p, 10);
+        return ((r1+r2));
+}

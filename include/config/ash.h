@@ -1,1 +1,1 @@
-#define CONFIG_ASH 1
+#undef CONFIG_ASH
