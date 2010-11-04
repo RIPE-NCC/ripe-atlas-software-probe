@@ -328,7 +328,7 @@ static void print_stats_and_exit(int junk UNUSED_PARAM)
 	if (tmin != UINT_MAX) {
 		unsigned tavg = tsum / (nreceived + nrepeats);
 #ifdef ATLAS
-		printf(" %u.%03u %u.%03u %u.%03u\n",
+		printf(" %u.%03u %u.%03u %u.%03u",
 #else
 		printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
 #endif 
@@ -337,6 +337,7 @@ static void print_stats_and_exit(int junk UNUSED_PARAM)
 			tmax / 1000, tmax % 1000);
 	}
 	/* if condition is true, exit with 1 -- 'failure' */
+	printf  ("\n");
 	exit(nreceived == 0 || (deadline && nreceived < pingcount));
 }
 
@@ -720,9 +721,12 @@ static void ping6(len_and_sockaddr *lsa)
 static void ping(len_and_sockaddr *lsa)
 {
 #ifdef ATLAS
-        time_t mytime;
-        mytime = time(NULL);
-        printf("%s %lu %s %s %d ", str_Atlas, mytime, hostname, dotted, datalen);
+	if(str_Atlas) {
+        	time_t mytime;
+        	mytime = time(NULL);
+		printf ("%s %lu ", str_Atlas, mytime);
+	}
+        printf(" %s %s %d ",  hostname, dotted, datalen);
 #else
 	printf("PING %s (%s)", hostname, dotted);
 #endif /*i ifdef ATLAS */
