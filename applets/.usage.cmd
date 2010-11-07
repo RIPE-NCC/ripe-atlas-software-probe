@@ -276,6 +276,7 @@ deps_applets/usage := \
     $(wildcard include/config/ormat.h) \
     $(wildcard include/config/sk.h) \
     $(wildcard include/config/ture/grep/fgrep/alias.h) \
+    $(wildcard include/config/ep.h) \
     $(wildcard include/config/dfs.h) \
     $(wildcard include/config/eramdisk.h) \
     $(wildcard include/config/k.h) \
@@ -352,7 +353,6 @@ deps_applets/usage := \
     $(wildcard include/config/nvt.h) \
     $(wildcard include/config/swd.h) \
     $(wildcard include/config/ch.h) \
-    $(wildcard include/config/ep.h) \
     $(wildcard include/config/of.h) \
     $(wildcard include/config/g6.h) \
     $(wildcard include/config/e/progress.h) \

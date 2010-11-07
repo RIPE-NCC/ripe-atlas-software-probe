@@ -246,7 +246,7 @@
 # define IPPROTO_IP 0
 #endif
 
-#define OPT_STRING "FIlnrdvxt:i:m:p:q:s:w:z:f:" \
+#define OPT_STRING "FIlnrdvxt:i:m:p:q:s:w:z:f:A:" \
                     USE_FEATURE_TRACEROUTE_SOURCE_ROUTE("g:") \
                     "4" USE_FEATURE_TRACEROUTE_IPV6("6")
 enum {
@@ -267,9 +267,10 @@ enum {
 	OPT_WAITTIME     = (1 << 14),   /* w */
 	OPT_PAUSE_MS     = (1 << 15),   /* z */
 	OPT_FIRST_TTL    = (1 << 16),   /* f */
-	OPT_SOURCE_ROUTE = (1 << 17) * ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE, /* g */
-	OPT_IPV4         = (1 << (17+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)),   /* 4 */
-	OPT_IPV6         = (1 << (18+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)) * ENABLE_FEATURE_TRACEROUTE_IPV6, /* 6 */
+	OPT_A    	 = (1 << 17),   /* A */
+	OPT_SOURCE_ROUTE = (1 << 18) * ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE, /* g */
+	OPT_IPV4         = (1 << (18+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)),   /* 4 */
+	OPT_IPV6         = (1 << (19+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)) * ENABLE_FEATURE_TRACEROUTE_IPV6, /* 6 */
 };
 #define verbose (option_mask32 & OPT_VERBOSE)
 
@@ -780,6 +781,7 @@ common_traceroute_main(int op, char **argv)
 	int nprobes = 3;
 	int first_ttl = 1;
 	unsigned pausemsecs = 0;
+	char *str_Atlas;
 	char *source;
 	char *device;
 	char *tos_str;
@@ -811,6 +813,7 @@ common_traceroute_main(int op, char **argv)
 	op |= getopt32(argv, OPT_STRING
 		, &tos_str, &device, &max_ttl_str, &port_str, &nprobes_str
 		, &source, &waittime_str, &pausemsecs_str, &first_ttl_str
+		, &str_Atlas
 //#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 //	, &source_route_list
 //#endif
@@ -1042,11 +1045,13 @@ common_traceroute_main(int op, char **argv)
 	xsetgid(getgid());
 	xsetuid(getuid());
 
+	if (option_mask32 & OPT_A)
+	printf("%s ", str_Atlas);
 	printf("traceroute to %s (%s)", argv[0],
 			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa));
 	if (op & OPT_SOURCE)
 		printf(" from %s", source);
-	printf(", %d hops max, %d byte packets\n", max_ttl, packlen);
+	printf(", %d hops max, %d byte packets NEWLINE", max_ttl, packlen);
 
 	from_lsa = dup_sockaddr(dest_lsa);
 	lastaddr = xzalloc(dest_lsa->len);
@@ -1185,13 +1190,15 @@ common_traceroute_main(int op, char **argv)
 			if (read_len == 0)
 				printf("  *");
 		}
-		bb_putchar('\n');
+		//AATLAS bb_putchar('\n');
+		printf (" NEWLINE ");
 		if (got_there
 		 || (unreachable > 0 && unreachable >= nprobes - 1)
 		) {
 			break;
 		}
 	}
+	printf ("\n");
 
 	return 0;
 }

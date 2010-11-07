@@ -243,6 +243,12 @@ config FALSE
 	help
 	  false returns an exit code of FALSE (1).
 
+config FINDPID
+	bool "findpid"
+	default n
+	help
+	  findpid  returns 0 if it find process by name 
+
 config FOLD
 	bool "fold"
 	default n
@@ -537,6 +543,14 @@ config FEATURE_FLOAT_SLEEP
 	help
 	  Allow for fractional numeric parameters.
 
+config SLEEPKICK
+	bool "sleepkick"
+	default n
+	help
+	  sleep is used to pause for a specified number of seconds and kick 
+	  /dev/watchdog every kick seconds. this is a simple one no frills.
+	  Antony Antony <antony@ripe.net>
+	 
 config SORT
 	bool "sort"
 	default n

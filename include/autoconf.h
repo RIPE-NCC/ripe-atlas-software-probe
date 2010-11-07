@@ -2,7 +2,7 @@
  * Automatically generated C config: don't edit
  * Busybox version: 1.13.3
  */
-#define AUTOCONF_TIMESTAMP "2010-11-03 13:32:03 CET"
+#define AUTOCONF_TIMESTAMP "2010-11-07 03:20:33 CET"
 
 #define CONFIG_HAVE_DOT_CONFIG 1
 #define ENABLE_HAVE_DOT_CONFIG 1
@@ -552,6 +552,10 @@
 #define ENABLE_FALSE 1
 #define USE_FALSE(...) __VA_ARGS__
 #define SKIP_FALSE(...)
+#define CONFIG_FINDPID 1
+#define ENABLE_FINDPID 1
+#define USE_FINDPID(...) __VA_ARGS__
+#define SKIP_FINDPID(...)
 #define CONFIG_FOLD 1
 #define ENABLE_FOLD 1
 #define USE_FOLD(...) __VA_ARGS__
@@ -724,6 +728,10 @@
 #define ENABLE_FEATURE_FLOAT_SLEEP 1
 #define USE_FEATURE_FLOAT_SLEEP(...) __VA_ARGS__
 #define SKIP_FEATURE_FLOAT_SLEEP(...)
+#define CONFIG_SLEEPKICK 1
+#define ENABLE_SLEEPKICK 1
+#define USE_SLEEPKICK(...) __VA_ARGS__
+#define SKIP_SLEEPKICK(...)
 #define CONFIG_SORT 1
 #define ENABLE_SORT 1
 #define USE_SORT(...) __VA_ARGS__

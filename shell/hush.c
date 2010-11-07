@@ -820,7 +820,6 @@ static const struct built_in_command bltins[] = {
 	BLTIN("continue", builtin_continue, "Start new loop iteration"),
 #endif
 	BLTIN("d4route"  , builtin_d4route, "0 if no v4 default route 1 if thereis"),
-	BLTIN("findpid"  , builtin_findpid, "Find pid by name returns the first pid"),
 	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
 	BLTIN("ssleep"  , builtin_ssleep, "builtin sleep"),
 	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),

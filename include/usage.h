@@ -1169,6 +1169,12 @@
        "$ find / -name passwd\n" \
        "/etc/passwd\n"
 
+#define findpid_trivial_usage \
+	"findpid <name>"
+
+#define findpid_full_usage \
+	"findpid <name> "
+
 #define fold_trivial_usage \
        "[-bs] [-w WIDTH] [FILE]"
 #define fold_full_usage "\n\n" \
@@ -3719,6 +3725,12 @@
 	USE_FEATURE_FANCY_SLEEP( \
        "$ sleep 1d 3h 22m 8s\n" \
        "[98528 second delay results]\n")
+
+#define sleepkick_trivial_usage \
+	"duration kick . both in seconds"
+
+#define sleepkick_full_usage \
+	"duration kick . both in seconds"
 
 #define sort_trivial_usage \
        "[-nru" \

@@ -38,7 +38,7 @@ execXXX("/proc/self/exe", applet_name, params....)
 and therefore comm field contains "exe".
 */
 
-static int comm_match(procps_status_t *p, const char *procName)
+int comm_match(procps_status_t *p, const char *procName)
 {
 	int argv1idx;
 

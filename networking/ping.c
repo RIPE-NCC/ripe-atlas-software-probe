@@ -619,6 +619,12 @@ static void ping4(len_and_sockaddr *lsa)
 				bb_perror_msg("recvfrom");
 			continue;
 		}
+		char *sA;
+		sA =  INET_rresolve(&from, ( 0x0fff | 0x4000), 0);
+		printf("S ADDRESS %-15.15s\n", sA);
+		free(sA);
+
+	
 		unpack4(packet, c, &from);
 		if (pingcount && nreceived >= pingcount)
 			break;

@@ -124,37 +124,38 @@ been enabled, more detailed usage information will also be available.</p>
         dmesg, dnsd, dos2unix, dpkg, dpkg_deb, du, dumpkmap, dumpleases, 
         e2fsck, echo, ed, egrep, eject, env, envdir, envuidgid, 
         ether_wake, expand, expr, fakeidentd, false, fbset, fbsplash, 
-        fdflush, fdformat, fdisk, fgrep, find, findfs, fold, free, 
-        freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, getenforce, 
-        getopt, getsebool, getty, grep, gunzip, gzip, halt, hd, hdparm, 
-        head, hexdump, hostid, hostname, httpd, hush, hwclock, id, 
-        ifconfig, ifdown, ifenslave, ifup, inetd, init, inotifyd, insmod, 
-        install, ip, ipaddr, ipcalc, ipcrm, ipcs, iplink, iproute, 
-        iprule, iptunnel, kbd_mode, kill, killall, killall5, klogd, lash, 
-        last, length, less, linux32, linux64, linuxrc, ln, load_policy, 
-        loadfont, loadkmap, logger, login, logname, logread, losetup, 
-        lpd, lpq, lpr, ls, lsattr, lsmod, lzmacat, makedevs, makemime, 
-        man, matchpathcon, md5sum, mdev, mesg, microcom, mkdir, mke2fs, 
-        mkfifo, mkfs_minix, mknod, mkswap, mktemp, modprobe, more, mount, 
-        mountpoint, msh, mt, mv, nameif, nc, netstat, nice, nmeter, 
-        nohup, nslookup, od, openvt, parse, passwd, patch, pgrep, pidof, 
-        ping, ping6, pipe_progress, pivot_root, pkill, popmaildir, 
-        poweroff, printenv, printf, ps, pscan, pwd, raidautorun, rdate, 
-        rdev, readahead, readlink, readprofile, realpath, reboot, 
-        reformime, renice, reset, resize, restorecon, rm, rmdir, rmmod, 
-        route, rpm, rpm2cpio, rtcwake, run_parts, runcon, runlevel, 
-        runsv, runsvdir, rx, script, sed, selinuxenabled, sendmail, seq, 
-        sestatus, setarch, setconsole, setenforce, setfiles, setfont, 
-        setkeycodes, setlogcons, setsebool, setsid, setuidgid, sh, 
-        sha1sum, showkey, slattach, sleep, softlimit, sort, split, 
-        start_stop_daemon, stat, strings, stty, su, sulogin, sum, sv, 
-        svlogd, swapoff, swapon, switch_root, sync, sysctl, syslogd, tac, 
-        tail, tar, taskset, tc, tcpsvd, tee, telnet, telnetd, test, tftp, 
-        tftpd, time, top, touch, tr, traceroute, true, tty, ttysize, 
-        tune2fs, udhcpc, udhcpd, udpsvd, umount, uname, uncompress, 
-        unexpand, uniq, unix2dos, unlzma, unzip, uptime, usleep, 
-        uudecode, uuencode, vconfig, vi, vlock, watch, watchdog, wc, 
-        wget, which, who, whoami, xargs, yes, zcat, zcip</pre>
+        fdflush, fdformat, fdisk, fgrep, find, findfs, findpid, fold, 
+        free, freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, 
+        getenforce, getopt, getsebool, getty, grep, gunzip, gzip, halt, 
+        hd, hdparm, head, hexdump, hostid, hostname, httpd, hush, 
+        hwclock, id, ifconfig, ifdown, ifenslave, ifup, inetd, init, 
+        inotifyd, insmod, install, ip, ipaddr, ipcalc, ipcrm, ipcs, 
+        iplink, iproute, iprule, iptunnel, kbd_mode, kill, killall, 
+        killall5, klogd, lash, last, length, less, linux32, linux64, 
+        linuxrc, ln, load_policy, loadfont, loadkmap, logger, login, 
+        logname, logread, losetup, lpd, lpq, lpr, ls, lsattr, lsmod, 
+        lzmacat, makedevs, makemime, man, matchpathcon, md5sum, mdev, 
+        mesg, microcom, mkdir, mke2fs, mkfifo, mkfs_minix, mknod, mkswap, 
+        mktemp, modprobe, more, mount, mountpoint, msh, mt, mv, nameif, 
+        nc, netstat, nice, nmeter, nohup, nslookup, od, openvt, parse, 
+        passwd, patch, pgrep, pidof, ping, ping6, pipe_progress, 
+        pivot_root, pkill, popmaildir, poweroff, printenv, printf, ps, 
+        pscan, pwd, raidautorun, rdate, rdev, readahead, readlink, 
+        readprofile, realpath, reboot, reformime, renice, reset, resize, 
+        restorecon, rm, rmdir, rmmod, route, rpm, rpm2cpio, rtcwake, 
+        run_parts, runcon, runlevel, runsv, runsvdir, rx, script, sed, 
+        selinuxenabled, sendmail, seq, sestatus, setarch, setconsole, 
+        setenforce, setfiles, setfont, setkeycodes, setlogcons, 
+        setsebool, setsid, setuidgid, sh, sha1sum, showkey, slattach, 
+        sleep, sleepkick, softlimit, sort, split, start_stop_daemon, 
+        stat, strings, stty, su, sulogin, sum, sv, svlogd, swapoff, 
+        swapon, switch_root, sync, sysctl, syslogd, tac, tail, tar, 
+        taskset, tc, tcpsvd, tee, telnet, telnetd, test, tftp, tftpd, 
+        time, top, touch, tr, traceroute, true, tty, ttysize, tune2fs, 
+        udhcpc, udhcpd, udpsvd, umount, uname, uncompress, unexpand, 
+        uniq, unix2dos, unlzma, unzip, uptime, usleep, uudecode, 
+        uuencode, vconfig, vi, vlock, watch, watchdog, wc, wget, which, 
+        who, whoami, xargs, yes, zcat, zcip</pre>
 <p>
 </p>
 <hr />
@@ -1338,6 +1339,12 @@ default EXPRESSION is '<strong>-print</strong>'</p>
 <p>Example:</p>
 <pre>
         $ findfs LABEL=MyDevice</pre>
+</dd>
+<dt><strong><a name="findpid" class="item"><strong>findpid   </strong></a></strong></dt>
+
+<dd>
+<p>findpid    findpid &lt;name&gt;</p>
+<p>findpid &lt;name&gt;</p>
 </dd>
 <dt><strong><a name="fold" class="item"><strong>fold      </strong></a></strong></dt>
 
@@ -3835,6 +3842,12 @@ have an optional suffix of (s)econds, (m)inutes, (h)ours, or (d)ays</pre>
         [2 second delay results]
         $ sleep 1d 3h 22m 8s
         [98528 second delay results]</pre>
+</dd>
+<dt><strong><a name="sleepkick" class="item"><strong>sleepkick </strong></a></strong></dt>
+
+<dd>
+<p>sleepkick  duration kick . both in seconds</p>
+<p>duration kick . both in seconds</p>
 </dd>
 <dt><strong><a name="softlimit" class="item"><strong>softlimit </strong></a></strong></dt>
 

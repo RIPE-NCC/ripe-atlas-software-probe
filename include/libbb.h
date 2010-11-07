@@ -1301,6 +1301,7 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags) FAST_FUNC;
 /* Format cmdline (up to col chars) into char buf[col+1] */
 /* Puts [comm] if cmdline is empty (-> process is a kernel thread) */
 void read_cmdline(char *buf, int col, unsigned pid, const char *comm) FAST_FUNC;
+int comm_match(procps_status_t *p, const char *procName);
 pid_t *find_pid_by_name(const char* procName) FAST_FUNC;
 pid_t *pidlist_reverse(pid_t *pidList) FAST_FUNC;
 
