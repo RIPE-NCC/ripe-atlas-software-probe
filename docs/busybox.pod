@@ -83,16 +83,16 @@ Currently available applets include:
 
 	[, [[, addgroup, adduser, adjtimex, ar, arp, arping, ash, 
 	atlasinit, atlasserial, awk, basename, bbconfig, bbsh, blkid, 
-	brctl, bunzip2, busybox, bzcat, bzip2, cal, cat, catv, chat, 
-	chattr, chcon, chgrp, chmod, chown, chpasswd, chpst, chroot, 
-	chrt, chvt, cksum, clear, cmp, comm, cp, cpio, crond, crontab, 
-	cryptpw, cttyhack, cut, date, dc, dd, deallocvt, delgroup, 
-	deluser, depmod, devfsd, devmem, df, dhcprelay, diff, dirname, 
-	dmesg, dnsd, dos2unix, dpkg, dpkg_deb, du, dumpkmap, dumpleases, 
-	e2fsck, echo, ed, egrep, eject, env, envdir, envuidgid, 
-	ether_wake, expand, expr, fakeidentd, false, fbset, fbsplash, 
-	fdflush, fdformat, fdisk, fgrep, find, findfs, findpid, fold, 
-	free, freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, 
+	brctl, buddyinfo, bunzip2, busybox, bzcat, bzip2, cal, cat, catv, 
+	chat, chattr, chcon, chgrp, chmod, chown, chpasswd, chpst, 
+	chroot, chrt, chvt, cksum, clear, cmp, comm, cp, cpio, crond, 
+	crontab, cryptpw, cttyhack, cut, date, dc, dd, deallocvt, 
+	delgroup, deluser, depmod, devfsd, devmem, df, dhcprelay, diff, 
+	dirname, dmesg, dnsd, dos2unix, dpkg, dpkg_deb, du, dumpkmap, 
+	dumpleases, e2fsck, echo, ed, egrep, eject, env, envdir, 
+	envuidgid, ether_wake, expand, expr, fakeidentd, false, fbset, 
+	fbsplash, fdflush, fdformat, fdisk, fgrep, find, findfs, findpid, 
+	fold, free, freeramdisk, fsck, fsck_minix, ftpget, ftpput, fuser, 
 	getenforce, getopt, getsebool, getty, grep, gunzip, gzip, halt, 
 	hd, hdparm, head, hexdump, hostid, hostname, httpd, hush, 
 	hwclock, id, ifconfig, ifdown, ifenslave, ifup, inetd, init, 
@@ -339,6 +339,14 @@ Commands:
 	setportprio BRIDGE PRIO		Set port priority
 	setbridgeprio BRIDGE PRIO	Set bridge priority
 	stp BRIDGE [1|0]		STP on/off
+
+
+
+=item B<buddyinfo >
+
+buddyinfo  buddyinfo print buddyinfo for atlsformat
+
+buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more
 
 
 

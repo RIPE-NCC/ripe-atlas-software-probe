@@ -127,6 +127,12 @@
        "$ basename /foo/bar.txt .txt\n" \
        "bar"
 
+#define buddyinfo_trivial_usage \
+	"buddyinfo print buddyinfo for atlsformat"
+
+#define buddyinfo_full_usage \
+	"buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more"
+
 #define fbsplash_trivial_usage \
        "-s IMGFILE [-c] [-d DEV] [-i INIFILE] [-f CMD]"
 #define fbsplash_full_usage "\n\n" \

@@ -8,6 +8,7 @@ libs-y			+= libcoreutils/
 
 lib-y:=
 lib-$(CONFIG_BASENAME)  += basename.o
+lib-$(CONFIG_BUDDYINFO) += buddyinfo.o
 lib-$(CONFIG_CAL)       += cal.o
 lib-$(CONFIG_CAT)       += cat.o
 lib-$(CONFIG_MORE)      += cat.o # more uses it if stdout isn't a tty

@@ -763,10 +763,8 @@ static int builtin_test(char **argv);
 static int builtin_add(char **argv);
 static int builtin_sub(char **argv);
 static int builtin_d4route(char **argv);
-static int builtin_findpid(char **argv);
 static int builtin_rchoose(char **argv);
 static int builtin_ssleep(char **argv);
-static int builtin_buddyinfo(char **argv);
 static int builtin_epoch(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
@@ -822,7 +820,6 @@ static const struct built_in_command bltins[] = {
 	BLTIN("d4route"  , builtin_d4route, "0 if no v4 default route 1 if thereis"),
 	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
 	BLTIN("ssleep"  , builtin_ssleep, "builtin sleep"),
-	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
 	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
@@ -4455,38 +4452,6 @@ static int builtin_ssleep (char **argv)
 
 }
 
-static int builtin_buddyinfo(char **argv)
-{
-	FILE *fp = xfopen_for_read("/proc/buddyinfo");
-	char aa[10];
-	fscanf(fp, "%s", aa);
-	fscanf(fp, "%s", aa);
-	fscanf(fp, "%s", aa);
-	fscanf(fp, "%s", aa);
-
-	int i=0; 
-	int j = 0;
-	printf ("RESULT 19001.0 ongoing  %d", (int)time(0));
-	for (j=0; j< 12; j++)
-	{
-		fscanf(fp, "%d ", &i);
-		printf("%-3d ", i);
-	}	
-	printf ("\n");
-	fclose(fp);
-	 return EXIT_SUCCESS;
-}
-
-static int builtin_findpid (char **argv) 
-{
-	if(! argv[1] )
-		return 0;
-	pid_t *pidlist = find_pid_by_name(argv[1]);
-	if (pidlist[0] > 0)
-		return (int) pidlist[0];
-	else 
-	 return 0;
-}
 
 static int builtin_d4route (char **argv)
 {
@@ -4561,8 +4526,8 @@ static int builtin_rchoose(char **argv)
 	argv -= argc;
 	argv++;
 	int r = rand();
-	r %= 2;
-	printf ("%s\n", argv[r]);
+	r %= (argc - 1 );
+	printf ("%s and int %d\n", argv[r], argc);
 	return fflush(stdout);
 }
 

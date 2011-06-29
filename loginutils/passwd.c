@@ -6,51 +6,11 @@
 #include "libbb.h"
 #include <syslog.h>
 
-static void nuke_str(char *str)
-{
-	if (str) memset(str, 0, strlen(str));
-}
 
-static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+static char* new_password( int algo, char *pass)
 {
 	char salt[sizeof("$N$XXXXXXXX")]; /* "$N$XXXXXXXX" or "XX" */
-	char *orig = (char*)"";
-	char *newp = NULL;
-	char *cp = NULL;
 	char *ret = NULL; /* failure so far */
-
-	if (myuid && pw->pw_passwd[0]) {
-		char *encrypted;
-
-		orig = bb_askpass(0, "Old password:"); /* returns ptr to static */
-		if (!orig)
-			goto err_ret;
-		encrypted = pw_encrypt(orig, pw->pw_passwd, 1); /* returns malloced str */
-		if (strcmp(encrypted, pw->pw_passwd) != 0) {
-			syslog(LOG_WARNING, "incorrect password for %s",
-				pw->pw_name);
-			bb_do_delay(FAIL_DELAY);
-			puts("Incorrect password");
-			goto err_ret;
-		}
-		if (ENABLE_FEATURE_CLEAN_UP) free(encrypted);
-	}
-	orig = xstrdup(orig); /* or else bb_askpass() will destroy it */
-	newp = bb_askpass(0, "New password:"); /* returns ptr to static */
-	if (!newp)
-		goto err_ret;
-	newp = xstrdup(newp); /* we are going to bb_askpass() again, so save it */
-	if (ENABLE_FEATURE_PASSWD_WEAK_CHECK
-	 && obscure(orig, newp, pw) && myuid)
-		goto err_ret; /* non-root is not allowed to have weak passwd */
-
-	cp = bb_askpass(0, "Retype password:");
-	if (!cp)
-		goto err_ret;
-	if (strcmp(cp, newp)) {
-		puts("Passwords don't match");
-		goto err_ret;
-	}
 
 	crypt_make_salt(salt, 1, 0); /* des */
 	if (algo) { /* MD5 */
@@ -58,15 +18,9 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
 		crypt_make_salt(salt + 3, 4, 0);
 	}
 	/* pw_encrypt returns malloced str */
-	ret = pw_encrypt(newp, salt, 1);
+	ret = pw_encrypt(pass, salt, 1);
 	/* whee, success! */
 
- err_ret:
-	nuke_str(orig);
-	if (ENABLE_FEATURE_CLEAN_UP) free(orig);
-	nuke_str(newp);
-	if (ENABLE_FEATURE_CLEAN_UP) free(newp);
-	nuke_str(cp);
 	return ret;
 }
 
@@ -89,10 +43,10 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 	char *myname;
 	char *name;
 	char *newp;
+	char *pass;
 	struct passwd *pw;
 	uid_t myuid;
 	struct rlimit rlimit_fsize;
-	char c;
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	/* Using _r function to avoid pulling in static buffers */
 	struct spwd spw;
@@ -116,8 +70,13 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 
 	/* Will complain and die if username not found */
 	myname = xstrdup(bb_getpwuid(NULL, -1, myuid));
-	name = argv[0] ? argv[0] : myname;
 
+	if( argc<3 ) {
+		bb_error_msg_and_die("You should supply a name ans a password");
+	}
+
+	name = argv[0];
+	pass = argv[1];
 	pw = getpwnam(name);
 	if (!pw)
 		bb_error_msg_and_die("unknown user %s", name);
@@ -125,6 +84,8 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 		/* LOGMODE_BOTH */
 		bb_error_msg_and_die("%s can't change password for %s", myname, name);
 	}
+
+	newp = new_password( opt & STATE_ALGO_md5, pass);
 
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	{
@@ -143,34 +104,6 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 	}
 #endif
 
-	/* Decide what the new password will be */
-	newp = NULL;
-	c = pw->pw_passwd[0] - '!';
-	if (!(opt & OPT_lud)) {
-		if (myuid && !c) { /* passwd starts with '!' */
-			/* LOGMODE_BOTH */
-			bb_error_msg_and_die("cannot change "
-					"locked password for %s", name);
-		}
-		printf("Changing password for %s\n", name);
-		newp = new_password(pw, myuid, opt & STATE_ALGO_md5);
-		if (!newp) {
-			logmode = LOGMODE_STDIO;
-			bb_error_msg_and_die("password for %s is unchanged", name);
-		}
-	} else if (opt & OPT_lock) {
-		if (!c) goto skip; /* passwd starts with '!' */
-		newp = xasprintf("!%s", pw->pw_passwd);
-	} else if (opt & OPT_unlock) {
-		if (c) goto skip; /* not '!' */
-		/* pw->pw_passwd points to static storage,
-		 * strdup'ing to avoid nasty surprizes */
-		newp = xstrdup(&pw->pw_passwd[1]);
-	} else if (opt & OPT_delete) {
-		//newp = xstrdup("");
-		newp = (char*)"";
-	}
-
 	rlimit_fsize.rlim_cur = rlimit_fsize.rlim_max = 512L * 30000;
 	setrlimit(RLIMIT_FSIZE, &rlimit_fsize);
 	bb_signals(0
@@ -183,7 +116,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	filename = bb_path_shadow_file;
-	rc = update_passwd(bb_path_shadow_file, name, newp);
+	rc = update_passwd(bb_path_shadow_file, name, newp );
 	if (rc == 0) /* no lines updated, no errors detected */
 #endif
 	{
@@ -197,7 +130,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 	bb_info_msg("Password for %s changed by %s", name, myname);
 
 	//if (ENABLE_FEATURE_CLEAN_UP) free(newp);
- skip:
+
 	if (!newp) {
 		bb_error_msg_and_die("password for %s is already %slocked",
 			name, (opt & OPT_unlock) ? "un" : "");

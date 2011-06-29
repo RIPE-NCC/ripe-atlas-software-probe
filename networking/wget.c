@@ -18,6 +18,16 @@ struct host_info {
 	smallint    is_ftp;
 };
 
+typedef off_t wgint;
+# define SIZEOF_WGINT SIZEOF_OFF_T
+
+/* Flags for select_fd's WAIT_FOR argument. */
+enum {
+  WAIT_FOR_READ = 1,
+  WAIT_FOR_WRITE = 2
+};
+
+
 
 /* Globals (can be accessed from signal handlers) */
 struct globals {
@@ -54,12 +64,23 @@ enum {
 	STALLTIME = 5                   /* Seconds when xfer considered "stalled" */
 };
 
+#ifndef struct_stat
+# define struct_stat struct stat
+#endif
+#ifndef struct_fstat
+# define struct_fstat struct stat
+#endif
+
 static unsigned int getttywidth(void)
 {
 	unsigned width;
 	get_terminal_width_height(0, &width, NULL);
 	return width;
 }
+
+static int post_file (int sock, const char *file_name, wgint promised_size);
+wgint file_size (const char *filename);
+int fd_write (int fd, char *buf, int bufsize, double timeout);
 
 static void progressmeter(int flag)
 {
@@ -834,3 +855,97 @@ However, in real world it was observed that some web servers
 
 	return EXIT_SUCCESS;
 }
+
+
+wgint file_size (const char *filename)
+{
+#if defined(HAVE_FSEEKO) && defined(HAVE_FTELLO)
+  wgint size;
+  /* We use fseek rather than stat to determine the file size because
+     that way we can also verify that the file is readable without
+     explicitly checking for permissions.  Inspired by the POST patch
+     by Arnaud Wylie.  */
+  FILE *fp = fopen (filename, "rb");
+  if (!fp)
+    return -1;
+  fseeko (fp, 0, SEEK_END);
+  size = ftello (fp);
+  fclose (fp);
+  return size;
+#else
+  struct_stat st;
+  if (stat (filename, &st) < 0)
+    return -1;
+  return st.st_size;
+#endif
+}
+
+/* Send the contents of FILE_NAME to SOCK.  Make sure that exactly
+   PROMISED_SIZE bytes are sent over the wire -- if the file is
+   longer, read only that much; if the file is shorter, report an error.  */
+
+static int post_file (int sock, const char *file_name, wgint promised_size)
+{
+  static char chunk[8192];
+  wgint written = 0;
+  int write_error;
+  FILE *fp;
+
+
+  fp = fopen (file_name, "rb");
+  if (!fp)
+    return -1;
+  while (!feof (fp) && written < promised_size)
+    {
+      int towrite;
+      int length = fread (chunk, 1, sizeof (chunk), fp);
+      if (length == 0)
+        break;
+      towrite = MIN (promised_size - written, length);
+      write_error = fd_write (sock, chunk, towrite, -1.0);
+      if (write_error < 0)
+        {
+          fclose (fp);
+          return -1;
+        }
+      written += towrite;
+    }
+  fclose (fp);
+
+  /* If we've written less than was promised, report a (probably
+     nonsensical) error rather than break the promise.  */
+  if (written < promised_size)
+    {
+      errno = EINVAL;
+      return -1;
+    }
+
+  assert (written == promised_size);
+  return 0;
+}
+
+int fd_write (int fd, char *buf, int bufsize, double timeout)
+{
+  int res;
+  struct transport_info *info;
+  LAZY_RETRIEVE_INFO (info);
+
+  /* `write' may write less than LEN bytes, thus the loop keeps trying
+     it until all was written, or an error occurred.  */
+  res = 0;
+  while (bufsize > 0)
+    {
+      if (!poll_internal (fd, info, WAIT_FOR_WRITE, timeout))
+        return -1;
+      if (info && info->writer)
+        res = info->writer (fd, buf, bufsize, info->ctx);
+      else
+        res = sock_write (fd, buf, bufsize);
+      if (res <= 0)
+        break;
+      buf += res;
+      bufsize -= res;
+    }
+  return res;
+}
+

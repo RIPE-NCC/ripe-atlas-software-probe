@@ -621,7 +621,6 @@ static void ping4(len_and_sockaddr *lsa)
 		}
 		char *sA;
 		sA =  INET_rresolve(&from, ( 0x0fff | 0x4000), 0);
-		printf("S ADDRESS %-15.15s\n", sA);
 		free(sA);
 
 	
@@ -732,9 +731,9 @@ static void ping(len_and_sockaddr *lsa)
         	mytime = time(NULL);
 		printf ("%s %lu ", str_Atlas, mytime);
 	}
-        printf(" %s %s %d ",  hostname, dotted, datalen);
+//        printf(" %s %s %d ",  hostname, dotted, datalen);
 #else
-	printf("PING %s (%s)", hostname, dotted);
+//	printf("PING %s (%s)", hostname, dotted);
 #endif /*i ifdef ATLAS */
 	if (source_lsa) {
 		printf(" from %s",
@@ -800,6 +799,7 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 		source_lsa = NULL;
 
 	dotted = xmalloc_sockaddr2dotted_noport(&lsa->u.sa);
+//	printf (" dotted %s \n", dotted);
 	ping(lsa);
 	print_stats_and_exit(EXIT_SUCCESS);
 	/*return EXIT_SUCCESS;*/

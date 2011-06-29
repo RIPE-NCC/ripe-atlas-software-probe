@@ -706,6 +706,13 @@ static void RunJobs(void)
 			} else if (line->cl_Pid > 0) {
 				file->cf_Running = 1;
 			}
+			// AA make it wait till the job is finished 
+			while (CheckJobs() > 0)
+			{
+				crondlog(LVL9 "waiting for job %s ", line->cl_Shell);
+				sleep(10);
+			}
+
 		}
 	}
 }

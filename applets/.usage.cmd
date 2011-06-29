@@ -219,6 +219,7 @@ deps_applets/usage := \
     $(wildcard include/config/applet.h) \
     $(wildcard include/config/ing.h) \
     $(wildcard include/config/ename.h) \
+    $(wildcard include/config/dyinfo.h) \
     $(wildcard include/config/asinit.h) \
     $(wildcard include/config/asserial.h) \
     $(wildcard include/config/onfig.h) \

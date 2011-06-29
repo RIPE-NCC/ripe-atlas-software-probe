@@ -596,7 +596,7 @@ packet4_ok(int read_len, const struct sockaddr_in *from, int seq)
 // but defer it to kernel, we can't set source port,
 // and thus can't check it here in the reply
 			/* && up->source == htons(ident) */
-			 && up->dest == htons(port + seq)
+			 && up->uh_dport == htons(port + seq)
 			) {
 				return (type == ICMP_TIMXCEED ? -1 : code + 1);
 			}
@@ -1046,7 +1046,11 @@ common_traceroute_main(int op, char **argv)
 	xsetuid(getuid());
 
 	if (option_mask32 & OPT_A)
-	printf("%s ", str_Atlas);
+	{	
+		time_t mytime;
+        	mytime = time(NULL);
+		printf("%s %lu ", str_Atlas, mytime);
+	}
 	printf("traceroute to %s (%s)", argv[0],
 			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa));
 	if (op & OPT_SOURCE)
