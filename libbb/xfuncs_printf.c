@@ -409,6 +409,21 @@ void FAST_FUNC xbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen)
 	if (bind(sockfd, my_addr, addrlen)) bb_perror_msg_and_die("bind");
 }
 
+// Call a user supplied reporting function and die with an error message if we
+// can't bind a socket to an address.
+void FAST_FUNC xrbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen,
+	void (*reportf)(int err))
+{
+	if (bind(sockfd, my_addr, addrlen)) {
+		if (reportf) {
+			int t_errno= errno;
+			reportf(t_errno);
+			errno= t_errno;
+		}
+		bb_perror_msg_and_die("bind");
+	}
+}
+
 // Die with an error message if we can't listen for connections on a socket.
 void FAST_FUNC xlisten(int s, int backlog)
 {
@@ -422,6 +437,26 @@ ssize_t FAST_FUNC xsendto(int s, const  void *buf, size_t len, const struct sock
 {
 	ssize_t ret = sendto(s, buf, len, 0, to, tolen);
 	if (ret < 0) {
+		if (ENABLE_FEATURE_CLEAN_UP)
+			close(s);
+		bb_perror_msg_and_die("sendto");
+	}
+	return ret;
+}
+
+/* Call a user supplied function and die with an error message if sendto failed.
+ * Return bytes sent otherwise  */
+ssize_t FAST_FUNC xrsendto(int s, const  void *buf, size_t len,
+	const struct sockaddr *to, socklen_t tolen,
+	void (*reportf)(int err))
+{
+	ssize_t ret = sendto(s, buf, len, 0, to, tolen);
+	if (ret < 0) {
+		if (reportf) {
+			int t_errno= errno;
+			reportf(t_errno);
+			t_errno= errno;
+		}
 		if (ENABLE_FEATURE_CLEAN_UP)
 			close(s);
 		bb_perror_msg_and_die("sendto");

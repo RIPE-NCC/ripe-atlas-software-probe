@@ -30,6 +30,7 @@
 #include "libbb.h"
 
 #define ATLAS 1
+#define WATCHDOGDEV "/dev/watchdog"
 
 #if ENABLE_PING6
 #include <netinet/icmp6.h>
@@ -50,6 +51,19 @@ enum {
 	MAXWAIT = 10,
 	PINGINTERVAL = 1, /* 1 second */
 };
+
+#ifdef ATLAS
+#define create_icmp_socket() local_create_icmp_socket()
+#define create_icmp6_socket() local_create_icmp6_socket()
+#define xbind(fd, addr, len) xrbind(fd, addr, len, ping_report_err)
+#define xsendto(fd, buf, len, addr, addrlen) \
+	xrsendto(fd, buf, len, addr, addrlen, ping_report_err)
+
+static int local_create_icmp_socket(void) FAST_FUNC;
+static int local_create_icmp6_socket(void) FAST_FUNC;
+static void ping_report_err(int err);
+static void ping_report_reserr(const char *hn);
+#endif /* ATLAS */
 
 /* common routines */
 
@@ -226,7 +240,7 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 /* full(er) version */
 
-#define OPT_STRING ("qvc:s:w:W:I:A:4" USE_PING6("6"))
+#define OPT_STRING ("qvc:s:w:W:I:A:4D" USE_PING6("6"))
 enum {
 	OPT_QUIET = 1 << 0,
 	OPT_VERBOSE = 1 << 1,
@@ -237,7 +251,8 @@ enum {
 	OPT_I = 1 << 6,
 	OPT_A = 1 << 7,
 	OPT_IPV4 = 1 << 8,
-	OPT_IPV6 = (1 << 9) * ENABLE_PING6,
+	OPT_D_WATCHDOG = 1 << 9,
+	OPT_IPV6 = (1 << 10) * ENABLE_PING6,
 };
 
 
@@ -352,7 +367,10 @@ static void sendping_tail(void (*sp)(int), const void *pkt, int size_pkt)
 	 * it doesn't matter */
 	sz = xsendto(pingsock, pkt, size_pkt, &pingaddr.sa, sizeof(pingaddr));
 	if (sz != size_pkt)
+	{
 		bb_error_msg_and_die(bb_msg_write_error);
+		printf ("ERRROR AA\n");
+	}
 
 	if (pingcount == 0 || deadline || ntransmitted < pingcount) {
 		/* Didn't send all pings yet - schedule next in 1s */
@@ -619,11 +637,6 @@ static void ping4(len_and_sockaddr *lsa)
 				bb_perror_msg("recvfrom");
 			continue;
 		}
-		char *sA;
-		sA =  INET_rresolve(&from, ( 0x0fff | 0x4000), 0);
-		free(sA);
-
-	
 		unpack4(packet, c, &from);
 		if (pingcount && nreceived >= pingcount)
 			break;
@@ -726,14 +739,15 @@ static void ping6(len_and_sockaddr *lsa)
 static void ping(len_and_sockaddr *lsa)
 {
 #ifdef ATLAS
+
 	if(str_Atlas) {
         	time_t mytime;
         	mytime = time(NULL);
 		printf ("%s %lu ", str_Atlas, mytime);
 	}
-//        printf(" %s %s %d ",  hostname, dotted, datalen);
+        printf(" %s %s %d ",  hostname, dotted, datalen);
 #else
-//	printf("PING %s (%s)", hostname, dotted);
+	printf("PING %s (%s)", hostname, dotted);
 #endif /*i ifdef ATLAS */
 	if (source_lsa) {
 		printf(" from %s",
@@ -765,6 +779,13 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 	opt = getopt32(argv, OPT_STRING, &pingcount, &str_s, &deadline, &timeout, &str_I, &str_Atlas);
 	if (opt & OPT_s)
 		datalen = xatou16(str_s); // -s
+	if(opt & OPT_D_WATCHDOG )
+	{
+		int fd = open(WATCHDOGDEV, O_RDWR);
+		write(fd, "1", 1);
+		close(fd);
+	}
+
 	if(opt & OPT_A) 
 	{
 	}	
@@ -788,18 +809,31 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 			af = AF_INET;
 		if (opt & OPT_IPV6)
 			af = AF_INET6;
+#ifdef ATLAS
+		lsa = host_and_af2sockaddr(hostname, 0, af);
+#else
 		lsa = xhost_and_af2sockaddr(hostname, 0, af);
+#endif /* ATLAS */
 	}
 #else
+#ifdef ATLAS
+	lsa = host_and_af2sockaddr(hostname, 0, AF_INET);
+#else
 	lsa = xhost_and_af2sockaddr(hostname, 0, AF_INET);
+#endif /* ATLAS */
 #endif
+#ifdef ATLAS
+	if (!lsa) {
+		ping_report_reserr(hostname);
+		xfunc_die();
+	}
+#endif /* ATLAS */
 
 	if (source_lsa && source_lsa->u.sa.sa_family != lsa->u.sa.sa_family)
 		/* leaking it here... */
 		source_lsa = NULL;
 
 	dotted = xmalloc_sockaddr2dotted_noport(&lsa->u.sa);
-//	printf (" dotted %s \n", dotted);
 	ping(lsa);
 	print_stats_and_exit(EXIT_SUCCESS);
 	/*return EXIT_SUCCESS;*/
@@ -852,3 +886,112 @@ int ping6_main(int argc UNUSED_PARAM, char **argv)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#ifdef ATLAS
+/* Extra functions for Atlas. Also, slightly modified copies of code that can
+ * be found in libbb.
+ */
+
+static void ping_report(void)
+{
+	int t_errno= errno;
+
+	printf("0 0 0 %d\n", errno);
+	errno= t_errno;
+}
+
+static void ping_report_err(int err)
+{
+	printf("0 0 0 %d\n", err);
+}
+
+static void ping_report_reserr(const char *hn)
+{
+	if(str_Atlas) {
+        	time_t mytime;
+        	mytime = time(NULL);
+		printf ("%s %lu ", str_Atlas, mytime);
+	}
+        printf(" %s bad-hostname\n", hn);
+}
+
+/* From: libbb/create_icmp_socket.c */
+
+/* vi: set sw=4 ts=4: */
+/*
+ * Utility routines.
+ *
+ * create raw socket for icmp protocol
+ * and drop root privileges if running setuid
+ */
+
+#include "libbb.h"
+
+int FAST_FUNC local_create_icmp_socket(void)
+{
+	int sock;
+#if 0
+	struct protoent *proto;
+	proto = getprotobyname("icmp");
+	/* if getprotobyname failed, just silently force
+	 * proto->p_proto to have the correct value for "icmp" */
+	sock = socket(AF_INET, SOCK_RAW,
+			(proto ? proto->p_proto : 1)); /* 1 == ICMP */
+#else
+	sock = socket(AF_INET, SOCK_RAW, 1); /* 1 == ICMP */
+#endif
+	if (sock < 0) {
+		if (errno == EPERM)
+			ping_report(), 
+			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+		ping_report();
+		bb_perror_msg_and_die(bb_msg_can_not_create_raw_socket);
+	}
+
+	/* drop root privs if running setuid */
+	xsetuid(getuid());
+
+	return sock;
+}
+
+/* From libbb/create_icmp6_socket.c */
+/* vi: set sw=4 ts=4: */
+/*
+ * Utility routines.
+ *
+ * create raw socket for icmp (IPv6 version) protocol
+ * and drop root privileges if running setuid
+ */
+
+#include "libbb.h"
+
+#if ENABLE_FEATURE_IPV6
+int FAST_FUNC local_create_icmp6_socket(void)
+{
+	int sock;
+#if 0
+	struct protoent *proto;
+	proto = getprotobyname("ipv6-icmp");
+	/* if getprotobyname failed, just silently force
+	 * proto->p_proto to have the correct value for "ipv6-icmp" */
+	sock = socket(AF_INET6, SOCK_RAW,
+			(proto ? proto->p_proto : IPPROTO_ICMPV6));
+#else
+	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+#endif
+	if (sock < 0) {
+		if (errno == EPERM)
+			ping_report(),
+			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+		ping_report();
+		bb_perror_msg_and_die(bb_msg_can_not_create_raw_socket);
+	}
+
+	/* drop root privs if running setuid */
+	xsetuid(getuid());
+
+	return sock;
+}
+#endif
+
+#endif /* ATLAS */
