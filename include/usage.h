@@ -1589,6 +1589,11 @@
      "\n	-e STRING	HTML encode STRING" \
      "\n	-d STRING	URL decode STRING" \
 
+#define httppost_trivial_usage "\n\n" \
+	"[OPTION]...[MANPAGE]..."
+#define httppost_full_usage "\n\n" \
+	"[OPTION]...[MANPAGE]..."
+
 #define hwclock_trivial_usage \
 	USE_FEATURE_HWCLOCK_LONG_OPTIONS( \
        "[-r|--show] [-s|--hctosys] [-w|--systohc]" \
