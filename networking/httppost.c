@@ -19,6 +19,7 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 struct option longopts[]=
 {
 	{ "post-file", required_argument, NULL, 'p' },
+	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
 	{ NULL, }
 };
@@ -40,15 +41,16 @@ static write_to_tcp_fd (int fd, FILE *tcp_file);
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c,  fd, fdF, tcp_fd, chunked, content_length;
+	int c,  fd, fdF, fdH, tcp_fd, chunked, content_length;
 	char *url, *host, *port, *hostport, *path;
-	char *post_file, *output_file, *post_footer;
+	char *post_file, *output_file, *post_footer, *post_header;
 	FILE *tcp_file, *out_file;
-	struct stat sb, sbF;
+	struct stat sb, sbF, sbH;
 	off_t     cLength;
 
 	post_file= NULL; 
 	post_footer=NULL;
+	post_header=NULL;
 	output_file= NULL;
 	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
 	{
@@ -56,6 +58,9 @@ int httppost_main(int argc, char *argv[])
 		{
 		case 'O':
 			output_file= optarg;
+			break;
+		case 'h':				/* --post-header */
+			post_header= optarg;
 			break;
 		case 'f':				/* --post-footer */
 			post_footer= optarg;
@@ -82,16 +87,26 @@ int httppost_main(int argc, char *argv[])
 	//printf("hostport: %s\n", hostport);
 	//printf("path: %s\n", path);
 
+	if(post_header != NULL )
+	{	
+		fdH = open(post_header, O_RDONLY);
+		if(fdH == -1 )
+			fatal_err("unable to open header '%s'", post_header);
+		if (fstat(fdH, &sbH) == -1)
+			fatal_err("fstat failed on header file '%s'", post_header);
+		if (!S_ISREG(sbH.st_mode))
+			fatal("'%s' header is not a regular file", post_header);
+	}
+
 	if(post_footer != NULL )
 	{	
-		printf ("open footer %s\n", post_footer );
 		fdF = open(post_footer, O_RDONLY);
 		if(fdF == -1 )
 			fatal_err("unable to open footer '%s'", post_footer);
 		if (fstat(fdF, &sbF) == -1)
-		fatal_err("fstat failed on footer file '%s'", post_footer);
+			fatal_err("fstat failed on footer file '%s'", post_footer);
 		if (!S_ISREG(sbF.st_mode))
-			fatal("'%s' is not a regular file", post_footer);
+			fatal("'%s' footer is not a regular file", post_footer);
 	}
 
 
@@ -125,21 +140,26 @@ int httppost_main(int argc, char *argv[])
 			"Content-Type: application/x-www-form-urlencoded\r\n");
 
 	cLength  = sb.st_size;
-	if( post_footer != NULL)
-		cLength  = sb.st_size  + sbF.st_size;
+	if( post_header != NULL )
+		cLength  +=  sbH.st_size;
+
+	if( post_footer != NULL )
+		cLength  +=  sbF.st_size;
+
 
 	fprintf(tcp_file, "Content-Length: %u\r\n", cLength);
 	fprintf(tcp_file, "\r\n");
+
+
+	if( post_header != NULL )
+		 write_to_tcp_fd(fdH, tcp_file); 
+
 	write_to_tcp_fd(fd, tcp_file);
 
 	if( post_footer != NULL)
-	{
 		write_to_tcp_fd(fdF, tcp_file);
-	}
 
 	check_result(tcp_file); 
-	printf ("wrote the footer file %s\n", post_footer);
-
 	eat_headers(tcp_file, &chunked, &content_length);
 
 	if (output_file)
@@ -169,7 +189,6 @@ static write_to_tcp_fd (int fd, FILE *tcp_file)
 	/* Copy file */
 	while(r= read(fd, buffer, sizeof(buffer)), r > 0)
 	{
-		printf ("read %u bytes\n%s", r,buffer);
 		if (fwrite(buffer, r, 1, tcp_file) != 1)
 			fatal_err("error writing to tcp connection");
 	}
