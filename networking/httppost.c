@@ -19,6 +19,7 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 struct option longopts[]=
 {
 	{ "post-file", required_argument, NULL, 'p' },
+	{ "post-footer", required_argument, NULL, 'f' },
 	{ NULL, }
 };
 
@@ -34,17 +35,20 @@ static void copy_bytes(FILE *in_file, FILE *out_file, size_t len);
 static void usage(void);
 static void fatal(char *fmt, ...);
 static void fatal_err(char *fmt, ...);
+static write_to_tcp_fd (int fd, FILE *tcp_file);
 
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c, r, fd, tcp_fd, chunked, content_length;
+	int c,  fd, fdF, tcp_fd, chunked, content_length;
 	char *url, *host, *port, *hostport, *path;
-	char *post_file, *output_file;
+	char *post_file, *output_file, *post_footer;
 	FILE *tcp_file, *out_file;
-	struct stat sb;
+	struct stat sb, sbF;
+	off_t     cLength;
 
-	post_file= NULL;
+	post_file= NULL; 
+	post_footer=NULL;
 	output_file= NULL;
 	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
 	{
@@ -53,6 +57,10 @@ int httppost_main(int argc, char *argv[])
 		case 'O':
 			output_file= optarg;
 			break;
+		case 'f':				/* --post-footer */
+			post_footer= optarg;
+			break;
+
 		case 'p':				/* --post-file */
 			post_file= optarg;
 			break;
@@ -73,6 +81,19 @@ int httppost_main(int argc, char *argv[])
 	//printf("port: %s\n", port);
 	//printf("hostport: %s\n", hostport);
 	//printf("path: %s\n", path);
+
+	if(post_footer != NULL )
+	{	
+		printf ("open footer %s\n", post_footer );
+		fdF = open(post_footer, O_RDONLY);
+		if(fdF == -1 )
+			fatal_err("unable to open footer '%s'", post_footer);
+		if (fstat(fdF, &sbF) == -1)
+		fatal_err("fstat failed on footer file '%s'", post_footer);
+		if (!S_ISREG(sbF.st_mode))
+			fatal("'%s' is not a regular file", post_footer);
+	}
+
 
 	/* Try to open the file before trying to connect */
 	if (post_file == NULL)
@@ -102,19 +123,22 @@ int httppost_main(int argc, char *argv[])
 	fprintf(tcp_file, "User-Agent: httppost for atlas.ripe.net\r\n");
 	fprintf(tcp_file,
 			"Content-Type: application/x-www-form-urlencoded\r\n");
-	fprintf(tcp_file, "Content-Length: %u\r\n", sb.st_size);
+
+	cLength  = sb.st_size;
+	if( post_footer != NULL)
+		cLength  = sb.st_size  + sbF.st_size;
+
+	fprintf(tcp_file, "Content-Length: %u\r\n", cLength);
 	fprintf(tcp_file, "\r\n");
+	write_to_tcp_fd(fd, tcp_file);
 
-	/* Copy file */
-	while(r= read(fd, buffer, sizeof(buffer)), r > 0)
+	if( post_footer != NULL)
 	{
-		if (fwrite(buffer, r, 1, tcp_file) != 1)
-			fatal_err("error writing to tcp connection");
+		write_to_tcp_fd(fdF, tcp_file);
 	}
-	if (r == -1)
-		fatal_err("error reading from file");
 
-	check_result(tcp_file);
+	check_result(tcp_file); 
+	printf ("wrote the footer file %s\n", post_footer);
 
 	eat_headers(tcp_file, &chunked, &content_length);
 
@@ -138,6 +162,22 @@ int httppost_main(int argc, char *argv[])
 
 	return 0;
 }
+
+static write_to_tcp_fd (int fd, FILE *tcp_file)
+{
+	int r;
+	/* Copy file */
+	while(r= read(fd, buffer, sizeof(buffer)), r > 0)
+	{
+		printf ("read %u bytes\n%s", r,buffer);
+		if (fwrite(buffer, r, 1, tcp_file) != 1)
+			fatal_err("error writing to tcp connection");
+	}
+	if (r == -1)
+		fatal_err("error reading from file");
+
+}
+
 
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp)
