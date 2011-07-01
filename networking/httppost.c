@@ -18,6 +18,7 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 
 struct option longopts[]=
 {
+	{ "delete-file", no_argument, NULL, 'd' },
 	{ "post-file", required_argument, NULL, 'p' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
@@ -42,6 +43,7 @@ int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
 	int c,  fd, fdF, fdH, tcp_fd, chunked, content_length;
+	int opt_delete_file;
 	char *url, *host, *port, *hostport, *path;
 	char *post_file, *output_file, *post_footer, *post_header;
 	FILE *tcp_file, *out_file;
@@ -52,12 +54,16 @@ int httppost_main(int argc, char *argv[])
 	post_footer=NULL;
 	post_header=NULL;
 	output_file= NULL;
+	opt_delete_file = 0;
 	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
 		case 'O':
 			output_file= optarg;
+			break;
+		case 'd':
+			opt_delete_file = 1;
 			break;
 		case 'h':				/* --post-header */
 			post_header= optarg;
@@ -179,8 +185,9 @@ int httppost_main(int argc, char *argv[])
 	{
 		copy_bytes(tcp_file, out_file, content_length);
 	}
-
-	return 0;
+	if ( opt_delete_file == 1 )
+		unlink (post_file);
+	return 0; 
 }
 
 static write_to_tcp_fd (int fd, FILE *tcp_file)
@@ -572,8 +579,17 @@ static void copy_bytes(FILE *in_file, FILE *out_file, size_t len)
 static void usage(void)
 {
 	fprintf(stderr,
-"Usage: httppost [--post-file <file-to-post] [-O <output-file>] <url>\n");
-		
+"Usage: httppost\n"); 
+	fprintf(stderr,
+"         [--post-header <file-to-post>] [--post-file <file-to-post>]\n");
+	fprintf(stderr, 
+"        [--post-footer  <file-to-post>] \n");
+
+	fprintf(stderr, 
+"        [--delete-file 'delete the upon success, not header and footer'\n");
+
+	fprintf(stderr, 
+"        [--post-footer  <file-to-post>] [-O <output-file>] <url>\n");
 	exit(1);
 }
 
