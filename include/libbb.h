@@ -422,13 +422,18 @@ struct BUG_too_small {
 			) <= 127 ? 1 : -1];
 };
 
-
 int xsocket(int domain, int type, int protocol) FAST_FUNC;
 void xbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen) FAST_FUNC;
+void xrbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen,
+	void (*reportf)(int err)) FAST_FUNC;
 void xlisten(int s, int backlog) FAST_FUNC;
 void xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen) FAST_FUNC;
+void xrconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen,
+				void (*reportf)(int err)) FAST_FUNC;
 ssize_t xsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
 				socklen_t tolen) FAST_FUNC;
+ssize_t xrsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
+			socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
 /* SO_REUSEADDR allows a server to rebind to an address that is already
  * "in use" by old connections to e.g. previous server instance which is
  * killed or crashed. Without it bind will fail until all such connections
@@ -525,6 +530,8 @@ char* xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa) FAST_FUNC;
 struct hostent *xgethostbyname(const char *name) FAST_FUNC;
 // Also mount.c and inetd.c are using gethostbyname(),
 // + inet_common.c has additional IPv4-only stuff
+
+len_and_sockaddr* get_sock_lsa(int fd) FAST_FUNC;
 
 
 void socket_want_pktinfo(int fd) FAST_FUNC;
@@ -1301,8 +1308,8 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags) FAST_FUNC;
 /* Format cmdline (up to col chars) into char buf[col+1] */
 /* Puts [comm] if cmdline is empty (-> process is a kernel thread) */
 void read_cmdline(char *buf, int col, unsigned pid, const char *comm) FAST_FUNC;
-int comm_match(procps_status_t *p, const char *procName);
 pid_t *find_pid_by_name(const char* procName) FAST_FUNC;
+int comm_match(procps_status_t *p, const char *procName);
 pid_t *pidlist_reverse(pid_t *pidList) FAST_FUNC;
 
 
