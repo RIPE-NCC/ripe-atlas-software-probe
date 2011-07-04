@@ -626,6 +626,7 @@ int tftp_main(int argc UNUSED_PARAM, char **argv)
 #if ENABLE_TFTPD
 
 /* TODO: libbb candidate? */
+#if 0
 static len_and_sockaddr *get_sock_lsa(int s)
 {
 	len_and_sockaddr *lsa;
@@ -638,6 +639,7 @@ static len_and_sockaddr *get_sock_lsa(int s)
 	getsockname(s, &lsa->u.sa, &lsa->len);
 	return lsa;
 }
+#endif
 
 int tftpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tftpd_main(int argc UNUSED_PARAM, char **argv)
