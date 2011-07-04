@@ -127,12 +127,6 @@
        "$ basename /foo/bar.txt .txt\n" \
        "bar"
 
-#define buddyinfo_trivial_usage \
-	"buddyinfo print buddyinfo for atlsformat"
-
-#define buddyinfo_full_usage \
-	"buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more"
-
 #define fbsplash_trivial_usage \
        "-s IMGFILE [-c] [-d DEV] [-i INIFILE] [-f CMD]"
 #define fbsplash_full_usage "\n\n" \
@@ -168,6 +162,12 @@
      "\n	setbridgeprio BRIDGE PRIO	Set bridge priority" \
      "\n	stp BRIDGE [1|0]		STP on/off" \
 	) \
+
+#define buddyinfo_trivial_usage \
+	"buddyinfo print buddyinfo for atlsformat"
+
+#define buddyinfo_full_usage \
+	"buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more"
 
 #define bunzip2_trivial_usage \
        "[OPTION]... [FILE]"
@@ -1176,10 +1176,10 @@
        "/etc/passwd\n"
 
 #define findpid_trivial_usage \
-	"findpid <name>"
+	"find pid return 0 on success" 
 
 #define findpid_full_usage \
-	"findpid <name> "
+	"find pid return 0 on success" 
 
 #define fold_trivial_usage \
        "[-bs] [-w WIDTH] [FILE]"
@@ -2415,7 +2415,7 @@
 	"[OPTION]...[MANPAGE]..."
 
 #define atlasserial_full_usage \
-	"atlasserial -l loglevel "
+	"atlasserial "
 
 #define matchpathcon_trivial_usage \
        "[-n] [-N] [-f file_contexts_file] [-p prefix] [-V]"
@@ -3738,10 +3738,10 @@
        "[98528 second delay results]\n")
 
 #define sleepkick_trivial_usage \
-	"duration kick . both in seconds"
+	"sleep duration and kick /dev/watchdog every x seconds"
 
 #define sleepkick_full_usage \
-	"duration kick . both in seconds"
+	"sleep duration and kick /dev/watchdog every x seconds"
 
 #define sort_trivial_usage \
        "[-nru" \
