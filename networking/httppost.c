@@ -37,6 +37,8 @@ static void copy_bytes(FILE *in_file, FILE *out_file, size_t len);
 static void usage(void);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
+static void report(const char *fmt, ...);
+static void report_err(const char *fmt, ...);
 static void write_to_tcp_fd (int fd, FILE *tcp_file);
 static void skip_spaces(const char *cp, char **ncp);
 
@@ -56,6 +58,15 @@ int httppost_main(int argc, char *argv[])
 	post_header=NULL;
 	output_file= NULL;
 	opt_delete_file = 0;
+
+	fd= -1;
+	fdH= -1;
+	fdF= -1;
+	tcp_fd= -1;
+	out_file= NULL;
+
+	/* Allow us to be called directly by another program in busybox */
+	optind= 0;
 	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
 	{
 		switch(c)
@@ -98,45 +109,84 @@ int httppost_main(int argc, char *argv[])
 	{	
 		fdH = open(post_header, O_RDONLY);
 		if(fdH == -1 )
-			fatal_err("unable to open header '%s'", post_header);
+		{
+			report_err("unable to open header '%s'", post_header);
+			goto err;
+		}
 		if (fstat(fdH, &sbH) == -1)
-			fatal_err("fstat failed on header file '%s'", post_header);
+		{
+			report_err("fstat failed on header file '%s'",
+				post_header);
+			goto err;
+		}
 		if (!S_ISREG(sbH.st_mode))
-			fatal("'%s' header is not a regular file", post_header);
+		{
+			report("'%s' header is not a regular file",
+				post_header);
+			goto err;
+		}
 	}
 
 	if(post_footer != NULL )
 	{	
 		fdF = open(post_footer, O_RDONLY);
 		if(fdF == -1 )
-			fatal_err("unable to open footer '%s'", post_footer);
+		{
+			report_err("unable to open footer '%s'", post_footer);
+			goto err;
+		}
 		if (fstat(fdF, &sbF) == -1)
-			fatal_err("fstat failed on footer file '%s'", post_footer);
+		{
+			report_err("fstat failed on footer file '%s'",
+				post_footer);
+			goto err;
+		}
 		if (!S_ISREG(sbF.st_mode))
-			fatal("'%s' footer is not a regular file", post_footer);
+		{
+			report("'%s' footer is not a regular file",
+				post_footer);
+			goto err;
+		}
 	}
-
 
 	/* Try to open the file before trying to connect */
 	if (post_file == NULL)
-		fatal("no file to POST");
+	{
+		report("no file to POST");
+		goto err;
+	}
 
 	fd= open(post_file, O_RDONLY);
 	if (fd == -1)
-		fatal_err("unable to open '%s'", post_file);
+	{
+		report_err("unable to open '%s'", post_file);
+		goto err;
+	}
 	if (fstat(fd, &sb) == -1)
-		fatal_err("fstat failed");
+	{
+		report_err("fstat failed");
+		goto err;
+	}
 	if (!S_ISREG(sb.st_mode))
-		fatal("'%s' is not a regular file", post_file);
+	{
+		report("'%s' is not a regular file", post_file);
+		goto err;
+	}
 
 	tcp_fd= connect_to_name(host, port);
 	if (tcp_fd == -1)
-		fatal_err("unable to connect to '%s'", host);
+	{
+		report_err("unable to connect to '%s'", host);
+		goto err;
+	}
 
 	/* Stdio makes life easy */
 	tcp_file= fdopen(tcp_fd, "r+");
 	if (tcp_file == NULL)
-		fatal("fdopen failed");
+	{
+		report("fdopen failed");
+		goto err;
+	}
 
 	fprintf(tcp_file, "POST %s HTTP/1.1\r\n", path);
 	//fprintf(tcp_file, "GET %s HTTP/1.1\r\n", path);
@@ -157,7 +207,6 @@ int httppost_main(int argc, char *argv[])
 	fprintf(tcp_file, "Content-Length: %lu\r\n", (unsigned long)cLength);
 	fprintf(tcp_file, "\r\n");
 
-
 	if( post_header != NULL )
 		 write_to_tcp_fd(fdH, tcp_file); 
 
@@ -173,7 +222,10 @@ int httppost_main(int argc, char *argv[])
 	{
 		out_file= fopen(output_file, "w");
 		if (!out_file)
-			fatal_err("unable to create '%s'", out_file);
+		{
+			report_err("unable to create '%s'", out_file);
+			goto err;
+		}
 	}
 	else
 		out_file= stdout;
@@ -189,6 +241,15 @@ int httppost_main(int argc, char *argv[])
 	if ( opt_delete_file == 1 )
 		unlink (post_file);
 	return 0; 
+
+err:
+	if (fdH != -1) close(fdH);
+	if (fdF != -1) close(fdF);
+	if (fd != -1) close(fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (out_file) fclose(out_file);
+	
+	return 1;
 }
 
 static void write_to_tcp_fd (int fd, FILE *tcp_file)
@@ -635,4 +696,33 @@ static void fatal_err(const char *fmt, ...)
 	va_end(ap);
 
 	exit(1);
+}
+
+static void report(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	fprintf(stderr, "httppost: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+
+	va_end(ap);
+}
+
+static void report_err(const char *fmt, ...)
+{
+	int s_errno;
+	va_list ap;
+
+	s_errno= errno;
+
+	va_start(ap, fmt);
+
+	fprintf(stderr, "httppost: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, ": %s\n", strerror(s_errno));
+
+	va_end(ap);
 }
