@@ -800,6 +800,7 @@ static void find_eos(char *cp, char **ncpp)
 
 int ping_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
+int httppost_main(int argc, char *argv[]);
 
 static struct builtin 
 {
@@ -809,11 +810,12 @@ static struct builtin
 {
 	{ "ping", ping_main },
 	{ "ping6", ping6_main },
+	{ "httppost", httppost_main },
 	{ NULL, 0 }
 };
 
 #define ATLAS_NARGS	20	/* Max arguments to a built-in command */
-#define ATLAS_ARGSIZE	100	/* Max size of the command line */
+#define ATLAS_ARGSIZE	256	/* Max size of the command line */
 
 static int atlas_run(char *cmdline)
 {
@@ -957,34 +959,42 @@ static int atlas_run(char *cmdline)
 	for (i= 0; i<argc; i++)
 		crondlog(LVL8 "atlas_run: argv[%d] = '%s'", i, argv[i]);
 
-	/* Redirect I/O */
-	crondlog(LVL8 "sending output to '%s'", outfile);
-	flags= O_CREAT | O_WRONLY;
-	if (do_append)
-		flags |= O_APPEND;
-	atlas_fd= open(outfile, flags, 0644);
-	if (atlas_fd == -1)
+	saved_fd= -1;	/* lint */
+	if (outfile)
 	{
-		crondlog(LVL8 "atlas_run: unable to create output file '%s'",
-			outfile);
-		return 1;
-	}
-	fflush(stdout);
-	saved_fd= dup(1);
-	if (saved_fd == -1)
-	{
-		crondlog(LVL8 "atlas_run: unable to dub stdout");
+		/* Redirect I/O */
+		crondlog(LVL8 "sending output to '%s'", outfile);
+		flags= O_CREAT | O_WRONLY;
+		if (do_append)
+			flags |= O_APPEND;
+		atlas_fd= open(outfile, flags, 0644);
+		if (atlas_fd == -1)
+		{
+			crondlog(
+			LVL8 "atlas_run: unable to create output file '%s'",
+				outfile);
+			return 1;
+		}
+		fflush(stdout);
+		saved_fd= dup(1);
+		if (saved_fd == -1)
+		{
+			crondlog(LVL8 "atlas_run: unable to dub stdout");
+			close(atlas_fd);
+			return 1;
+		}
+		dup2(atlas_fd, 1);
 		close(atlas_fd);
-		return 1;
 	}
-	dup2(atlas_fd, 1);
-	close(atlas_fd);
 
 	bp->func(argc, argv);
 
-	fflush(stdout);
-	dup2(saved_fd, 1);
-	close(saved_fd);
+	if (outfile)
+	{
+		fflush(stdout);
+		dup2(saved_fd, 1);
+		close(saved_fd);
+	}
 
 	return 1;
 }
