@@ -434,6 +434,8 @@ ssize_t xsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
 				socklen_t tolen) FAST_FUNC;
 ssize_t xrsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
 			socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
+ssize_t rsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
+			socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
 /* SO_REUSEADDR allows a server to rebind to an address that is already
  * "in use" by old connections to e.g. previous server instance which is
  * killed or crashed. Without it bind will fail until all such connections
