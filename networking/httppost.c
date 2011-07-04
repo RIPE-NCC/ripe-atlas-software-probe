@@ -35,9 +35,10 @@ static int connect_to_name(char *host, char *port);
 static void copy_chunked(FILE *in_file, FILE *out_file);
 static void copy_bytes(FILE *in_file, FILE *out_file, size_t len);
 static void usage(void);
-static void fatal(char *fmt, ...);
-static void fatal_err(char *fmt, ...);
-static write_to_tcp_fd (int fd, FILE *tcp_file);
+static void fatal(const char *fmt, ...);
+static void fatal_err(const char *fmt, ...);
+static void write_to_tcp_fd (int fd, FILE *tcp_file);
+static void skip_spaces(const char *cp, char **ncp);
 
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
@@ -153,7 +154,7 @@ int httppost_main(int argc, char *argv[])
 		cLength  +=  sbF.st_size;
 
 
-	fprintf(tcp_file, "Content-Length: %u\r\n", cLength);
+	fprintf(tcp_file, "Content-Length: %lu\r\n", (unsigned long)cLength);
 	fprintf(tcp_file, "\r\n");
 
 
@@ -190,7 +191,7 @@ int httppost_main(int argc, char *argv[])
 	return 0; 
 }
 
-static write_to_tcp_fd (int fd, FILE *tcp_file)
+static void write_to_tcp_fd (int fd, FILE *tcp_file)
 {
 	int r;
 	/* Copy file */
@@ -208,7 +209,8 @@ static write_to_tcp_fd (int fd, FILE *tcp_file)
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp)
 {
-	char *cp, *np, *prefix, *item;
+	char *item;
+	const char *cp, *np, *prefix;
 	size_t len;
 
 	/* the url must start with 'http://' */
@@ -304,7 +306,8 @@ static void check_result(FILE *tcp_file)
 {
 	int major, minor;
 	size_t len;
-	char *cp, *check, *line, *prefix;
+	char *cp, *check, *line;
+	const char *prefix;
 
 	if (fgets(buffer, sizeof(buffer), tcp_file) == NULL)
 	{
@@ -338,9 +341,8 @@ static void check_result(FILE *tcp_file)
 	{
 		fatal("bad major version in response '%s'", line);
 	}
-	cp= check;
-	while (cp[0] != '\0' && isspace(*(unsigned char *)cp))
-		cp++;
+
+	skip_spaces(check, &cp);
 
 	if (!isdigit(*(unsigned char *)cp))
 		fatal("bad status code in response '%s'", line);
@@ -351,9 +353,9 @@ static void check_result(FILE *tcp_file)
 
 static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 {
-	char *line, *cp, *kw, *check;
+	char *line, *cp, *ncp, *check;
 	size_t len;
-	unsigned char *ucp, *uncp;
+	const char *kw;
 
 	*chunked= 0;
 	*content_length= 0;
@@ -372,38 +374,40 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 
 		fprintf(stderr, "httppost: got line '%s'\n", line);
 
-		ucp= line;
-		while (ucp[0] != '\0' && isspace(ucp[0]))
-			ucp++;
-		if (ucp != (unsigned char *)line)
+		cp= line;
+		skip_spaces(cp, &ncp);
+		if (ncp != line)
 			continue;	/* Continuation line */
-		uncp= ucp;
-		while (uncp[0] != '\0' && uncp[0] != ':' && !isspace(uncp[0]))
-			uncp++;
+
+		cp= ncp;
+		while (ncp[0] != '\0' && ncp[0] != ':' &&
+			!isspace((unsigned char)ncp[0]))
+		{
+			ncp++;
+		}
+
 		kw= "Transfer-Encoding";
 		len= strlen(kw);
-		if (strncasecmp(ucp, kw, len) == 0)
+		if (strncasecmp(cp, kw, len) == 0)
 		{
 			/* Skip optional white space */
-			ucp= uncp;
-			while (ucp[0] != '\0' && isspace(ucp[0]))
-				ucp++;
+			cp= ncp;
+			skip_spaces(cp, &cp);
 
-			if (ucp[0] != ':')
+			if (cp[0] != ':')
 				fatal("malformed content-length header", line);
-			ucp++;
+			cp++;
 
 			/* Skip more white space */
-			while (ucp[0] != '\0' && isspace(ucp[0]))
-				ucp++;
+			skip_spaces(cp, &cp);
 
 			/* Should have the value by now */
 			kw= "chunked";
 			len= strlen(kw);
-			if (strncasecmp(ucp, kw, len) != 0)
+			if (strncasecmp(cp, kw, len) != 0)
 				continue;
 			/* make sure we have end of line or white space */
-			if (ucp[len] != '\0' && isspace(ucp[len]))
+			if (cp[len] != '\0' && isspace((unsigned char)cp[len]))
 				continue;
 			*chunked= 1;
 			continue;
@@ -411,33 +415,30 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 
 		kw= "Content-length";
 		len= strlen(kw);
-		if (strncasecmp(ucp, kw, len) != 0)
+		if (strncasecmp(cp, kw, len) != 0)
 			continue;
 
 		/* Skip optional white space */
-		ucp= uncp;
-		while (ucp[0] != '\0' && isspace(ucp[0]))
-			ucp++;
+		cp= ncp;
+		skip_spaces(cp, &cp);
 
-		if (ucp[0] != ':')
+		if (cp[0] != ':')
 			fatal("malformed content-length header", line);
-		ucp++;
+		cp++;
 
 		/* Skip more white space */
-		while (ucp[0] != '\0' && isspace(ucp[0]))
-			ucp++;
+		skip_spaces(cp, &cp);
 
 		/* Should have the value by now */
-		*content_length= strtoul(ucp, &check, 10);
-		if ((unsigned char *)check == ucp)
+		*content_length= strtoul(cp, &check, 10);
+		if (check == cp)
 			fatal("malformed content-length header", line);
 
 		/* And after that we should have just white space */
-		ucp= check;
-		while (ucp[0] != '\0' && isspace(ucp[0]))
-			ucp++;
+		cp= check;
+		skip_spaces(cp, &cp);
 
-		if (ucp[0] != '\0')
+		if (cp[0] != '\0')
 			fatal("malformed content-length header", line);
 	}
 	if (feof(tcp_file))
@@ -576,6 +577,16 @@ static void copy_bytes(FILE *in_file, FILE *out_file, size_t len)
 	}
 }
 
+static void skip_spaces(const char *cp, char **ncp)
+{
+	const unsigned char *ucp;
+
+	ucp= (const unsigned char *)cp;
+	while (ucp[0] != '\0' && isspace(ucp[0]))
+		ucp++;
+	*ncp= (char *)ucp;
+}
+
 static void usage(void)
 {
 	fprintf(stderr,
@@ -593,7 +604,7 @@ static void usage(void)
 	exit(1);
 }
 
-static void fatal(char *fmt, ...)
+static void fatal(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -608,7 +619,7 @@ static void fatal(char *fmt, ...)
 	exit(1);
 }
 
-static void fatal_err(char *fmt, ...)
+static void fatal_err(const char *fmt, ...)
 {
 	int s_errno;
 	va_list ap;
