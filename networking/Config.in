@@ -267,9 +267,9 @@ config FEATURE_HTTPD_PROXY
 
 config HTTPPOST
 	bool "httppost"
-        default y
-        help
-          simple httppost --post-file with IPv4. RIPE NCC 2011
+	default y
+	help 
+	  simple httppost --post-file with IPv4. RIPE NCC 2011
 
 config IFCONFIG
 	bool "ifconfig"
