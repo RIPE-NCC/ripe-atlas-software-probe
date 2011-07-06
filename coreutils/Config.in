@@ -13,14 +13,6 @@ config BASENAME
 	  leaving just the filename itself. Enable this option if you wish
 	  to enable the 'basename' utility.
 
-config BUDDYINFO
-	bool "buddyinfo"
-	default n
-	help
-	  buddyinfo print /cat/proc/buddyinfo for format. "RESULT 9001.0 ongoing <epoch> "
-	  if env variable LOW_MEM_T in Kilobytes (4 - 4096 is set) and no blocks of that or
-	  bigger size return EXIT_FAILURE
-
 config CAL
 	bool "cal"
 	default n
@@ -250,12 +242,6 @@ config FALSE
 	default n
 	help
 	  false returns an exit code of FALSE (1).
-
-config FINDPID
-        bool "findpid"
-        default n
-        help
-          findpid  returns 0 if the nameed command is running
 
 config FOLD
 	bool "fold"
