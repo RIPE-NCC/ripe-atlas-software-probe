@@ -762,9 +762,10 @@ static int builtin_read(char **argv);
 static int builtin_test(char **argv);
 static int builtin_add(char **argv);
 static int builtin_sub(char **argv);
-static int builtin_d4route(char **argv);
 static int builtin_rchoose(char **argv);
-static int builtin_ssleep(char **argv);
+static int builtin_findpid(char **argv);
+static int builtin_sleepkick(char **argv);
+static int builtin_buddyinfo(char **argv);
 static int builtin_epoch(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
@@ -817,9 +818,10 @@ static const struct built_in_command bltins[] = {
 #if ENABLE_HUSH_LOOPS
 	BLTIN("continue", builtin_continue, "Start new loop iteration"),
 #endif
-	BLTIN("d4route"  , builtin_d4route, "0 if no v4 default route 1 if thereis"),
 	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
-	BLTIN("ssleep"  , builtin_ssleep, "builtin sleep"),
+	BLTIN("findpid"  , builtin_findpid, "find process /proc/"),
+	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
+	BLTIN("sleepkick"  , builtin_sleepkick, "sleep and kick the watchdog"),
 	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
@@ -4443,45 +4445,52 @@ static int builtin_true(char **argv UNUSED_PARAM)
 	return 0;
 }
 
-static int builtin_ssleep (char **argv)
+static int builtin_sleepkick (char **argv)
 {
- unsigned duration;
- duration = xatou(argv[1]);
- sleep(duration);
- return EXIT_SUCCESS;
+#define WATCHDOGDEV "/dev/watchdog"
+	unsigned duration;
+	unsigned watchdog;
+	if (argv[1] == NULL) 
+		return (1);
+	
+	duration = xatou(argv[1]);
 
-}
+	if(argv[2])
+	{ 
+		int fd;         /* File handler for watchdog */
+		int i = 0;
+		int iMax = 0;
 
+		watchdog =  xatou(argv[2]);
+		iMax =   (int) (duration / watchdog);
 
-static int builtin_d4route (char **argv)
-{
-	char devname[64], flags[16], *sdest, *sgw;
-	unsigned long d, g, m;
-        int flgs, ref, use, metric, mtu, win, ir;
-	 
-	struct sockaddr_in s_addr;
-
-	 FILE *fp = xfopen_for_read("/proc/net/route");
-	if (fscanf(fp, "%*[^\n]\n") < 0) { /* Skip the first line. */	
-		fclose (fp);
-		return EXIT_FAILURE;
-	}
-	int r = 0;
-       while ((r = fscanf(fp, "%63s%lx%lx%X%d%d%d%lx%d%d%d\n", devname, &d, &g, &flgs, &ref, &use, &metric, &m, &mtu, &win, &ir)) == 11)
-	{
-		if ( (d == 0 ) && (m == 0) )
+		int modDuration = 0;
+		if( duration >= watchdog)
 		{
-			memset(&s_addr, 0, sizeof(struct sockaddr_in));
-			s_addr.sin_family = AF_INET;
-			s_addr.sin_addr.s_addr = g;
-			sgw =  INET_rresolve(&s_addr, ( 0x0fff | 0x4000), m); /* Host instead of net */
-			printf("%-15.15s\n", sgw);
-			free(sgw);
-			return EXIT_SUCCESS;
+			modDuration =   duration % watchdog;
 		}
+		else {
+			modDuration  = duration;
+		}
+
+		fd = open(WATCHDOGDEV, O_RDWR);
+		for( i = 0; i < iMax; i++)
+		{
+			write(fd, "1", 1);
+			sleep(watchdog);	
+		}
+		if(modDuration)
+		{
+			write(fd, "1", 1);
+			sleep(modDuration);
+			write(fd, "1", 1);
+		}
+ 		close(fd);
 	}
-	fclose (fp);
-	return EXIT_FAILURE;
+	else 
+	{
+		sleep(duration);
+	}
 }
 
 static int builtin_add(char **argv)
@@ -4515,6 +4524,119 @@ static int builtin_epoch (char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int builtin_buddyinfo(char **argv) 
+{
+	char *lowmemChar;
+	unsigned lowmem = 0;
+	
+	lowmemChar =  argv[1];
+	if(lowmemChar) 
+		lowmem = xatou(lowmemChar);
+
+        FILE *fp = xfopen_for_read("/proc/buddyinfo");
+        char aa[10];
+        fscanf(fp, "%s", aa); 
+        fscanf(fp, "%s", aa);
+        fscanf(fp, "%s", aa);
+        fscanf(fp, "%s", aa);
+
+	char *my_mac ;
+        my_mac = getenv("ETHER_SCANNED");
+
+        int i = 0;
+        int j = 0;
+	int memBlock = 4;
+	int fReboot = 1; // don't reboot 
+	if (lowmem >= 4 ) 
+	{
+		fReboot = 0; // env variable is set sow we check for low thershhold
+	}
+        printf ("RESULT 9001.0 ongoing %d ", (int)time(0));
+	if (my_mac !=  NULL)
+		printf("%s ", my_mac);
+	else
+		printf( "AAAAAABBBBBB ");
+	/* get uptime and print it */
+	struct sysinfo info; 
+	sysinfo(&info);
+ 	printf ("%ld", info.uptime );
+	int freeMem = 0;
+	int jMax = 64; // enough
+
+        for (j=0; j < jMax; j++)  
+        {
+                if (fscanf(fp, "%d", &i) != 1)
+			break;
+		freeMem += ( memBlock * i);
+		if ( lowmem >= 4) 
+		{
+			if(  memBlock >=  lowmem)
+			{
+		 		if(fReboot == 0)
+				{ 
+			  		if (i > 0 )
+						{
+							fReboot = 1;
+							
+						}
+				} 
+			}
+		}
+		memBlock  *= 2; 
+        }
+
+	/* now print it */
+
+	printf (" %d " ,  freeMem);
+
+	fclose (fp);
+        FILE *fp1 = xfopen_for_read("/proc/buddyinfo");
+        fscanf(fp1, "%s", aa);
+        fscanf(fp1, "%s", aa);
+        fscanf(fp1, "%s", aa);
+        fscanf(fp1, "%s", aa);
+
+
+        for (j=0; j < jMax ; j++)  
+        {
+                if (fscanf(fp1, "%d", &i) != 1)
+			break;
+                printf("%-3d ", i);
+        }
+
+        printf ("\n"); 
+        fclose(fp1);
+	if(fReboot == 0 )
+	{
+		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
+		return (EXIT_FAILURE);
+	}
+}
+
+static int builtin_findpid(char **argv)
+{
+	pid_t* pidList;
+	procps_status_t* p = NULL;
+
+	if (argv[1])
+	{
+		while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN)))
+		{
+			if (comm_match(p, argv[1])
+                /* or we require argv0 to match (essential for matching reexeced
+ /proc/self/exe)*/
+                 	|| (p->argv0 && strcmp(bb_basename(p->argv0), argv) == 0)
+                /* TODO: we can also try /proc/NUM/exe link, do we want that? */
+                ) 
+			{
+                        	return 0; /* found the match */
+                	}
+		}
+	}
+	return 1 ; /* NO MATCH */
+}
+
+
 static int builtin_rchoose(char **argv)
 {
 	srand (time (0));
@@ -4526,8 +4648,8 @@ static int builtin_rchoose(char **argv)
 	argv -= argc;
 	argv++;
 	int r = rand();
-	r %= (argc - 1 );
-	printf ("%s and int %d\n", argv[r], argc);
+	r %= (argc - 1);
+	printf ("%s\n", argv[r]);
 	return fflush(stdout);
 }
 
