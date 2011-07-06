@@ -83,7 +83,8 @@ enum {
 	OPT_S = (1 << 4),
 	OPT_c = (1 << 5),
 	OPT_A = (1 << 6),
-	OPT_d = (1 << 7) * ENABLE_FEATURE_CROND_D,
+	OPT_D = (1 << 7),
+	OPT_d = (1 << 8) * ENABLE_FEATURE_CROND_D,
 };
 #if ENABLE_FEATURE_CROND_D
 #define DebugOpt (option_mask32 & OPT_d)
@@ -120,6 +121,7 @@ static struct globals G;
 
 #ifdef ATLAS
 static int do_atlas;
+static int do_kick_watchdog;
 
 static int atlas_run(char *cmdline);
 #endif
@@ -188,7 +190,7 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_CROND_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:A" USE_FEATURE_CROND_D("d:"),
+	opt = getopt32(argv, "l:L:fbSc:AD" USE_FEATURE_CROND_D("d:"),
 			&LogLevel, &LogFile, &CDir
 			USE_FEATURE_CROND_D(,&LogLevel));
 	/* both -d N and -l N set the same variable: LogLevel */
@@ -206,6 +208,7 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	do_atlas= !!(opt & OPT_A);
+	do_kick_watchdog= !!(opt & OPT_D);
 
 	xchdir(CDir);
 	//signal(SIGHUP, SIG_IGN); /* ? original crond dies on HUP... */
@@ -220,11 +223,24 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 		time_t t2;
 		long dt;
 		int rescan = 60;
-		int sleep_time = 60;
+		int sleep_time = 20; /* AA previously 60 */
 
 		write_pidfile("/var/run/crond.pid");
 		for (;;) {
+			if(do_kick_watchdog) 
+			{
+				int fdwatchdog = open("/dev/watchdog", O_RDWR);
+                		write(fdwatchdog, "1", 1);
+                		close(fdwatchdog);
+			}
 			sleep((sleep_time + 1) - (time(NULL) % sleep_time));
+
+			if(do_kick_watchdog) 
+			{
+				int fdwatchdog = open("/dev/watchdog", O_RDWR);
+                		write(fdwatchdog, "1", 1);
+                		close(fdwatchdog);
+			}
 
 			t2 = time(NULL);
 			dt = (long)t2 - (long)t1;
@@ -261,7 +277,7 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 				if (CheckJobs() > 0) {
 					sleep_time = 10;
 				} else {
-					sleep_time = 60;
+					sleep_time = 20; /* AA previously 60 */
 				}
 			}
 			t1 = t2;
@@ -802,6 +818,11 @@ int ping_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 
+static int traceroute_main(int argc, char *argv[]);
+static int traceroute_main(int argc, char *argv[]) {
+	return;
+}
+
 static struct builtin 
 {
 	const char *cmd;
@@ -811,6 +832,7 @@ static struct builtin
 	{ "ping", ping_main },
 	{ "ping6", ping6_main },
 	{ "httppost", httppost_main },
+	{ "traceroute", traceroute_main },
 	{ NULL, 0 }
 };
 
