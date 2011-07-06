@@ -163,12 +163,6 @@
      "\n	stp BRIDGE [1|0]		STP on/off" \
 	) \
 
-#define buddyinfo_trivial_usage \
-	"buddyinfo print buddyinfo for atlsformat"
-
-#define buddyinfo_full_usage \
-	"buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more"
-
 #define bunzip2_trivial_usage \
        "[OPTION]... [FILE]"
 #define bunzip2_full_usage "\n\n" \
@@ -1174,12 +1168,6 @@
 #define find_example_usage \
        "$ find / -name passwd\n" \
        "/etc/passwd\n"
-
-#define findpid_trivial_usage \
-	"find pid return 0 on success" 
-
-#define findpid_full_usage \
-	"find pid return 0 on success" 
 
 #define fold_trivial_usage \
        "[-bs] [-w WIDTH] [FILE]"
@@ -3736,12 +3724,6 @@
 	USE_FEATURE_FANCY_SLEEP( \
        "$ sleep 1d 3h 22m 8s\n" \
        "[98528 second delay results]\n")
-
-#define sleepkick_trivial_usage \
-	"sleep duration and kick /dev/watchdog every x seconds"
-
-#define sleepkick_full_usage \
-	"sleep duration and kick /dev/watchdog every x seconds"
 
 #define sort_trivial_usage \
        "[-nru" \
