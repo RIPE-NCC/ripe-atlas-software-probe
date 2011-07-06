@@ -63,6 +63,7 @@ int httppost_main(int argc, char *argv[])
 	fdH= -1;
 	fdF= -1;
 	tcp_fd= -1;
+	tcp_file= NULL;
 	out_file= NULL;
 
 	/* Allow us to be called directly by another program in busybox */
@@ -240,12 +241,22 @@ int httppost_main(int argc, char *argv[])
 	}
 	if ( opt_delete_file == 1 )
 		unlink (post_file);
+
+
+	if (fdH != -1) close(fdH);
+	if (fdF != -1) close(fdF);
+	if (fd != -1) close(fd);
+	if (tcp_file) fclose(tcp_file);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (out_file) fclose(out_file);
+
 	return 0; 
 
 err:
 	if (fdH != -1) close(fdH);
 	if (fdF != -1) close(fdF);
 	if (fd != -1) close(fd);
+	if (tcp_file) fclose(tcp_file);
 	if (tcp_fd != -1) close(tcp_fd);
 	if (out_file) fclose(out_file);
 	
