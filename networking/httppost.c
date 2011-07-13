@@ -45,7 +45,7 @@ static void skip_spaces(const char *cp, char **ncp);
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c,  fd, fdF, fdH, tcp_fd, chunked, content_length;
+	int c,  fd, fdF, fdH, tcp_fd, chunked, content_length, result;
 	int opt_delete_file;
 	char *url, *host, *port, *hostport, *path;
 	char *post_file, *output_file, *post_footer, *post_header;
@@ -65,6 +65,10 @@ int httppost_main(int argc, char *argv[])
 	tcp_fd= -1;
 	tcp_file= NULL;
 	out_file= NULL;
+	host= NULL;
+	port= NULL;
+	hostport= NULL;
+	path= NULL;
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
@@ -242,25 +246,25 @@ int httppost_main(int argc, char *argv[])
 	if ( opt_delete_file == 1 )
 		unlink (post_file);
 
+	result= 0;
 
+leave:
 	if (fdH != -1) close(fdH);
 	if (fdF != -1) close(fdF);
 	if (fd != -1) close(fd);
 	if (tcp_file) fclose(tcp_file);
 	if (tcp_fd != -1) close(tcp_fd);
 	if (out_file) fclose(out_file);
+	if (host) free(host);
+	if (port) free(port);
+	if (hostport) free(hostport);
+	if (path) free(path);
 
-	return 0; 
+	return result; 
 
 err:
-	if (fdH != -1) close(fdH);
-	if (fdF != -1) close(fdF);
-	if (fd != -1) close(fd);
-	if (tcp_file) fclose(tcp_file);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (out_file) fclose(out_file);
-	
-	return 1;
+	result= 1;
+	goto leave;
 }
 
 static void write_to_tcp_fd (int fd, FILE *tcp_file)
