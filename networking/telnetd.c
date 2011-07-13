@@ -32,11 +32,53 @@
 #endif
 #include <arpa/telnet.h>
 
+#define ATLAS 1
+
+#ifdef ATLAS
+#define LOGIN_PREFIX	"(telnet) "
+#define LOGIN_PROMPT	" login: "
+#define PASSWORD_PROMPT	"\r\nPassword: "
+
+#define ATLAS_LOGIN	"C_TO_P_TEST"
+#define ATLAS_PASSWORD	"vuurwerk19"
+
+#define CMD_CRONTAB	"CRONTAB "
+#define CMD_END_CRONTAB	""
+
+#define CRLF		"\r\n"
+#define RESULT_OK	"OK" CRLF CRLF
+#define BAD_PASSWORD	"BAD_PASSWORD" CRLF CRLF
+#define BAD_COMMAND	"BAD_COMMAND" CRLF CRLF
+#define NAME_TOO_LONG	"NAME_TOO_LONG" CRLF CRLF
+#define CRONTAB_BUSY	"CRONTAB_BUSY" CRLF CRLF
+#define CREATE_FAILED	"UNABLE_TO_CREATE_NEW_CRONTAB" CRLF CRLF
+#define IO_ERROR	"IO_ERROR" CRLF CRLF
+
+#define CRONUSER	"root"
+#define CRONTAB_NEW_SUF	"/" CRONUSER ".new"
+#define CRONTAB_SUFFIX	"/" CRONUSER
+#define CRONUPDATE	"/cron.update"
+#define UPDATELINE	CRONUSER "\n"
+
+enum state
+{
+	DO_TRADITIONAL,
+	GET_LOGINNAME,
+	GET_PASSWORD,
+	GET_CMD,
+	DO_CRONTAB
+};
+#endif
+
 /* Structure that describes a session */
 struct tsession {
 	struct tsession *next;
 	int sockfd_read, sockfd_write, ptyfd;
 	int shell_pid;
+
+#ifdef ATLAS
+	enum state state;
+#endif
 
 	/* two circular buffers */
 	/*char *buf1, *buf2;*/
@@ -52,6 +94,15 @@ struct tsession {
  * Make whole thing fit in 4k */
 enum { BUFSIZE = (4 * 1024 - sizeof(struct tsession)) / 2 };
 
+#ifdef ATLAS
+static void add_2sock(struct tsession *ts, const char *str);
+static void pack_4sock(void);
+static char *getline_2pty(struct tsession *ts);
+static void pack_2pty(struct tsession *ts);
+static int start_crontab(struct tsession *ts, char *line);
+static void add_to_crontab(struct tsession *ts, char *line);
+static void end_crontab(struct tsession *ts);
+#endif
 
 /* Globals */
 static int maxfd;
@@ -59,6 +110,16 @@ static struct tsession *sessions;
 static const char *loginpath = "/bin/login";
 static const char *issuefile = "/etc/issue.net";
 
+#ifdef ATLAS
+/* Place to store the file handle and directory name for a new crontab */
+static FILE *atlas_crontab;
+static char atlas_dirname[256];
+static struct tsession *atlas_ts;	/* Allow only one 'atlas' connection
+					 * at a time. The old one
+					 * self-destructs when a new one is
+					 * started.
+					 */
+#endif
 
 /*
    Remove all IAC's from buf1 (received IACs are ignored and must be removed
@@ -165,21 +226,32 @@ make_new_session(
 		USE_FEATURE_TELNETD_STANDALONE(int sock)
 		SKIP_FEATURE_TELNETD_STANDALONE(void)
 ) {
+#ifndef ATLAS
 	const char *login_argv[2];
 	struct termios termbuf;
 	int fd, pid;
 	char tty_name[GETPTY_BUFSIZE];
+#endif
 	struct tsession *ts = xzalloc(sizeof(struct tsession) + BUFSIZE * 2);
+
+#ifdef ATLAS
+	ts->state= GET_LOGINNAME;
+#endif
 
 	/*ts->buf1 = (char *)(ts + 1);*/
 	/*ts->buf2 = ts->buf1 + BUFSIZE;*/
 
+#ifdef ATLAS
+	ts->ptyfd= 0;
+#else
 	/* Got a new connection, set up a tty. */
 	fd = xgetpty(tty_name);
 	if (fd > maxfd)
 		maxfd = fd;
 	ts->ptyfd = fd;
 	ndelay_on(fd);
+#endif /* ATLAS */
+
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 	ts->sockfd_read = sock;
 	/* SO_KEEPALIVE by popular demand */
@@ -217,6 +289,25 @@ make_new_session(
 		ts->size2 = sizeof(iacs_to_send);
 	}
 
+#ifdef ATLAS	/* Split original function into two */
+	return ts;
+}
+
+static int start_login(struct tsession *ts, char *user)
+{
+	int fd, pid;
+	const char *login_argv[3];
+	struct termios termbuf;
+	char tty_name[GETPTY_BUFSIZE];
+
+	/* Got a new connection, set up a tty. */
+	fd = xgetpty(tty_name);
+	if (fd > maxfd)
+		maxfd = fd;
+	ts->ptyfd = fd;
+	ndelay_on(fd);
+#endif /* ATLAS */
+
 	fflush(NULL); /* flush all streams */
 	pid = vfork(); /* NOMMU-friendly */
 	if (pid < 0) {
@@ -224,12 +315,20 @@ make_new_session(
 		close(fd);
 		/* sock will be closed by caller */
 		bb_perror_msg("vfork");
+#ifdef ATLAS
+		return -1;
+#else
 		return NULL;
+#endif
 	}
 	if (pid > 0) {
 		/* Parent */
 		ts->shell_pid = pid;
+#ifdef ATLAS
+		return 0;
+#else
 		return ts;
+#endif
 	}
 
 	/* Child */
@@ -270,7 +369,12 @@ make_new_session(
 
 	/* Exec shell / login / whatever */
 	login_argv[0] = loginpath;
+#ifdef ATLAS
+	login_argv[1] = user;
+	login_argv[2] = NULL;
+#else
 	login_argv[1] = NULL;
+#endif
 	/* exec busybox applet (if PREFER_APPLETS=y), if that fails,
 	 * exec external program */
 	BB_EXECVP(loginpath, (char **)login_argv);
@@ -313,7 +417,12 @@ free_session(struct tsession *ts)
 	kill(ts->shell_pid, SIGKILL);
 	wait4(ts->shell_pid, NULL, 0, NULL);
 #endif
+#ifdef ATLAS
+	if (ts->ptyfd != 0)
+		close(ts->ptyfd);
+#else
 	close(ts->ptyfd);
+#endif
 	close(ts->sockfd_read);
 	/* We do not need to close(ts->sockfd_write), it's the same
 	 * as sockfd_read unless we are in inetd mode. But in inetd mode
@@ -469,13 +578,24 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			/* Child died and we detected that */
 			free_session(ts);
 		} else {
+#ifdef ATLAS
+			if (ts->size1 > 0 && ts->state == DO_TRADITIONAL)
+				/* can write to pty */
+#else
 			if (ts->size1 > 0)       /* can write to pty */
+#endif
 				FD_SET(ts->ptyfd, &wrfdset);
 			if (ts->size1 < BUFSIZE) /* can read from socket */
 				FD_SET(ts->sockfd_read, &rdfdset);
 			if (ts->size2 > 0)       /* can write to socket */
 				FD_SET(ts->sockfd_write, &wrfdset);
+#ifdef ATLAS
+			if (ts->size2 < BUFSIZE &&
+				ts->state == DO_TRADITIONAL)
+				/* can read from pty */
+#else
 			if (ts->size2 < BUFSIZE) /* can read from pty */
+#endif
 				FD_SET(ts->ptyfd, &rdfdset);
 		}
 		ts = next;
@@ -505,6 +625,15 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		/* Create a new session and link it into our active list */
 		new_ts = make_new_session(fd);
 		if (new_ts) {
+#ifdef ATLAS
+			char *hostname;
+
+			hostname= safe_gethostname();
+			add_2sock(new_ts, LOGIN_PREFIX);
+			add_2sock(new_ts, hostname);
+			add_2sock(new_ts, LOGIN_PROMPT);
+			free(hostname);
+#endif /* ATLAS */
 			new_ts->next = sessions;
 			sessions = new_ts;
 		} else {
@@ -566,6 +695,11 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		}
 
 		if (/*ts->size1 < BUFSIZE &&*/ FD_ISSET(ts->sockfd_read, &rdfdset)) {
+#ifdef ATLAS
+			if (ts->rdidx1 >= BUFSIZE && ts->size1 < BUFSIZE)
+				pack_2pty(ts);
+#endif
+
 			/* Read from socket to buffer 1. */
 			count = MIN(BUFSIZE - ts->rdidx1, BUFSIZE - ts->size1);
 			count = safe_read(ts->sockfd_read, TS_BUF1 + ts->rdidx1, count);
@@ -584,6 +718,158 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 				ts->rdidx1 = 0;
 		}
  skip3:
+#ifdef ATLAS
+		switch(ts->state)
+		{
+		case DO_TRADITIONAL:
+			break;	/* Nothing to do */
+		case GET_LOGINNAME:
+			{
+			int num_totty;
+			char *line;
+			unsigned char *ptr;
+
+			ptr = remove_iacs(ts, &num_totty);
+
+			line= getline_2pty(ts);
+			if (!line)
+				goto skip3a;
+
+			if (strcmp(line, ATLAS_LOGIN) == 0)
+			{
+				free(line); line= NULL;
+				add_2sock(ts, PASSWORD_PROMPT);
+				ts->state= GET_PASSWORD;
+				goto skip3;
+			}
+			else
+			{
+				int r;
+
+				/* Echo login name */
+				add_2sock(ts, line);
+
+				r= start_login(ts, line);
+				free(line); line= NULL;
+				if (r == -1)
+					goto kill_session;
+				ts->state= DO_TRADITIONAL;
+				goto skip3a;
+			}
+
+			}
+		case GET_PASSWORD:
+			{
+			char *line;
+
+			line= getline_2pty(ts);
+			if (!line)
+				goto skip3a;
+
+			if (strcmp(line, ATLAS_PASSWORD) == 0)
+			{
+				free(line); line= NULL;
+
+				if (atlas_ts)
+				{
+					bb_error_msg("found atlas session");
+					/* There is an old session still
+					 * around. Take over.
+					 */
+					if (atlas_crontab)
+					{
+						fclose(atlas_crontab);
+						atlas_crontab= NULL;
+					}
+				}
+				atlas_ts= ts;
+ 
+				ts->state= GET_CMD;
+				goto skip3;
+			}
+			else
+			{
+				free(line); line= NULL;
+
+				/* Bad password, the end */
+				add_2sock(ts, BAD_PASSWORD);
+				goto skip3;
+			}
+
+			}
+
+		case GET_CMD:
+			{
+			int r;
+			size_t len;
+			char *line;
+
+			if (ts != atlas_ts)
+				goto kill_session;	/* Old session */
+
+			line= getline_2pty(ts);
+			if (!line)
+				goto skip3a;
+
+			len= strlen(CMD_CRONTAB);
+			if (strncmp(line, CMD_CRONTAB, len) == 0)
+			{
+				r= start_crontab(ts, line);
+				free(line); line= NULL;
+				if (r == -1)
+				{
+					/* Assume start_crontab sent an
+					 * error response.
+					 */
+					goto skip3;
+				}
+
+				ts->state= DO_CRONTAB;
+				goto skip3;
+			}
+
+			free(line); line= NULL;
+
+			/* Bad command */
+			add_2sock(ts, BAD_COMMAND);
+			goto skip3a;
+
+			}
+
+		case DO_CRONTAB:
+			{
+			char *line;
+
+			if (ts != atlas_ts)
+				goto kill_session;	/* Old session */
+
+			line= getline_2pty(ts);
+			if (!line)
+				goto skip3a;
+
+			if (strcmp(line, CMD_END_CRONTAB) == 0)
+			{
+				free(line); line= NULL;
+
+				end_crontab(ts);
+
+				/* Assume end_crontab sends a response. */
+				ts->state= GET_CMD;
+				goto skip3;
+			}
+
+			add_to_crontab(ts, line);
+			free(line); line= NULL;
+
+			/* And again */
+			goto skip3;
+			}
+		default:
+			bb_error_msg("unknown state %d", ts->state);
+			abort();
+		}
+skip3a:
+#endif /* ATLAS */
 		if (/*ts->size2 < BUFSIZE &&*/ FD_ISSET(ts->ptyfd, &rdfdset)) {
 			/* Read from pty to buffer 2. */
 			count = MIN(BUFSIZE - ts->rdidx2, BUFSIZE - ts->size2);
@@ -602,9 +888,251 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		ts = next;
 		continue;
  kill_session:
+#ifdef ATLAS
+		if (ts == atlas_ts)
+		{
+			if (atlas_crontab)
+			{
+				fclose(atlas_crontab);
+				atlas_crontab= NULL;
+			}
+			atlas_ts= NULL;
+		}
+#endif /* ATLAS */
 		free_session(ts);
 		ts = next;
 	}
 
 	goto again;
 }
+
+#ifdef ATLAS
+static void add_2sock(struct tsession *ts, const char *str)
+{
+	size_t len;
+
+	len= strlen(str);
+	if (ts->size2 + len > BUFSIZE)
+	{
+		syslog(LOG_ERR, "add_2sock: buffer full");
+		abort();
+	}
+	if (ts->rdidx2 + len > BUFSIZE)
+		pack_4sock();
+
+	memcpy(TS_BUF2+ts->rdidx2, str, len);
+	ts->rdidx2 += len;
+	ts->size2 += len;
+}
+
+static void pack_4sock(void)
+{
+	syslog(LOG_ERR, "pack_4sock: not implemented");
+	abort();
+}
+
+static char *getline_2pty(struct tsession *ts)
+{
+	size_t size1, len;
+	char *cp, *cp2, *line;
+
+	size1= ts->size1;
+
+	if (ts->wridx1 + size1 > BUFSIZE)
+		pack_2pty(ts);
+
+	/* remove_iacs converts a CR-LF to a CR */
+	cp= memchr(TS_BUF1+ts->wridx1, '\r', size1);
+	cp2= memchr(TS_BUF1+ts->wridx1, '\n', size1);
+	if (cp2 != NULL && (cp == NULL || cp2 < cp))
+	{
+		/* Use the LF. Patch '\n' to '\r' */
+		*cp2= '\r';
+		cp= cp2;
+	}
+	if (cp == NULL)
+		return NULL;
+
+	len= cp-((char *)TS_BUF1+ts->wridx1)+1;
+	line= xmalloc(len+1);
+	memcpy(line, (char *)TS_BUF1+ts->wridx1, len);
+	line[len]= '\0';
+
+	ts->wridx1 += len;
+	ts->size1 -= len;
+
+	/* Make sure that the line ends in a \r. If not, just ignore the
+	 * line. Otherwise, delete the \r.
+	 */
+	cp= strchr(line, '\r');
+	if (cp == NULL || cp-line != strlen(line)-1)
+	{
+		bb_error_msg("bad line '%s', cp %p, cp-line %d, |line| %d",
+			line, cp, cp-line, strlen(line));
+
+		/* Bad line, just ignore it */
+		free(line); line= NULL;
+		return NULL;
+	}
+	*cp= '\0';
+
+	return line;
+}
+
+static void pack_2pty(struct tsession *ts)
+{
+	size_t size1, size_lo, size_hi, wridx1;
+
+	size1= ts->size1;
+	wridx1= ts->wridx1;
+
+	size_hi= BUFSIZE-wridx1;	/* Amount at the top of the buffer */
+	size_lo= size1-size_hi;
+
+	/* Move the low part up a bit */
+	memmove(TS_BUF1+size_hi, TS_BUF1, size_lo);
+
+	/* Now move the high part down */
+	memmove(TS_BUF1, TS_BUF1+wridx1, size_hi);
+
+	/* Update wridx1 and rdidx1 */
+	ts->wridx1= 0;
+	ts->rdidx1= size1;
+}
+
+static int start_crontab(struct tsession *ts, char *line)
+{
+	size_t len;
+	char *cp;
+	char filename[256];
+
+	if (atlas_crontab)
+	{
+		add_2sock(ts, CRONTAB_BUSY);
+		return -1;
+	}
+
+	cp= line+strlen(CMD_CRONTAB);
+	len= strlen(cp);
+	if (len+1 > sizeof(atlas_dirname))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return -1;
+	}
+	strlcpy(atlas_dirname, cp, sizeof(atlas_dirname));
+
+	if (len + strlen(CRONTAB_NEW_SUF) + 1 > sizeof(filename))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return -1;
+	}
+
+	strlcpy(filename, atlas_dirname, sizeof(filename));
+	strlcat(filename, CRONTAB_NEW_SUF, sizeof(filename));
+
+	atlas_crontab= fopen(filename, "w");
+	if (!atlas_crontab)
+	{
+		add_2sock(ts, CREATE_FAILED);
+		return -1;
+	}
+
+	return 0;
+}
+
+static void add_to_crontab(struct tsession *ts, char *line)
+{
+	if (!atlas_crontab)
+		return;		/* Some error occured earlier */
+	if (fputs(line, atlas_crontab) == -1 || 
+		fputc('\n', atlas_crontab) == -1)
+	{
+		add_2sock(ts, IO_ERROR);
+		fclose(atlas_crontab);
+		atlas_crontab= NULL;
+		return;
+	}
+}
+
+static void end_crontab(struct tsession *ts)
+{
+	int fd;
+	size_t len;
+	struct stat st;
+	char filename1[256];
+	char filename2[256];
+
+	if (!atlas_crontab)
+		return;		/* Some error occured earlier */
+	if (fclose(atlas_crontab) == -1)
+	{
+		atlas_crontab= NULL;
+		add_2sock(ts, IO_ERROR);
+		return;
+	}
+	atlas_crontab= NULL;
+
+	/* Rename */
+	if (len + strlen(CRONTAB_NEW_SUF) + 1 > sizeof(filename1))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return;
+	}
+	strlcpy(filename1, atlas_dirname, sizeof(filename1));
+	strlcat(filename1, CRONTAB_NEW_SUF, sizeof(filename1));
+	if (len + strlen(CRONTAB_SUFFIX) + 1 > sizeof(filename2))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return;
+	}
+	strlcpy(filename2, atlas_dirname, sizeof(filename2));
+	strlcat(filename2, CRONTAB_SUFFIX, sizeof(filename2));
+	if (rename(filename1, filename2) == -1)
+	{
+		add_2sock(ts, IO_ERROR);
+		return;
+	}
+
+	/* Inspired by the crontab command, tell cron to load the new
+	 * crontab.
+	 */
+	if (strlen(atlas_dirname) + strlen(CRONUPDATE) + 1 > sizeof(filename1))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return;
+	}
+
+	strlcpy(filename1, atlas_dirname, sizeof(filename1));
+	strlcat(filename1, CRONUPDATE, sizeof(filename1));
+
+	while (fd= open(filename1, O_WRONLY|O_CREAT|O_APPEND, 0600), fd >= 0)
+	{
+		len= strlen(UPDATELINE);
+		if (write(fd, UPDATELINE, len) != len)
+		{
+			close(fd);
+			add_2sock(ts, IO_ERROR);
+			return;
+		}
+		if (fstat(fd, &st) != 0)
+		{
+			close(fd);
+			add_2sock(ts, IO_ERROR);
+			return;
+		}
+		close(fd);
+		if (st.st_nlink != 0)
+			break;
+
+		/* Race condition, try again */
+	}
+
+	if (fd < 0)
+	{
+		add_2sock(ts, CREATE_FAILED);
+		return;
+	}
+
+	add_2sock(ts, RESULT_OK);
+}
+#endif /* ATLAS */
