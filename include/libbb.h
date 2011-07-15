@@ -319,6 +319,11 @@ char *xrealloc_getcwd_or_warn(char *cwd) FAST_FUNC;
 
 char *xmalloc_follow_symlinks(const char *path) FAST_FUNC;
 
+extern size_t strlcat(char *__restrict dst, const char *__restrict src,
+                      size_t n) __THROW __nonnull ((1, 2));
+extern size_t strlcpy(char *__restrict dst, const char *__restrict src,
+                      size_t n) __THROW __nonnull ((1, 2));
+
 
 enum {
 	/* bb_signals(BB_FATAL_SIGS, handler) catches all signals which
