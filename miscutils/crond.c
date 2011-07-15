@@ -817,11 +817,7 @@ static void find_eos(char *cp, char **ncpp)
 int ping_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
-
-static int traceroute_main(int argc, char *argv[]);
-static int traceroute_main(int argc, char *argv[]) {
-	return;
-}
+int traceroute_main(int argc, char *argv[]);
 
 static struct builtin 
 {
