@@ -929,7 +929,8 @@ common_traceroute_main(int op, char **argv)
 
 	if (!dest_lsa) {
 		printf("traceroute to %s (bad-hostname)\n", argv[0]);
-		xfunc_die();
+		free(ptr_to_globals);
+		return 1;
 	}
 #endif
 
@@ -1098,8 +1099,12 @@ common_traceroute_main(int op, char **argv)
 	xsetgid(getgid());
 	xsetuid(getuid());
 
-	printf("traceroute to %s (%s)", argv[0],
-			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa));
+	{
+		char *tmpstr= 
+			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa);
+		printf("traceroute to %s (%s)", argv[0], tmpstr);
+		free(tmpstr);
+	}
 	if (op & OPT_SOURCE)
 		printf(" from %s", source);
 	printf(", %d hops max, %d byte packets NEWLINE", max_ttl, packlen);
@@ -1258,6 +1263,12 @@ common_traceroute_main(int op, char **argv)
 	}
 	printf ("\n");
 
+	free(dest_lsa);
+	free(from_lsa);
+	free(lastaddr);
+	free(to);
+	free(outip);
+	free(ptr_to_globals);
 	return 0;
 }
 
