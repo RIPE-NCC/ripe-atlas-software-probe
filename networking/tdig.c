@@ -95,7 +95,7 @@ int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
 //int main(int argc, char **argv)
 {
- 	unsigned char buf[2048];
+	unsigned char buf[2048];
 	unsigned char lookupname[32];
 	char * server_ip_str;
 	char * soa_str;
@@ -143,15 +143,15 @@ int tdig_main(int argc, char **argv)
 		}
 	} 
 	if (optind != argc-1)
-                fatal("exactly one server IP address expected");
+		fatal("exactly one server IP address expected");
 
 	server_ip_str = argv[optind];
 
 	bzero(&hints, sizeof(hints));
-   	hints.ai_family = AF_UNSPEC;    
-   	hints.ai_flags = 0;
-   	hints.ai_socktype = SOCK_DGRAM;
-	 hints.ai_flags = 0;
+	hints.ai_family = AF_UNSPEC;    
+	hints.ai_flags = 0;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
 	char port[] = "domain";
 
 	err_num = getaddrinfo(server_ip_str, port , &hints, &res);
@@ -162,42 +162,44 @@ int tdig_main(int argc, char **argv)
 	qlen =  makequery(dns, buf, lookupname,  qtype, qclass);
 	// query info 
 	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
-  ressave = res;
-  int sendto_len  ;
-      sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION);
+	ressave = res;
+	int sendto_len  ;
+	sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION);
 
-  do {
-      s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-      if(s < 0)
-            continue;
-      if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
-            perror("send");
-            close(s);
-            continue;
-      }  
-      else {
+	do 
+	{
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if(s < 0)
+			continue;
+		if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
+			perror("send");
+			close(s);
+			continue;
+		}  
+		else 
+		{
 
-	      if(read(s, buf, 2048) == -1) {
-		      perror("read");
-		      close(s);
-		      continue;
-	      }
-	      else {
-		      close(s);
-		      break;
-	      }	
-             close(s);
-             break;
-      }
-   } while ((res = res->ai_next) != NULL);
-   if(!res) {
-      freeaddrinfo(ressave);
-      fatal("socket/sendto failed for all addresses\n");
-   }
-  freeaddrinfo(ressave);
-  printf("RESPONSE ");
-  printAnswer(buf);
-  return (0);
+			if(read(s, buf, 2048) == -1) {
+				perror("read");
+				close(s);
+				continue;
+			}
+			else {
+				close(s);
+				break;
+			}	
+			close(s);
+			break;
+		}
+	} while ((res = res->ai_next) != NULL);
+	if(!res) {
+		freeaddrinfo(ressave);
+		fatal("socket/sendto failed for all addresses\n");
+	}
+	freeaddrinfo(ressave);
+	printf("RESPONSE ");
+	printAnswer(buf);
+	return (0);
 }
 
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) 
