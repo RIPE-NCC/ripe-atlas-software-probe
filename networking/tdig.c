@@ -26,41 +26,39 @@ Also DNSMN GPL version
 //DNS header structure
 struct DNS_HEADER
 {
-	unsigned short id; // identification number
+	u_int16_t id;        // identification number
+	u_int16_t rd :1,     // recursion desired
+		  tc :1,     // truncated message
+		  aa :1,     // authoritive answer
+		  opcode :4, // purpose of message
+		  qr :1,     // query/response flag
+		  rcode :4,  // response code
+		  cd :1,     // checking disabled
+		  ad :1,     // authenticated data
+		  z :1,      // its z! reserved
+		  ra :1;     // recursion available
 
-	unsigned char rd :1; // recursion desired
-	unsigned char tc :1; // truncated message
-	unsigned char aa :1; // authoritive answer
-	unsigned char opcode :4; // purpose of message
-	unsigned char qr :1; // query/response flag
-
-	unsigned char rcode :4; // response code
-	unsigned char cd :1; // checking disabled
-	unsigned char ad :1; // authenticated data
-	unsigned char z :1; // its z! reserved
-	unsigned char ra :1; // recursion available
-
-	unsigned short q_count; // number of question entries
-	unsigned short ans_count; // number of answer entries 
-	unsigned short auth_count; // number of authority entries
-	unsigned short add_count; // number of resource entries
+	u_int16_t q_count; // number of question entries
+	u_int16_t ans_count; // number of answer entries 
+	u_int16_t auth_count; // number of authority entries
+	u_int16_t add_count; // number of resource entries
 };       
 
 //Constant sized fields of query structure
 struct QUESTION
 {
-	unsigned short qtype;
-	unsigned short qclass;
+	u_int16_t qtype;
+	u_int16_t qclass;
 };  
 
 //Constant sized fields of the resource record structure
 #pragma pack(push, 1)
 struct R_DATA
 {   
-	unsigned short type;
-	unsigned short _class;
-	unsigned int ttl;
-	unsigned short data_len;
+	u_int16_t type;
+	u_int16_t _class;
+	u_int32_t ttl;
+	u_int16_t data_len;
 };
 #pragma pack(pop)
 
@@ -71,8 +69,6 @@ struct RES_RECORD
 	struct R_DATA *resource;
 	unsigned char *rdata;
 };
-
-char dns_servers[256]; 
 
 static void fatal(const char *fmt, ...);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
@@ -86,7 +82,7 @@ static struct option longopts[]=
         { "id-server", no_argument, NULL, 'i' },
         { "version-bind", no_argument, NULL, 'b' },
         { "version.server", no_argument, NULL, 'r' },
-        { "soa", no_argument, NULL, 's' },
+        { "soa", required_argument, NULL, 's' },
         { NULL, }
 };
 
@@ -99,6 +95,7 @@ int tdig_main(int argc, char **argv)
 
 	char lookupname[32];
 	char * server_ip_str;
+	char * soa_str;
 	int c;
 	char * packet [512];
 	//char * packet = (char *) malloc(512);
@@ -111,20 +108,35 @@ int tdig_main(int argc, char **argv)
 	struct QUESTION *qinfo = NULL;
 
 	optind= 0;
-	while (c= getopt_long(argc, argv, "46i?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "46bhirs:?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
 			case '4':
+				break; 
+			case 'b':
+				strcpy(lookupname , "version.bind.");
+				break;
+			case 'h':
+				strcpy(lookupname , "hostname.bind.");
 				break;
 			case 'i':
 				strcpy(lookupname , "id.server.");
 				break;
+			case 'r':
+				strcpy(lookupname , "version.server.");
+				break;
+
+			case 's':
+				soa_str = optarg;
+				fatal("soa not implemented yet");
+				break;
+
 			default:
+				fatal("unknown option");
 				break;
 
 		}
-
 
 	} 
 	if (optind != argc-1)
