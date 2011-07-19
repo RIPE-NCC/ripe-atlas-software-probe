@@ -71,13 +71,6 @@ struct RES_RECORD
 	unsigned char *rdata;
 };
 
-static void fatal(const char *fmt, ...);
-unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
-void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
-unsigned int makequery( struct DNS_HEADER *dns, char *buf, char *lookupname, u_int16_t qtype, u_int16_t qclass);
-
-int printAnswer(char *result);
-
 static struct option longopts[]=
 {
         { "hostname-bind", no_argument, NULL, 'h' },
@@ -90,22 +83,29 @@ static struct option longopts[]=
 
 int dns_id;
 
+static void fatal(const char *fmt, ...);
+unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
+void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
+unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
+
+int printAnswer(unsigned char *result);
+
+
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
 //int main(int argc, char **argv)
 {
- 	unsigned char buf[2048], *reader;
-	char lookupname[32];
+ 	unsigned char buf[2048];
+	unsigned char lookupname[32];
 	char * server_ip_str;
 	char * soa_str;
 	int c;
-	int raw_fd;
-	struct sockaddr_in dest;
 	struct QUESTION *qinfo = NULL;
 	optind= 0;
 	u_int16_t qtype; 
+	struct addrinfo hints, *res, *ressave;
+	int s ,  err_num;;
 	u_int16_t qclass;
-	
 	struct DNS_HEADER *dns = NULL;
 	unsigned int qlen; 
 	qtype = T_TXT; /* TEXT */
@@ -147,8 +147,6 @@ int tdig_main(int argc, char **argv)
 
 	server_ip_str = argv[optind];
 
-	struct addrinfo hints, *res, *ressave;
-   	int s ,  err_num;;
 	bzero(&hints, sizeof(hints));
    	hints.ai_family = AF_UNSPEC;    
    	hints.ai_flags = 0;
@@ -196,9 +194,10 @@ int tdig_main(int argc, char **argv)
       freeaddrinfo(ressave);
       fatal("socket/sendto failed for all addresses\n");
    }
-   freeaddrinfo(ressave);
-	printf("RESPONSE ");
-	printAnswer(buf);
+  freeaddrinfo(ressave);
+  printf("RESPONSE ");
+  printAnswer(buf);
+  return (0);
 }
 
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) 
@@ -218,7 +217,7 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 	*dns++=NULL;
 }
 
-int printAnswer(char *result) 
+int printAnswer(unsigned char *result) 
 {
 	int i, stop=0;
 	unsigned char *qname, *reader;
@@ -247,8 +246,6 @@ int printAnswer(char *result)
 
 		answers[i].resource = (struct R_DATA*)(reader);
 		reader = reader + sizeof(struct R_DATA);
-
-
 	}
 
 	//print answers
@@ -325,7 +322,7 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 }
 
 
-unsigned int makequery( struct DNS_HEADER *dns, char *buf, char *lookupname, u_int16_t qtype, u_int16_t qclass)
+unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass)
 {
 	unsigned char *qname;
 	struct QUESTION *qinfo = NULL;
