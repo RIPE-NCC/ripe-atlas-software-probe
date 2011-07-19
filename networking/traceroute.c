@@ -210,7 +210,10 @@
  *     Tue Dec 20 03:50:13 PST 1988
  */
 
+#define ATLAS 1
+
 #define TRACEROUTE_SO_DEBUG 0
+#define WATCHDOGDEV "/dev/watchdog"
 
 /* TODO: undefs were uncommented - ??! we have config system for that! */
 /* probably ok to remove altogether */
@@ -220,6 +223,11 @@
 //#define CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE
 //#undef CONFIG_FEATURE_TRACEROUTE_USE_ICMP
 //#define CONFIG_FEATURE_TRACEROUTE_USE_ICMP
+
+#define ENABLE_FEATURE_TRACEROUTE_IPV6 1
+#ifndef USE_FEATURE_TRACEROUTE_IPV6
+#define USE_FEATURE_TRACEROUTE_IPV6(x) x
+#endif
 
 
 #include <net/if.h>
@@ -246,7 +254,7 @@
 # define IPPROTO_IP 0
 #endif
 
-#define OPT_STRING "FIlnrdvxt:i:m:p:q:s:w:z:f:A:" \
+#define OPT_STRING "FIlnrdvxt:i:m:p:q:s:w:z:f:A:D" \
                     USE_FEATURE_TRACEROUTE_SOURCE_ROUTE("g:") \
                     "4" USE_FEATURE_TRACEROUTE_IPV6("6")
 enum {
@@ -268,9 +276,10 @@ enum {
 	OPT_PAUSE_MS     = (1 << 15),   /* z */
 	OPT_FIRST_TTL    = (1 << 16),   /* f */
 	OPT_A    	 = (1 << 17),   /* A */
-	OPT_SOURCE_ROUTE = (1 << 18) * ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE, /* g */
-	OPT_IPV4         = (1 << (18+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)),   /* 4 */
-	OPT_IPV6         = (1 << (19+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)) * ENABLE_FEATURE_TRACEROUTE_IPV6, /* 6 */
+	OPT_D_WATCHDOG   = (1 << 18),   /* D */
+	OPT_SOURCE_ROUTE = (1 << 19) * ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE, /* g */
+	OPT_IPV4         = (1 << (19+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)),   /* 4 */
+	OPT_IPV6         = (1 << (20+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)) * ENABLE_FEATURE_TRACEROUTE_IPV6, /* 6 */
 };
 #define verbose (option_mask32 & OPT_VERBOSE)
 
@@ -342,6 +351,15 @@ struct globals {
 #define outicmp ((struct icmp *)(outip + 1))
 #define outudp  ((struct udphdr *)(outip + 1))
 
+#ifdef ATLAS
+#define xsendto(fd, buf, len, addr, addrlen) \
+	xrsendto(fd, buf, len, addr, addrlen, traceroute_report_err)
+#define xconnect(fd, addr, addrlen) \
+	xrconnect(fd, addr, addrlen, traceroute_report_err)
+
+static void traceroute_report_err(int err);
+static void resolver_timeout(int __attribute((unused)) sig);
+#endif /* ATLAS */
 
 /* libbb candidate? tftp uses this idiom too */
 static len_and_sockaddr* dup_sockaddr(const len_and_sockaddr *lsa)
@@ -791,6 +809,7 @@ common_traceroute_main(int op, char **argv)
 	char *waittime_str;
 	char *pausemsecs_str;
 	char *first_ttl_str;
+	int fd ;
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 	llist_t *source_route_list = NULL;
 	int lsrr = 0;
@@ -867,19 +886,53 @@ common_traceroute_main(int op, char **argv)
 	minpacket = sizeof(*outip) + SIZEOF_ICMP_HDR + sizeof(*outdata) + optlen;
 	if (!(op & OPT_USE_ICMP))
 		minpacket += sizeof(*outudp) - SIZEOF_ICMP_HDR;
+
+#ifdef ATLAS
+	if (option_mask32 & OPT_A)
+	{	
+		time_t mytime;
+        	mytime = time(NULL);
+		printf("%s %lu ", str_Atlas, mytime);
+	}
+
+	signal(SIGALRM, resolver_timeout);
+	alarm(10);
+#endif /* ATLAS */
+
 #if ENABLE_FEATURE_TRACEROUTE_IPV6
 	af = AF_UNSPEC;
 	if (op & OPT_IPV4)
 		af = AF_INET;
 	if (op & OPT_IPV6)
 		af = AF_INET6;
+#ifdef ATLAS
+	dest_lsa = host_and_af2sockaddr(argv[0], port, af);
+	if (dest_lsa)
+		af = dest_lsa->u.sa.sa_family;
+#else
 	dest_lsa = xhost_and_af2sockaddr(argv[0], port, af);
 	af = dest_lsa->u.sa.sa_family;
+#endif /* ATLAS */
 	if (af == AF_INET6)
 		minpacket = sizeof(struct outdata6_t);
 #else
+#ifdef ATLAS
+	dest_lsa = host2sockaddr(argv[0], port);
+#else
 	dest_lsa = xhost2sockaddr(argv[0], port);
+#endif /* ATLAS */
 #endif
+
+#ifdef ATLAS
+	alarm(0);
+	signal(SIGALRM, SIG_DFL);
+
+	if (!dest_lsa) {
+		printf("traceroute to %s (bad-hostname)\n", argv[0]);
+		xfunc_die();
+	}
+#endif
+
 	packlen = minpacket;
 	if (argv[1])
 		packlen = xatoul_range(argv[1], minpacket, 32 * 1024);
@@ -1045,12 +1098,6 @@ common_traceroute_main(int op, char **argv)
 	xsetgid(getgid());
 	xsetuid(getuid());
 
-	if (option_mask32 & OPT_A)
-	{	
-		time_t mytime;
-        	mytime = time(NULL);
-		printf("%s %lu ", str_Atlas, mytime);
-	}
 	printf("traceroute to %s (%s)", argv[0],
 			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa));
 	if (op & OPT_SOURCE)
@@ -1070,6 +1117,13 @@ common_traceroute_main(int op, char **argv)
 
 		printf("%2d", ttl);
 		for (probe = 0; probe < nprobes; ++probe) {
+	
+			if (option_mask32 & OPT_D_WATCHDOG) {
+				fd = open(WATCHDOGDEV, O_RDWR);
+                		write(fd, "1", 1);
+                		close(fd);
+
+			}
 			int read_len;
 			unsigned t1;
 			unsigned t2;
@@ -1218,5 +1272,18 @@ int traceroute6_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int traceroute6_main(int argc UNUSED_PARAM, char **argv)
 {
 	return common_traceroute_main(OPT_IPV6, argv);
+}
+#endif
+
+#ifdef ATLAS
+static void traceroute_report_err(int err)
+{
+	printf(" errno %d\n", err);
+}
+
+static void resolver_timeout(int __attribute((unused)) sig)
+{
+	printf("dns-timeout\n");
+	exit(1);
 }
 #endif

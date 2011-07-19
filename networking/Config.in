@@ -48,17 +48,24 @@ config ARPING
 	  Ping hosts by ARP packets.
 
 config ATLASINIT
-        bool "atlasinit"
-        default y
-        help
-         RIPE NCC Atals initialization and parsing applicaton. antony@rip.net.
-         Aug 2010.
+	bool "atlasinit"
+	default n
+	help
+	RIPE NCC Atlas initialization and parsing applicaton. antony@rip.net. Aug 2010.
 
 config ATLASSERIAL
-        bool "atlasserial"
-        default y
+	bool "atlasserial"
+	default n
+	help
+	RIPE NCC Atlas serialloop. antony@rip.net. Aug 2010.
+
+
+config AUTOSSH
+        bool "autossh"
+        default n
         help
-         RIPE NCC Atals serialization loop Aug 2010. antony@ripe.net
+          Monitor the ssh port. Added by AA Antony. 2010 Oct
+
 
 config BRCTL
 	bool "brctl"
@@ -260,10 +267,9 @@ config FEATURE_HTTPD_PROXY
 
 config HTTPPOST
 	bool "httppost"
-        default y
-        help
-          simple httppost --post-file with IPv4. RIPE NCC 2011
-
+	default y
+	help 
+	  simple httppost --post-file with IPv4. RIPE NCC 2011
 
 config IFCONFIG
 	bool "ifconfig"
@@ -588,8 +594,6 @@ config FEATURE_IPCALC_LONG_OPTIONS
 	help
 	  Support long options for the ipcalc applet.
 
-
-
 config NAMEIF
 	bool "nameif"
 	default n
@@ -856,11 +860,11 @@ config TRACEROUTE
 	  Utility to trace the route of IP packets
 
 config FEATURE_TRACEROUTE_IPV6
-        bool "Enable IPv6 Support"
-        default n
-        depends on FEATURE_IPV6 && TRACEROUTE
-        help
-        Add IPv6 support for the traceroute
+	bool "Enable IPv6 Support"
+	default n
+	depends on FEATURE_IPV6 && TRACEROUTE
+	help
+	Add IPv6 support for the traceroute
 
 config FEATURE_TRACEROUTE_VERBOSE
 	bool "Enable verbose output"

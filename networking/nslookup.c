@@ -14,6 +14,8 @@
 #include <resolv.h>
 #include "libbb.h"
 
+#define ATLAS 1
+
 /*
  * I'm only implementing non-interactive mode;
  * I totally forgot nslookup even had an interactive mode.
@@ -50,6 +52,20 @@
  * ns3.kernel.org  internet address = 204.152.191.36
  */
 
+#ifdef ATLAS
+#define WATCHDOGDEV "/dev/watchdog"
+
+static char *str_Atlas;
+
+#define ATLAS_NEWLINE() \
+	do \
+	{ \
+		if (str_Atlas) printf(" NEWLINE "); \
+		else bb_putchar('\n'); \
+	} while (0)
+
+#endif
+
 static int print_host(const char *hostname, const char *header)
 {
 	/* We can't use xhost2sockaddr() - we want to get ALL addresses,
@@ -70,14 +86,27 @@ static int print_host(const char *hostname, const char *header)
 		struct addrinfo *cur = result;
 		unsigned cnt = 0;
 
-		printf("%-10s %s\n", header, hostname);
+		printf("%-10s %s", header, hostname);
+#ifdef ATLAS
+		ATLAS_NEWLINE();
+#else
+		bb_putchar('\n');
+#endif
 		// puts(cur->ai_canonname); ?
 		while (cur) {
 			char *dotted, *revhost;
 			dotted = xmalloc_sockaddr2dotted_noport(cur->ai_addr);
 			revhost = xmalloc_sockaddr2hostonly_noport(cur->ai_addr);
 
-			printf("Address %u: %s%c", ++cnt, dotted, revhost ? ' ' : '\n');
+			printf("Address %u: %s", ++cnt, dotted);
+#ifdef ATLAS
+			if (revhost)
+				bb_putchar(' ');
+			else
+				ATLAS_NEWLINE();
+#else
+			printf("%c", revhost ? ' ' : '\n');
+#endif
 			if (revhost) {
 				puts(revhost);
 				if (ENABLE_FEATURE_CLEAN_UP)
@@ -114,7 +143,11 @@ static void server_print(void)
 	print_host(server, "Server:");
 	if (ENABLE_FEATURE_CLEAN_UP)
 		free(server);
+#ifdef ATLAS
+	ATLAS_NEWLINE();
+#else
 	bb_putchar('\n');
+#endif
 }
 
 /* alter the global _res nameserver structure to use
@@ -129,9 +162,33 @@ static void set_default_dns(char *server)
 	}
 }
 
+#define OPT_STRING ("A:D")
+enum {
+	OPT_A = 1 << 0,
+	OPT_D_WATCHDOG = 1 << 1,
+};
+
 int nslookup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int nslookup_main(int argc, char **argv)
 {
+	int r, opt;
+
+	opt = getopt32(argv, OPT_STRING, &str_Atlas);
+	if(opt & OPT_D_WATCHDOG )
+	{
+		int fd = open(WATCHDOGDEV, O_RDWR);
+		write(fd, "1", 1);
+		close(fd);
+	}
+	if(opt & OPT_A) 
+	{
+	}	
+	else 	
+		str_Atlas = NULL;
+
+	argc -= (optind-1);
+	argv += (optind-1);
+
 	/* We allow 1 or 2 arguments.
 	 * The first is the name to be looked up and the second is an
 	 * optional DNS server with which to do the lookup.
@@ -150,6 +207,18 @@ int nslookup_main(int argc, char **argv)
 	if (argv[2])
 		set_default_dns(argv[2]);
 
+	if (str_Atlas)
+	{
+        	time_t mytime;
+        	mytime = time(NULL);
+		printf ("%s %lu ", str_Atlas, mytime);
+	}
+
 	server_print();
-	return print_host(argv[1], "Name:");
+	r= print_host(argv[1], "Name:");
+#ifdef ATLAS
+	if (str_Atlas)
+		bb_putchar('\n');
+#endif
+	return r;
 }

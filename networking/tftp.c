@@ -625,8 +625,8 @@ int tftp_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_TFTPD
 
-#if 0
 /* TODO: libbb candidate? */
+#if 0
 static len_and_sockaddr *get_sock_lsa(int s)
 {
 	len_and_sockaddr *lsa;

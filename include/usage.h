@@ -127,12 +127,6 @@
        "$ basename /foo/bar.txt .txt\n" \
        "bar"
 
-#define buddyinfo_trivial_usage \
-	"buddyinfo print buddyinfo for atlsformat"
-
-#define buddyinfo_full_usage \
-	"buddyinfo print buddyinfo for atlsformat and reset if no blocks of LOW_MEM_T or more"
-
 #define fbsplash_trivial_usage \
        "-s IMGFILE [-c] [-d DEV] [-i INIFILE] [-f CMD]"
 #define fbsplash_full_usage "\n\n" \
@@ -1174,12 +1168,6 @@
 #define find_example_usage \
        "$ find / -name passwd\n" \
        "/etc/passwd\n"
-
-#define findpid_trivial_usage \
-	"findpid <name>"
-
-#define findpid_full_usage \
-	"findpid <name> "
 
 #define fold_trivial_usage \
        "[-bs] [-w WIDTH] [FILE]"
@@ -2415,7 +2403,7 @@
 	"[OPTION]...[MANPAGE]..."
 
 #define atlasserial_full_usage \
-	"atlasserial -l loglevel "
+	"atlasserial "
 
 #define matchpathcon_trivial_usage \
        "[-n] [-N] [-f file_contexts_file] [-p prefix] [-V]"
@@ -3736,12 +3724,6 @@
 	USE_FEATURE_FANCY_SLEEP( \
        "$ sleep 1d 3h 22m 8s\n" \
        "[98528 second delay results]\n")
-
-#define sleepkick_trivial_usage \
-	"duration kick . both in seconds"
-
-#define sleepkick_full_usage \
-	"duration kick . both in seconds"
 
 #define sort_trivial_usage \
        "[-nru" \

@@ -57,12 +57,14 @@ enum {
 #define create_icmp6_socket() local_create_icmp6_socket()
 #define xbind(fd, addr, len) xrbind(fd, addr, len, ping_report_err)
 #define xsendto(fd, buf, len, addr, addrlen) \
-	xrsendto(fd, buf, len, addr, addrlen, ping_report_err)
+	Xxrsendto(fd, buf, len, addr, addrlen, ping_report_err)
 
 static int local_create_icmp_socket(void) FAST_FUNC;
 static int local_create_icmp6_socket(void) FAST_FUNC;
 static void ping_report_err(int err);
 static void ping_report_reserr(const char *hn);
+#else
+#define ping_report_err	0
 #endif /* ATLAS */
 
 /* common routines */
@@ -117,14 +119,20 @@ static void ping4(len_and_sockaddr *lsa)
 	pkt->icmp_type = ICMP_ECHO;
 	pkt->icmp_cksum = in_cksum((unsigned short *) pkt, sizeof(packet));
 
-	c = xsendto(pingsock, packet, DEFDATALEN + ICMP_MINLEN,
-			   (struct sockaddr *) &pingaddr, sizeof(pingaddr));
+	c = rsendto(pingsock, packet, DEFDATALEN + ICMP_MINLEN,
+	   (struct sockaddr *) &pingaddr, sizeof(pingaddr), ping_report_err);
+	if (c == -1)
+		return;
 
 	/* listen for replies */
 	while (1) {
 		struct sockaddr_in from;
 		socklen_t fromlen = sizeof(from);
 
+		if (need_to_exit)
+			break;
+
+printf("%s, %d: recvfrom, need_to_exit %d\n", __FILE__, __LINE__, need_to_exit);
 		c = recvfrom(pingsock, packet, sizeof(packet), 0,
 				(struct sockaddr *) &from, &fromlen);
 		if (c < 0) {
@@ -154,6 +162,8 @@ static void ping6(len_and_sockaddr *lsa)
 	char packet[DEFDATALEN + MAXIPLEN + MAXICMPLEN];
 
 	pingsock = create_icmp6_socket();
+	if (pingsock == -1)
+		return;
 	pingaddr = lsa->u.sin6;
 
 	pkt = (struct icmp6_hdr *) packet;
@@ -170,6 +180,9 @@ static void ping6(len_and_sockaddr *lsa)
 	while (1) {
 		struct sockaddr_in6 from;
 		socklen_t fromlen = sizeof(from);
+
+		if (need_to_exit)
+			break;
 
 		c = recvfrom(pingsock, packet, sizeof(packet), 0,
 				(struct sockaddr *) &from, &fromlen);
@@ -261,6 +274,8 @@ struct globals {
 	int if_index;
 	char *str_I;
 	char *str_Atlas;
+	int need_to_exit;
+	int send_error;
 	len_and_sockaddr *source_lsa;
 	unsigned datalen;
 	unsigned pingcount; /* must be int-sized */
@@ -287,7 +302,9 @@ struct globals {
 #define if_index     (G.if_index    )
 #define source_lsa   (G.source_lsa  )
 #define str_I        (G.str_I       )
-#define str_Atlas    (G.str_Atlas      )
+#define str_Atlas    (G.str_Atlas   )
+#define need_to_exit (G.need_to_exit)
+#define send_error   (G.send_error)
 #define datalen      (G.datalen     )
 #define ntransmitted (G.ntransmitted)
 #define nreceived    (G.nreceived   )
@@ -312,6 +329,11 @@ void BUG_ping_globals_too_big(void);
 	datalen = DEFDATALEN; \
 	timeout = MAXWAIT; \
 	tmin = UINT_MAX; \
+	need_to_exit = 0; \
+	send_error = 0; \
+	ntransmitted = 0; \
+	nreceived = 0; \
+	nrepeats = 0; \
 } while (0)
 
 
@@ -322,11 +344,22 @@ void BUG_ping_globals_too_big(void);
 #define	TST(bit)	(A(bit) & B(bit))
 
 /**************************************************************************/
+#ifdef ATLAS
+static void req_exit(int sig UNUSED_PARAM)
+{
+	need_to_exit= 1;
 
-static void print_stats_and_exit(int junk) NORETURN;
-static void print_stats_and_exit(int junk UNUSED_PARAM)
+	/* Reset the alarm in case of a race condition */
+	alarm(1);
+}
+#endif
+
+static void print_stats(void)
 {
 	signal(SIGINT, SIG_IGN);
+
+	if (send_error)
+		return;
 
 #ifdef ATLAS
         printf("%lu %lu %lu", ntransmitted, nreceived, nrepeats);
@@ -351,21 +384,38 @@ static void print_stats_and_exit(int junk UNUSED_PARAM)
 			tavg / 1000, tavg % 1000,
 			tmax / 1000, tmax % 1000);
 	}
-	/* if condition is true, exit with 1 -- 'failure' */
 	printf  ("\n");
+}
+
+static void print_stats_and_exit(int junk) NORETURN;
+static void print_stats_and_exit(int junk UNUSED_PARAM)
+{
+	print_stats();
+
+	/* if condition is true, exit with 1 -- 'failure' */
 	exit(nreceived == 0 || (deadline && nreceived < pingcount));
 }
 
 static void sendping_tail(void (*sp)(int), const void *pkt, int size_pkt)
 {
 	int sz;
+#ifdef ATLAS
+	struct sigaction sa;
+#endif
 
 	CLR((uint16_t)ntransmitted % MAX_DUP_CHK);
 	ntransmitted++;
 
 	/* sizeof(pingaddr) can be larger than real sa size, but I think
 	 * it doesn't matter */
-	sz = xsendto(pingsock, pkt, size_pkt, &pingaddr.sa, sizeof(pingaddr));
+	sz = rsendto(pingsock, pkt, size_pkt, &pingaddr.sa, sizeof(pingaddr),
+		ping_report_err);
+	if (sz == -1)
+	{
+		need_to_exit= 1;
+		send_error= 1;
+		return;
+	}
 	if (sz != size_pkt)
 	{
 		bb_error_msg_and_die(bb_msg_write_error);
@@ -394,7 +444,14 @@ static void sendping_tail(void (*sp)(int), const void *pkt, int size_pkt)
 			if (expire == 0)
 				expire = 1;
 		}
+#ifdef ATLAS
+		sa.sa_handler= req_exit;
+		sa.sa_flags= 0;
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGALRM, &sa, NULL);
+#else
 		signal(SIGALRM, print_stats_and_exit);
+#endif
 		alarm(expire);
 	}
 }
@@ -630,6 +687,9 @@ static void ping4(len_and_sockaddr *lsa)
 		socklen_t fromlen = (socklen_t) sizeof(from);
 		int c;
 
+		if (need_to_exit)
+			break;
+
 		c = recvfrom(pingsock, packet, sizeof(packet), 0,
 				(struct sockaddr *) &from, &fromlen);
 		if (c < 0) {
@@ -641,6 +701,7 @@ static void ping4(len_and_sockaddr *lsa)
 		if (pingcount && nreceived >= pingcount)
 			break;
 	}
+	close(pingsock);
 }
 #if ENABLE_PING6
 extern int BUG_bad_offsetof_icmp6_cksum(void);
@@ -654,6 +715,8 @@ static void ping6(len_and_sockaddr *lsa)
 	char control_buf[CMSG_SPACE(36)];
 
 	pingsock = create_icmp6_socket();
+	if (pingsock == -1)
+		return;
 	pingaddr.sin6 = lsa->u.sin6;
 	/* untested whether "-I addr" really works for IPv6: */
 	if (source_lsa)
@@ -713,6 +776,9 @@ static void ping6(len_and_sockaddr *lsa)
 		struct cmsghdr *mp;
 		int hoplimit = -1;
 		msg.msg_controllen = sizeof(control_buf);
+
+		if (need_to_exit)
+			break;
 
 		c = recvmsg(pingsock, &msg, 0);
 		if (c < 0) {
@@ -825,7 +891,7 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 #ifdef ATLAS
 	if (!lsa) {
 		ping_report_reserr(hostname);
-		xfunc_die();
+		return EXIT_FAILURE;
 	}
 #endif /* ATLAS */
 
@@ -835,8 +901,16 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 	dotted = xmalloc_sockaddr2dotted_noport(&lsa->u.sa);
 	ping(lsa);
+#ifdef ATLAS
+	print_stats();
+	alarm(0);
+	signal(SIGALRM, SIG_DFL);
+	signal(SIGINT, SIG_DFL);
+	return EXIT_SUCCESS;
+#else
 	print_stats_and_exit(EXIT_SUCCESS);
 	/*return EXIT_SUCCESS;*/
+#endif
 }
 #endif /* FEATURE_FANCY_PING */
 
@@ -984,7 +1058,8 @@ int FAST_FUNC local_create_icmp6_socket(void)
 			ping_report(),
 			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
 		ping_report();
-		bb_perror_msg_and_die(bb_msg_can_not_create_raw_socket);
+		bb_perror_msg(bb_msg_can_not_create_raw_socket);
+		return -1;
 	}
 
 	/* drop root privs if running setuid */

@@ -464,6 +464,27 @@ ssize_t FAST_FUNC xrsendto(int s, const  void *buf, size_t len,
 	return ret;
 }
 
+/* Call a user supplied function with an error message if sendto failed.
+ * Return bytes sent otherwise  */
+ssize_t FAST_FUNC rsendto(int s, const  void *buf, size_t len,
+	const struct sockaddr *to, socklen_t tolen,
+	void (*reportf)(int err))
+{
+	ssize_t ret = sendto(s, buf, len, 0, to, tolen);
+	if (ret < 0) {
+		int t_errno= errno;
+		if (reportf) {
+			reportf(t_errno);
+		}
+		if (ENABLE_FEATURE_CLEAN_UP)
+			close(s);
+		errno= t_errno;
+		bb_perror_msg("sendto");
+		errno= t_errno;
+	}
+	return ret;
+}
+
 // xstat() - a stat() which dies on failure with meaningful error message
 void FAST_FUNC xstat(const char *name, struct stat *stat_buf)
 {

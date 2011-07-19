@@ -14,6 +14,8 @@
 #include "libbb.h"
 #include <syslog.h>
 
+#define ATLAS 1
+
 /* glibc frees previous setenv'ed value when we do next setenv()
  * of the same variable. uclibc does not do this! */
 #if (defined(__GLIBC__) && !defined(__UCLIBC__)) /* || OTHER_SAFE_LIBC... */
@@ -80,7 +82,9 @@ enum {
 	OPT_b = (1 << 3),
 	OPT_S = (1 << 4),
 	OPT_c = (1 << 5),
-	OPT_d = (1 << 6) * ENABLE_FEATURE_CROND_D,
+	OPT_A = (1 << 6),
+	OPT_D = (1 << 7),
+	OPT_d = (1 << 8) * ENABLE_FEATURE_CROND_D,
 };
 #if ENABLE_FEATURE_CROND_D
 #define DebugOpt (option_mask32 & OPT_d)
@@ -99,7 +103,11 @@ struct globals {
 	char *env_var_home;
 #endif
 };
+#ifdef ATLAS
+static struct globals G;
+#else
 #define G (*(struct globals*)&bb_common_bufsiz1)
+#endif
 #define LogLevel           (G.LogLevel               )
 #define LogFile            (G.LogFile                )
 #define CDir               (G.CDir                   )
@@ -111,6 +119,12 @@ struct globals {
 	CDir = CRONTABS; \
 } while (0)
 
+#ifdef ATLAS
+static int do_atlas;
+static int do_kick_watchdog;
+
+static int atlas_run(char *cmdline);
+#endif
 
 static void CheckUpdates(void);
 static void SynchronizeDir(void);
@@ -158,17 +172,25 @@ static void crondlog(const char *ctl, ...)
 		exit(20);
 }
 
+static void my_exit(void)
+{
+	crondlog(LVL8 "in my_exit (exit was called!)");
+	abort();
+}
+
 int crond_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int crond_main(int argc UNUSED_PARAM, char **argv)
 {
 	unsigned opt;
+
+	atexit(my_exit);
 
 	INIT_G();
 
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_CROND_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:" USE_FEATURE_CROND_D("d:"),
+	opt = getopt32(argv, "l:L:fbSc:AD" USE_FEATURE_CROND_D("d:"),
 			&LogLevel, &LogFile, &CDir
 			USE_FEATURE_CROND_D(,&LogLevel));
 	/* both -d N and -l N set the same variable: LogLevel */
@@ -185,6 +207,9 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 		logmode = LOGMODE_SYSLOG;
 	}
 
+	do_atlas= !!(opt & OPT_A);
+	do_kick_watchdog= !!(opt & OPT_D);
+
 	xchdir(CDir);
 	//signal(SIGHUP, SIG_IGN); /* ? original crond dies on HUP... */
 	xsetenv("SHELL", DEFAULT_SHELL); /* once, for all future children */
@@ -198,11 +223,24 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 		time_t t2;
 		long dt;
 		int rescan = 60;
-		int sleep_time = 60;
+		int sleep_time = 20; /* AA previously 60 */
 
 		write_pidfile("/var/run/crond.pid");
 		for (;;) {
+			if(do_kick_watchdog) 
+			{
+				int fdwatchdog = open("/dev/watchdog", O_RDWR);
+                		write(fdwatchdog, "1", 1);
+                		close(fdwatchdog);
+			}
 			sleep((sleep_time + 1) - (time(NULL) % sleep_time));
+
+			if(do_kick_watchdog) 
+			{
+				int fdwatchdog = open("/dev/watchdog", O_RDWR);
+                		write(fdwatchdog, "1", 1);
+                		close(fdwatchdog);
+			}
 
 			t2 = time(NULL);
 			dt = (long)t2 - (long)t1;
@@ -239,7 +277,7 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 				if (CheckJobs() > 0) {
 					sleep_time = 10;
 				} else {
-					sleep_time = 60;
+					sleep_time = 20; /* AA previously 60 */
 				}
 			}
 			t1 = t2;
@@ -706,12 +744,12 @@ static void RunJobs(void)
 			} else if (line->cl_Pid > 0) {
 				file->cf_Running = 1;
 			}
-			// AA make it wait till the job is finished 
-			while (CheckJobs() > 0)
+			// AA make it wait till the job is finished
+			while (CheckJobs() > 0)                        
 			{
-				crondlog(LVL9 "waiting for job %s ", line->cl_Shell);
-				sleep(10);
-			}
+                         	// crondlog(LVL9 "waiting for job %s ", line->cl_Shell);
+                                sleep(5);
+                        }
 
 		}
 	}
@@ -752,6 +790,235 @@ static int CheckJobs(void)
 		nStillRunning += file->cf_Running;
 	}
 	return nStillRunning;
+}
+
+static void skip_space(char *cp, char **ncpp)
+{
+	while (cp[0] != '\0' && isspace(*(unsigned char *)cp))
+		cp++;
+	*ncpp= cp;
+}
+
+static void skip_nonspace(char *cp, char **ncpp)
+{
+	while (cp[0] != '\0' && !isspace(*(unsigned char *)cp))
+		cp++;
+	*ncpp= cp;
+}
+
+static void find_eos(char *cp, char **ncpp)
+{
+	while (cp[0] != '\0' && cp[0] != '"')
+		cp++;
+	*ncpp= cp;
+}
+
+
+int ping_main(int argc, char *argv[]);
+int ping6_main(int argc, char *argv[]);
+int httppost_main(int argc, char *argv[]);
+
+static int traceroute_main(int argc, char *argv[]);
+static int traceroute_main(int argc, char *argv[]) {
+	return;
+}
+
+static struct builtin 
+{
+	const char *cmd;
+	int (*func)(int argc, char *argv[]);
+} builtin_cmds[]=
+{
+	{ "ping", ping_main },
+	{ "ping6", ping6_main },
+	{ "httppost", httppost_main },
+	{ "traceroute", traceroute_main },
+	{ NULL, 0 }
+};
+
+#define ATLAS_NARGS	20	/* Max arguments to a built-in command */
+#define ATLAS_ARGSIZE	256	/* Max size of the command line */
+
+static int atlas_run(char *cmdline)
+{
+	int i, argc, atlas_fd, saved_fd, do_append, flags;
+	size_t len;
+	char *cp, *ncp;
+	struct builtin *bp;
+	char *outfile;
+	char *argv[ATLAS_NARGS];
+	char args[ATLAS_ARGSIZE];
+
+	crondlog(LVL8 "atlas_run: looking for '%s'", cmdline);
+
+	for (bp= builtin_cmds; bp->cmd != NULL; bp++)
+	{
+		len= strlen(bp->cmd);
+		if (strncmp(cmdline, bp->cmd, len) != 0)
+			continue;
+		if (cmdline[len] != ' ')
+			continue;
+		break;
+	}
+	if (bp->cmd == NULL)
+		return 0;	/* Nothing found */
+	
+	crondlog(LVL8 "found cmd '%s' for '%s'", bp->cmd, cmdline);
+
+	outfile= NULL;
+	do_append= 0;
+
+	len= strlen(cmdline);
+	if (len+1 > ATLAS_ARGSIZE)
+	{
+		crondlog(LVL8 "atlas_run: command line '%s' too big", cmdline);
+		return 1;	/* Just skip it */
+	}
+	strcpy(args, cmdline);
+
+	/* Split the command line */
+	cp= args;
+	argc= 0;
+	argv[argc]= cp;
+	skip_nonspace(cp, &ncp);
+	cp= ncp;
+
+	for(;;)
+	{
+		/* End of list */
+		if (cp[0] == '\0')
+		{
+			argc++;
+			break;
+		}
+
+		/* Find start of next argument */
+		skip_space(cp, &ncp);
+
+		/* Terminate current one */
+		cp[0]= '\0';
+
+		/* Special case for '>' */
+		if (argv[argc][0] == '>')
+		{
+			cp= argv[argc]+1;
+			if (cp[0] == '>')
+			{
+				/* Append */
+				do_append= 1;
+				cp++;
+			}
+			if (cp[0] != '\0')
+			{
+				/* Filename immediately follows '>' */
+				outfile= cp;
+				
+				/* And move on with the next option */
+			}
+			else
+			{
+				/* Get the next argument */
+				outfile= ncp;
+				cp= ncp;
+				skip_nonspace(cp, &ncp);
+				cp= ncp;
+
+				if (cp[0] == '\0')
+					break;
+
+				/* Find start of next argument */
+				skip_space(cp, &ncp);
+				*cp= '\0';
+			}
+		}
+		else
+		{
+			argc++;
+		}
+
+		if (argc >= ATLAS_NARGS-1)
+		{
+			crondlog(
+			LVL8 "atlas_run: command line '%s', too arguments",
+				cmdline);
+			return 1;	/* Just skip it */
+		}
+
+		cp= ncp;
+		argv[argc]= cp;
+		if (cp[0] == '"')
+		{
+			/* Special code for strings */
+			find_eos(cp+1, &ncp);
+			if (ncp[0] != '"')
+			{
+				crondlog(
+		LVL8 "atlas_run: command line '%s', end of string not found",
+					cmdline);
+				return 1;	/* Just skip it */
+			}
+			argv[argc]= cp+1;
+			cp= ncp;
+			cp[0]= '\0';
+			cp++;
+		}
+		else
+		{
+			skip_nonspace(cp, &ncp);
+			cp= ncp;
+		}
+	}
+
+	if (argc >= ATLAS_NARGS)
+	{
+		crondlog(	
+			LVL8 "atlas_run: command line '%s', too many arguments",
+			cmdline);
+		return 1;	/* Just skip it */
+	}
+	argv[argc]= NULL;
+
+	for (i= 0; i<argc; i++)
+		crondlog(LVL8 "atlas_run: argv[%d] = '%s'", i, argv[i]);
+
+	saved_fd= -1;	/* lint */
+	if (outfile)
+	{
+		/* Redirect I/O */
+		crondlog(LVL8 "sending output to '%s'", outfile);
+		flags= O_CREAT | O_WRONLY;
+		if (do_append)
+			flags |= O_APPEND;
+		atlas_fd= open(outfile, flags, 0644);
+		if (atlas_fd == -1)
+		{
+			crondlog(
+			LVL8 "atlas_run: unable to create output file '%s'",
+				outfile);
+			return 1;
+		}
+		fflush(stdout);
+		saved_fd= dup(1);
+		if (saved_fd == -1)
+		{
+			crondlog(LVL8 "atlas_run: unable to dub stdout");
+			close(atlas_fd);
+			return 1;
+		}
+		dup2(atlas_fd, 1);
+		close(atlas_fd);
+	}
+
+	bp->func(argc, argv);
+
+	if (outfile)
+	{
+		fflush(stdout);
+		dup2(saved_fd, 1);
+		close(saved_fd);
+	}
+
+	return 1;
 }
 
 #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
@@ -848,6 +1115,13 @@ static void RunJob(const char *user, CronLine *line)
 		}
 	}
 
+
+	if (atlas_outfile && atlas_run(line->cl_Shell))
+	{
+		/* Internal command */
+		return;
+	}
+
 	ForkJob(user, line, mailFd, DEFAULT_SHELL, "-c", line->cl_Shell, mailFile);
 }
 
@@ -905,6 +1179,12 @@ static void RunJob(const char *user, CronLine *line)
 {
 	struct passwd *pas;
 	pid_t pid;
+
+	if (do_atlas && atlas_run(line->cl_Shell))
+	{
+		/* Internal command */
+		return;
+	}
 
 	/* prepare things before vfork */
 	pas = getpwnam(user);
