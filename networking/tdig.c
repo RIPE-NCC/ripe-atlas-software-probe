@@ -20,6 +20,7 @@ Also DNSMN GPL version
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <arpa/nameser.h>
+#include <netdb.h>
 
 #include "libbb.h"
 
@@ -91,6 +92,7 @@ int dns_id;
 
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
+//int main(int argc, char **argv)
 {
  	unsigned char buf[2048], *reader;
 	char lookupname[32];
@@ -144,25 +146,57 @@ int tdig_main(int argc, char **argv)
                 fatal("exactly one server IP address expected");
 
 	server_ip_str = argv[optind];
-	dest.sin_family = AF_INET;
-	dest.sin_port = htons(53);
-	dest.sin_addr.s_addr = inet_addr(server_ip_str );
-	raw_fd = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP); //UDP packet for DNS queries
+
+	struct addrinfo hints, *res, *ressave;
+   	int s ,  err_num;;
+	bzero(&hints, sizeof(hints));
+   	hints.ai_family = AF_UNSPEC;    
+   	hints.ai_flags = 0;
+   	hints.ai_socktype = SOCK_DGRAM;
+	 hints.ai_flags = 0;
+	char port[] = "domain";
+
+	err_num = getaddrinfo(server_ip_str, port , &hints, &res);
+	if(err_num) 
+		fatal("getaddrinfo: host %s port %s :  %s", server_ip_str, port, gai_strerror(err_num));
+
 	dns = (struct DNS_HEADER *)&buf;
 	qlen =  makequery(dns, buf, lookupname,  qtype, qclass);
 	// query info 
 	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
+  ressave = res;
+  int sendto_len  ;
+      sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION);
 
-	if(sendto(raw_fd,(char*)buf,sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION),0,(struct sockaddr*)&dest,sizeof(dest)) == 0)
-	{
-		printf("Error sending socket");
-	}
-	int i;
-	i = sizeof dest ;
-	if(recvfrom (raw_fd,(char*)buf,2048,0,(struct sockaddr*)&dest,&i) == 0)
-	{
-		printf("Failed. Error Code ");
-	}
+  do {
+      s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+      if(s < 0)
+            continue;
+      if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
+            perror("send");
+            close(s);
+            continue;
+      }  
+      else {
+
+	      if(read(s, buf, 2048) == -1) {
+		      perror("read");
+		      close(s);
+		      continue;
+	      }
+	      else {
+		      close(s);
+		      break;
+	      }	
+             close(s);
+             break;
+      }
+   } while ((res = res->ai_next) != NULL);
+   if(!res) {
+      freeaddrinfo(ressave);
+      fatal("socket/sendto failed for all addresses\n");
+   }
+   freeaddrinfo(ressave);
 	printf("RESPONSE ");
 	printAnswer(buf);
 }
@@ -241,8 +275,8 @@ int printAnswer(char *result)
 
 		if(answers[i].rdata != NULL) 
 			free (answers[i].rdata); 
-		printf("\n");
 	}
+	printf("\n");
 }
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 {
@@ -332,7 +366,7 @@ static void fatal(const char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	fprintf(stderr, "httppost: ");
+	fprintf(stderr, "tdig: ");
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "\n");
 
