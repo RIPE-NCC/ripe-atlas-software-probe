@@ -7,6 +7,13 @@ Dated : 29/4/2009
 Also DNSMN GPL version
 */
 
+#include <getopt.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include<stdio.h>
 #include<sys/socket.h>
 #include<netinet/in.h>
@@ -67,9 +74,21 @@ struct RES_RECORD
 
 char dns_servers[256]; 
 
+static void fatal(const char *fmt, ...);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
-void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ;
+void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
+
 int printAnswer(char *result);
+
+static struct option longopts[]=
+{
+        { "hostname-bind", no_argument, NULL, 'h' },
+        { "id-server", no_argument, NULL, 'i' },
+        { "version-bind", no_argument, NULL, 'b' },
+        { "version.server", no_argument, NULL, 'r' },
+        { "soa", no_argument, NULL, 's' },
+        { NULL, }
+};
 
 int dns_id;
 static unsigned char buf[2048], *qname,*reader;
@@ -78,6 +97,9 @@ int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
 {
 
+	char lookupname[32];
+	char * server_ip_str;
+	int c;
 	char * packet [512];
 	//char * packet = (char *) malloc(512);
 	int raw_fd;
@@ -85,12 +107,33 @@ int tdig_main(int argc, char **argv)
 	struct sockaddr_in dest;
 	//char dns_server[] = "k.root-servers.net.";
 	char dns_server[] = "193.0.14.129";
-	dest.sin_family = AF_INET;
-	dest.sin_port = htons(53);
-	dest.sin_addr.s_addr = inet_addr(dns_server);
-
 	struct DNS_HEADER *dns = NULL;
 	struct QUESTION *qinfo = NULL;
+
+	optind= 0;
+	while (c= getopt_long(argc, argv, "46i?", longopts, NULL), c != -1)
+	{
+		switch(c)
+		{
+			case '4':
+				break;
+			case 'i':
+				strcpy(lookupname , "id.server.");
+				break;
+			default:
+				break;
+
+		}
+
+
+	} 
+	if (optind != argc-1)
+                fatal("exactly one server IP address expected");
+
+	server_ip_str = argv[optind];
+	dest.sin_family = AF_INET;
+	dest.sin_port = htons(53);
+	dest.sin_addr.s_addr = inet_addr(server_ip_str );
 
 	raw_fd = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP); //UDP packet for DNS queries
 
@@ -116,7 +159,7 @@ int tdig_main(int argc, char **argv)
 	//point to the query portion
 	qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
 
-	ChangetoDnsNameFormat(qname , "id.server.");
+	ChangetoDnsNameFormat(qname , lookupname);
 	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; //fill it
 
 	qinfo->qtype = htons(16); //txt 
@@ -125,7 +168,7 @@ int tdig_main(int argc, char **argv)
 	{
 		printf("Error sending socket");
 	}
-	printf("Sent");
+	printf("Sent ..");
 	int i;
 	i = sizeof dest ;
 	if(recvfrom (raw_fd,(char*)buf,2048,0,(struct sockaddr*)&dest,&i) == 0)
@@ -263,4 +306,20 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 	}
 	name[i-1]=NULL; //remove the last dot
 	return name;
+}
+
+
+
+static void fatal(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	fprintf(stderr, "httppost: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+
+	va_end(ap);
+	exit(1);
 }
