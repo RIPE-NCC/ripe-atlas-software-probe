@@ -73,6 +73,7 @@ struct RES_RECORD
 static void fatal(const char *fmt, ...);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
+unsigned int makequery( struct DNS_HEADER *dns, char *buf, char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
 int printAnswer(char *result);
 
@@ -87,27 +88,28 @@ static struct option longopts[]=
 };
 
 int dns_id;
-static unsigned char buf[2048], *qname,*reader;
 
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
 {
-
+ 	unsigned char buf[2048], *reader;
 	char lookupname[32];
 	char * server_ip_str;
 	char * soa_str;
 	int c;
-	char * packet [512];
-	//char * packet = (char *) malloc(512);
 	int raw_fd;
-	int udp_fd;
 	struct sockaddr_in dest;
-	//char dns_server[] = "k.root-servers.net.";
-	char dns_server[] = "193.0.14.129";
-	struct DNS_HEADER *dns = NULL;
 	struct QUESTION *qinfo = NULL;
-
 	optind= 0;
+	u_int16_t qtype; 
+	u_int16_t qclass;
+	
+	struct DNS_HEADER *dns = NULL;
+	unsigned int qlen; 
+	qtype = T_TXT; /* TEXT */
+	qclass = C_CHAOS;
+	bzero(buf, 2048);	
+
 	while (c= getopt_long(argc, argv, "46bhirs:?", longopts, NULL), c != -1)
 	{
 		switch(c)
@@ -137,7 +139,6 @@ int tdig_main(int argc, char **argv)
 				break;
 
 		}
-
 	} 
 	if (optind != argc-1)
                 fatal("exactly one server IP address expected");
@@ -146,48 +147,23 @@ int tdig_main(int argc, char **argv)
 	dest.sin_family = AF_INET;
 	dest.sin_port = htons(53);
 	dest.sin_addr.s_addr = inet_addr(server_ip_str );
-
 	raw_fd = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP); //UDP packet for DNS queries
-
-	//Set the DNS structure to standard queries
 	dns = (struct DNS_HEADER *)&buf;
+	qlen =  makequery(dns, buf, lookupname,  qtype, qclass);
+	// query info 
+	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
 
-	dns->id = (unsigned short) htons(getpid());
-	dns->qr = 0; //This is a query
-	dns->opcode = 0; //This is a standard query
-	dns->aa = 0; //Not Authoritative
-	dns->tc = 0; //This message is not truncated
-	dns->rd = 0; //Recursion Desired
-	dns->ra = 0; //Recursion not available! hey we dont have it (lol)
-	dns->z = 0;
-	dns->ad = 0;
-	dns->cd = 0;
-	dns->rcode = 0;
-	dns->q_count = htons(1); //we have only 1 question
-	dns->ans_count = 0;
-	dns->auth_count = 0;
-	dns->add_count = 0;
-
-	//point to the query portion
-	qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
-
-	ChangetoDnsNameFormat(qname , lookupname);
-	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; //fill it
-
-	qinfo->qtype = htons(16); //txt 
-	qinfo->qclass = htons(3); //chaos
-	if(sendto(raw_fd,(char*)buf,sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION),0,(struct sockaddr*)&dest,sizeof(dest)) == 0)
+	if(sendto(raw_fd,(char*)buf,sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION),0,(struct sockaddr*)&dest,sizeof(dest)) == 0)
 	{
 		printf("Error sending socket");
 	}
-	printf("Sent ..");
 	int i;
 	i = sizeof dest ;
 	if(recvfrom (raw_fd,(char*)buf,2048,0,(struct sockaddr*)&dest,&i) == 0)
 	{
 		printf("Failed. Error Code ");
 	}
-	printf("Received.");
+	printf("RESPONSE ");
 	printAnswer(buf);
 }
 
@@ -208,32 +184,31 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 	*dns++=NULL;
 }
 
-
 int printAnswer(char *result) 
 {
 	int i, stop=0;
+	unsigned char *qname, *reader;
 	struct DNS_HEADER *dnsR = NULL;
-	struct RES_RECORD answers[20],auth[20],addit[20]; //the replies from the DNS server
+	struct RES_RECORD answers[20]; //the replies from the DNS server
 
-	dnsR = (struct DNS_HEADER*) buf;
+	dnsR = (struct DNS_HEADER*) result;
 
 	//point to the query portion
-	qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
+	qname =(unsigned char*)&result[sizeof(struct DNS_HEADER)];
 
 	//move ahead of the dns header and the query field
-	reader = &buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
+	reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
-	printf("nThe response contains : ");
-	printf("n %d Questions.",ntohs(dnsR->q_count));
-	printf("n %d Answers.",ntohs(dnsR->ans_count));
-	printf("n %d Authoritative Servers.",ntohs(dnsR->auth_count));
-	printf("n %d Additional records.\n",ntohs(dnsR->add_count));
+	printf(" : questions  %d  ",ntohs(dnsR->q_count));
+	printf(" : answers %d ",ntohs(dnsR->ans_count));
+	printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
+	printf(" : additional records %d",ntohs(dnsR->add_count));
 
 	stop=0;
 
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
-		answers[i].name=ReadName(reader,buf,&stop);
+		answers[i].name=ReadName(reader,result,&stop);
 		reader = reader + stop;
 
 		answers[i].resource = (struct R_DATA*)(reader);
@@ -245,25 +220,22 @@ int printAnswer(char *result)
 	//print answers
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
-		//printf("nAnswer : %d",i+1);
-		printf("Name : %s ",answers[i].name);
+		printf(": name  %s ",answers[i].name);
 
 		if(ntohs(answers[i].resource->type)==16) //txt
 		{
-			answers[i].rdata = ReadName(reader,buf,&stop);
+			answers[i].rdata = ReadName(reader,result,&stop);
 			reader = reader + stop;
 
-			printf("type : TXT : %d ", ntohs(answers[i].resource->data_len));
-			printf(" %s ", answers[i].name);
+			printf(": type TXT : len %d ", ntohs(answers[i].resource->data_len));
 			answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-			printf(" %s ", answers[i].name);
-			printf(" %s", answers[i].rdata);
+			printf(": record %s", answers[i].rdata);
 		}
 		else {
-			printf ("Unknown type : %d\n", ntohs(answers[i].resource->type));
+			printf (": unknown type  %d \n", ntohs(answers[i].resource->type));
 		}
 
-		// free memory
+		// free mem 
 		if(answers[i].name != NULL) 
 			free (answers[i].name); 
 
@@ -271,8 +243,6 @@ int printAnswer(char *result)
 			free (answers[i].rdata); 
 		printf("\n");
 	}
-
-
 }
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 {
@@ -321,6 +291,40 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 }
 
 
+unsigned int makequery( struct DNS_HEADER *dns, char *buf, char *lookupname, u_int16_t qtype, u_int16_t qclass)
+{
+	unsigned char *qname;
+	struct QUESTION *qinfo = NULL;
+	unsigned int ret;
+
+	dns->id = (unsigned short) htons(getpid());
+	dns->qr = 0; //This is a query
+	dns->opcode = 0; //This is a standard query
+	dns->aa = 0; //Not Authoritative
+	dns->tc = 0; //This message is not truncated
+	dns->rd = 0; //Recursion  not Desired
+	dns->ra = 0; //Recursion not available! hey we dont have it (lol)
+	dns->z = 0;
+	dns->ad = 0;
+	dns->cd = 0;
+	dns->rcode = 0;
+	dns->q_count = htons(1); //we have only 1 question
+	dns->ans_count = 0;
+	dns->auth_count = 0;
+	dns->add_count = 0;
+
+	//point to the query portion
+	qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
+	
+	ChangetoDnsNameFormat(qname , lookupname);
+	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; //fill it 
+	ret = (strlen((const char*)qname) + 1);
+
+	qinfo->qtype = htons(qtype); 
+	qinfo->qclass = htons(qclass);
+
+	return  (ret);
+}
 
 static void fatal(const char *fmt, ...)
 {
