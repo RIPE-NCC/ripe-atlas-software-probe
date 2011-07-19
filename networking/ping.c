@@ -328,7 +328,9 @@ void BUG_ping_globals_too_big(void);
 	pingsock = -1; \
 	datalen = DEFDATALEN; \
 	timeout = MAXWAIT; \
+	tsum = 0; \
 	tmin = UINT_MAX; \
+	tmax = 0; \
 	need_to_exit = 0; \
 	send_error = 0; \
 	ntransmitted = 0; \
@@ -799,6 +801,7 @@ static void ping6(len_and_sockaddr *lsa)
 		if (pingcount && nreceived >= pingcount)
 			break;
 	}
+	close(pingsock);
 }
 #endif
 
@@ -901,16 +904,21 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 	dotted = xmalloc_sockaddr2dotted_noport(&lsa->u.sa);
 	ping(lsa);
+
 #ifdef ATLAS
 	print_stats();
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);
 	signal(SIGINT, SIG_DFL);
-	return EXIT_SUCCESS;
 #else
 	print_stats_and_exit(EXIT_SUCCESS);
 	/*return EXIT_SUCCESS;*/
 #endif
+
+	free(dotted); dotted= NULL;
+	free(lsa); lsa= NULL;
+
+	return EXIT_SUCCESS;
 }
 #endif /* FEATURE_FANCY_PING */
 
