@@ -20,7 +20,8 @@ include/config/feature/traceroute/ipv6.h
 include/config/findpid.h
 include/config/httppost.h
 include/config/sleepkick.h
-networking/.httppost.o.d
+include/config/autossh.h
+include/config/tdig.h
 applets/.applet_tables.cmd
 applets/.usage.cmd
 applets/applet_tables
