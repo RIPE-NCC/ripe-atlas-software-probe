@@ -724,6 +724,11 @@ config SLATTACH
 #	def_bool n
 #	depends on TC
 
+config TDIG
+	bool "tdig"
+	help
+	 tiny implemention of dig RIPE NCC 2011
+
 config TELNET
 	bool "telnet"
 	default n

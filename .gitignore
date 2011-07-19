@@ -13,6 +13,7 @@ busybox_unstripped*
 .indent.pro
 .kconfig.d
 .kernelrelease
+.config.old
 include/config/atlasserial.h
 include/config/buddyinfo.h
 include/config/feature/traceroute/ipv6.h

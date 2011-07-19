@@ -4139,6 +4139,11 @@
        "$ taskset -p 1\n" \
        "pid 1's current affinity mask: 3\n"
 
+#define tdig_trivial_usage \
+       "[OPTION]... [FILE]..."
+#define tdig_full_usage "\n\n" \
+       "tiny dig ripe ncc"\
+
 #define tee_trivial_usage \
        "[OPTION]... [FILE]..."
 #define tee_full_usage "\n\n" \
