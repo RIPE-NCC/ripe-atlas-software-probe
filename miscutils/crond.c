@@ -818,6 +818,7 @@ int ping_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 int traceroute_main(int argc, char *argv[]);
+int condmv_main(int argc, char *argv[]);
 
 static struct builtin 
 {
@@ -829,11 +830,12 @@ static struct builtin
 	{ "ping6", ping6_main },
 	{ "httppost", httppost_main },
 	{ "traceroute", traceroute_main },
+	{ "condmv", condmv_main },
 	{ NULL, 0 }
 };
 
 #define ATLAS_NARGS	20	/* Max arguments to a built-in command */
-#define ATLAS_ARGSIZE	256	/* Max size of the command line */
+#define ATLAS_ARGSIZE	512	/* Max size of the command line */
 
 static int atlas_run(char *cmdline)
 {
@@ -867,7 +869,7 @@ static int atlas_run(char *cmdline)
 	len= strlen(cmdline);
 	if (len+1 > ATLAS_ARGSIZE)
 	{
-		crondlog(LVL8 "atlas_run: command line '%s' too big", cmdline);
+		crondlog(LVL8 "atlas_run: command line too big: '%s'", cmdline);
 		return 1;	/* Just skip it */
 	}
 	strcpy(args, cmdline);
@@ -1175,8 +1177,58 @@ static void RunJob(const char *user, CronLine *line)
 {
 	struct passwd *pas;
 	pid_t pid;
+	char *cp, *ncp, *check;
+	unsigned long tv;
+	time_t now;
 
-	if (do_atlas && atlas_run(line->cl_Shell))
+	now= time(NULL);
+
+	/* Look for start and end times */
+	cp= line->cl_Shell;
+	skip_space(cp, &ncp);
+	cp= ncp;
+
+	/* Try to parse the value as a start time */
+	tv= strtoul(cp, &check, 10);
+	if (check[0] == ' ')
+	{
+		if (tv > now)
+		{
+			/* Start time is in the future.  */
+			crondlog(
+			LVL8 "atlas_run: command starts in the future '%s'",
+					line->cl_Shell);
+			return;		/* Skip it */
+		}
+
+		cp= check;
+		skip_space(cp, &ncp);
+		cp= ncp;
+
+		/* Try to parse the value as an end time */
+		tv= strtoul(cp, &check, 10);
+		if (check[0] != ' ')
+		{
+			crondlog(LVL8 "atlas_run: bad end time in '%s'",
+						line->cl_Shell);
+			return;		/* Skip it */
+		}
+
+		if (tv < now)
+		{
+			/* End time is in the past.  */
+			crondlog(
+			LVL8 "atlas_run: command ends in the past '%s'",
+				line->cl_Shell);
+			return;		/* Skip it */
+		}
+
+		cp= check;
+		skip_space(cp, &ncp);
+		cp= ncp;
+	}
+
+	if (do_atlas && atlas_run(cp))
 	{
 		/* Internal command */
 		return;
@@ -1201,9 +1253,9 @@ static void RunJob(const char *user, CronLine *line)
 		}
 		/* crond 3.0pl1-100 puts tasks in separate process groups */
 		bb_setpgrp();
-		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
+		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", cp, NULL);
 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
-				 DEFAULT_SHELL, "-c", line->cl_Shell);
+				 DEFAULT_SHELL, "-c", cp);
 		_exit(EXIT_SUCCESS);
 	}
 	if (pid < 0) {

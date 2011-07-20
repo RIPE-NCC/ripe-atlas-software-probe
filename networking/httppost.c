@@ -20,6 +20,7 @@ struct option longopts[]=
 {
 	{ "delete-file", no_argument, NULL, 'd' },
 	{ "post-file", required_argument, NULL, 'p' },
+	{ "post-dir", required_argument, NULL, 'D' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
 	{ NULL, }
@@ -32,6 +33,7 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 static void check_result(FILE *tcp_file);
 static void eat_headers(FILE *tcp_file, int *chunked, int *content_length);
 static int connect_to_name(char *host, char *port);
+char *do_dir(char *dir_name, off_t *lenp);
 static void copy_chunked(FILE *in_file, FILE *out_file);
 static void copy_bytes(FILE *in_file, FILE *out_file, size_t len);
 static void usage(void);
@@ -45,14 +47,15 @@ static void skip_spaces(const char *cp, char **ncp);
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c,  fd, fdF, fdH, tcp_fd, chunked, content_length, result;
+	int c,  fd, fdF, fdH, fdS, tcp_fd, chunked, content_length, result;
 	int opt_delete_file;
-	char *url, *host, *port, *hostport, *path;
-	char *post_file, *output_file, *post_footer, *post_header;
+	char *url, *host, *port, *hostport, *path, *filelist, *p;
+	char *post_dir, *post_file, *output_file, *post_footer, *post_header;
 	FILE *tcp_file, *out_file;
-	struct stat sb, sbF, sbH;
-	off_t     cLength;
+	struct stat sbF, sbH, sbS;
+	off_t     cLength, dir_length;
 
+	post_dir= NULL; 
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
@@ -62,6 +65,7 @@ int httppost_main(int argc, char *argv[])
 	fd= -1;
 	fdH= -1;
 	fdF= -1;
+	fdS= -1;
 	tcp_fd= -1;
 	tcp_file= NULL;
 	out_file= NULL;
@@ -69,6 +73,7 @@ int httppost_main(int argc, char *argv[])
 	port= NULL;
 	hostport= NULL;
 	path= NULL;
+	filelist= NULL;
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
@@ -81,6 +86,9 @@ int httppost_main(int argc, char *argv[])
 			break;
 		case 'd':
 			opt_delete_file = 1;
+			break;
+		case 'D':
+			post_dir = optarg;		/* --post-dir */
 			break;
 		case 'h':				/* --post-header */
 			post_header= optarg;
@@ -109,6 +117,17 @@ int httppost_main(int argc, char *argv[])
 	//printf("port: %s\n", port);
 	//printf("hostport: %s\n", hostport);
 	//printf("path: %s\n", path);
+
+	if (post_dir)
+	{
+		filelist= do_dir(post_dir, &dir_length);
+		if (!filelist)
+		{
+			/* Something went wrong. */
+			goto err;
+		}
+		fprintf(stderr, "total size in dir: %d\n", dir_length);
+	}
 
 	if(post_header != NULL )
 	{	
@@ -155,27 +174,24 @@ int httppost_main(int argc, char *argv[])
 	}
 
 	/* Try to open the file before trying to connect */
-	if (post_file == NULL)
+	if (post_file != NULL)
 	{
-		report("no file to POST");
-		goto err;
-	}
-
-	fd= open(post_file, O_RDONLY);
-	if (fd == -1)
-	{
-		report_err("unable to open '%s'", post_file);
-		goto err;
-	}
-	if (fstat(fd, &sb) == -1)
-	{
-		report_err("fstat failed");
-		goto err;
-	}
-	if (!S_ISREG(sb.st_mode))
-	{
-		report("'%s' is not a regular file", post_file);
-		goto err;
+		fdS= open(post_file, O_RDONLY);
+		if (fdS == -1)
+		{
+			report_err("unable to open '%s'", post_file);
+			goto err;
+		}
+		if (fstat(fdS, &sbS) == -1)
+		{
+			report_err("fstat failed");
+			goto err;
+		}
+		if (!S_ISREG(sbS.st_mode))
+		{
+			report("'%s' is not a regular file", post_file);
+			goto err;
+		}
 	}
 
 	tcp_fd= connect_to_name(host, port);
@@ -201,13 +217,18 @@ int httppost_main(int argc, char *argv[])
 	fprintf(tcp_file,
 			"Content-Type: application/x-www-form-urlencoded\r\n");
 
-	cLength  = sb.st_size;
+	cLength= 0;
 	if( post_header != NULL )
 		cLength  +=  sbH.st_size;
 
+	if (post_file)
+		cLength  += sbS.st_size;
+
+	if (post_dir)
+		cLength += dir_length;
+
 	if( post_footer != NULL )
 		cLength  +=  sbF.st_size;
-
 
 	fprintf(tcp_file, "Content-Length: %lu\r\n", (unsigned long)cLength);
 	fprintf(tcp_file, "\r\n");
@@ -215,7 +236,25 @@ int httppost_main(int argc, char *argv[])
 	if( post_header != NULL )
 		 write_to_tcp_fd(fdH, tcp_file); 
 
-	write_to_tcp_fd(fd, tcp_file);
+	if (post_file != NULL)
+		write_to_tcp_fd(fdS, tcp_file);
+
+	if (post_dir)
+	{
+		for (p= filelist; p[0] != 0; p += strlen(p)+1)
+		{
+			fprintf(stderr, "posting file '%s'\n", p);
+			fd= open(p, O_RDONLY);
+			if (fd == -1)
+			{
+				report_err("unable to open '%s'", p);
+				goto err;
+			}
+			write_to_tcp_fd(fd, tcp_file);
+			close(fd);
+			fd= -1;
+		}
+	}
 
 	if( post_footer != NULL)
 		write_to_tcp_fd(fdF, tcp_file);
@@ -244,13 +283,26 @@ int httppost_main(int argc, char *argv[])
 		copy_bytes(tcp_file, out_file, content_length);
 	}
 	if ( opt_delete_file == 1 )
-		unlink (post_file);
+	{
+		if (post_file)
+			unlink (post_file);
+		if (post_dir)
+		{
+			for (p= filelist; p[0] != 0; p += strlen(p)+1)
+			{
+				fprintf(stderr, "unlinking file '%s'\n", p);
+				if (unlink(p) != 0)
+					report_err("unable to unlink '%s'", p);
+			}
+		}
+	}
 
 	result= 0;
 
 leave:
 	if (fdH != -1) close(fdH);
 	if (fdF != -1) close(fdF);
+	if (fdS != -1) close(fdS);
 	if (fd != -1) close(fd);
 	if (tcp_file) fclose(tcp_file);
 	if (tcp_fd != -1) close(tcp_fd);
@@ -259,6 +311,7 @@ leave:
 	if (port) free(port);
 	if (hostport) free(hostport);
 	if (path) free(path);
+	if (filelist) free(filelist);
 
 	return result; 
 
@@ -558,6 +611,88 @@ static int connect_to_name(char *host, char *port)
 	if (s == -1)
 		errno= s_errno;
 	return s;
+}
+
+char *do_dir(char *dir_name, off_t *lenp)
+{
+	size_t currsize, allocsize, dirlen, len;
+	char *list, *tmplist, *path;
+	DIR *dir;
+	struct dirent *de;
+	struct stat sb;
+
+	/* Scan a directory for files. Return the filenames asa list of 
+	 * strings. An empty string terminates the list. Also compute the
+	 * total size of the files
+	 */
+	*lenp= 0;
+	currsize= 0;
+	allocsize= 0;
+	list= NULL;
+	dir= opendir(dir_name);
+	if (dir == NULL)
+	{
+		report_err("opendir failed for '%s'", dir_name);
+		return NULL;
+	}
+
+	dirlen= strlen(dir_name);
+	while (de= readdir(dir), de != NULL)
+	{
+		/* Concat dir and entry */
+		len= dirlen + 1 + strlen(de->d_name) + 1;
+		if (currsize+len > allocsize)
+		{
+			allocsize += 4096;
+			tmplist= realloc(list, allocsize);
+			if (!tmplist)
+			{
+				free(list);
+				report("realloc failed for %d bytes",
+					allocsize);
+				return NULL;
+			}
+			list= tmplist;
+		}
+		path= list+currsize;
+
+		strlcpy(path, dir_name, allocsize-currsize);
+		strlcat(path, "/", allocsize-currsize);
+		strlcat(path, de->d_name, allocsize-currsize);
+
+		if (stat(path, &sb) != 0)
+		{
+			report_err("stat '%s' failed", path);
+			free(list);
+			return NULL;
+		}
+
+		if (!S_ISREG(sb.st_mode))
+			continue;	/* Just skip entry */
+
+		currsize += len;
+		*lenp += sb.st_size;
+	}
+
+	/* Add empty string to terminate the list */
+	len= 1;
+	if (currsize+len > allocsize)
+	{
+		allocsize += 4096;
+		tmplist= realloc(list, allocsize);
+		if (!tmplist)
+		{
+			free(list);
+			report("realloc failed for %d bytes", allocsize);
+			return NULL;
+		}
+		list= tmplist;
+	}
+	path= list+currsize;
+
+	*path= '\0';
+
+	return list;
 }
 
 static void copy_chunked(FILE *in_file, FILE *out_file)

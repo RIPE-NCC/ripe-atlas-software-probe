@@ -470,6 +470,14 @@
      "\n	-2	Suppress lines unique to FILE2" \
      "\n	-3	Suppress lines common to both files" \
 
+#define condmv_trivial_usage \
+       "[-A <string to append>][-f] FILE1 FILE2"
+#define condmv_full_usage "\n\n" \
+       "Rename FILE1 to FILE2 if FILE2 does not exist\n" \
+     "\nOptions:" \
+     "\n	-A <string>	Append <string> before renaming FILE1" \
+     "\n	-f 		Force. Move even if FILE2 does exist" \
+
 #define bbconfig_trivial_usage \
        ""
 #define bbconfig_full_usage "\n\n" \
