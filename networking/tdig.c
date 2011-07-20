@@ -88,7 +88,7 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
 unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
-int printAnswer(unsigned char *result);
+void printAnswer(unsigned char *result);
 
 
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -111,13 +111,23 @@ int tdig_main(int argc, char **argv)
 	qtype = T_TXT; /* TEXT */
 	qclass = C_CHAOS;
 	bzero(buf, 2048);	
+	int opt_v4_only , opt_v6_only;
+	char  *atlas_str = NULL;
 
-	while (c= getopt_long(argc, argv, "46bhirs:?", longopts, NULL), c != -1)
+	opt_v4_only =  opt_v6_only = 0;
+	while (c= getopt_long(argc, argv, "46bhirs:A:?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
 			case '4':
+				opt_v4_only = 1;
 				break; 
+			case '6':
+				opt_v6_only = 1;
+				break;
+			case 'A':
+				atlas_str = optarg;
+			        break;
 			case 'b':
 				strcpy(lookupname , "version.bind.");
 				break;
@@ -144,11 +154,29 @@ int tdig_main(int argc, char **argv)
 	} 
 	if (optind != argc-1)
 		fatal("exactly one server IP address expected");
-
 	server_ip_str = argv[optind];
+
+	if(atlas_str) {
+		time_t mytime;
+        	mytime = time(NULL);
+		printf ("%s %lu ", atlas_str, mytime);
+	}
+	printf (" %s ", server_ip_str);
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;    
+	if( opt_v4_only == 1 )
+	{
+		hints.ai_family = AF_INET;    
+	}
+	else if ( opt_v4_only == 1 )
+	{
+		hints.ai_family = AF_INET6;    
+	}
+	else if ( (opt_v4_only == 1 ) && (opt_v4_only == 1 ))
+	{
+		hints.ai_family = AF_UNSPEC;    
+	}
 	hints.ai_flags = 0;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
@@ -171,6 +199,21 @@ int tdig_main(int argc, char **argv)
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if(s < 0)
 			continue;
+		
+		void *ptr;
+		char addrstr[100];
+		switch (res->ai_family)
+		{
+			case AF_INET:
+	  			ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+	  			break;
+			case AF_INET6:
+	  			ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
+	  			break;
+		}
+		inet_ntop (res->ai_family, ptr, addrstr, 100);
+		printf ("IPv%d address : %s ", res->ai_family == PF_INET6 ? 6 : 4, addrstr );
+
 		if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
 			perror("send");
 			close(s);
@@ -178,7 +221,6 @@ int tdig_main(int argc, char **argv)
 		}  
 		else 
 		{
-
 			if(read(s, buf, 2048) == -1) {
 				perror("read");
 				close(s);
@@ -197,7 +239,6 @@ int tdig_main(int argc, char **argv)
 		fatal("socket/sendto failed for all addresses\n");
 	}
 	freeaddrinfo(ressave);
-	printf("RESPONSE ");
 	printAnswer(buf);
 	return (0);
 }
@@ -219,7 +260,7 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 	*dns++=NULL;
 }
 
-int printAnswer(unsigned char *result) 
+void printAnswer(unsigned char *result) 
 {
 	int i, stop=0;
 	unsigned char *qname, *reader;
