@@ -20,6 +20,7 @@ lib-$(CONFIG_CHOWN)     += chown.o
 lib-$(CONFIG_CHROOT)    += chroot.o
 lib-$(CONFIG_CKSUM)     += cksum.o
 lib-$(CONFIG_COMM)      += comm.o
+lib-$(CONFIG_CONDMV)    += condmv.o
 lib-$(CONFIG_CP)        += cp.o
 lib-$(CONFIG_CUT)       += cut.o
 lib-$(CONFIG_DATE)      += date.o

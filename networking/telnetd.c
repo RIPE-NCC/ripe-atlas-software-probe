@@ -39,11 +39,14 @@
 #define LOGIN_PROMPT	" login: "
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
-#define ATLAS_LOGIN	"C_TO_P_TEST"
+#define ATLAS_LOGIN	"C_TO_P_TEST_V1"
 #define ATLAS_PASSWORD	"vuurwerk19"
+#define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
+#define SESSION_ID_PREFIX	"SESSION_ID "
 
 #define CMD_CRONTAB	"CRONTAB "
-#define CMD_END_CRONTAB	""
+#define CMD_CRONLINE	"CRONLINE"
+#define CMD_ONEOFF	"ONEOFF"
 
 #define CRLF		"\r\n"
 #define RESULT_OK	"OK" CRLF CRLF
@@ -66,7 +69,8 @@ enum state
 	GET_LOGINNAME,
 	GET_PASSWORD,
 	GET_CMD,
-	DO_CRONTAB
+	DO_CRONTAB,
+	EOM_SEEN
 };
 #endif
 
@@ -95,6 +99,7 @@ struct tsession {
 enum { BUFSIZE = (4 * 1024 - sizeof(struct tsession)) / 2 };
 
 #ifdef ATLAS
+static int equal_sessionid(char *passwd);
 static void add_2sock(struct tsession *ts, const char *str);
 static void pack_4sock(void);
 static char *getline_2pty(struct tsession *ts);
@@ -102,6 +107,7 @@ static void pack_2pty(struct tsession *ts);
 static int start_crontab(struct tsession *ts, char *line);
 static void add_to_crontab(struct tsession *ts, char *line);
 static void end_crontab(struct tsession *ts);
+static void do_oneoff(struct tsession *ts, char *line);
 #endif
 
 /* Globals */
@@ -481,6 +487,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned opt;
 	int count;
 	struct tsession *ts;
+	char *line;
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 #define IS_INETD (opt & OPT_INETD)
 	int master_fd = master_fd; /* be happy, gcc */
@@ -726,7 +733,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		case GET_LOGINNAME:
 			{
 			int num_totty;
-			char *line;
 			unsigned char *ptr;
 
 			ptr = remove_iacs(ts, &num_totty);
@@ -759,14 +765,12 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 			}
 		case GET_PASSWORD:
-			{
-			char *line;
-
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
 
-			if (strcmp(line, ATLAS_PASSWORD) == 0)
+			if (equal_sessionid(line) ||
+				strcmp(line, ATLAS_PASSWORD) == 0)
 			{
 				free(line); line= NULL;
 
@@ -796,13 +800,10 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 				goto skip3;
 			}
 
-			}
-
 		case GET_CMD:
 			{
 			int r;
 			size_t len;
-			char *line;
 
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
@@ -811,6 +812,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			if (!line)
 				goto skip3a;
 
+do_cmd:
 			len= strlen(CMD_CRONTAB);
 			if (strncmp(line, CMD_CRONTAB, len) == 0)
 			{
@@ -828,17 +830,39 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 				goto skip3;
 			}
 
+			len= strlen(CMD_ONEOFF);
+			if (strncmp(line, CMD_ONEOFF, len) == 0)
+			{
+				do_oneoff(ts, line);
+				free(line); line= NULL;
+
+				/* Assume do_oneoff sent an error response
+				 * if something was wrong.
+				 */
+				goto skip3;
+			}
+			if (strlen(line) == 0)
+			{
+				free(line); line= NULL;
+
+				/* End of request */
+				add_2sock(ts, RESULT_OK);
+
+				ts->state= EOM_SEEN;
+				goto skip3;
+			}
+
+
 			free(line); line= NULL;
 
 			/* Bad command */
 			add_2sock(ts, BAD_COMMAND);
 			goto skip3a;
-
 			}
 
 		case DO_CRONTAB:
 			{
-			char *line;
+			size_t len;
 
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
@@ -847,23 +871,43 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			if (!line)
 				goto skip3a;
 
-			if (strcmp(line, CMD_END_CRONTAB) == 0)
+			len= strlen(CMD_CRONLINE);
+			if (strncmp(line, CMD_CRONLINE, len) != 0)
 			{
-				free(line); line= NULL;
-
 				end_crontab(ts);
+				
+				/* Assume end_crontab sends a response
+				 * if there was an error.
+				 */
 
-				/* Assume end_crontab sends a response. */
 				ts->state= GET_CMD;
-				goto skip3;
+
+				/* Unfortunately, the line that ends the
+				 * crontab is the next command.
+				 */
+				goto do_cmd;
 			}
 
-			add_to_crontab(ts, line);
+			add_to_crontab(ts, line+len);
 			free(line); line= NULL;
 
 			/* And again */
 			goto skip3;
 			}
+
+		case EOM_SEEN:
+			if (ts != atlas_ts)
+				goto kill_session;	/* Old session */
+
+			/* Just eat all input and return bad command */
+			line= getline_2pty(ts);
+			if (!line)
+				goto skip3a;
+
+			free(line); line= NULL;
+			add_2sock(ts, BAD_COMMAND);
+			goto skip3;
+
 		default:
 			bb_error_msg("unknown state %d", ts->state);
 			abort();
@@ -907,6 +951,56 @@ skip3a:
 }
 
 #ifdef ATLAS
+static int equal_sessionid(char *passwd)
+{
+	size_t len;
+	char *cp;
+	FILE *file;
+	char line[80];
+
+	file= fopen(ATLAS_SESSION_FILE, "r");
+	if (file == NULL)
+	{
+		syslog(LOG_ERR, "unable to open '%s': %m", ATLAS_SESSION_FILE);
+		return 0;
+	}
+
+	if (fgets(line, sizeof(line), file) == NULL)
+	{
+		syslog(LOG_ERR, "unable to read from '%s': %m",
+			ATLAS_SESSION_FILE);
+		fclose(file);
+		return 0;
+	}
+	fclose(file);
+
+	len= strlen(SESSION_ID_PREFIX);
+	if (strlen(line) < len)
+	{
+		syslog(LOG_ERR, "not enough session ID data");
+		return 0;
+	}
+	if (memcmp(line, SESSION_ID_PREFIX, len) != 0)
+	{
+		syslog(LOG_ERR, "missing session ID prefix");
+		return 0;
+	}
+		
+	cp= strchr(line, '\n');
+	if (cp == NULL)
+	{
+		syslog(LOG_ERR, "missing newline in session ID file");
+		return 0;
+	}
+	*cp= '\0';
+
+	if (strcmp(line+len, passwd) == 0)
+		return 1;
+
+	/* Wrong password */
+	return 0;
+}
+
 static void add_2sock(struct tsession *ts, const char *str)
 {
 	size_t len;
@@ -967,8 +1061,8 @@ static char *getline_2pty(struct tsession *ts)
 	cp= strchr(line, '\r');
 	if (cp == NULL || cp-line != strlen(line)-1)
 	{
-		bb_error_msg("bad line '%s', cp %p, cp-line %d, |line| %d",
-			line, cp, cp-line, strlen(line));
+		bb_error_msg("bad line '%s', cp %p, cp-line %d, |line| %ld",
+			line, cp, cp-line, (long)strlen(line));
 
 		/* Bad line, just ignore it */
 		free(line); line= NULL;
@@ -1073,6 +1167,7 @@ static void end_crontab(struct tsession *ts)
 	atlas_crontab= NULL;
 
 	/* Rename */
+	len= strlen(atlas_dirname);
 	if (len + strlen(CRONTAB_NEW_SUF) + 1 > sizeof(filename1))
 	{
 		add_2sock(ts, NAME_TOO_LONG);
@@ -1132,7 +1227,10 @@ static void end_crontab(struct tsession *ts)
 		add_2sock(ts, CREATE_FAILED);
 		return;
 	}
+}
 
-	add_2sock(ts, RESULT_OK);
+static void do_oneoff(struct tsession *ts, char *line)
+{
+	bb_error_msg("oneoff not implemented");
 }
 #endif /* ATLAS */
