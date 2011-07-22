@@ -223,7 +223,7 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 		time_t t2;
 		long dt;
 		int rescan = 60;
-		int sleep_time = 20; /* AA previously 60 */
+		int sleep_time = 10; /* AA previously 60 */
 
 		write_pidfile("/var/run/crond.pid");
 		for (;;) {
@@ -273,11 +273,11 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 			} else if (dt > 0) {
 				TestJobs(t1, t2);
 				RunJobs();
-				sleep(5);
+				sleep(4);
 				if (CheckJobs() > 0) {
 					sleep_time = 10;
 				} else {
-					sleep_time = 20; /* AA previously 60 */
+					sleep_time = 10; /* AA previously 60 */
 				}
 			}
 			t1 = t2;
@@ -819,6 +819,8 @@ int ping6_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 int traceroute_main(int argc, char *argv[]);
 int condmv_main(int argc, char *argv[]);
+int tdig_main(int argc, char *argv[]);
+int dfrm_main(int argc, char *argv[]);
 
 static struct builtin 
 {
@@ -831,6 +833,8 @@ static struct builtin
 	{ "httppost", httppost_main },
 	{ "traceroute", traceroute_main },
 	{ "condmv", condmv_main },
+	{ "tdig", tdig_main },
+	{ "dfrm", dfrm_main },
 	{ NULL, 0 }
 };
 
@@ -1231,6 +1235,7 @@ static void RunJob(const char *user, CronLine *line)
 	if (do_atlas && atlas_run(cp))
 	{
 		/* Internal command */
+		line->cl_Pid = 0;
 		return;
 	}
 
