@@ -767,6 +767,8 @@ static int builtin_findpid(char **argv);
 static int builtin_sleepkick(char **argv);
 static int builtin_buddyinfo(char **argv);
 static int builtin_epoch(char **argv);
+static int builtin_condmv(char **argv);
+static int builtin_dfrm(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -823,6 +825,8 @@ static const struct built_in_command bltins[] = {
 	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
 	BLTIN("sleepkick"  , builtin_sleepkick, "sleep and kick the watchdog"),
 	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
+	BLTIN("condmv" , builtin_condmv, "conditional move"),
+	BLTIN("dfrm"  , builtin_dfrm, "cleanup if free space gets too low"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -4559,7 +4563,7 @@ static int builtin_buddyinfo(char **argv)
 	/* get uptime and print it */
 	struct sysinfo info; 
 	sysinfo(&info);
- 	printf ("%ld", info.uptime );
+ 	printf ("%-7ld", info.uptime );
 	int freeMem = 0;
 	int jMax = 64; // enough
 
@@ -4587,7 +4591,7 @@ static int builtin_buddyinfo(char **argv)
 
 	/* now print it */
 
-	printf (" %d " ,  freeMem);
+	printf (" %-5d " ,  freeMem);
 
 	fclose (fp);
         FILE *fp1 = xfopen_for_read("/proc/buddyinfo");
@@ -4634,6 +4638,28 @@ static int builtin_findpid(char **argv)
 		}
 	}
 	return 1 ; /* NO MATCH */
+}
+
+int condmv_main(int argc, char *argv[]);
+
+static int builtin_condmv(char **argv) 
+{
+	int argc;
+
+	for (argc= 0; argv[argc] != 0; argc++)
+		;
+	return condmv_main(argc, argv);
+}
+
+int dfrm_main(int argc, char *argv[]);
+
+static int builtin_dfrm(char **argv) 
+{
+	int argc;
+
+	for (argc= 0; argv[argc] != 0; argc++)
+		;
+	return dfrm_main(argc, argv);
 }
 
 
