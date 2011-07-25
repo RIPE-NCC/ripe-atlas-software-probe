@@ -88,7 +88,7 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
 unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
-void printAnswer(unsigned char *result);
+void printAnswer(unsigned char *result, unsigned long long tTrip_us);
 
 
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -113,6 +113,11 @@ int tdig_main(int argc, char **argv)
 	bzero(buf, 2048);	
 	int opt_v4_only , opt_v6_only;
 	char  *atlas_str = NULL;
+	char hostname[100];
+	bzero(hostname, 100);
+	gethostname(hostname, 100);
+
+	unsigned long long  tSend_us, tRecv_us, tTrip_us;
 
 	opt_v4_only =  opt_v6_only = 0;
 	while (c= getopt_long(argc, argv, "46bhirs:A:?", longopts, NULL), c != -1)
@@ -143,13 +148,12 @@ int tdig_main(int argc, char **argv)
 
 			case 's':
 				soa_str = optarg;
-				fatal("soa not implemented yet");
-				break;
+				fprintf(stderr, "EROOR SOA query not implemented\n");
+				return(1);
 
 			default:
-				fatal("unknown option");
-				break;
-
+				fprintf(stderr, "ERROR unknown option %d \n");
+				return (1);
 		}
 	} 
 	if (optind != argc-1)
@@ -161,7 +165,6 @@ int tdig_main(int argc, char **argv)
         	mytime = time(NULL);
 		printf ("%s %lu ", atlas_str, mytime);
 	}
-	printf (" %s ", server_ip_str);
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;    
@@ -169,11 +172,11 @@ int tdig_main(int argc, char **argv)
 	{
 		hints.ai_family = AF_INET;    
 	}
-	else if ( opt_v4_only == 1 )
+	else if ( opt_v6_only == 1 )
 	{
 		hints.ai_family = AF_INET6;    
 	}
-	else if ( (opt_v4_only == 1 ) && (opt_v4_only == 1 ))
+	else if ( (opt_v4_only == 1 ) && (opt_v6_only == 1 ))
 	{
 		hints.ai_family = AF_UNSPEC;    
 	}
@@ -183,8 +186,11 @@ int tdig_main(int argc, char **argv)
 	char port[] = "domain";
 
 	err_num = getaddrinfo(server_ip_str, port , &hints, &res);
-	if(err_num) 
-		fatal("getaddrinfo: host %s port %s :  %s", server_ip_str, port, gai_strerror(err_num));
+	if(err_num)
+		{ 
+			printf("%s ERROR port %s %s\n", server_ip_str, port, gai_strerror(err_num));	
+			return (1);
+		}
 
 	dns = (struct DNS_HEADER *)&buf;
 	qlen =  makequery(dns, buf, lookupname,  qtype, qclass);
@@ -205,15 +211,16 @@ int tdig_main(int argc, char **argv)
 		switch (res->ai_family)
 		{
 			case AF_INET:
-	  			ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+	  			ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;		
 	  			break;
 			case AF_INET6:
 	  			ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
 	  			break;
 		}
 		inet_ntop (res->ai_family, ptr, addrstr, 100);
-		printf ("IPv%d address : %s ", res->ai_family == PF_INET6 ? 6 : 4, addrstr );
+		printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, server_ip_str,  addrstr );
 
+		tSend_us = monotonic_us();
 		if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
 			perror("send");
 			close(s);
@@ -230,16 +237,19 @@ int tdig_main(int argc, char **argv)
 				close(s);
 				break;
 			}	
+			tRecv_us = monotonic_us();
+			tTrip_us = tRecv_us - tSend_us;
 			close(s);
 			break;
 		}
 	} while ((res = res->ai_next) != NULL);
 	if(!res) {
 		freeaddrinfo(ressave);
-		fatal("socket/sendto failed for all addresses\n");
+		printf("DNS0 %s bad-hostname\n", server_ip_str);
+		return (1);
 	}
 	freeaddrinfo(ressave);
-	printAnswer(buf);
+	printAnswer(buf, tTrip_us );
 	return (0);
 }
 
@@ -260,7 +270,7 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 	*dns++=NULL;
 }
 
-void printAnswer(unsigned char *result) 
+void printAnswer(unsigned char *result, unsigned long long tTrip_us) 
 {
 	int i, stop=0;
 	unsigned char *qname, *reader;
@@ -275,12 +285,22 @@ void printAnswer(unsigned char *result)
 	//move ahead of the dns header and the query field
 	reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
+	/* 
 	printf(" : questions  %d  ",ntohs(dnsR->q_count));
 	printf(" : answers %d ",ntohs(dnsR->ans_count));
 	printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
 	printf(" : additional records %d",ntohs(dnsR->add_count));
-
+	*/
 	stop=0;
+
+
+	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
+	if(dnsR->ans_count == 0) 
+	{
+		printf ("0 UNKNOWN UNKNOWN");
+	}
+	else 
+		printf (" %d ", ntohs(dnsR->ans_count));	
 
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
@@ -294,20 +314,22 @@ void printAnswer(unsigned char *result)
 	//print answers
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
-		printf(": name  %s ",answers[i].name);
+		printf(" %s ",answers[i].name);
 
 		if(ntohs(answers[i].resource->type)==16) //txt
 		{
 			answers[i].rdata = ReadName(reader,result,&stop);
 			reader = reader + stop;
 
-			printf(": type TXT : len %d ", ntohs(answers[i].resource->data_len));
+			// printf(": type TXT : len %d ", ntohs(answers[i].resource->data_len));
 			answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-			printf(": record %s", answers[i].rdata);
+			printf(" %s", answers[i].rdata);
 		}
-		else {
-			printf (": unknown type  %d \n", ntohs(answers[i].resource->type));
+		else 
+		{
+			printf("DISCARDED NOT TXT=16 type");
 		}
+		
 
 		// free mem 
 		if(answers[i].name != NULL) 
