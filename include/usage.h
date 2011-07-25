@@ -760,6 +760,9 @@
 #define dfrm_trivial_usage \
 	"<fs> <min-size> <dir>..."
 
+#define dfrm_full_usage \
+	"<fs> <min-size> <dir>..."
+
 #define dhcprelay_trivial_usage \
        "[client1,client2,...] [server_device]"
 #define dhcprelay_full_usage "\n\n" \
