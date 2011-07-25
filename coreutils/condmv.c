@@ -14,6 +14,7 @@ int condmv_main(int argc, char *argv[])
 	unsigned opt;
 	struct stat sb;
 	FILE *file;
+	time_t mytime;
 
 	opt_add= NULL;
 	opt_complementary= NULL;	/* For when we are called by crond */
@@ -35,6 +36,7 @@ int condmv_main(int argc, char *argv[])
 
 	if (opt_add)
 	{
+		mytime = time(NULL);
 		/* We have to add something to the existing file before moving
 		 * to.
 		 */
@@ -46,7 +48,7 @@ int condmv_main(int argc, char *argv[])
 				from, strerror(errno));
 			return 1;
 		}
-		if (fprintf(file, "%s\n", opt_add) < 0)
+		if (fprintf(file, "%s %lu %s\n", opt_add, mytime, from) < 0)
 		{
 			fprintf(stderr,
 				"condmv: unable to append to '%s': %s\n",
