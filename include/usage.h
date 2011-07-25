@@ -4152,7 +4152,8 @@
 
 #define tdig_trivial_usage \
              "[-h|-i|-b|-s] ... <server IP address>"
-#define tdig_full_usage "\n\n" \     "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
+#define tdig_full_usage "\n\n" \
+    "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
      "\n     not implemented:  recursion, IPv6 yet, SOA" \
      "\n     -h | --hostname-bind hostname.bind txt chaos " \
      "\n     -i | id-server id.server txt chaos " \
