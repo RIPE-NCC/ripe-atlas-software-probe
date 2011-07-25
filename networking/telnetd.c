@@ -45,7 +45,7 @@
 #define SESSION_ID_PREFIX	"SESSION_ID "
 
 #define CMD_CRONTAB	"CRONTAB "
-#define CMD_CRONLINE	"CRONLINE"
+#define CMD_CRONLINE	"CRONLINE "
 #define CMD_ONEOFF	"ONEOFF"
 
 #define CRLF		"\r\n"
