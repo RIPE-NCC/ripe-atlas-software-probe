@@ -759,6 +759,8 @@
 
 #define dfrm_trivial_usage \
 	"<fs> <min-size> <dir>..."
+#define dfrm_full_usage "\n\n" \
+	"<fs> <min-size> <dir>..."
 
 #define dhcprelay_trivial_usage \
        "[client1,client2,...] [server_device]"
@@ -4151,8 +4153,9 @@
        "pid 1's current affinity mask: 3\n"
 
 #define tdig_trivial_usage \
-             "[-h|-i|-b|-s] ... <server IP address>"
-#define tdig_full_usage "\n\n" \     "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
+	"[-h|-i|-b|-s] ... <server IP address>"
+#define tdig_full_usage "\n\n" \
+    "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
      "\n     not implemented:  recursion, IPv6 yet, SOA" \
      "\n     -h | --hostname-bind hostname.bind txt chaos " \
      "\n     -i | id-server id.server txt chaos " \
