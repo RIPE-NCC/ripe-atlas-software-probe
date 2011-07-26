@@ -208,6 +208,7 @@ int httppost_main(int argc, char *argv[])
 		report("fdopen failed");
 		goto err;
 	}
+	tcp_fd= -1;
 
 	fprintf(tcp_file, "POST %s HTTP/1.1\r\n", path);
 	//fprintf(tcp_file, "GET %s HTTP/1.1\r\n", path);
@@ -607,7 +608,7 @@ static int connect_to_name(char *host, char *port)
 		s= -1;
 	}
 
-	free(res);
+	freeaddrinfo(res);
 	if (s == -1)
 		errno= s_errno;
 	return s;
@@ -650,6 +651,7 @@ char *do_dir(char *dir_name, off_t *lenp)
 				free(list);
 				report("realloc failed for %d bytes",
 					allocsize);
+				closedir(dir);
 				return NULL;
 			}
 			list= tmplist;
@@ -664,6 +666,7 @@ char *do_dir(char *dir_name, off_t *lenp)
 		{
 			report_err("stat '%s' failed", path);
 			free(list);
+			closedir(dir);
 			return NULL;
 		}
 
@@ -673,6 +676,7 @@ char *do_dir(char *dir_name, off_t *lenp)
 		currsize += len;
 		*lenp += sb.st_size;
 	}
+	closedir(dir);
 
 	/* Add empty string to terminate the list */
 	len= 1;

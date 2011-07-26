@@ -142,6 +142,13 @@ config DF
 	  df reports the amount of disk space used and available
 	  on filesystems.
 
+config DFRM
+	bool "dfrm"
+	default n
+	help
+	  dfrm deletes files from directories when the amount of free space is
+	  too low
+
 config FEATURE_DF_FANCY
 	bool "Enable -a, -i, -B"
 	default n

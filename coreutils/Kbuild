@@ -26,6 +26,7 @@ lib-$(CONFIG_CUT)       += cut.o
 lib-$(CONFIG_DATE)      += date.o
 lib-$(CONFIG_DD)        += dd.o
 lib-$(CONFIG_DF)        += df.o
+lib-$(CONFIG_DFRM)      += dfrm.o
 lib-$(CONFIG_DIRNAME)   += dirname.o
 lib-$(CONFIG_DOS2UNIX)  += dos2unix.o
 lib-$(CONFIG_DU)        += du.o

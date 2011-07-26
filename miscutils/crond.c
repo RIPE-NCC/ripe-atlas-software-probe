@@ -15,6 +15,7 @@
 #include <syslog.h>
 
 #define ATLAS 1
+#define ATLAS_NEW_FORMAT 1
 
 /* glibc frees previous setenv'ed value when we do next setenv()
  * of the same variable. uclibc does not do this! */
@@ -63,12 +64,21 @@ typedef struct CronLine {
 	smallint cl_MailFlag;   /* running pid is for mail              */
 	char *cl_MailTo;	/* whom to mail results			*/
 #endif
+#if ATLAS_NEW_FORMAT
+	unsigned interval;
+	time_t last_time;
+	time_t start_time;
+	time_t end_time;
+	int distribution;
+	int distr_param;
+#else
 	/* ordered by size, not in natural order. makes code smaller: */
 	char cl_Dow[7];         /* 0-6, beginning sunday                */
 	char cl_Mons[12];       /* 0-11                                 */
 	char cl_Hrs[24];        /* 0-23                                 */
 	char cl_Days[32];       /* 1-31                                 */
 	char cl_Mins[60];       /* 0-59                                 */
+#endif /* ATLAS_NEW_FORMAT */
 } CronLine;
 
 
@@ -128,7 +138,11 @@ static int atlas_run(char *cmdline);
 
 static void CheckUpdates(void);
 static void SynchronizeDir(void);
+#if ATLAS_NEW_FORMAT
+static int TestJobs(time_t *nextp);
+#else
 static int TestJobs(time_t t1, time_t t2);
+#endif
 static void RunJobs(void);
 static int CheckJobs(void);
 static void RunJob(const char *user, CronLine *line);
@@ -220,10 +234,16 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 	 * of 1 second. */
 	{
 		time_t t1 = time(NULL);
+#if ATLAS_NEW_FORMAT
+		time_t next;
+		time_t last_minutely= 0;
+		time_t last_hourly= 0;
+#else
 		time_t t2;
 		long dt;
 		int rescan = 60;
-		int sleep_time = 20; /* AA previously 60 */
+#endif
+		int sleep_time = 10; /* AA previously 60 */
 
 		write_pidfile("/var/run/crond.pid");
 		for (;;) {
@@ -233,7 +253,11 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
                 		write(fdwatchdog, "1", 1);
                 		close(fdwatchdog);
 			}
+#if ATLAS_NEW_FORMAT
+			sleep(sleep_time);
+#else
 			sleep((sleep_time + 1) - (time(NULL) % sleep_time));
+#endif
 
 			if(do_kick_watchdog) 
 			{
@@ -242,6 +266,21 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
                 		close(fdwatchdog);
 			}
 
+#if ATLAS_NEW_FORMAT
+			crondlog(LVL9 "t1 = %d, last_minutely =%d, last_hourly =%d", t1, last_minutely, last_hourly);
+			if (t1 >= last_minutely + 60)
+			{
+				last_minutely= t1;
+				crondlog(LVL9 "calling CheckUpdates");
+				CheckUpdates();
+			}
+			if (t1 >= last_hourly + 3600)
+			{
+				last_hourly= t1;
+				crondlog(LVL9 "calling SynchronizeDir");
+				SynchronizeDir();
+			}
+#else
 			t2 = time(NULL);
 			dt = (long)t2 - (long)t1;
 
@@ -270,17 +309,42 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 				crondlog(LVL5 "wakeup dt=%ld", dt);
 			if (dt < -60 * 60 || dt > 60 * 60) {
 				crondlog(WARN9 "time disparity of %d minutes detected", dt / 60);
-			} else if (dt > 0) {
+			} else if (dt > 0)
+#endif /* ATLAS_NEW_FORMAT */
+			{
+#if ATLAS_NEW_FORMAT
+				sleep_time= 60;
+				if (do_kick_watchdog)
+					sleep_time= 10;
+				TestJobs(&next);
+				if (!next)
+				{
+					RunJobs();
+					sleep_time= 1;
+				} else if (next > t1 && next < t1+sleep_time)
+					sleep_time= next-t1;
+				if (CheckJobs() > 0) {
+					sleep_time = 10;
+				}
+				crondlog(
+				LVL9 "t1 = %d, next = %d, sleep_time = %d",
+					t1, next, sleep_time);
+#else
 				TestJobs(t1, t2);
 				RunJobs();
-				sleep(5);
+				sleep(4);
 				if (CheckJobs() > 0) {
 					sleep_time = 10;
 				} else {
-					sleep_time = 20; /* AA previously 60 */
+					sleep_time = 10; /* AA previously 60 */
 				}
+#endif
 			}
+#if ATLAS_NEW_FORMAT
+			t1= time(NULL);
+#else
 			t1 = t2;
+#endif
 		}
 	}
 	return 0; /* not reached */
@@ -342,6 +406,7 @@ static const char MonAry[] ALIGN1 =
 	/* "Jan""Feb""Mar""Apr""May""Jun""Jul""Aug""Sep""Oct""Nov""Dec" */
 ;
 
+#if !ATLAS_NEW_FORMAT
 static void ParseField(char *user, char *ary, int modvalue, int off,
 				const char *names, char *ptr)
 /* 'names' is a pointer to a set of 3-char abbreviations */
@@ -452,7 +517,9 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
 		fputc('\n', stderr);
 	}
 }
+#endif /* !ATLAS_NEW_FORMAT */
 
+#if !ATLAS_NEW_FORMAT
 static void FixDayDow(CronLine *line)
 {
 	unsigned i;
@@ -478,6 +545,7 @@ static void FixDayDow(CronLine *line)
 			memset(line->cl_Dow, 0, sizeof(line->cl_Dow));
 	}
 }
+#endif /* !ATLAS_NEW_FORMAT */
 
 static void SynchronizeFile(const char *fileName)
 {
@@ -487,6 +555,9 @@ static void SynchronizeFile(const char *fileName)
 	char *tokens[6];
 #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
 	char *mailTo = NULL;
+#endif
+#if ATLAS_NEW_FORMAT
+	char *check0, *check1, *check2;
 #endif
 
 	if (!fileName)
@@ -531,6 +602,21 @@ static void SynchronizeFile(const char *fileName)
 			if (n < 6)
 				continue;
 			*pline = line = xzalloc(sizeof(*line));
+#if ATLAS_NEW_FORMAT
+			line->interval= strtoul(tokens[0], &check0, 10);
+			line->start_time= strtoul(tokens[1], &check1, 10);
+			line->end_time= strtoul(tokens[2], &check2, 10);
+			line->last_time= 0;
+
+			if (check0[0] != '\0' ||
+				check1[0] != '\0' ||
+				check2[0] != '\0')
+			{
+				crondlog(LVL9 "bad crontab line");
+				free(line);
+				continue;
+			}
+#else
 			/* parse date ranges */
 			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
 			ParseField(file->cf_User, line->cl_Hrs, 24, 0, NULL, tokens[1]);
@@ -542,6 +628,7 @@ static void SynchronizeFile(const char *fileName)
 			 * is "*", the other is set to 0, and vise-versa
 			 */
 			FixDayDow(line);
+#endif /* ATLAS_NEW_FORMAT */
 #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
 			/* copy mailto (can be NULL) */
 			line->cl_MailTo = xstrdup(mailTo);
@@ -675,11 +762,27 @@ static void DeleteFile(const char *userName)
  * period is about a minute (one scan).  Worst case it will be one
  * hour (60 scans).
  */
+#if ATLAS_NEW_FORMAT
+static int TestJobs(time_t *nextp)
+#else
 static int TestJobs(time_t t1, time_t t2)
+#endif
 {
 	int nJobs = 0;
+#if ATLAS_NEW_FORMAT
+	time_t now;
+#else
 	time_t t;
+#endif
 
+#if ATLAS_NEW_FORMAT
+	now= time(NULL);
+	*nextp= now+3600;	/* Enough */
+
+	{
+		CronFile *file;
+		CronLine *line;
+#else
 	/* Find jobs > t1 and <= t2 */
 
 	for (t = t1 - t1 % 60; t <= t2; t += 60) {
@@ -691,6 +794,7 @@ static int TestJobs(time_t t1, time_t t2)
 			continue;
 
 		tp = localtime(&t);
+#endif /* ATLAS_NEW_FORMAT */
 		for (file = FileBase; file; file = file->cf_Next) {
 			if (DebugOpt)
 				crondlog(LVL5 "file %s:", file->cf_User);
@@ -699,10 +803,18 @@ static int TestJobs(time_t t1, time_t t2)
 			for (line = file->cf_LineBase; line; line = line->cl_Next) {
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
+#if ATLAS_NEW_FORMAT
+				if (now >= line->last_time + line->interval &&
+					now >= line->start_time &&
+					now <= line->end_time
+				)
+#else
 				if (line->cl_Mins[tp->tm_min] && line->cl_Hrs[tp->tm_hour]
 				 && (line->cl_Days[tp->tm_mday] || line->cl_Dow[tp->tm_wday])
 				 && line->cl_Mons[tp->tm_mon]
-				) {
+				)
+#endif
+				{
 					if (DebugOpt) {
 						crondlog(LVL5 " job: %d %s",
 							(int)line->cl_Pid, line->cl_Shell);
@@ -714,8 +826,24 @@ static int TestJobs(time_t t1, time_t t2)
 						line->cl_Pid = -1;
 						file->cf_Ready = 1;
 						++nJobs;
+#if ATLAS_NEW_FORMAT
+						*nextp= 0;
+						line->last_time= now;
+#endif
 					}
 				}
+#if ATLAS_NEW_FORMAT
+				else if (now >= line->start_time &&
+					now <= line->end_time)
+				{
+					/* Compute next time */
+					time_t next;
+
+					next= line->last_time + line->interval;
+					if (next < *nextp)
+						*nextp= next;
+				}
+#endif /* ATLAS_NEW_FORMAT */
 			}
 		}
 	}
@@ -819,6 +947,8 @@ int ping6_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 int traceroute_main(int argc, char *argv[]);
 int condmv_main(int argc, char *argv[]);
+int tdig_main(int argc, char *argv[]);
+int dfrm_main(int argc, char *argv[]);
 
 static struct builtin 
 {
@@ -831,6 +961,8 @@ static struct builtin
 	{ "httppost", httppost_main },
 	{ "traceroute", traceroute_main },
 	{ "condmv", condmv_main },
+	{ "tdig", tdig_main },
+	{ "dfrm", dfrm_main },
 	{ NULL, 0 }
 };
 
@@ -1177,60 +1309,11 @@ static void RunJob(const char *user, CronLine *line)
 {
 	struct passwd *pas;
 	pid_t pid;
-	char *cp, *ncp, *check;
-	unsigned long tv;
-	time_t now;
 
-	now= time(NULL);
-
-	/* Look for start and end times */
-	cp= line->cl_Shell;
-	skip_space(cp, &ncp);
-	cp= ncp;
-
-	/* Try to parse the value as a start time */
-	tv= strtoul(cp, &check, 10);
-	if (check[0] == ' ')
-	{
-		if (tv > now)
-		{
-			/* Start time is in the future.  */
-			crondlog(
-			LVL8 "atlas_run: command starts in the future '%s'",
-					line->cl_Shell);
-			return;		/* Skip it */
-		}
-
-		cp= check;
-		skip_space(cp, &ncp);
-		cp= ncp;
-
-		/* Try to parse the value as an end time */
-		tv= strtoul(cp, &check, 10);
-		if (check[0] != ' ')
-		{
-			crondlog(LVL8 "atlas_run: bad end time in '%s'",
-						line->cl_Shell);
-			return;		/* Skip it */
-		}
-
-		if (tv < now)
-		{
-			/* End time is in the past.  */
-			crondlog(
-			LVL8 "atlas_run: command ends in the past '%s'",
-				line->cl_Shell);
-			return;		/* Skip it */
-		}
-
-		cp= check;
-		skip_space(cp, &ncp);
-		cp= ncp;
-	}
-
-	if (do_atlas && atlas_run(cp))
+	if (do_atlas && atlas_run(line->cl_Shell))
 	{
 		/* Internal command */
+		line->cl_Pid = 0;
 		return;
 	}
 
@@ -1253,9 +1336,9 @@ static void RunJob(const char *user, CronLine *line)
 		}
 		/* crond 3.0pl1-100 puts tasks in separate process groups */
 		bb_setpgrp();
-		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", cp, NULL);
+		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
-				 DEFAULT_SHELL, "-c", cp);
+				 DEFAULT_SHELL, "-c", line->cl_Shell);
 		_exit(EXIT_SUCCESS);
 	}
 	if (pid < 0) {
