@@ -4523,6 +4523,7 @@ static int builtin_epoch (char **argv)
 	{
 		int r2  = time(0) - r1;
 		printf("%d\n", r2);
+		return EXIT_SUCCESS;
 	}
 	printf ("%d\n", (time(0)));
 	return EXIT_SUCCESS;
@@ -4621,6 +4622,7 @@ static int builtin_findpid(char **argv)
 {
 	pid_t* pidList;
 	procps_status_t* p = NULL;
+	int found = 0;
 
 	if (argv[1])
 	{
@@ -4633,11 +4635,13 @@ static int builtin_findpid(char **argv)
                 /* TODO: we can also try /proc/NUM/exe link, do we want that? */
                 ) 
 			{
-                        	return 0; /* found the match */
+				found = 1;  /* found the match  but return at the end */
+					    /* otherwise free_procps won't be called 
+					       d will remain open */
                 	}
 		}
 	}
-	return 1 ; /* NO MATCH */
+	return found ; /* NO MATCH */
 }
 
 int condmv_main(int argc, char *argv[]);
