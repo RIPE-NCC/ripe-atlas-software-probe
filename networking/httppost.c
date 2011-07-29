@@ -210,6 +210,7 @@ int httppost_main(int argc, char *argv[])
 	}
 	tcp_fd= -1;
 
+	fprintf(stderr, "httppost: sending request\n");
 	fprintf(tcp_file, "POST %s HTTP/1.1\r\n", path);
 	//fprintf(tcp_file, "GET %s HTTP/1.1\r\n", path);
 	fprintf(tcp_file, "Host: %s\r\n", host);
@@ -260,9 +261,12 @@ int httppost_main(int argc, char *argv[])
 	if( post_footer != NULL)
 		write_to_tcp_fd(fdF, tcp_file);
 
+	fprintf(stderr, "httppost: getting result\n");
 	check_result(tcp_file); 
+	fprintf(stderr, "httppost: getting reply headers \n");
 	eat_headers(tcp_file, &chunked, &content_length);
 
+	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
 	{
 		out_file= fopen(output_file, "w");
@@ -283,6 +287,7 @@ int httppost_main(int argc, char *argv[])
 	{
 		copy_bytes(tcp_file, out_file, content_length);
 	}
+	fprintf(stderr, "httppost: deleting files\n");
 	if ( opt_delete_file == 1 )
 	{
 		if (post_file)
@@ -297,6 +302,7 @@ int httppost_main(int argc, char *argv[])
 			}
 		}
 	}
+	fprintf(stderr, "httppost: done\n");
 
 	result= 0;
 
@@ -583,6 +589,7 @@ static int connect_to_name(char *host, char *port)
 	struct addrinfo *res, *aip;
 	struct addrinfo hints;
 
+	fprintf(stderr, "httppost: before getaddrinfo\n");
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	r= getaddrinfo(host, port, &hints, &res);
@@ -600,6 +607,7 @@ static int connect_to_name(char *host, char *port)
 			continue;
 		}
 
+		fprintf(stderr, "httppost: before connect\n");
 		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
 			break;
 

@@ -769,6 +769,7 @@ static int builtin_buddyinfo(char **argv);
 static int builtin_epoch(char **argv);
 static int builtin_condmv(char **argv);
 static int builtin_dfrm(char **argv);
+static int builtin_rxtxrpt(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -827,6 +828,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
 	BLTIN("condmv" , builtin_condmv, "conditional move"),
 	BLTIN("dfrm"  , builtin_dfrm, "cleanup if free space gets too low"),
+	BLTIN("rxtxrpt"  , builtin_rxtxrpt, "report RX and TX"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -4523,6 +4525,7 @@ static int builtin_epoch (char **argv)
 	{
 		int r2  = time(0) - r1;
 		printf("%d\n", r2);
+		return EXIT_SUCCESS;
 	}
 	printf ("%d\n", (time(0)));
 	return EXIT_SUCCESS;
@@ -4660,6 +4663,17 @@ static int builtin_dfrm(char **argv)
 	for (argc= 0; argv[argc] != 0; argc++)
 		;
 	return dfrm_main(argc, argv);
+}
+
+int rxtxrpt_main(int argc, char *argv[]);
+
+static int builtin_rxtxrpt(char **argv) 
+{
+	int argc;
+
+	for (argc= 0; argv[argc] != 0; argc++)
+		;
+	return rxtxrpt_main(argc, argv);
 }
 
 
