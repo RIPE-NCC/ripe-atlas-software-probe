@@ -1,5 +1,7 @@
 /* vi: set sw=4 ts=4: */
 /*
+ * perd formerly crond but now heavily hacked for Atlas
+ *
  * crond -d[#] -c <crondir> -f -b
  *
  * run as root, but NOT setuid root
@@ -45,6 +47,10 @@
 #define MAXLINES        256	/* max lines in non-root crontabs */
 #endif
 
+#if ATLAS_NEW_FORMAT
+#define URANDOM_DEV	"/dev/urandom"
+#endif
+
 
 typedef struct CronFile {
 	struct CronFile *cf_Next;
@@ -69,8 +75,9 @@ typedef struct CronLine {
 	time_t last_time;
 	time_t start_time;
 	time_t end_time;
-	int distribution;
-	int distr_param;
+	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
+	int distr_param;	/* Parameter for distribution, if any */
+	int distr_offset;	/* Current offset to randomize the interval */
 #else
 	/* ordered by size, not in natural order. makes code smaller: */
 	char cl_Dow[7];         /* 0-6, beginning sunday                */
@@ -192,10 +199,14 @@ static void my_exit(void)
 	abort();
 }
 
-int crond_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int crond_main(int argc UNUSED_PARAM, char **argv)
+int perd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+int perd_main(int argc UNUSED_PARAM, char **argv)
 {
 	unsigned opt;
+#if ATLAS_NEW_FORMAT
+	int fd;
+	unsigned seed;
+#endif
 
 	atexit(my_exit);
 
@@ -228,6 +239,20 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 	//signal(SIGHUP, SIG_IGN); /* ? original crond dies on HUP... */
 	xsetenv("SHELL", DEFAULT_SHELL); /* once, for all future children */
 	crondlog(LVL9 "crond (busybox "BB_VER") started, log level %d", LogLevel);
+
+#if ATLAS_NEW_FORMAT
+	fd= open(URANDOM_DEV, O_RDONLY);
+
+	/* Best effort, just ignore errors */
+	if (fd != -1)
+	{
+		read(fd, &seed, sizeof(seed));
+		close(fd);
+	}
+	crondlog(LVL7 "using seed '%u'", seed);
+	srandom(seed);
+#endif
+
 	SynchronizeDir();
 
 	/* main loop - synchronize to 1 second after the minute, minimum sleep
@@ -267,17 +292,14 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
 			}
 
 #if ATLAS_NEW_FORMAT
-			crondlog(LVL9 "t1 = %d, last_minutely =%d, last_hourly =%d", t1, last_minutely, last_hourly);
 			if (t1 >= last_minutely + 60)
 			{
 				last_minutely= t1;
-				crondlog(LVL9 "calling CheckUpdates");
 				CheckUpdates();
 			}
 			if (t1 >= last_hourly + 3600)
 			{
 				last_hourly= t1;
-				crondlog(LVL9 "calling SynchronizeDir");
 				SynchronizeDir();
 			}
 #else
@@ -547,6 +569,27 @@ static void FixDayDow(CronLine *line)
 }
 #endif /* !ATLAS_NEW_FORMAT */
 
+static void do_distr(CronLine *line)
+{
+	long n, r, modulus, max;
+
+	line->distr_offset= 0;		/* Safe default */
+	if (line->distribution == DISTR_UNIFORM)
+	{
+		/* Generate a random number in the range [0..distr_param] */
+		modulus= line->distr_param+1;
+		n= LONG_MAX/modulus;
+		max= n*modulus;
+		do
+		{
+			r= random();
+		} while (r >= max);
+		r %= modulus;
+		line->distr_offset= r - line->distr_param/2;
+	}
+	crondlog(LVL9 "do_distr: using %d", line->distr_offset);
+}
+
 static void SynchronizeFile(const char *fileName)
 {
 	struct parser_t *parser;
@@ -616,6 +659,29 @@ static void SynchronizeFile(const char *fileName)
 				free(line);
 				continue;
 			}
+
+			if (strcmp(tokens[3], "NONE") == 0)
+			{
+				line->distribution= DISTR_NONE;
+			}
+			else if (strcmp(tokens[3], "UNIFORM") == 0)
+			{
+				line->distribution= DISTR_UNIFORM;
+				line->distr_param=
+					strtoul(tokens[4], &check0, 10);
+				if (check0[0] != '\0')
+				{
+					crondlog(LVL9 "bad crontab line");
+					free(line);
+					continue;
+				}
+				if (line->distr_param == 0 ||
+					LONG_MAX/line->distr_param == 0)
+				{
+					line->distribution= DISTR_NONE;
+				}
+			}
+			do_distr(line);
 #else
 			/* parse date ranges */
 			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
@@ -804,7 +870,8 @@ static int TestJobs(time_t t1, time_t t2)
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
 #if ATLAS_NEW_FORMAT
-				if (now >= line->last_time + line->interval &&
+				if (now >= line->last_time + line->interval +
+					line->distr_offset &&
 					now >= line->start_time &&
 					now <= line->end_time
 				)
@@ -829,6 +896,7 @@ static int TestJobs(time_t t1, time_t t2)
 #if ATLAS_NEW_FORMAT
 						*nextp= 0;
 						line->last_time= now;
+						do_distr(line);
 #endif
 					}
 				}
@@ -1109,7 +1177,7 @@ static int atlas_run(char *cmdline)
 	argv[argc]= NULL;
 
 	for (i= 0; i<argc; i++)
-		crondlog(LVL8 "atlas_run: argv[%d] = '%s'", i, argv[i]);
+		crondlog(LVL7 "atlas_run: argv[%d] = '%s'", i, argv[i]);
 
 	saved_fd= -1;	/* lint */
 	if (outfile)

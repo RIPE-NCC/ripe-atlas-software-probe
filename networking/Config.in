@@ -707,6 +707,13 @@ config ROUTE
 	help
 	  Route displays or manipulates the kernel's IP routing tables.
 
+config RXTXRPT
+	bool "rxtxrpt"
+	default n
+	help
+	  rxtxrpt report RX and TX statistics as well as IPv6 addresses and
+	  routes
+
 config SLATTACH
 	bool "slattach"
 	default n
@@ -725,9 +732,10 @@ config SLATTACH
 #	depends on TC
 
 config TDIG
-	bool "tdig"
-	help
-	 tiny implemention of dig RIPE NCC 2011
+        bool "tdig"
+        default n
+        help
+	 tiny dig. support only limited queries id.sever txt chaos. RIPE NCC 2011
 
 config TELNET
 	bool "telnet"

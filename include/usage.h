@@ -759,7 +759,8 @@
 
 #define dfrm_trivial_usage \
 	"<fs> <min-size> <dir>..."
-#define dfrm_full_usage "\n\n" \
+
+#define dfrm_full_usage \
 	"<fs> <min-size> <dir>..."
 
 #define dhcprelay_trivial_usage \
@@ -3013,6 +3014,20 @@
        "$ patch -p1 < example.diff\n" \
        "$ patch -p0 -i example.diff"
 
+#define perd_trivial_usage \
+       "-fbS -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
+#define perd_full_usage "\n\n" \
+       "	-f	Foreground" \
+     "\n	-b	Background (default)" \
+     "\n	-S	Log to syslog (default)" \
+     "\n	-l	Set log level. 0 is the most verbose, default 8" \
+	USE_FEATURE_CROND_D( \
+     "\n	-d	Set log level, log to stderr" \
+	) \
+     "\n	-L	Log to file" \
+     "\n	-c	Working dir" \
+
+
 #define pgrep_trivial_usage \
        "[-flnovx] pattern"
 #define pgrep_full_usage "\n\n" \
@@ -3522,6 +3537,12 @@
        "Receive a file using the xmodem protocol"
 #define rx_example_usage \
        "$ rx /tmp/foo\n"
+
+#define rxtxrpt_trivial_usage \
+       "[ipv6-info-cache]"
+
+#define rxtxrpt_full_usage "\n\n" \
+       "Display RX and TX statistics as well as IPv6 info\n" \
 
 #define script_trivial_usage \
        "[-afq] [-c COMMAND] [OUTFILE]"
@@ -4153,7 +4174,7 @@
        "pid 1's current affinity mask: 3\n"
 
 #define tdig_trivial_usage \
-	"[-h|-i|-b|-s] ... <server IP address>"
+             "[-h|-i|-b|-s] ... <server IP address>"
 #define tdig_full_usage "\n\n" \
     "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
      "\n     not implemented:  recursion, IPv6 yet, SOA" \
