@@ -29,8 +29,9 @@
 #define DATE_OPT_UTC		0x04
 #define DATE_OPT_DATE		0x08
 #define DATE_OPT_REFERENCE	0x10
-#define DATE_OPT_TIMESPEC	0x20
-#define DATE_OPT_HINT		0x40
+#define DATE_OPT_UNIXSECS	0x20
+#define DATE_OPT_TIMESPEC	0x40
+#define DATE_OPT_HINT		0x80
 
 static void maybe_set_utc(int opt)
 {
@@ -50,10 +51,11 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 	char *fmt_str2dt;
 	char *filename;
 	char *isofmt_arg = NULL;
+	char *check;
 
 	opt_complementary = "d--s:s--d"
 		USE_FEATURE_DATE_ISOFMT(":R--I:I--R");
-	opt = getopt32(argv, "Rs:ud:r:"
+	opt = getopt32(argv, "Rs:ud:r:S"
 			USE_FEATURE_DATE_ISOFMT("I::D:"),
 			&date_str, &date_str, &filename
 			USE_FEATURE_DATE_ISOFMT(, &isofmt_arg, &fmt_str2dt));
@@ -104,7 +106,19 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 		tm_time.tm_hour = 0;
 
 		/* Process any date input to UNIX time since 1 Jan 1970 */
-		if (ENABLE_FEATURE_DATE_ISOFMT && (opt & DATE_OPT_HINT)) {
+		if (opt & DATE_OPT_UNIXSECS)
+		{
+			tm= strtoul(date_str, &check, 10);
+			if (check[0] != '\0')
+			{
+				bb_error_msg_and_die(bb_msg_invalid_date,
+					date_str);
+			}
+
+			/* Fill in tm_time */
+			tm_time= *localtime(&tm);
+		}
+		else if (ENABLE_FEATURE_DATE_ISOFMT && (opt & DATE_OPT_HINT)) {
 			if (strptime(date_str, fmt_str2dt, &tm_time) == NULL)
 				bb_error_msg_and_die(bb_msg_invalid_date, date_str);
 		} else {
@@ -168,13 +182,19 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 				bb_error_msg_and_die(bb_msg_invalid_date, date_str);
 			}
 		}
-		/* Correct any day of week and day of year etc. fields */
-		tm_time.tm_isdst = -1;	/* Be sure to recheck dst. */
-		tm = mktime(&tm_time);
-		if (tm < 0) {
-			bb_error_msg_and_die(bb_msg_invalid_date, date_str);
+		if (!(opt & DATE_OPT_UNIXSECS))
+		{
+			/* Correct any day of week and day of year etc.
+			 * fields
+			 */
+			tm_time.tm_isdst = -1;	/* Be sure to recheck dst. */
+			tm = mktime(&tm_time);
+			if (tm < 0) {
+				bb_error_msg_and_die(bb_msg_invalid_date,
+					date_str);
+			}
+			maybe_set_utc(opt);
 		}
-		maybe_set_utc(opt);
 
 		/* if setting time, set it */
 		if ((opt & DATE_OPT_SET) && stime(&tm) < 0) {

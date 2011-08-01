@@ -610,6 +610,7 @@
      "\n	-d TIME		Display TIME, not 'now'" \
      "\n	-r FILE		Display last modification time of FILE" \
      "\n	[-s] TIME	Set time to TIME" \
+     "\n	-S 		Interpret TIME as Unix seconds since epoch" \
 	USE_FEATURE_DATE_ISOFMT( \
      "\n	-D FMT		Use FMT for str->date conversion" \
 	) \
