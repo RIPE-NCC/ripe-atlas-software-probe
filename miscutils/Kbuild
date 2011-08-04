@@ -26,6 +26,7 @@ lib-$(CONFIG_MAN)         += man.o
 lib-$(CONFIG_MICROCOM)    += microcom.o
 lib-$(CONFIG_MOUNTPOINT)  += mountpoint.o
 lib-$(CONFIG_MT)          += mt.o
+lib-$(CONFIG_OOQD)        += ooqd.o
 lib-$(CONFIG_PERD)        += perd.o
 lib-$(CONFIG_RAIDAUTORUN) += raidautorun.o
 lib-$(CONFIG_READAHEAD)   += readahead.o

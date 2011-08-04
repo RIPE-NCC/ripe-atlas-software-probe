@@ -2960,6 +2960,10 @@
        "Write an unambiguous representation, octal bytes by default, of FILE\n" \
        "to standard output. With no FILE or when FILE is -, read standard input."
 
+#define ooqd_trivial_usage \
+       "<queue-file>"
+#define ooqd_full_usage \
+
 #define openvt_trivial_usage \
        "[-c NUM] [-sw] [COMMAND [ARGS]]"
 #define openvt_full_usage "\n\n" \

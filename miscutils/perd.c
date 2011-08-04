@@ -58,7 +58,10 @@ typedef struct CronFile {
 	char *cf_User;                  /* username                     */
 	smallint cf_Ready;              /* bool: one or more jobs ready */
 	smallint cf_Running;            /* bool: one or more jobs running */
-	smallint cf_Deleted;            /* marked for deletion, ignore  */
+	smallint cf_ToBeDeleted;        /* marked for deletion, ignore  */
+	smallint cf_Deleted;            /* deleted but some entries are
+					 * still busy
+					 */
 } CronFile;
 
 typedef struct CronLine {
@@ -72,7 +75,7 @@ typedef struct CronLine {
 #endif
 #if ATLAS_NEW_FORMAT
 	unsigned interval;
-	time_t last_time;
+	time_t nextcycle;
 	time_t start_time;
 	time_t end_time;
 	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
@@ -115,6 +118,8 @@ struct globals {
 	const char *LogFile;
 	const char *CDir; /* = CRONTABS; */
 	CronFile *FileBase;
+	CronFile *oldFile;
+	CronLine *oldLine;
 #if SETENV_LEAKS
 	char *env_var_user;
 	char *env_var_home;
@@ -129,6 +134,8 @@ static struct globals G;
 #define LogFile            (G.LogFile                )
 #define CDir               (G.CDir                   )
 #define FileBase           (G.FileBase               )
+#define oldFile            (G.oldFile                )
+#define oldLine            (G.oldLine                )
 #define env_var_user       (G.env_var_user           )
 #define env_var_home       (G.env_var_home           )
 #define INIT_G() do { \
@@ -158,7 +165,9 @@ static void EndJob(const char *user, CronLine *line);
 #else
 #define EndJob(user, line)  ((line)->cl_Pid = 0)
 #endif
-static void DeleteFile(const char *userName);
+static void DeleteFile(CronFile *tfile);
+static void SetOld(const char *userName);
+static void CopyFromOld(CronLine *line);
 
 
 #define LVL5  "\x05"
@@ -199,6 +208,16 @@ static void my_exit(void)
 	abort();
 }
 
+static void kick_watchdog(void)
+{
+	if(do_kick_watchdog) 
+	{
+		int fdwatchdog = open("/dev/watchdog", O_RDWR);
+		write(fdwatchdog, "1", 1);
+		close(fdwatchdog);
+	}
+}
+
 int perd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int perd_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -213,11 +232,11 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	INIT_G();
 
 	/* "-b after -f is ignored", and so on for every pair a-b */
-	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_CROND_D(":d-l")
+	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:AD" USE_FEATURE_CROND_D("d:"),
+	opt = getopt32(argv, "l:L:fbSc:AD" USE_FEATURE_PERD_D("d:"),
 			&LogLevel, &LogFile, &CDir
-			USE_FEATURE_CROND_D(,&LogLevel));
+			USE_FEATURE_PERD_D(,&LogLevel));
 	/* both -d N and -l N set the same variable: LogLevel */
 
 	if (!(opt & OPT_f)) {
@@ -272,24 +291,14 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 
 		write_pidfile("/var/run/crond.pid");
 		for (;;) {
-			if(do_kick_watchdog) 
-			{
-				int fdwatchdog = open("/dev/watchdog", O_RDWR);
-                		write(fdwatchdog, "1", 1);
-                		close(fdwatchdog);
-			}
+			kick_watchdog();
 #if ATLAS_NEW_FORMAT
 			sleep(sleep_time);
 #else
 			sleep((sleep_time + 1) - (time(NULL) % sleep_time));
 #endif
 
-			if(do_kick_watchdog) 
-			{
-				int fdwatchdog = open("/dev/watchdog", O_RDWR);
-                		write(fdwatchdog, "1", 1);
-                		close(fdwatchdog);
-			}
+			kick_watchdog();
 
 #if ATLAS_NEW_FORMAT
 			if (t1 >= last_minutely + 60)
@@ -349,7 +358,7 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 					sleep_time = 10;
 				}
 				crondlog(
-				LVL9 "t1 = %d, next = %d, sleep_time = %d",
+				LVL7 "t1 = %d, next = %d, sleep_time = %d",
 					t1, next, sleep_time);
 #else
 				TestJobs(t1, t2);
@@ -587,7 +596,7 @@ static void do_distr(CronLine *line)
 		r %= modulus;
 		line->distr_offset= r - line->distr_param/2;
 	}
-	crondlog(LVL9 "do_distr: using %d", line->distr_offset);
+	crondlog(LVL7 "do_distr: using %d", line->distr_offset);
 }
 
 static void SynchronizeFile(const char *fileName)
@@ -601,17 +610,23 @@ static void SynchronizeFile(const char *fileName)
 #endif
 #if ATLAS_NEW_FORMAT
 	char *check0, *check1, *check2;
+	time_t now;
 #endif
 
 	if (!fileName)
 		return;
 
-	DeleteFile(fileName);
+	SetOld(fileName);
+
 	parser = config_open(fileName);
 	if (!parser)
 		return;
 
 	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
+
+#if ATLAS_NEW_FORMAT
+	now= time(NULL);
+#endif
 
 	if (fstat(fileno(parser->fp), &sbuf) == 0 && sbuf.st_uid == DaemonUid) {
 		CronFile *file = xzalloc(sizeof(CronFile));
@@ -649,7 +664,9 @@ static void SynchronizeFile(const char *fileName)
 			line->interval= strtoul(tokens[0], &check0, 10);
 			line->start_time= strtoul(tokens[1], &check1, 10);
 			line->end_time= strtoul(tokens[2], &check2, 10);
-			line->last_time= 0;
+
+			line->nextcycle= (now-line->start_time)/
+				line->interval + 1;
 
 			if (check0[0] != '\0' ||
 				check1[0] != '\0' ||
@@ -706,6 +723,10 @@ static void SynchronizeFile(const char *fileName)
 			}
 			pline = &line->cl_Next;
 //bb_error_msg("M[%s]F[%s][%s][%s][%s][%s][%s]", mailTo, tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]);
+
+			CopyFromOld(line);
+
+			kick_watchdog();
 		}
 		*pline = NULL;
 
@@ -717,6 +738,8 @@ static void SynchronizeFile(const char *fileName)
 		}
 	}
 	config_close(parser);
+
+	DeleteFile(oldFile);
 }
 
 static void CheckUpdates(void)
@@ -738,13 +761,10 @@ static void CheckUpdates(void)
 static void SynchronizeDir(void)
 {
 	CronFile *file;
-	/* Attempt to delete the database. */
- again:
+
+	/* Mark all file in the current database for deletion */
 	for (file = FileBase; file; file = file->cf_Next) {
-		if (!file->cf_Deleted) {
-			DeleteFile(file->cf_User);
-			goto again;
-		}
+		file->cf_ToBeDeleted= 1;
 	}
 
 	/*
@@ -777,6 +797,105 @@ static void SynchronizeDir(void)
 		}
 		closedir(dir);
 	}
+
+	/* Clear the cf_Deleted flags on all file and try to delete everything
+	 * marked as cf_ToBeDeleted.
+	 */
+	for (file = FileBase; file; file = file->cf_Next) {
+		file->cf_Deleted= 0;
+	}
+
+ again:
+	for (file = FileBase; file; file = file->cf_Next) {
+		if (file->cf_ToBeDeleted && !file->cf_Deleted) {
+			DeleteFile(file);
+			goto again;
+		}
+	}
+
+}
+
+/*
+ * SetOld() - find a user database that is not marked for deletion set.
+ */
+static void SetOld(const char *userName)
+{
+	CronFile *file;
+
+	oldFile= NULL;
+	oldLine= NULL;
+	for (file = FileBase; file; file = file->cf_Next) {
+		if (file->cf_ToBeDeleted)
+			continue;
+		if (strcmp(file->cf_User, userName) != 0)
+			continue;
+		file->cf_ToBeDeleted= 1;
+		oldFile= file;
+		break;
+	}
+}
+
+/*
+ * CopyFromOld - copy nextcycle from old entry
+ */
+static void CopyFromOld(CronLine *line)
+{
+	if (!oldFile)
+		return;		/* Nothing to do */
+
+	if (oldLine)
+	{
+		/* Try to match line expected to be next */
+		if (oldLine->interval == line->interval &&
+			oldLine->start_time == line->start_time &&
+			strcmp(oldLine->cl_Shell, line->cl_Shell) == 0)
+		{
+			crondlog(LVL9 "next line matches");
+			; /* okay */
+		}
+		else
+			oldLine= NULL;
+	}
+
+	if (!oldLine)
+	{
+		/* Try to find one */
+		for (oldLine= oldFile->cf_LineBase; oldLine;
+			oldLine= oldLine->cl_Next)
+		{
+			if (oldLine->interval == line->interval &&
+				oldLine->start_time == line->start_time &&
+				strcmp(oldLine->cl_Shell, line->cl_Shell) == 0)
+			{
+				crondlog(LVL9 "found matching line");
+				break;
+			}
+		}
+	}
+
+	if (!oldLine)
+	{
+		crondlog(LVL9, "found no match for line '%s'", 
+			line);
+		return;
+	}
+
+	crondlog(LVL9 "found old line for '%s'", oldLine->cl_Shell);
+	if (line->nextcycle != oldLine->nextcycle)
+	{
+		crondlog(LVL9 "nextcycle %d -> %d for '%s'",
+			line->nextcycle, oldLine->nextcycle,
+			oldLine->cl_Shell);
+	}
+	line->nextcycle= oldLine->nextcycle;
+
+	if (oldLine->distribution == line->distribution &&
+		oldLine->distr_param == line->distr_param)
+	{
+		line->distr_offset= oldLine->distr_offset;
+	}
+
+	oldLine= oldLine->cl_Next;
 }
 
 /*
@@ -785,13 +904,13 @@ static void SynchronizeDir(void)
  *  Note: multiple entries for same user may exist if we were unable to
  *  completely delete a database due to running processes.
  */
-static void DeleteFile(const char *userName)
+static void DeleteFile(CronFile *tfile)
 {
 	CronFile **pfile = &FileBase;
 	CronFile *file;
 
 	while ((file = *pfile) != NULL) {
-		if (strcmp(userName, file->cf_User) == 0) {
+		if (file == tfile) {
 			CronLine **pline = &file->cf_LineBase;
 			CronLine *line;
 
@@ -807,6 +926,7 @@ static void DeleteFile(const char *userName)
 					free(line->cl_Shell);
 					free(line);
 				}
+				kick_watchdog();
 			}
 			if (file->cf_Running == 0) {
 				*pfile = file->cf_Next;
@@ -870,7 +990,8 @@ static int TestJobs(time_t t1, time_t t2)
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
 #if ATLAS_NEW_FORMAT
-				if (now >= line->last_time + line->interval +
+				if (now >= line->start_time +
+					line->nextcycle*line->interval +
 					line->distr_offset &&
 					now >= line->start_time &&
 					now <= line->end_time
@@ -895,7 +1016,15 @@ static int TestJobs(time_t t1, time_t t2)
 						++nJobs;
 #if ATLAS_NEW_FORMAT
 						*nextp= 0;
-						line->last_time= now;
+						line->nextcycle++;
+						if (line->start_time +
+							line->nextcycle*
+							line->interval <= now)
+						{
+							line->nextcycle=
+							(now-line->start_time)/
+							line->interval + 1;
+						}
 						do_distr(line);
 #endif
 					}
@@ -907,7 +1036,9 @@ static int TestJobs(time_t t1, time_t t2)
 					/* Compute next time */
 					time_t next;
 
-					next= line->last_time + line->interval;
+					next= line->start_time +
+						line->nextcycle*line->interval +
+						line->distr_offset;
 					if (next < *nextp)
 						*nextp= next;
 				}
@@ -931,6 +1062,8 @@ static void RunJobs(void)
 		for (line = file->cf_LineBase; line; line = line->cl_Next) {
 			if (line->cl_Pid >= 0)
 				continue;
+
+			kick_watchdog();
 
 			RunJob(file->cf_User, line);
 			crondlog(LVL8 "USER %s pid %3d cmd %s",
@@ -1047,7 +1180,7 @@ static int atlas_run(char *cmdline)
 	char *argv[ATLAS_NARGS];
 	char args[ATLAS_ARGSIZE];
 
-	crondlog(LVL8 "atlas_run: looking for '%s'", cmdline);
+	crondlog(LVL7 "atlas_run: looking for %p '%s'", cmdline, cmdline);
 
 	for (bp= builtin_cmds; bp->cmd != NULL; bp++)
 	{
@@ -1061,7 +1194,7 @@ static int atlas_run(char *cmdline)
 	if (bp->cmd == NULL)
 		return 0;	/* Nothing found */
 	
-	crondlog(LVL8 "found cmd '%s' for '%s'", bp->cmd, cmdline);
+	crondlog(LVL7 "found cmd '%s' for '%s'", bp->cmd, cmdline);
 
 	outfile= NULL;
 	do_append= 0;
@@ -1183,7 +1316,7 @@ static int atlas_run(char *cmdline)
 	if (outfile)
 	{
 		/* Redirect I/O */
-		crondlog(LVL8 "sending output to '%s'", outfile);
+		crondlog(LVL7 "sending output to '%s'", outfile);
 		flags= O_CREAT | O_WRONLY;
 		if (do_append)
 			flags |= O_APPEND;

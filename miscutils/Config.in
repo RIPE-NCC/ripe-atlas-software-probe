@@ -453,6 +453,12 @@ config MT
 	  to advance or rewind a tape past a specified number of archive
 	  files on the tape.
 
+config OOQD
+	bool "ooqd"
+	default n
+	help
+	  Ooqd runs one-off Atlas measurements.
+
 config PERD
 	bool "perd"
 	default n
@@ -460,6 +466,13 @@ config PERD
 	select FEATURE_SYSLOG
 	help
 	  Perd periodically runs Atlas measurements. It is based on crond.
+
+config FEATURE_PERD_D
+	bool "Support option -d to redirect output to stderr"
+	depends on PERD
+	default n
+	help
+	  -d sets loglevel to 0 (most verbose) and directs all output to stderr.
 
 config RAIDAUTORUN
 	bool "raidautorun"

@@ -1,1 +1,1 @@
-#define CONFIG_CROND 1
+#undef CONFIG_CROND

@@ -1,0 +1,1 @@
+#define CONFIG_FEATURE_PERD_D 1

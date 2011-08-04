@@ -23,9 +23,11 @@ struct option longopts[]=
 	{ "post-dir", required_argument, NULL, 'D' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
+	{ "set-time", required_argument, NULL, 's' },
 	{ NULL, }
 };
 
+static char *time_tolerance;
 static char buffer[1024];
 
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
@@ -61,6 +63,7 @@ int httppost_main(int argc, char *argv[])
 	post_header=NULL;
 	output_file= NULL;
 	opt_delete_file = 0;
+	time_tolerance = NULL;
 
 	fd= -1;
 	fdH= -1;
@@ -99,6 +102,9 @@ int httppost_main(int argc, char *argv[])
 
 		case 'p':				/* --post-file */
 			post_file= optarg;
+			break;
+		case 's':				/* --set-time */
+			time_tolerance= optarg;
 			break;
 		case '?':
 			usage();
@@ -509,6 +515,35 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 			return;		/* End of headers */
 
 		fprintf(stderr, "httppost: got line '%s'\n", line);
+
+		if (time_tolerance && strncmp(line, "Date: ", 6) == 0)
+		{
+			/* Try to set time from server */
+			time_t now, tim, tolerance;
+			struct tm tm;
+
+			tolerance= strtoul(time_tolerance, &cp, 10);
+			if (cp[0] != '\0')
+			{
+				fatal("unable to parse tolerance '%s'",
+					time_tolerance);
+			}
+			cp= strptime(line+6, "%a, %d %b %Y %H:%M:%S ", &tm);
+			if (!cp || strcmp(cp, "GMT") != 0)
+			{
+				fprintf(stderr, "unable to parse time '%s'\n",
+					line+6);
+			}
+			tim= timegm(&tm);
+			now= time(NULL);
+			if (now < tim-tolerance || now > tim+tolerance)
+			{
+				fprintf(stderr, "setting time, time difference is %d\n",
+					tim-now);
+				stime(&tim);
+			}
+		}
+
 
 		cp= line;
 		skip_spaces(cp, &ncp);

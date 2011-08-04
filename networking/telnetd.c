@@ -46,7 +46,7 @@
 
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
-#define CMD_ONEOFF	"ONEOFF"
+#define CMD_ONEOFF	"ONEOFF "
 
 #define CRLF		"\r\n"
 #define RESULT_OK	"OK" CRLF CRLF
@@ -62,6 +62,7 @@
 #define CRONTAB_SUFFIX	"/" CRONUSER
 #define CRONUPDATE	"/cron.update"
 #define UPDATELINE	CRONUSER "\n"
+#define ONEOFF_SUFFIX	".new"
 
 enum state
 {
@@ -1231,6 +1232,63 @@ static void end_crontab(struct tsession *ts)
 
 static void do_oneoff(struct tsession *ts, char *line)
 {
-	bb_error_msg("oneoff not implemented");
+	size_t len;
+	char *cp, *ncp;
+	FILE *file;
+	char filename[256];
+	char filename_new[256];
+
+	cp= line+strlen(CMD_ONEOFF);
+
+	/* Find the end of the filename */
+	ncp= cp;
+	while (ncp[0] != '\0' && !isspace((unsigned char)ncp[0]))
+		ncp++;
+
+	len= ncp-cp;
+	if (len+1 > sizeof(filename))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return -1;
+	}
+	memcpy(filename, cp, len);
+	filename[len]= '\0';
+
+	if (len + strlen(ONEOFF_SUFFIX) + 1 > sizeof(filename_new))
+	{
+		add_2sock(ts, NAME_TOO_LONG);
+		return;
+	}
+	strlcpy(filename_new, filename, sizeof(filename_new));
+	strlcat(filename_new, ONEOFF_SUFFIX, sizeof(filename_new));
+
+	/* Try to grab 'filename', if there is any. It doesn't matter if this
+	 * fails.
+	 */
+	rename(filename, filename_new);
+
+	file= fopen(filename_new, "a");
+	if (!file)
+	{
+		add_2sock(ts, CREATE_FAILED);
+		return;
+	}
+
+	/* Find start of command */
+	cp= ncp;
+	while (cp[0] != '\0' && isspace((unsigned char)cp[0]))
+		cp++;
+
+	if (fprintf(file, "%s\n", cp) == -1)
+	{
+		add_2sock(ts, IO_ERROR);
+		fclose(file);
+		return;
+	}
+
+	fclose(file);
+
+	/* And rename back. Ignore any errors */
+	rename(filename_new, filename);
 }
 #endif /* ATLAS */

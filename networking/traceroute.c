@@ -285,8 +285,6 @@ enum {
 
 enum {
 	SIZEOF_ICMP_HDR = 8,
-	rcvsock = 3, /* receive (icmp) socket file descriptor */
-	sndsock = 4, /* send (udp/icmp) socket file descriptor */
 };
 
 /* Data section of the probe packet */
@@ -314,6 +312,8 @@ struct globals {
 	uint32_t ident;
 	uint16_t port; // 32768 + 666;  /* start udp dest port # for probe packets */
 	int waittime; // 5;             /* time to wait for response (in seconds) */
+	int rcvsock;
+	int sndsock;
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 	int optlen;                     /* length of ip options */
 #else
@@ -337,6 +337,8 @@ struct globals {
 #define ident     (G.ident    )
 #define port      (G.port     )
 #define waittime  (G.waittime )
+#define rcvsock   (G.rcvsock  )
+#define sndsock   (G.sndsock  )
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 # define optlen   (G.optlen   )
 #endif
@@ -346,6 +348,8 @@ struct globals {
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
 	port = 32768 + 666; \
 	waittime = 5; \
+	rcvsock = -1; \
+	sndsock = -1; \
 } while (0)
 
 #define outicmp ((struct icmp *)(outip + 1))
@@ -943,7 +947,7 @@ common_traceroute_main(int op, char **argv)
 
 #if ENABLE_FEATURE_TRACEROUTE_IPV6
 	if (af == AF_INET6) {
-		xmove_fd(xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6), rcvsock);
+		rcvsock= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 # ifdef IPV6_RECVPKTINFO
 		setsockopt(rcvsock, SOL_IPV6, IPV6_RECVPKTINFO,
 				&const_int_1, sizeof(const_int_1));
@@ -956,7 +960,7 @@ common_traceroute_main(int op, char **argv)
 	} else
 #endif
 	{
-		xmove_fd(xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP), rcvsock);
+		rcvsock= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	}
 
 #if TRACEROUTE_SO_DEBUG
@@ -973,14 +977,14 @@ common_traceroute_main(int op, char **argv)
 		static const int two = 2;
 		if (setsockopt(rcvsock, SOL_RAW, IPV6_CHECKSUM, &two, sizeof(two)) < 0)
 			bb_perror_msg_and_die("setsockopt RAW_CHECKSUM");
-		xmove_fd(xsocket(af, SOCK_DGRAM, 0), sndsock);
+		sndsock= xsocket(af, SOCK_DGRAM, 0);
 	} else
 #endif
 	{
 		if (op & OPT_USE_ICMP)
-			xmove_fd(xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP), sndsock);
+			sndsock= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 		else
-			xmove_fd(xsocket(AF_INET, SOCK_DGRAM, 0), sndsock);
+			sndsock= xsocket(AF_INET, SOCK_DGRAM, 0);
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE && defined IP_OPTIONS
 		if (lsrr > 0) {
 			unsigned char optlist[MAX_IPOPTLEN];
@@ -1262,6 +1266,17 @@ common_traceroute_main(int op, char **argv)
 		}
 	}
 	printf ("\n");
+
+	if (rcvsock != -1)
+	{
+		close(rcvsock);
+		rcvsock= -1;
+	}
+	if (sndsock != -1)
+	{
+		close(sndsock);
+		sndsock= -1;
+	}
 
 	free(dest_lsa);
 	free(from_lsa);
