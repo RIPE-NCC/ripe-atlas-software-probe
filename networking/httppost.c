@@ -19,25 +19,34 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 struct option longopts[]=
 {
 	{ "delete-file", no_argument, NULL, 'd' },
-	{ "post-file", required_argument, NULL, 'p' },
-	{ "post-dir", required_argument, NULL, 'D' },
+	{ "get",	no_argument, NULL, 'g' },
+	{ "post-file",	required_argument, NULL, 'p' },
+	{ "post-dir",	required_argument, NULL, 'D' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
-	{ "set-time", required_argument, NULL, 's' },
+	{ "set-time",	required_argument, NULL, 's' },
+	{ "store-headers", required_argument, NULL, 'H' },
+	{ "store-body",	required_argument, NULL, 'B' },
+	{ "summary",	no_argument, NULL, 'S' },
+	{ "user-agent",	required_argument, NULL, 'u' },
 	{ NULL, }
 };
 
 static char *time_tolerance;
 static char buffer[1024];
+char host_addr[INET6_ADDRSTRLEN];
+const char *user_agent= "httppost for atlas.ripe.net";
 
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
-static void check_result(FILE *tcp_file);
-static void eat_headers(FILE *tcp_file, int *chunked, int *content_length);
-static int connect_to_name(char *host, char *port);
+static void check_result(FILE *tcp_file, int *result);
+static void eat_headers(FILE *tcp_file, int *chunked, int *content_length,
+	FILE *out_file, int max_headers);
+static int connect_to_name(char *host, char *port, int only_v4, int only_v6, 
+	struct timeval *start_time);
 char *do_dir(char *dir_name, off_t *lenp);
-static void copy_chunked(FILE *in_file, FILE *out_file);
-static void copy_bytes(FILE *in_file, FILE *out_file, size_t len);
+static void copy_chunked(FILE *in_file, FILE *out_file, int *length, int max_body);
+static void copy_bytes(FILE *in_file, FILE *out_file, size_t len, int max_body);
 static void usage(void);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
@@ -49,21 +58,32 @@ static void skip_spaces(const char *cp, char **ncp);
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c,  fd, fdF, fdH, fdS, tcp_fd, chunked, content_length, result;
-	int opt_delete_file;
-	char *url, *host, *port, *hostport, *path, *filelist, *p;
-	char *post_dir, *post_file, *output_file, *post_footer, *post_header;
+	int c,  i, fd, fdF, fdH, fdS, tcp_fd, chunked, content_length, result,
+		http_result, opt_delete_file, do_get, max_headers, max_body,
+		do_multiline, only_v4, only_v6, do_summary;
+	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
+	char *post_dir, *post_file, *output_file, *post_footer, *post_header,
+		*A_arg, *store_headers, *store_body;
 	FILE *tcp_file, *out_file;
+	struct timeval tv_start, tv_end;
 	struct stat sbF, sbH, sbS;
 	off_t     cLength, dir_length;
+	char rndbuf[16];
 
+	do_get= 0;
 	post_dir= NULL; 
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
 	output_file= NULL;
 	opt_delete_file = 0;
-	time_tolerance = NULL;
+	time_tolerance= NULL;
+	store_headers= NULL;
+	store_body= NULL;
+	A_arg= NULL;
+	only_v4= 0;
+	only_v6= 0;
+	do_summary= 0;
 
 	fd= -1;
 	fdH= -1;
@@ -80,15 +100,21 @@ int httppost_main(int argc, char *argv[])
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "A:O:46?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
+		case 'A':
+			A_arg= optarg;
+			break;
 		case 'O':
 			output_file= optarg;
 			break;
 		case 'd':
 			opt_delete_file = 1;
+			break;
+		case 'g':				/* --get */
+			do_get = 1;
 			break;
 		case 'D':
 			post_dir = optarg;		/* --post-dir */
@@ -106,6 +132,26 @@ int httppost_main(int argc, char *argv[])
 		case 's':				/* --set-time */
 			time_tolerance= optarg;
 			break;
+		case 'H':				/* --store-headers */
+			store_headers= optarg;
+			break;
+		case 'B':				/* --store-body */
+			store_body= optarg;
+			break;
+		case 'S':				/* --summary */
+			do_summary= 1;
+			break;
+		case '4':
+			only_v4= 1;
+			only_v6= 0;
+			break;
+		case '6':
+			only_v6= 1;
+			only_v4= 0;
+			break;
+		case 'u':				/* --user-agent */
+			user_agent= optarg;
+			break;
 		case '?':
 			usage();
 		default:
@@ -116,6 +162,31 @@ int httppost_main(int argc, char *argv[])
 	if (optind != argc-1)
 		fatal("exactly one url expected");
 	url= argv[optind];
+
+	max_headers= 0;
+	max_body= UINT_MAX;	/* default is to write out the entire body */
+	if (do_summary)
+		max_body= 0;	/* default to no body if we want a summary */
+
+	if (store_headers)
+	{
+		max_headers= strtoul(store_headers, &check, 10);
+		if (check[0] != '\0')
+		{
+			report("unable to parse argument '%s'", store_headers);
+			return 1;
+		}
+	}
+
+	if (store_body)
+	{
+		max_body= strtoul(store_body, &check, 10);
+		if (check[0] != '\0')
+		{
+			report("unable to parse argument '%s'", store_body);
+			return 1;
+		}
+	}
 
 	parse_url(url, &host, &port, &hostport, &path);
 
@@ -132,7 +203,7 @@ int httppost_main(int argc, char *argv[])
 			/* Something went wrong. */
 			goto err;
 		}
-		fprintf(stderr, "total size in dir: %d\n", dir_length);
+		fprintf(stderr, "total size in dir: %ld\n", (long)dir_length);
 	}
 
 	if(post_header != NULL )
@@ -200,7 +271,7 @@ int httppost_main(int argc, char *argv[])
 		}
 	}
 
-	tcp_fd= connect_to_name(host, port);
+	tcp_fd= connect_to_name(host, port, only_v4, only_v6, &tv_start);
 	if (tcp_fd == -1)
 	{
 		report_err("unable to connect to '%s'", host);
@@ -217,11 +288,10 @@ int httppost_main(int argc, char *argv[])
 	tcp_fd= -1;
 
 	fprintf(stderr, "httppost: sending request\n");
-	fprintf(tcp_file, "POST %s HTTP/1.1\r\n", path);
-	//fprintf(tcp_file, "GET %s HTTP/1.1\r\n", path);
+	fprintf(tcp_file, "%s %s HTTP/1.1\r\n", do_get ? "GET" : "POST", path);
 	fprintf(tcp_file, "Host: %s\r\n", host);
 	fprintf(tcp_file, "Connection: close\r\n");
-	fprintf(tcp_file, "User-Agent: httppost for atlas.ripe.net\r\n");
+	fprintf(tcp_file, "User-Agent: %s\r\n", user_agent);
 	fprintf(tcp_file,
 			"Content-Type: application/x-www-form-urlencoded\r\n");
 
@@ -267,11 +337,6 @@ int httppost_main(int argc, char *argv[])
 	if( post_footer != NULL)
 		write_to_tcp_fd(fdF, tcp_file);
 
-	fprintf(stderr, "httppost: getting result\n");
-	check_result(tcp_file); 
-	fprintf(stderr, "httppost: getting reply headers \n");
-	eat_headers(tcp_file, &chunked, &content_length);
-
 	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
 	{
@@ -285,14 +350,76 @@ int httppost_main(int argc, char *argv[])
 	else
 		out_file= stdout;
 
+	do_multiline= (A_arg && (max_headers != 0 || max_body != 0));
+	if (do_multiline)
+	{
+		fd= open("/dev/urandom", O_RDONLY);
+		read(fd, rndbuf, sizeof(rndbuf));
+		close(fd);
+		fprintf(out_file, "BEGINRESULT ");
+		for (i= 0; i<sizeof(rndbuf); i++)
+			fprintf(out_file, "%02x", (unsigned char)rndbuf[i]);
+		fprintf(out_file, " %s %ld\n", A_arg, (long)time(NULL));
+	}
+
+	fprintf(stderr, "httppost: getting result\n");
+	check_result(tcp_file, &http_result); 
+	fprintf(stderr, "httppost: getting reply headers \n");
+	eat_headers(tcp_file, &chunked, &content_length, out_file, max_headers);
+	if (max_headers != 0 && max_body != 0)
+		fprintf(out_file, "\n");	/* separate headers from body */
+
 	if (chunked)
 	{
-		copy_chunked(tcp_file, out_file);
+		copy_chunked(tcp_file, out_file, &content_length, max_body);
 	}
 	else if (content_length)
 	{
-		copy_bytes(tcp_file, out_file, content_length);
+		copy_bytes(tcp_file, out_file, content_length, max_body);
 	}
+	gettimeofday(&tv_end, NULL);
+
+	tv_end.tv_sec -= tv_start.tv_sec;
+	tv_end.tv_usec -= tv_start.tv_usec;
+	if (tv_end.tv_usec < 0)
+	{
+		tv_end.tv_usec += 1000000;
+		tv_end.tv_sec--;
+	}
+
+	if (do_multiline)
+	{
+		fprintf(out_file, "ENDRESULT ");
+		for (i= 0; i<sizeof(rndbuf); i++)
+			fprintf(out_file, "%02x", (unsigned char)rndbuf[i]);
+		fprintf(out_file, "\n");
+	}
+
+	if (A_arg && do_summary)
+	{
+		fprintf(out_file, "RESULT %s %ld ",
+			A_arg, (long)time(NULL));
+	}
+	if (do_summary)
+	{
+		const char *v, *cmd;
+
+		cmd= "POST";
+		if (do_get)
+			cmd= "GET";
+		if (only_v4)
+			v= "4";
+		else if (only_v6)
+			v= "6";
+		else
+			v= "46";
+
+		fprintf(out_file, "%s%s %s %d.%06d %03u %d\n",
+			cmd, v, 
+			host_addr, (int)tv_end.tv_sec, (int)tv_end.tv_usec,
+			http_result, content_length);
+	}
+
 	fprintf(stderr, "httppost: deleting files\n");
 	if ( opt_delete_file == 1 )
 	{
@@ -444,7 +571,7 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	*portp= item;
 }
 
-static void check_result(FILE *tcp_file)
+static void check_result(FILE *tcp_file, int *result)
 {
 	int major, minor;
 	size_t len;
@@ -488,19 +615,23 @@ static void check_result(FILE *tcp_file)
 
 	if (!isdigit(*(unsigned char *)cp))
 		fatal("bad status code in response '%s'", line);
+	*result= strtoul(cp, NULL, 10);
 
 	if (cp[0] != '2')
 		fatal("POST command failed: '%s'", cp);
 }
 
-static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
+static void eat_headers(FILE *tcp_file, int *chunked, int *content_length,
+	FILE *out_file, int max_headers)
 {
+	int tot_headers;
 	char *line, *cp, *ncp, *check;
 	size_t len;
 	const char *kw;
 
 	*chunked= 0;
 	*content_length= 0;
+	tot_headers= 0;
 	while (fgets(buffer, sizeof(buffer), tcp_file) != NULL)
 	{
 		line= buffer;
@@ -515,6 +646,24 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 			return;		/* End of headers */
 
 		fprintf(stderr, "httppost: got line '%s'\n", line);
+
+		len= strlen(line);
+		if (tot_headers+len+1 <= max_headers)
+		{
+			fprintf(out_file, "%s\n", line);
+			tot_headers += len+1;
+		} else if (tot_headers <= max_headers && max_headers != 0)
+		{
+			/* Fill up remaining space and report truncation */
+			if (tot_headers < max_headers)
+			{
+				fprintf(out_file, "%.*s\n", max_headers-tot_headers,
+					line);
+			}
+			fprintf(out_file, "[...]\n");
+
+			tot_headers += len+1;
+		}
 
 		if (time_tolerance && strncmp(line, "Date: ", 6) == 0)
 		{
@@ -539,7 +688,7 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 			if (now < tim-tolerance || now > tim+tolerance)
 			{
 				fprintf(stderr, "setting time, time difference is %d\n",
-					tim-now);
+					(int)(tim-now));
 				stime(&tim);
 			}
 		}
@@ -618,7 +767,8 @@ static void eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 		fatal_err("error reading from server");
 }
 
-static int connect_to_name(char *host, char *port)
+static int connect_to_name(char *host, char *port, int only_v4, int only_v6,
+	struct timeval *start_time)
 {
 	int r, s, s_errno;
 	struct addrinfo *res, *aip;
@@ -627,6 +777,10 @@ static int connect_to_name(char *host, char *port)
 	fprintf(stderr, "httppost: before getaddrinfo\n");
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
+	if (only_v4)
+		hints.ai_family= AF_INET;
+	if (only_v6)
+		hints.ai_family= AF_INET6;
 	r= getaddrinfo(host, port, &hints, &res);
 	if (r != 0)
 		fatal("unable to resolve '%s': %s", host, gai_strerror(r));
@@ -635,6 +789,9 @@ static int connect_to_name(char *host, char *port)
 	s= -1;
 	for (aip= res; aip != NULL; aip= aip->ai_next)
 	{
+		getnameinfo(res->ai_addr, res->ai_addrlen, host_addr, sizeof(host_addr),
+			NULL, 0, NI_NUMERICHOST);
+		gettimeofday(start_time, NULL);
 		s= socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (s == -1)
 		{	
@@ -742,11 +899,14 @@ char *do_dir(char *dir_name, off_t *lenp)
 	return list;
 }
 
-static void copy_chunked(FILE *in_file, FILE *out_file)
+static void copy_chunked(FILE *in_file, FILE *out_file, int *length, int max_body)
 {
-	size_t len, offset, size;
+	int need_nl;
+	size_t len, offset, size, tot_body;
 	char *cp, *line, *check;
 
+	*length= 0;
+	need_nl= 0;
 	for (;;)
 	{
 		/* Get a chunk size */
@@ -768,6 +928,8 @@ static void copy_chunked(FILE *in_file, FILE *out_file)
 		if (!len)
 			break;
 
+		*length += len;
+
 		offset= 0;
 
 		while (offset < len)
@@ -777,8 +939,29 @@ static void copy_chunked(FILE *in_file, FILE *out_file)
 				size= sizeof(buffer);
 			if (fread(buffer, size, 1, in_file) != 1)
 				fatal_err("error reading input");
-			if (fwrite(buffer, size, 1, out_file) != 1)
-				fatal_err("error writing output");
+
+			if (tot_body+size <= max_body)
+			{
+				if (fwrite(buffer, size, 1, out_file) != 1)
+					fatal_err("error writing output");
+				need_nl= (buffer[size-1] != '\n');
+				tot_body += len;
+			} else if (tot_body <= max_body && max_body != 0)
+			{
+				/* Fill up remaining space and report truncation */
+				if (tot_body < max_body)
+				{
+					if (fwrite(buffer, max_body-tot_body, 1,
+						out_file) != 1)
+					{
+						fatal_err("error writing output");
+					}
+				}
+				fprintf(out_file, "\n[...]\n");
+				need_nl= 0;
+				tot_body += len;
+			}
+
 			offset += size;
 		}
 
@@ -796,6 +979,9 @@ static void copy_chunked(FILE *in_file, FILE *out_file)
 		if (line[0] != '\0')
 			fatal("Garbage after chunk data");
 	}
+
+	if (max_body && need_nl)
+		fprintf(out_file, "\n");
 
 	for (;;)
 	{
@@ -816,12 +1002,15 @@ static void copy_chunked(FILE *in_file, FILE *out_file)
 		fprintf(stderr, "httppost: got end-of-chunk line '%s'\n", line);
 	}
 }
-static void copy_bytes(FILE *in_file, FILE *out_file, size_t len)
+
+static void copy_bytes(FILE *in_file, FILE *out_file, size_t len, int max_body)
 {
-	size_t offset, size;
+	size_t offset, size, tot_body;
+	int need_nl;
 
 	offset= 0;
 
+	need_nl= 0;
 	while (offset < len)
 	{
 		size= len-offset;
@@ -829,10 +1018,33 @@ static void copy_bytes(FILE *in_file, FILE *out_file, size_t len)
 			size= sizeof(buffer);
 		if (fread(buffer, size, 1, in_file) != 1)
 			fatal_err("error reading input");
-		if (fwrite(buffer, size, 1, out_file) != 1)
-			fatal_err("error writing output");
+
+		if (tot_body+size <= max_body)
+		{
+			if (fwrite(buffer, size, 1, out_file) != 1)
+				fatal_err("error writing output");
+			need_nl= (buffer[size-1] != '\n');
+			tot_body += len;
+		} else if (tot_body <= max_body && max_body != 0)
+		{
+			/* Fill up remaining space and report truncation */
+			if (tot_body < max_body)
+			{
+				if (fwrite(buffer, max_body-tot_body, 1,
+					out_file) != 1)
+				{
+					fatal_err("error writing output");
+				}
+			}
+			fprintf(out_file, "\n[...]\n");
+			need_nl= 0;
+			tot_body += len;
+		}
+
 		offset += size;
 	}
+	if (max_body && need_nl)
+		fprintf(out_file, "\n");
 }
 
 static void skip_spaces(const char *cp, char **ncp)

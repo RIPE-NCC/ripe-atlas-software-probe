@@ -40,7 +40,6 @@
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
 #define ATLAS_LOGIN	"C_TO_P_TEST_V1"
-#define ATLAS_PASSWORD	"vuurwerk19"
 #define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
 #define SESSION_ID_PREFIX	"SESSION_ID "
 
@@ -770,8 +769,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			if (!line)
 				goto skip3a;
 
-			if (equal_sessionid(line) ||
-				strcmp(line, ATLAS_PASSWORD) == 0)
+			if (equal_sessionid(line))
 			{
 				free(line); line= NULL;
 
@@ -1249,7 +1247,7 @@ static void do_oneoff(struct tsession *ts, char *line)
 	if (len+1 > sizeof(filename))
 	{
 		add_2sock(ts, NAME_TOO_LONG);
-		return -1;
+		return;
 	}
 	memcpy(filename, cp, len);
 	filename[len]= '\0';
