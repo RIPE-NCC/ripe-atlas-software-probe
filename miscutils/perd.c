@@ -227,6 +227,7 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned seed;
 #endif
 
+	const char *PidFileName = NULL;
 	atexit(my_exit);
 
 	INIT_G();
@@ -234,8 +235,8 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:AD" USE_FEATURE_PERD_D("d:"),
-			&LogLevel, &LogFile, &CDir
+	opt = getopt32(argv, "l:L:fbSc:ADP:" USE_FEATURE_PERD_D("d:"),
+			&LogLevel, &LogFile, &CDir, &PidFileName
 			USE_FEATURE_PERD_D(,&LogLevel));
 	/* both -d N and -l N set the same variable: LogLevel */
 
@@ -288,8 +289,14 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 		int rescan = 60;
 #endif
 		int sleep_time = 10; /* AA previously 60 */
-
-		write_pidfile("/var/run/crond.pid");
+		if(PidFileName)
+		{
+			write_pidfile(PidFileName);
+		}
+		else 
+		{
+			write_pidfile("/var/run/crond.pid");
+		}
 		for (;;) {
 			kick_watchdog();
 #if ATLAS_NEW_FORMAT
