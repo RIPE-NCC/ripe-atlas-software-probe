@@ -97,6 +97,7 @@ static void find_eos(char *cp, char **ncpp)
 
 int ping_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
+int httpget_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 int traceroute_main(int argc, char *argv[]);
 int condmv_main(int argc, char *argv[]);
@@ -111,6 +112,7 @@ static struct builtin
 {
 	{ "ping", ping_main },
 	{ "ping6", ping6_main },
+	{ "httpget", httpget_main },
 	{ "httppost", httppost_main },
 	{ "traceroute", traceroute_main },
 	{ "condmv", condmv_main },
@@ -160,6 +162,14 @@ printf("got cp %p, line %p, '%s'\n", cp, line, cp);
 		{
 			report("nothing found for '%s'", cp);
 			return;		/* Nothing found */
+		}
+
+		/* Remove trailing white space */
+		len= strlen(cp);
+		while (len > 0 && isspace((unsigned char)cp[len-1]))
+		{
+			cp[len-1]= '\0';
+			len--;
 		}
 		
 		outfile= NULL;

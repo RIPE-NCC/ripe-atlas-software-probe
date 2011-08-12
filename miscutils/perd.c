@@ -627,7 +627,14 @@ static void SynchronizeFile(const char *fileName)
 
 	parser = config_open(fileName);
 	if (!parser)
+	{
+		/* We have to get rid of the old entries if the file is not
+		 * there. Assume a non-existant file is the only reason for
+		 * failure.
+		 */
+		DeleteFile(oldFile);
 		return;
+	}
 
 	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
 

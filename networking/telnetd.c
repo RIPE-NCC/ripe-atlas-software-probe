@@ -486,6 +486,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	fd_set rdfdset, wrfdset;
 	unsigned opt;
 	int count;
+	int num_totty;
 	struct tsession *ts;
 	char *line;
 #if ENABLE_FEATURE_TELNETD_STANDALONE
@@ -655,7 +656,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		struct tsession *next = ts->next; /* in case we free ts. */
 
 		if (/*ts->size1 &&*/ FD_ISSET(ts->ptyfd, &wrfdset)) {
-			int num_totty;
 			unsigned char *ptr;
 			/* Write to pty from buffer 1. */
 			ptr = remove_iacs(ts, &num_totty);
@@ -701,15 +701,22 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			ts->wridx2 = 0;
 		}
 
-		if (/*ts->size1 < BUFSIZE &&*/ FD_ISSET(ts->sockfd_read, &rdfdset)) {
+		if (/*ts->size1 < BUFSIZE &&*/
+			FD_ISSET(ts->sockfd_read, &rdfdset)) {
 #ifdef ATLAS
-			if (ts->rdidx1 >= BUFSIZE && ts->size1 < BUFSIZE)
+			if (ts->size1 < BUFSIZE &&
+				(ts->rdidx1 >= BUFSIZE ||
+				ts->rdidx1 < ts->wridx1))
+			{
 				pack_2pty(ts);
+			}
 #endif
 
 			/* Read from socket to buffer 1. */
 			count = MIN(BUFSIZE - ts->rdidx1, BUFSIZE - ts->size1);
-			count = safe_read(ts->sockfd_read, TS_BUF1 + ts->rdidx1, count);
+
+			count = safe_read(ts->sockfd_read,
+				TS_BUF1 + ts->rdidx1, count);
 			if (count <= 0) {
 				if (count < 0 && errno == EAGAIN)
 					goto skip3;
@@ -732,7 +739,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			break;	/* Nothing to do */
 		case GET_LOGINNAME:
 			{
-			int num_totty;
 			unsigned char *ptr;
 
 			ptr = remove_iacs(ts, &num_totty);
@@ -765,6 +771,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 			}
 		case GET_PASSWORD:
+			remove_iacs(ts, &num_totty);
+
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
@@ -806,6 +814,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
+
+			remove_iacs(ts, &num_totty);
 
 			line= getline_2pty(ts);
 			if (!line)
@@ -851,7 +861,6 @@ do_cmd:
 				goto skip3;
 			}
 
-
 			free(line); line= NULL;
 
 			/* Bad command */
@@ -865,6 +874,8 @@ do_cmd:
 
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
+
+			remove_iacs(ts, &num_totty);
 
 			line= getline_2pty(ts);
 			if (!line)
@@ -899,6 +910,8 @@ do_cmd:
 				goto kill_session;	/* Old session */
 
 			/* Just eat all input and return bad command */
+			remove_iacs(ts, &num_totty);
+
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
@@ -1030,6 +1043,7 @@ static char *getline_2pty(struct tsession *ts)
 	char *cp, *cp2, *line;
 
 	size1= ts->size1;
+
 
 	if (ts->wridx1 + size1 > BUFSIZE)
 		pack_2pty(ts);

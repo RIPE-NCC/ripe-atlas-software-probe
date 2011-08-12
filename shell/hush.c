@@ -4643,7 +4643,7 @@ static int builtin_findpid(char **argv)
                 	}
 		}
 	}
-	return found ; /* NO MATCH */
+	return !found;	/* exit 0 is success */
 }
 
 int condmv_main(int argc, char *argv[]);

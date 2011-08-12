@@ -1592,6 +1592,11 @@
      "\n	-e STRING	HTML encode STRING" \
      "\n	-d STRING	URL decode STRING" \
 
+#define httpget_trivial_usage "\n\n" \
+	"[OPTION]...[MANPAGE]..."
+#define httpget_full_usage "\n\n" \
+	"[OPTION]...[MANPAGE]..."
+
 #define httppost_trivial_usage "\n\n" \
 	"[OPTION]...[MANPAGE]..."
 #define httppost_full_usage "\n\n" \
