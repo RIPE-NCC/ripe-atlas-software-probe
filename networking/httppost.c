@@ -483,13 +483,25 @@ static int check_result(FILE *tcp_file)
 	char *cp, *check, *line;
 	const char *prefix;
 
-	if (fgets(buffer, sizeof(buffer), tcp_file) == NULL)
+	
+	while (fgets(buffer, sizeof(buffer), tcp_file) == NULL)
 	{
 		if (feof(tcp_file))
+		{
 			report("got unexpected EOF from server");
+			return 0;
+		}
+		if (errno == EINTR)
+		{
+			report("timeout");
+			kick_watchdog();
+			sleep(10);
+		}
 		else
+		{
 			report_err("error reading from server");
-		return 0;
+			return 0;
+		}
 	}
 
 	line= buffer;

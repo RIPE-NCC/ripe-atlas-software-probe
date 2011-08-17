@@ -83,6 +83,7 @@ static struct option longopts[]=
 
 int dns_id;
 
+static void got_alarm(int sig);
 static void fatal(const char *fmt, ...);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
@@ -114,10 +115,11 @@ int tdig_main(int argc, char **argv)
 	int opt_v4_only , opt_v6_only;
 	char  *atlas_str = NULL;
 	char hostname[100];
+	struct sigaction sa;
+	unsigned long long  tSend_us, tRecv_us, tTrip_us;
+
 	bzero(hostname, 100);
 	gethostname(hostname, 100);
-
-	unsigned long long  tSend_us, tRecv_us, tTrip_us;
 
 	opt_v4_only =  opt_v6_only = 0;
 	while (c= getopt_long(argc, argv, "46bhirs:A:?", longopts, NULL), c != -1)
@@ -202,6 +204,12 @@ int tdig_main(int argc, char **argv)
 
 	do 
 	{
+		sa.sa_flags= 0;
+		sa.sa_handler= got_alarm;
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGALRM, &sa, NULL);
+		alarm(1);
+
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if(s < 0)
 			continue;
@@ -245,12 +253,21 @@ int tdig_main(int argc, char **argv)
 	} while ((res = res->ai_next) != NULL);
 	if(!res) {
 		freeaddrinfo(ressave);
-		printf("DNS0 %s bad-hostname\n", server_ip_str);
+		printf("DNS0 %s no-response\n", server_ip_str);
 		return (1);
 	}
 	freeaddrinfo(ressave);
 	printAnswer(buf, tTrip_us );
+
+	alarm(0);
+
 	return (0);
+}
+
+static void got_alarm(int sig)
+{
+	fprintf(stderr, "got alarm, setting alarm again\n");
+	alarm(1);
 }
 
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) 

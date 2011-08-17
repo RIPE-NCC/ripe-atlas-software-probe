@@ -103,6 +103,7 @@ int traceroute_main(int argc, char *argv[]);
 int condmv_main(int argc, char *argv[]);
 int tdig_main(int argc, char *argv[]);
 int dfrm_main(int argc, char *argv[]);
+int nslookup_main(int argc, char *argv[]);
 
 static struct builtin 
 {
@@ -118,6 +119,7 @@ static struct builtin
 	{ "condmv", condmv_main },
 	{ "tdig", tdig_main },
 	{ "dfrm", dfrm_main },
+	{ "nslookup", nslookup_main },
 	{ NULL, 0 }
 };
 

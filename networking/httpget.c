@@ -420,7 +420,7 @@ int httpget_main(int argc, char *argv[])
 		out_file= fopen(output_file, do_append ? "a" : "w");
 		if (!out_file)
 		{
-			report_err("unable to create '%s'", out_file);
+			report_err("unable to create '%s'", output_file);
 			goto err;
 		}
 	}
@@ -494,9 +494,6 @@ fail:
 		tv_end.tv_sec--;
 	}
 
-	printf("clearing alarm\n");
-	alarm(0);
-
 	if (do_multiline)
 	{
 		fprintf(out_file, "ENDRESULT ");
@@ -565,6 +562,9 @@ leave:
 	if (hostport) free(hostport);
 	if (path) free(path);
 	if (filelist) free(filelist);
+
+	printf("clearing alarm\n");
+	alarm(0);
 
 	return result; 
 
