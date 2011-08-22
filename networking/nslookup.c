@@ -15,6 +15,7 @@
 #include "libbb.h"
 
 #define ATLAS 1
+#define ENABLE_FEATURE_CLEAN_UP	1	/* Where does this come from? */
 
 /*
  * I'm only implementing non-interactive mode;

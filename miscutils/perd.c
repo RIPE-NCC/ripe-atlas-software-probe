@@ -81,6 +81,9 @@ typedef struct CronLine {
 	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
 	int distr_param;	/* Parameter for distribution, if any */
 	int distr_offset;	/* Current offset to randomize the interval */
+
+	/* For debugging */
+	time_t lasttime;
 #else
 	/* ordered by size, not in natural order. makes code smaller: */
 	char cl_Dow[7];         /* 0-6, beginning sunday                */
@@ -355,9 +358,15 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 				if (do_kick_watchdog)
 					sleep_time= 10;
 				TestJobs(&next);
+				crondlog(LVL9 "got next %d, now %d",
+					next, time(NULL));
 				if (!next)
 				{
+					crondlog(LVL9 "calling RunJobs at %d",
+						time(NULL));
 					RunJobs();
+					crondlog(LVL9 "RunJobs ended at %d",
+						time(NULL));
 					sleep_time= 1;
 				} else if (next > t1 && next < t1+sleep_time)
 					sleep_time= next-t1;
@@ -713,6 +722,8 @@ static void SynchronizeFile(const char *fileName)
 				}
 			}
 			do_distr(line);
+
+			line->lasttime= 0;
 #else
 			/* parse date ranges */
 			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
@@ -1004,6 +1015,27 @@ static int TestJobs(time_t t1, time_t t2)
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
 #if ATLAS_NEW_FORMAT
+				if (line->lasttime != 0)
+				{
+					time_t now= time(NULL);
+					if (now > line->lasttime+
+						line->interval+
+						line->distr_param)
+					{
+						crondlog(
+LVL9 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
+							now, line->lasttime,
+							line->lasttime+
+							line->interval+
+							line->distr_param,
+							line->start_time +
+							line->nextcycle*
+							line->interval+
+							line->distr_offset,
+							line->cl_Shell);
+					}
+				}
+
 				if (now >= line->start_time +
 					line->nextcycle*line->interval +
 					line->distr_offset &&
@@ -1524,6 +1556,22 @@ static void RunJob(const char *user, CronLine *line)
 {
 	struct passwd *pas;
 	pid_t pid;
+
+	if (line->lasttime != 0)
+	{
+		time_t now= time(NULL);
+		if (now > line->lasttime+line->interval+line->distr_param)
+		{
+			crondlog(LVL9 "job is late. Now %d, lasttime %d, max %d, should %d: %s",
+				now, line->lasttime,
+				line->lasttime+line->interval+line->distr_param,
+				line->start_time +
+				line->nextcycle*line->interval+
+				line->distr_offset,
+				line->cl_Shell);
+		}
+	}
+	line->lasttime= time(NULL);
 
 	if (do_atlas && atlas_run(line->cl_Shell))
 	{

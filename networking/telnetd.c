@@ -35,6 +35,9 @@
 #define ATLAS 1
 
 #ifdef ATLAS
+#include <unistd.h>
+#include <linux/reboot.h>
+
 #define LOGIN_PREFIX	"(telnet) "
 #define LOGIN_PROMPT	" login: "
 #define PASSWORD_PROMPT	"\r\nPassword: "
@@ -46,6 +49,7 @@
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
 #define CMD_ONEOFF	"ONEOFF "
+#define CMD_REBOOT	"REBOOT"
 
 #define CRLF		"\r\n"
 #define RESULT_OK	"OK" CRLF CRLF
@@ -848,6 +852,14 @@ do_cmd:
 				/* Assume do_oneoff sent an error response
 				 * if something was wrong.
 				 */
+				goto skip3;
+			}
+			if (strcmp(line, CMD_REBOOT) == 0)
+			{
+				sync();
+				reboot(LINUX_REBOOT_CMD_RESTART);
+				free(line); line= NULL;
+
 				goto skip3;
 			}
 			if (strlen(line) == 0)
