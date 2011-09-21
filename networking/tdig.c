@@ -170,6 +170,7 @@ int tdig_main(int argc, char **argv)
 
 	srand (time (0));
 
+	tSend_us = monotonic_us();
 	opt_v4_only =  opt_v6_only = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhirs:A:?", longopts, NULL), c != -1)
 	{
@@ -314,7 +315,6 @@ int tdig_main(int argc, char **argv)
 			} 
 			ssize_t wire_size = 0;
 			wire_size = ldns_read_uint16(wire);
-			printf ("read tcp wire size reply %u\n",  wire_size);
 			
 			bzero(buf, 2048);	
 			while ( fread(buf, wire_size, 1, tcp_file) == NULL)
@@ -356,6 +356,7 @@ int tdig_main(int argc, char **argv)
 			sigemptyset(&sa.sa_mask);
 			sigaction(SIGALRM, &sa, NULL);
 			alarm(1);
+			tSend_us = monotonic_us();
 
 			s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 			if(s < 0)
@@ -376,8 +377,6 @@ int tdig_main(int argc, char **argv)
 			printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, server_ip_str,  addrstr );
 
 			tSend_us = monotonic_us();
-
-			tSend_us =  0;
 			if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
 				perror("send");
 				close(s);
@@ -394,8 +393,6 @@ int tdig_main(int argc, char **argv)
 					close(s);
 					break;
 				}
-				tRecv_us = monotonic_us();
-				tTrip_us = tRecv_us - tSend_us;
 				close(s);
 				break;
 			}
@@ -406,6 +403,9 @@ int tdig_main(int argc, char **argv)
 			return (1);
 		}
 	}
+	tRecv_us = monotonic_us();
+	tTrip_us = tRecv_us - tSend_us;
+
 	printAnswer(buf, tTrip_us );
 	alarm(0);
 
