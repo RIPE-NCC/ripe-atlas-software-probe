@@ -6,7 +6,7 @@ Author : Prasshhant Pugalia (prasshhant.p@gmail.com)
 Dated : 29/4/2009
 Also DNSMN GPL version
 */
-
+#include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -22,7 +22,24 @@ Also DNSMN GPL version
 #include <arpa/nameser.h>
 #include <netdb.h>
 
+
 #include "libbb.h"
+
+#ifndef ns_t_dnskey
+#define ns_t_dnskey   48
+#endif 
+
+#ifndef T_DNSKEY
+#define T_DNSKEY ns_t_dnskey  
+#endif 
+
+
+
+u_int32_t get32b(char *p);  
+
+void ldns_write_uint16(void *dst, uint16_t data);
+uint16_t ldns_read_uint16(const void *src);
+static int connect_to_name(char *host, char *port);
 
 //DNS header structure
 struct DNS_HEADER
@@ -44,6 +61,22 @@ struct DNS_HEADER
 	u_int16_t auth_count; // number of authority entries
 	u_int16_t add_count; // number of resource entries
 };       
+
+
+// EDNS0
+
+struct EDNS0_HEADER 
+{
+	/** EDNS0 available buffer size, see RFC2671 */
+	u_int16_t qtype; 
+        uint16_t _edns_udp_size;
+	u_int8_t _edns_x; // combined rcode and edns version both zeros.
+	u_int8_t _edns_y; // combined rcode and edns version both zeros.
+	//u_int16_t _edns_z;
+	u_int16_t DO ;
+	u_int16_t len ;
+	u_int8_t _edns_d;
+};
 
 //Constant sized fields of query structure
 struct QUESTION
@@ -78,36 +111,44 @@ static struct option longopts[]=
         { "version-bind", no_argument, NULL, 'b' },
         { "version.server", no_argument, NULL, 'r' },
         { "soa", required_argument, NULL, 's' },
+	{ "edns0", required_argument, NULL, 'e' },
+	{ "dnssec", no_argument, NULL, 'd' },
+	{ "dnskey", required_argument, NULL, 'D' },
         { NULL, }
 };
 
+struct addrinfo hints, *res, *ressave;
 int dns_id;
+static int opt_dnssec = 0;	
+static int opt_edns0 = 0;
 
 static void got_alarm(int sig);
 static void fatal(const char *fmt, ...);
+static void fatal_err(const char *fmt, ...);
+static void report(const char *fmt, ...);
+static void report_err(const char *fmt, ...);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
-unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
+unsigned int makequery( struct DNS_HEADER *dns, struct EDNS0_HEADER *edns0, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
 void printAnswer(unsigned char *result, unsigned long long tTrip_us);
 
-
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
-//int main(int argc, char **argv)
 {
 	unsigned char buf[2048];
 	unsigned char lookupname[32];
 	char * server_ip_str;
-	char * soa_str;
 	int c;
 	struct QUESTION *qinfo = NULL;
 	optind= 0;
 	u_int16_t qtype; 
-	struct addrinfo hints, *res, *ressave;
+//	struct addrinfo hints, *res, *ressave;
 	int s ,  err_num;;
 	u_int16_t qclass;
 	struct DNS_HEADER *dns = NULL;
+	struct EDNS0_HEADER *edns0 = NULL;
+	
 	unsigned int qlen; 
 	qtype = T_TXT; /* TEXT */
 	qclass = C_CHAOS;
@@ -117,12 +158,20 @@ int tdig_main(int argc, char **argv)
 	char hostname[100];
 	struct sigaction sa;
 	unsigned long long  tSend_us, tRecv_us, tTrip_us;
+	int opt_tcp = 0;
+	int tcp_fd = 0;
+	int result = 0;
+	FILE *tcp_file;
+	uint8_t wire[1300]; 
+	char *check;
 
 	bzero(hostname, 100);
 	gethostname(hostname, 100);
 
+	srand (time (0));
+
 	opt_v4_only =  opt_v6_only = 0;
-	while (c= getopt_long(argc, argv, "46bhirs:A:?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "46dD:e:tbhirs:A:?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -138,6 +187,23 @@ int tdig_main(int argc, char **argv)
 			case 'b':
 				strcpy(lookupname , "version.bind.");
 				break;
+			case 'D':
+				qtype = T_DNSKEY;
+				qclass = C_IN;
+				if(opt_edns0 == 0)
+					opt_edns0 = 512; 
+				opt_dnssec = 1;
+				strcpy(lookupname, optarg);
+				break;
+
+			case 'd':
+				opt_dnssec = 1;
+				if(opt_edns0 == 0)
+					opt_edns0 = 512;
+				break;
+			case 'e':
+				opt_edns0= strtoul(optarg, &check, 10);
+				break;
 			case 'h':
 				strcpy(lookupname , "hostname.bind.");
 				break;
@@ -149,9 +215,13 @@ int tdig_main(int argc, char **argv)
 				break;
 
 			case 's':
-				soa_str = optarg;
-				fprintf(stderr, "EROOR SOA query not implemented\n");
-				return(1);
+				qtype = T_SOA;
+				qclass = C_IN;
+				strcpy(lookupname, optarg);
+				break;
+			case 't':
+				opt_tcp = 1;
+			break;
 
 			default:
 				fprintf(stderr, "ERROR unknown option %d \n");
@@ -187,81 +257,165 @@ int tdig_main(int argc, char **argv)
 	hints.ai_flags = 0;
 	char port[] = "domain";
 
-	err_num = getaddrinfo(server_ip_str, port , &hints, &res);
-	if(err_num)
+	
+	dns = (struct DNS_HEADER *)&buf;
+	qlen =  makequery(dns, edns0, buf, lookupname,  qtype, qclass);
+	// query info 
+	//qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
+	ressave = res;
+	int sendto_len  ;
+	sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
+	// sendto_len--;
+	if(opt_tcp)
+	{
+		tcp_fd= connect_to_name(server_ip_str, port);
+		if (tcp_fd == -1)
+		{
+			report_err("unable to connect to '%s'", server_ip_str);
+			goto err;
+		}
+		
+		// Stdio makes life easy 
+		tcp_file= fdopen(tcp_fd, "r+");
+		if (tcp_file == NULL)
+		{
+			report("fdopen failed");
+			goto err;
+		}
+		tcp_fd= -1; 
+
+		uint16_t payload_len ;
+		payload_len = (uint16_t) sendto_len;
+		ldns_write_uint16(wire, sendto_len );
+		memcpy(wire + 2, buf, sendto_len);
+		int wire_red =0;
+		wire_red = fwrite(wire, (sendto_len+2), 1, tcp_file);
+		if (  wire_red   > 0)
+		{
+			bzero(wire, 1300);	
+			while ( fread(wire, 2, 1, tcp_file) == NULL)
+			{
+				if (feof(tcp_file))
+				{
+					report("got unexpected EOF from server");
+					return 0;
+				}
+				if (errno == EINTR)
+				{
+					report("timeout");
+					//kick_watchdog();
+					sleep(10);
+				}
+				else
+				{
+					report_err("error reading from server");
+					return 0;
+				}
+			} 
+			ssize_t wire_size = 0;
+			wire_size = ldns_read_uint16(wire);
+			printf ("read tcp wire size reply %u\n",  wire_size);
+			
+			bzero(buf, 2048);	
+			while ( fread(buf, wire_size, 1, tcp_file) == NULL)
+			{
+				if (feof(tcp_file))
+				{
+					report("got unexpected EOF from server");
+					return 0;
+				}
+				if (errno == EINTR)
+				{
+					report("timeout");
+					//kick_watchdog();
+					sleep(10);
+				}
+				else
+				{
+					report_err("error reading from server");
+					return 0;
+				}
+			} 
+			
+		}
+	}
+	else 
+	{
+		err_num = getaddrinfo(server_ip_str, port , &hints, &res);
+		if(err_num)
 		{ 
 			printf("%s ERROR port %s %s\n", server_ip_str, port, gai_strerror(err_num));	
 			return (1);
 		}
 
-	dns = (struct DNS_HEADER *)&buf;
-	qlen =  makequery(dns, buf, lookupname,  qtype, qclass);
-	// query info 
-	qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
-	ressave = res;
-	int sendto_len  ;
-	sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION);
 
-	do 
-	{
-		sa.sa_flags= 0;
-		sa.sa_handler= got_alarm;
-		sigemptyset(&sa.sa_mask);
-		sigaction(SIGALRM, &sa, NULL);
-		alarm(1);
-
-		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-		if(s < 0)
-			continue;
-		
-		void *ptr;
-		char addrstr[100];
-		switch (res->ai_family)
+		do 
 		{
-			case AF_INET:
-	  			ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;		
-	  			break;
-			case AF_INET6:
-	  			ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
-	  			break;
-		}
-		inet_ntop (res->ai_family, ptr, addrstr, 100);
-		printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, server_ip_str,  addrstr );
+			sa.sa_flags= 0;
+			sa.sa_handler= got_alarm;
+			sigemptyset(&sa.sa_mask);
+			sigaction(SIGALRM, &sa, NULL);
+			alarm(1);
 
-		tSend_us = monotonic_us();
-		if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
-			perror("send");
-			close(s);
-			continue;
-		}  
-		else 
-		{
-			if(read(s, buf, 2048) == -1) {
-				perror("read");
+			s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+			if(s < 0)
+				continue;
+
+			void *ptr;
+			char addrstr[100];
+			switch (res->ai_family)
+			{
+				case AF_INET:
+					ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;		
+					break;
+				case AF_INET6:
+					ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
+					break;
+			}
+			inet_ntop (res->ai_family, ptr, addrstr, 100);
+			printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, server_ip_str,  addrstr );
+
+			tSend_us = monotonic_us();
+
+			tSend_us =  0;
+			if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
+				perror("send");
 				close(s);
 				continue;
-			}
-			else {
+			}  
+			else 
+			{
+				if(read(s, buf, 2048) == -1) {
+					perror("read");
+					close(s);
+					continue;
+				}
+				else {
+					close(s);
+					break;
+				}
+				tRecv_us = monotonic_us();
+				tTrip_us = tRecv_us - tSend_us;
 				close(s);
 				break;
-			}	
-			tRecv_us = monotonic_us();
-			tTrip_us = tRecv_us - tSend_us;
-			close(s);
-			break;
+			}
+		} while ((res = res->ai_next) != NULL);
+		if(!res) {
+			freeaddrinfo(ressave);
+			printf("DNS0 %s no-response\n", server_ip_str);
+			return (1);
 		}
-	} while ((res = res->ai_next) != NULL);
-	if(!res) {
-		freeaddrinfo(ressave);
-		printf("DNS0 %s no-response\n", server_ip_str);
-		return (1);
 	}
-	freeaddrinfo(ressave);
 	printAnswer(buf, tTrip_us );
-
 	alarm(0);
 
-	return (0);
+leave:
+	return (result);
+
+err:
+        fprintf(stderr, "tdig: leaving with error\n");
+        result= 1;
+        goto leave;
 }
 
 static void got_alarm(int sig)
@@ -272,9 +426,12 @@ static void got_alarm(int sig)
 
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) 
 {
+	char *s;
+	s = dns;
 	int lock = 0 , i;
 	for(i = 0 ; i < (int)strlen((char*)host) ; i++) 
 	{
+		//printf ("%c", host[i] );
 		if(host[i]=='.') 
 		{
 			*dns++=i-lock;
@@ -284,7 +441,7 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 			lock++; //or lock=i+1;
 		}
 	}
-	*dns++=NULL;
+	*dns++=0;
 }
 
 void printAnswer(unsigned char *result, unsigned long long tTrip_us) 
@@ -302,22 +459,25 @@ void printAnswer(unsigned char *result, unsigned long long tTrip_us)
 	//move ahead of the dns header and the query field
 	reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
-	/* 
+	/*
 	printf(" : questions  %d  ",ntohs(dnsR->q_count));
 	printf(" : answers %d ",ntohs(dnsR->ans_count));
 	printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
 	printf(" : additional records %d",ntohs(dnsR->add_count));
 	*/
-	stop=0;
 
+	stop=0;
 
 	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
 	if(dnsR->ans_count == 0) 
 	{
-		printf ("0 UNKNOWN UNKNOWN");
+		printf ("0 %d UNKNOWN UNKNOWN", dnsR->tc);
 	}
 	else 
+	{
 		printf (" %d ", ntohs(dnsR->ans_count));	
+		printf (" %d ",  dnsR->tc);
+	}
 
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
@@ -331,26 +491,48 @@ void printAnswer(unsigned char *result, unsigned long long tTrip_us)
 	//print answers
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
-		printf(" %s ",answers[i].name);
+		answers[i].rdata  = NULL;
 
-		if(ntohs(answers[i].resource->type)==16) //txt
+		if(ntohs(answers[i].resource->type)==T_TXT) //txt
 		{
+			printf(" TXT ", ntohs(answers[i].resource->data_len));
+			printf(" %s ",answers[i].name);
 			answers[i].rdata = ReadName(reader,result,&stop);
 			reader = reader + stop;
 
-			// printf(": type TXT : len %d ", ntohs(answers[i].resource->data_len));
 			answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
 			printf(" %s", answers[i].rdata);
 		}
-		else 
+		else if (ntohs(answers[i].resource->type)== T_SOA)
 		{
-			printf("DISCARDED NOT TXT=16 type");
+			printf("SOA ");
+			printf(" %s ",answers[i].name);
+			answers[i].rdata = ReadName(reader,result,&stop);
+			//printf(" %s", answers[i].rdata);
+			reader =  reader + stop;
+			answers[i].rdata = ReadName(reader,result,&stop);
+			//printf(" %s", answers[i].rdata);
+		        reader =  reader + stop;
+			u_int32_t serial;
+			serial = get32b(reader);
+			printf(" %u ", serial);
+		        reader =  reader + 4;
 		}
-		
+		else if (ntohs(answers[i].resource->type)== T_DNSKEY)
+		{
+			
+			printf("DNSKEY ");
+		}
+		else  
+		{
 
+			printf("DISCARDED-%u ", ntohs(answers[i].resource->type));
+		}
+		fflush(stdout);
+		
 		// free mem 
-		if(answers[i].name != NULL) 
-			free (answers[i].name); 
+		//if(answers[i].name != NULL) 
+		//	free (answers[i].name);  
 
 		if(answers[i].rdata != NULL) 
 			free (answers[i].rdata); 
@@ -404,13 +586,16 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 }
 
 
-unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass)
+unsigned int makequery( struct DNS_HEADER *dns, struct EDNS0_HEADER *edns0, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass)
 {
 	unsigned char *qname;
-	struct QUESTION *qinfo = NULL;
+	struct QUESTION *qinfo = NULL; 
+	struct EDNS0_HEADER *e;
 	unsigned int ret;
-
-	dns->id = (unsigned short) htons(getpid());
+	int r;
+	r =  rand();
+	r %= 65535;
+	dns->id = (unsigned short) r;
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
 	dns->aa = 0; //Not Authoritative
@@ -424,7 +609,7 @@ unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned cha
 	dns->q_count = htons(1); //we have only 1 question
 	dns->ans_count = 0;
 	dns->auth_count = 0;
-	dns->add_count = 0;
+	dns->add_count = htons(1);
 
 	//point to the query portion
 	qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
@@ -436,6 +621,17 @@ unsigned int makequery( struct DNS_HEADER *dns, unsigned char *buf, unsigned cha
 	qinfo->qtype = htons(qtype); 
 	qinfo->qclass = htons(qclass);
 
+	e=(struct EDNS0_HEADER*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + sizeof(struct QUESTION) + 2 ) ]; //fill it 
+
+	e->qtype = htons(ns_t_opt);
+	e->_edns_udp_size = htons(opt_edns0);
+	//e->_edns_z = htons(128);
+	if(opt_dnssec  == 1) 
+	{
+		e->DO = 0x80;
+	}
+	e->len = htons(0);
+//	printf (" qtype int %u , qclass %u : %s \n", qtype, qclass, qname);
 	return  (ret);
 }
 
@@ -451,4 +647,131 @@ static void fatal(const char *fmt, ...)
 
 	va_end(ap);
 	exit(1);
+}
+
+static int connect_to_name(char *host, char *port)
+{
+	int r, s, s_errno;
+	//struct addrinfo *res, *aip;
+	struct addrinfo  *aip;
+	struct addrinfo hints;
+
+	fprintf(stderr, "tdig: before getaddrinfo\n");
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_socktype= SOCK_STREAM;
+	r= getaddrinfo(host, port, &hints, &res);
+	if (r != 0)
+		fatal("unable to resolve '%s': %s", host, gai_strerror(r));
+
+	s_errno= 0;
+	s= -1;
+	for (aip= res; aip != NULL; aip= aip->ai_next)
+	{
+		s= socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s == -1)
+		{	
+			s_errno= errno;
+			continue;
+		}
+
+		fprintf(stderr, "tdig: before connect\n");
+		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
+			break;
+
+		s_errno= errno;
+		close(s);
+		s= -1;
+	}
+
+	freeaddrinfo(res);
+	if (s == -1)
+		errno= s_errno;
+	return s;
+}
+
+
+static void fatal_err(const char *fmt, ...)
+{
+	int s_errno;
+	va_list ap;
+
+	s_errno= errno;
+
+	va_start(ap, fmt);
+
+	fprintf(stderr, "tdig: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, ": %s\n", strerror(s_errno));
+
+	va_end(ap);
+
+	exit(1);
+}
+
+static void report(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	fprintf(stderr, "tdig: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+
+	va_end(ap);
+}
+
+static void report_err(const char *fmt, ...)
+{
+	int s_errno;
+	va_list ap;
+        fprintf(stderr, "tdig: ");
+        vfprintf(stderr, fmt, ap);
+        fprintf(stderr, ": %s\n", strerror(s_errno));
+
+        va_end(ap);
+}
+
+
+/* get 4 bytes from memory
+ * eg.  used to extract serial number from soa packet
+ */
+u_int32_t
+get32b (char *p)
+{
+    u_int32_t var;
+
+    var = (0x000000ff & *(p)) << 24;
+    var |= (0x000000ff & *(p+1)) << 16;
+    var |= (0x000000ff & *(p+2)) << 8;
+    var |= (0x000000ff & *(p+3));
+
+    return (var);
+}
+
+/*
+ * Copy data allowing for unaligned accesses in network byte order
+ * (big endian).
+ */
+void ldns_write_uint16(void *dst, uint16_t data)
+{
+#ifdef ALLOW_UNALIGNED_ACCESSES
+        * (uint16_t *) dst = htons(data);
+#else
+        uint8_t *p = (uint8_t *) dst;
+        p[0] = (uint8_t) ((data >> 8) & 0xff);
+        p[1] = (uint8_t) (data & 0xff);
+#endif
+}
+
+
+uint16_t
+ldns_read_uint16(const void *src)
+{
+#ifdef ALLOW_UNALIGNED_ACCESSES
+        return ntohs(*(uint16_t *) src);
+#else
+        uint8_t *p = (uint8_t *) src;
+        return ((uint16_t) p[0] << 8) | (uint16_t) p[1];
+#endif
 }
