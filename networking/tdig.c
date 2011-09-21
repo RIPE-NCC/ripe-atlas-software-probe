@@ -121,7 +121,7 @@ struct addrinfo hints, *res, *ressave;
 int dns_id;
 static int opt_dnssec = 0;	
 static int opt_edns0 = 0;
-
+static	char hostname[100];
 static void got_alarm(int sig);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
@@ -131,7 +131,7 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
 unsigned int makequery( struct DNS_HEADER *dns, struct EDNS0_HEADER *edns0, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
-void printAnswer(unsigned char *result, unsigned long long tTrip_us);
+void printAnswer(unsigned char *result, int wire_size,  unsigned long long tTrip_us);
 
 int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
@@ -155,7 +155,6 @@ int tdig_main(int argc, char **argv)
 	bzero(buf, 2048);	
 	int opt_v4_only , opt_v6_only;
 	char  *atlas_str = NULL;
-	char hostname[100];
 	struct sigaction sa;
 	unsigned long long  tSend_us, tRecv_us, tTrip_us;
 	int opt_tcp = 0;
@@ -164,7 +163,7 @@ int tdig_main(int argc, char **argv)
 	FILE *tcp_file;
 	uint8_t wire[1300]; 
 	char *check;
-
+	ssize_t wire_size = 0;
 	bzero(hostname, 100);
 	gethostname(hostname, 100);
 
@@ -313,7 +312,6 @@ int tdig_main(int argc, char **argv)
 					return 0;
 				}
 			} 
-			ssize_t wire_size = 0;
 			wire_size = ldns_read_uint16(wire);
 			
 			bzero(buf, 2048);	
@@ -384,7 +382,7 @@ int tdig_main(int argc, char **argv)
 			}  
 			else 
 			{
-				if(read(s, buf, 2048) == -1) {
+				if( ( wire_size = read(s, buf, 2048)) == -1) {
 					perror("read");
 					close(s);
 					continue;
@@ -406,7 +404,7 @@ int tdig_main(int argc, char **argv)
 	tRecv_us = monotonic_us();
 	tTrip_us = tRecv_us - tSend_us;
 
-	printAnswer(buf, tTrip_us );
+	printAnswer(buf, wire_size, tTrip_us );
 	alarm(0);
 
 leave:
@@ -444,7 +442,7 @@ void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host)
 	*dns++=0;
 }
 
-void printAnswer(unsigned char *result, unsigned long long tTrip_us) 
+void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_us) 
 {
 	int i, stop=0;
 	unsigned char *qname, *reader;
@@ -479,6 +477,7 @@ void printAnswer(unsigned char *result, unsigned long long tTrip_us)
 		printf (" %d ",  dnsR->tc);
 	}
 
+	printf (" %u ",  wire_size);
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
 		answers[i].name=ReadName(reader,result,&stop);
@@ -655,8 +654,9 @@ static int connect_to_name(char *host, char *port)
 	//struct addrinfo *res, *aip;
 	struct addrinfo  *aip;
 	struct addrinfo hints;
+	char addrstr[100];
+	void *ptr;
 
-	fprintf(stderr, "tdig: before getaddrinfo\n");
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	r= getaddrinfo(host, port, &hints, &res);
@@ -674,9 +674,22 @@ static int connect_to_name(char *host, char *port)
 			continue;
 		}
 
-		fprintf(stderr, "tdig: before connect\n");
 		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
+		{
+			switch (res->ai_family)
+                        {
+                                case AF_INET:
+                                        ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+                                        break;
+                                case AF_INET6:
+                                        ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
+                                        break;
+                        }
+			inet_ntop (res->ai_family, ptr, addrstr, 100);
+			printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, host,  addrstr );
+
 			break;
+		}
 
 		s_errno= errno;
 		close(s);
