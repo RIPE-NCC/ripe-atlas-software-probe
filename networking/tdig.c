@@ -121,7 +121,6 @@ struct addrinfo hints, *res, *ressave;
 int dns_id;
 static int opt_dnssec = 0;	
 static int opt_edns0 = 0;
-static	char hostname[100];
 static void got_alarm(int sig);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
@@ -164,8 +163,6 @@ int tdig_main(int argc, char **argv)
 	uint8_t wire[1300]; 
 	char *check;
 	ssize_t wire_size = 0;
-	bzero(hostname, 100);
-	gethostname(hostname, 100);
 
 	srand (time (0));
 
@@ -268,6 +265,14 @@ int tdig_main(int argc, char **argv)
 	// sendto_len--;
 	if(opt_tcp)
 	{
+		sa.sa_flags= 0;
+		sa.sa_handler= got_alarm;
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGALRM, &sa, NULL);
+		//fprintf(stderr, "setting alarm\n");
+		alarm(10);
+		signal(SIGPIPE, SIG_IGN);
+
 		tcp_fd= connect_to_name(server_ip_str, port);
 		if (tcp_fd == -1)
 		{
@@ -308,6 +313,7 @@ int tdig_main(int argc, char **argv)
 				}
 				else
 				{
+					printf (" TCP-READ-ERROR-SIZE\n");
 					report_err("error reading from server");
 					return 0;
 				}
@@ -330,6 +336,7 @@ int tdig_main(int argc, char **argv)
 				}
 				else
 				{
+					printf (" TCP-READ-ERROR-%d byte\n", wire_size);
 					report_err("error reading from server");
 					return 0;
 				}
@@ -372,7 +379,7 @@ int tdig_main(int argc, char **argv)
 					break;
 			}
 			inet_ntop (res->ai_family, ptr, addrstr, 100);
-			printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, server_ip_str,  addrstr );
+			printf ("DNS%d T %s %s ", res->ai_family == PF_INET6 ? 6 : 4, server_ip_str,  addrstr );
 
 			tSend_us = monotonic_us();
 			if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
@@ -686,7 +693,7 @@ static int connect_to_name(char *host, char *port)
                                         break;
                         }
 			inet_ntop (res->ai_family, ptr, addrstr, 100);
-			printf ("DNS%d %s %s %s ", res->ai_family == PF_INET6 ? 6 : 4, hostname, host,  addrstr );
+			printf ("DNS%d T %s %s ", res->ai_family == PF_INET6 ? 6 : 4, host,  addrstr );
 
 			break;
 		}
