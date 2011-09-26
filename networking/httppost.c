@@ -38,7 +38,6 @@ static int connect_to_name(char *host, char *port);
 char *do_dir(char *dir_name, off_t *lenp);
 static int copy_chunked(FILE *in_file, FILE *out_file);
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len);
-static void usage(void);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
 static void report(const char *fmt, ...);
@@ -110,7 +109,8 @@ int httppost_main(int argc, char *argv[])
 			time_tolerance= optarg;
 			break;
 		case '?':
-			usage();
+			bb_show_usage();
+			return 1;
 		default:
 			fatal("bad option '%c'", c);
 		}
@@ -135,7 +135,7 @@ int httppost_main(int argc, char *argv[])
 			/* Something went wrong. */
 			goto err;
 		}
-		fprintf(stderr, "total size in dir: %d\n", dir_length);
+		fprintf(stderr, "total size in dir: %ld\n", (long)dir_length);
 	}
 
 	if(post_header != NULL )
@@ -208,6 +208,7 @@ int httppost_main(int argc, char *argv[])
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGALRM, &sa, NULL);
 	alarm(10);
+	signal(SIGPIPE, SIG_IGN);
 
 	tcp_fd= connect_to_name(host, port);
 	if (tcp_fd == -1)
@@ -351,6 +352,7 @@ leave:
 	if (filelist) free(filelist);
 
 	alarm(0);
+	signal(SIGPIPE, SIG_DFL);
 
 	return result; 
 
@@ -586,8 +588,8 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 			if (now < tim-tolerance || now > tim+tolerance)
 			{
 				fprintf(stderr,
-				"setting time, time difference is %d\n",
-					tim-now);
+				"setting time, time difference is %ld\n",
+					(long)tim-now);
 				stime(&tim);
 			}
 		}
@@ -912,7 +914,7 @@ static void skip_spaces(const char *cp, char **ncp)
 	*ncp= (char *)ucp;
 }
 
-static void got_alarm(int sig)
+static void got_alarm(int sig __attribute__((unused)) )
 {
 	report("got alarm, setting alarm again");
 	alarm(1);
@@ -926,23 +928,6 @@ static void kick_watchdog(void)
 		write(fdwatchdog, "1", 1);
 		close(fdwatchdog);
 	}
-}
-
-static void usage(void)
-{
-	fprintf(stderr,
-"Usage: httppost\n"); 
-	fprintf(stderr,
-"         [--post-header <file-to-post>] [--post-file <file-to-post>]\n");
-	fprintf(stderr, 
-"        [--post-footer  <file-to-post>] \n");
-
-	fprintf(stderr, 
-"        [--delete-file 'delete the upon success, not header and footer'\n");
-
-	fprintf(stderr, 
-"        [--post-footer  <file-to-post>] [-O <output-file>] <url>\n");
-	exit(1);
 }
 
 static void fatal(const char *fmt, ...)

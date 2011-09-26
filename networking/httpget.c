@@ -16,6 +16,8 @@ Created:	Aug 2011 by Philip Homburg for RIPE NCC
 #include <sys/stat.h>
 #include "libbb.h"
 
+#define debug 0
+
 static struct option longopts[]=
 {
 	{ "append",	no_argument, NULL, 'a' },
@@ -48,7 +50,7 @@ static int check_result(FILE *tcp_file, int *result);
 static int eat_headers(FILE *tcp_file, int *chunked, int *content_length,
 	int *headers_size, FILE *out_file, int max_headers);
 static int connect_to_name(char *host, char *port, int only_v4, int only_v6, 
-	struct timeval *start_time);
+	struct timeval *start_time, int *gerr);
 static char *do_dir(char *dir_name, off_t *lenp);
 static int copy_chunked(FILE *in_file, FILE *out_file, int *length,
 	int max_body);
@@ -68,7 +70,7 @@ int httpget_main(int argc, char *argv[])
 	int c,  i, r, fd, fdF, fdH, fdS, chunked, content_length,
 		result, http_result, opt_delete_file, do_get, do_head, do_post,
 		max_headers, max_body, do_multiline, only_v4, only_v6,
-		do_summary, headers_size, no_body, do_append, do_http10;
+		do_summary, headers_size, no_body, do_append, do_http10, gerr;
 	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body;
@@ -245,7 +247,11 @@ int httpget_main(int argc, char *argv[])
 			/* Something went wrong. */
 			goto err;
 		}
-		fprintf(stderr, "total size in dir: %ld\n", (long)dir_length);
+		if (debug)
+		{
+			fprintf(stderr, "total size in dir: %ld\n",
+				(long)dir_length);
+		}
 	}
 
 	if(post_header != NULL )
@@ -317,13 +323,45 @@ int httpget_main(int argc, char *argv[])
 	sa.sa_handler= got_alarm;
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGALRM, &sa, NULL);
-	printf("setting alarm\n");
+	if (debug) fprintf(stderr, "setting alarm\n");
 	alarm(10);
+	signal(SIGPIPE, SIG_IGN);
 
-	tcp_fd= connect_to_name(host, port, only_v4, only_v6, &tv_start);
+	if (output_file)
+	{
+		out_file= fopen(output_file, do_append ? "a" : "w");
+		if (!out_file)
+		{
+			report_err("unable to create '%s'", output_file);
+			goto err;
+		}
+	}
+	else
+		out_file= stdout;
+
+
+	tcp_fd= connect_to_name(host, port, only_v4, only_v6, &tv_start,
+		&gerr);
 	if (tcp_fd == -1)
 	{
-		report_err("unable to connect to '%s'", host);
+		int s_errno= errno;
+
+		if (A_arg && do_summary)
+		{
+			fprintf(out_file, "%s %ld ",
+				A_arg, (long)time(NULL));
+			if (gerr != 0)
+			{
+				fprintf(out_file, "bad-hostname %s\n",
+					gai_strerror(gerr));
+			}
+			else
+			{
+				fprintf(out_file, "connect error %d\n",
+					s_errno);
+			}
+		}
+		report("unable to connect to '%s'", host);
 		goto err;
 	}
 
@@ -336,7 +374,7 @@ int httpget_main(int argc, char *argv[])
 	}
 	tcp_fd= -1;
 
-	fprintf(stderr, "httpget: sending request\n");
+	if (debug) fprintf(stderr, "httpget: sending request\n");
 	fprintf(tcp_file, "%s %s HTTP/1.%c\r\n",
 		do_get ? "GET" : do_head ? "HEAD" : "POST", path,
 		do_http10 ? '0' : '1');
@@ -387,7 +425,7 @@ int httpget_main(int argc, char *argv[])
 	{
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
-			fprintf(stderr, "posting file '%s'\n", p);
+			if (debug) fprintf(stderr, "posting file '%s'\n", p);
 			fd= open(p, O_RDONLY);
 			if (fd == -1)
 			{
@@ -414,19 +452,7 @@ int httpget_main(int argc, char *argv[])
 		}
 	}
 
-	fprintf(stderr, "httpget: writing output\n");
-	if (output_file)
-	{
-		out_file= fopen(output_file, do_append ? "a" : "w");
-		if (!out_file)
-		{
-			report_err("unable to create '%s'", output_file);
-			goto err;
-		}
-	}
-	else
-		out_file= stdout;
-
+	if (debug) fprintf(stderr, "httpget: writing output\n");
 	do_multiline= (A_arg && (max_headers != 0 || max_body != 0));
 	if (do_multiline)
 	{
@@ -439,13 +465,13 @@ int httpget_main(int argc, char *argv[])
 		fprintf(out_file, " %s %ld\n", A_arg, (long)time(NULL));
 	}
 
-	fprintf(stderr, "httpget: getting result\n");
+	if (debug) fprintf(stderr, "httpget: getting result\n");
 	if (!check_result(tcp_file, &http_result))
 	{
 		printf("check_result failed\n");
 		goto fail;
 	}
-	fprintf(stderr, "httpget: getting reply headers \n");
+	if (debug) fprintf(stderr, "httpget: getting reply headers \n");
 	if (!eat_headers(tcp_file, &chunked, &content_length, &headers_size,
 		out_file, max_headers))
 	{
@@ -504,7 +530,7 @@ fail:
 
 	if (A_arg && do_summary)
 	{
-		fprintf(out_file, "RESULT %s %ld ",
+		fprintf(out_file, "%s %ld ",
 			A_arg, (long)time(NULL));
 	}
 	if (do_summary)
@@ -530,7 +556,7 @@ fail:
 			http_result, headers_size, content_length);
 	}
 
-	fprintf(stderr, "httpget: deleting files\n");
+	if (debug) fprintf(stderr, "httpget: deleting files\n");
 	if ( opt_delete_file == 1 )
 	{
 		if (post_file)
@@ -539,13 +565,17 @@ fail:
 		{
 			for (p= filelist; p[0] != 0; p += strlen(p)+1)
 			{
-				fprintf(stderr, "unlinking file '%s'\n", p);
+				if (debug)
+				{
+					fprintf(stderr,
+						"unlinking file '%s'\n", p);
+				}
 				if (unlink(p) != 0)
 					report_err("unable to unlink '%s'", p);
 			}
 		}
 	}
-	fprintf(stderr, "httpget: done\n");
+	if (debug) fprintf(stderr, "httpget: done\n");
 
 	result= 0;
 
@@ -565,6 +595,7 @@ leave:
 
 	printf("clearing alarm\n");
 	alarm(0);
+	signal(SIGPIPE, SIG_DFL);
 
 	return result; 
 
@@ -783,7 +814,7 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length,
 
 		*headers_size += len;
 
-		fprintf(stderr, "httpget: got line '%s'\n", line);
+		if (debug) fprintf(stderr, "httpget: got line '%s'\n", line);
 
 		len= strlen(line);
 		if (tot_headers+len+1 <= max_headers)
@@ -818,15 +849,22 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length,
 			cp= strptime(line+6, "%a, %d %b %Y %H:%M:%S ", &tm);
 			if (!cp || strcmp(cp, "GMT") != 0)
 			{
-				fprintf(stderr, "unable to parse time '%s'\n",
-					line+6);
+				if (debug) 
+				{
+					fprintf(stderr,
+					"unable to parse time '%s'\n",
+						line+6);
+				}
 			}
 			tim= timegm(&tm);
 			now= time(NULL);
 			if (now < tim-tolerance || now > tim+tolerance)
 			{
-				fprintf(stderr, "setting time, time difference is %d\n",
-					(int)(tim-now));
+				if (debug)
+				{	fprintf(stderr,
+				"setting time, time difference is %d\n",
+						(int)(tim-now));
+				}
 				stime(&tim);
 			}
 		}
@@ -919,13 +957,13 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length,
 }
 
 static int connect_to_name(char *host, char *port, int only_v4, int only_v6,
-	struct timeval *start_time)
+	struct timeval *start_time, int *gerr)
 {
 	int r, s, s_errno;
 	struct addrinfo *res, *aip;
 	struct addrinfo hints;
 
-	fprintf(stderr, "httpget: before getaddrinfo\n");
+	if (debug) fprintf(stderr, "httpget: before getaddrinfo\n");
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	if (only_v4)
@@ -933,6 +971,7 @@ static int connect_to_name(char *host, char *port, int only_v4, int only_v6,
 	if (only_v6)
 		hints.ai_family= AF_INET6;
 	r= getaddrinfo(host, port, &hints, &res);
+	*gerr= r;
 	if (r != 0)
 	{
 		report("unable to resolve '%s': %s", host, gai_strerror(r));
@@ -955,7 +994,7 @@ static int connect_to_name(char *host, char *port, int only_v4, int only_v6,
 			continue;
 		}
 
-		fprintf(stderr, "httpget: before connect\n");
+		if (debug) fprintf(stderr, "httpget: before connect\n");
 		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
 			break;
 
@@ -1084,7 +1123,10 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *length, int max_body
 		if (cp > line && cp[-1] == '\r')
 			cp[-1]= '\0';
 
-		fprintf(stderr, "httpget: got chunk line '%s'\n", line);
+		if (debug)
+		{	
+			fprintf(stderr, "httpget: got chunk line '%s'\n", line);
+		}
 		len= strtoul(line, &check, 16);
 		if (check[0] != '\0' && !isspace(*(unsigned char *)check))
 		{
@@ -1184,7 +1226,11 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *length, int max_body
 		if (line[0] == '\0')
 			break;
 
-		fprintf(stderr, "httpget: got end-of-chunk line '%s'\n", line);
+		if (debug)
+		{
+			fprintf(stderr,
+				"httpget: got end-of-chunk line '%s'\n", line);
+		}
 	}
 	return 1;
 }
@@ -1274,13 +1320,13 @@ static void skip_spaces(const char *cp, char **ncp)
 	*ncp= (char *)ucp;
 }
 
-static void got_alarm(int sig)
+static void got_alarm(int sig __attribute__((unused)) )
 {
-	printf("got alarm\n");
-	printf("switching tcp_fd to nonblocking\n");
+	// printf("got alarm\n");
+	// printf("switching tcp_fd to nonblocking\n");
 	if (tcp_fd != -1)
 		fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);
-	printf("setting alarm again\n");
+	//printf("setting alarm again\n");
 	alarm(1);
 }
 

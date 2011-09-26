@@ -476,15 +476,15 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
 	if(dnsR->ans_count == 0) 
 	{
-		printf ("0 %d %u UNKNOWN UNKNOWN", dnsR->tc, wire_size);
+		printf ("0 %d UNKNOWN UNKNOWN", dnsR->tc);
 	}
 	else 
 	{
 		printf (" %d ", ntohs(dnsR->ans_count));	
 		printf (" %d ",  dnsR->tc);
-		printf (" %u ",  wire_size);
 	}
 
+	printf (" %u ",  wire_size);
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
 		answers[i].name=ReadName(reader,result,&stop);

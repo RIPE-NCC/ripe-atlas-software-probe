@@ -47,6 +47,10 @@
 #define MAXLINES        256	/* max lines in non-root crontabs */
 #endif
 
+#ifdef ATLAS
+#include <cmdtable.h>
+#endif
+
 #if ATLAS_NEW_FORMAT
 #define URANDOM_DEV	"/dev/urandom"
 #endif
@@ -221,6 +225,49 @@ static void kick_watchdog(void)
 	}
 }
 
+#if 0
+static void FAST_FUNC Xbb_daemonize_or_rexec(int flags, char **argv)
+{
+	int fd;
+
+	if (flags & DAEMON_CHDIR_ROOT)
+		xchdir("/");
+
+	if (flags & DAEMON_DEVNULL_STDIO) {
+		close(0);
+		close(1);
+		close(2);
+	}
+
+	fd = open(bb_dev_null, O_RDWR);
+	if (fd < 0) {
+		/* NB: we can be called as bb_sanitize_stdio() from init
+		 * or mdev, and there /dev/null may legitimately not (yet) exist!
+		 * Do not use xopen above, but obtain _ANY_ open descriptor,
+		 * even bogus one as below. */
+		fd = xopen("/", O_RDONLY); /* don't believe this can fail */
+	}
+
+	while ((unsigned)fd < 2)
+		fd = dup(fd); /* have 0,1,2 open at least to /dev/null */
+
+	if (!(flags & DAEMON_ONLY_SANITIZE)) {
+		//forkexit_or_rexec(argv);
+		/* if daemonizing, make sure we detach from stdio & ctty */
+		setsid();
+		dup2(fd, 0);
+		dup2(fd, 1);
+		dup2(fd, 2);
+	}
+	while (fd > 2) {
+		close(fd--);
+		if (!(flags & DAEMON_CLOSE_EXTRA_FDS))
+			return;
+		/* else close everything after fd#2 */
+	}
+}
+#endif
+
 int perd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int perd_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -358,14 +405,14 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 				if (do_kick_watchdog)
 					sleep_time= 10;
 				TestJobs(&next);
-				crondlog(LVL9 "got next %d, now %d",
+				crondlog(LVL7 "got next %d, now %d",
 					next, time(NULL));
 				if (!next)
 				{
-					crondlog(LVL9 "calling RunJobs at %d",
+					crondlog(LVL7 "calling RunJobs at %d",
 						time(NULL));
 					RunJobs();
-					crondlog(LVL9 "RunJobs ended at %d",
+					crondlog(LVL7 "RunJobs ended at %d",
 						time(NULL));
 					sleep_time= 1;
 				} else if (next > t1 && next < t1+sleep_time)
@@ -1023,7 +1070,7 @@ static int TestJobs(time_t t1, time_t t2)
 						line->distr_param)
 					{
 						crondlog(
-LVL9 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
+LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
 							now, line->lasttime,
 							line->lasttime+
 							line->interval+
@@ -1188,30 +1235,6 @@ static void find_eos(char *cp, char **ncpp)
 	*ncpp= cp;
 }
 
-
-int ping_main(int argc, char *argv[]);
-int ping6_main(int argc, char *argv[]);
-int httppost_main(int argc, char *argv[]);
-int traceroute_main(int argc, char *argv[]);
-int condmv_main(int argc, char *argv[]);
-int tdig_main(int argc, char *argv[]);
-int dfrm_main(int argc, char *argv[]);
-
-static struct builtin 
-{
-	const char *cmd;
-	int (*func)(int argc, char *argv[]);
-} builtin_cmds[]=
-{
-	{ "ping", ping_main },
-	{ "ping6", ping6_main },
-	{ "httppost", httppost_main },
-	{ "traceroute", traceroute_main },
-	{ "condmv", condmv_main },
-	{ "tdig", tdig_main },
-	{ "dfrm", dfrm_main },
-	{ NULL, 0 }
-};
 
 #define ATLAS_NARGS	20	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */
@@ -1388,6 +1411,8 @@ static int atlas_run(char *cmdline)
 
 	bp->func(argc, argv);
 
+	alarm(0);
+
 	if (outfile)
 	{
 		fflush(stdout);
@@ -1562,7 +1587,7 @@ static void RunJob(const char *user, CronLine *line)
 		time_t now= time(NULL);
 		if (now > line->lasttime+line->interval+line->distr_param)
 		{
-			crondlog(LVL9 "job is late. Now %d, lasttime %d, max %d, should %d: %s",
+			crondlog(LVL7 "job is late. Now %d, lasttime %d, max %d, should %d: %s",
 				now, line->lasttime,
 				line->lasttime+line->interval+line->distr_param,
 				line->start_time +

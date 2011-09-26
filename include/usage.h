@@ -1592,15 +1592,54 @@
      "\n	-e STRING	HTML encode STRING" \
      "\n	-d STRING	URL decode STRING" \
 
-#define httpget_trivial_usage "\n\n" \
-	"[OPTION]...[MANPAGE]..."
+#define httpget_trivial_usage \
+	"[--append] [--delete-file] [--get|--head|--post] " \
+	"[--post-file FILE] [--post-dir DIR] " \
+	"[--post-header FILE] " \
+	"[--post-footer FILE] [--set-time bound] " \
+	"[--store-headers SIZE] [--store-body SIZE] [--summary] " \
+	"[--user-agent STRING] [-0|-1] [-4|-6] [-A STRING] [-O FILE] URL"
 #define httpget_full_usage "\n\n" \
-	"[OPTION]...[MANPAGE]..."
+"Interact with a HTTP server using GET/HEAD/POST commands\n" \
+"\nOptions:" \
+"\n	--append		Append data to output file" \
+"\n	--defile-file		Delete files after they have been posted" \
+"\n	--get			HTTP GET command (default)" \
+"\n	--head			HTTP HEAD command" \
+"\n	--post			HTTP POST command" \
+"\n	--post-file FILE	Post this file" \
+"\n	--post-dir DIR		Post all files in this directory" \
+"\n	--post-header FILE	First post this file and do not delete it" \
+"\n	--post-footer FILE	Post this file last and do not delete it" \
+"\n	--set-time bound	Parse the time in the HTTP reply and set the" \
+"\n				system time if it exceeds bound (in seconds)" \
+"\n	--store-headers SIZE	Write this amount of headers to the output" \
+"\n	--store-body SIZE	Write this amount of body to the output" \
+"\n	--summary 		Write the summary output" \
+"\n	--user-agent STRING	Set the user-agent header to STRING" \
+"\n	-0			Send the request using http/1.0" \
+"\n	-1			Send the request using http/1.1 (default)" \
+"\n	-4			Connect only over IPv4" \
+"\n	-6			Connect only over IPv6" \
+"\n	-A STRING		Format the output for Atlas using STRING" \
+"\n	-O FILE			Write the body of the HTTP reply to FILE"
 
-#define httppost_trivial_usage "\n\n" \
-	"[OPTION]...[MANPAGE]..."
+#define httppost_trivial_usage \
+	"[--delete-file] [--post-file FILE] [--post-dir DIR] " \
+	"[--post-header FILE] " \
+	"[--post-footer FILE] [--set-time bound] " \
+	"[-O FILE] URL"
 #define httppost_full_usage "\n\n" \
-	"[OPTION]...[MANPAGE]..."
+"Post file using the HTTP POST command\n" \
+"\nOptions:" \
+"\n	--defile-file		Delete files after they have been posted" \
+"\n	--post-file FILE	Post this file" \
+"\n	--post-dir DIR		Post all files in this directory" \
+"\n	--post-header FILE	First post this file and do not delete it" \
+"\n	--post-footer FILE	Post this file last and do not delete it" \
+"\n	--set-time bound	Parse the time in the HTTP reply and set the" \
+"\n				system time if it exceeds bound (in seconds)" \
+"\n	-O FILE			Write the body of the HTTP reply to FILE"
 
 #define hwclock_trivial_usage \
 	USE_FEATURE_HWCLOCK_LONG_OPTIONS( \
@@ -3025,7 +3064,7 @@
        "$ patch -p0 -i example.diff"
 
 #define perd_trivial_usage \
-       "-fbS -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
+       "-fbSAD -P pidfile -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
 #define perd_full_usage "\n\n" \
        "	-f	Foreground" \
      "\n	-b	Background (default)" \
@@ -3036,6 +3075,9 @@
 	) \
      "\n	-L	Log to file" \
      "\n	-c	Working dir" \
+     "\n	-A	Atlas specific processing" \
+     "\n	-D	Periodically kick watchdog" \
+     "\n	-P	pidfile to use" \
 
 
 #define pgrep_trivial_usage \
@@ -3549,10 +3591,11 @@
        "$ rx /tmp/foo\n"
 
 #define rxtxrpt_trivial_usage \
-       "[ipv6-info-cache]"
+       "[-A STRING] [ipv6-info-cache]"
 
 #define rxtxrpt_full_usage "\n\n" \
        "Display RX and TX statistics as well as IPv6 info\n" \
+       "\n	-A STRING	Use Atlas format with STRING" \
 
 #define script_trivial_usage \
        "[-afq] [-c COMMAND] [OUTFILE]"

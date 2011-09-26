@@ -8,6 +8,7 @@ One-off queue daemon
 #include <string.h>
 
 #include <libbb.h>
+#include <cmdtable.h>
 
 #define SUFFIX 		".curr"
 #define WAIT_TIME	60	/* in seconds */
@@ -93,36 +94,6 @@ static void find_eos(char *cp, char **ncpp)
 		cp++;
 	*ncpp= cp;
 }
-
-
-int ping_main(int argc, char *argv[]);
-int ping6_main(int argc, char *argv[]);
-int httpget_main(int argc, char *argv[]);
-int httppost_main(int argc, char *argv[]);
-int traceroute_main(int argc, char *argv[]);
-int condmv_main(int argc, char *argv[]);
-int tdig_main(int argc, char *argv[]);
-int dfrm_main(int argc, char *argv[]);
-int nslookup_main(int argc, char *argv[]);
-
-static struct builtin 
-{
-	const char *cmd;
-	int (*func)(int argc, char *argv[]);
-} builtin_cmds[]=
-{
-	{ "ping", ping_main },
-	{ "ping6", ping6_main },
-	{ "httpget", httpget_main },
-	{ "httppost", httppost_main },
-	{ "traceroute", traceroute_main },
-	{ "condmv", condmv_main },
-	{ "tdig", tdig_main },
-	{ "dfrm", dfrm_main },
-	{ "nslookup", nslookup_main },
-	{ NULL, 0 }
-};
-
 
 static void process(FILE *file)
 {

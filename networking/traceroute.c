@@ -314,6 +314,7 @@ struct globals {
 	int waittime; // 5;             /* time to wait for response (in seconds) */
 	int rcvsock;
 	int sndsock;
+	int got_timeout;
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 	int optlen;                     /* length of ip options */
 #else
@@ -339,6 +340,7 @@ struct globals {
 #define waittime  (G.waittime )
 #define rcvsock   (G.rcvsock  )
 #define sndsock   (G.sndsock  )
+#define got_timeout (G.got_timeout  )
 #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
 # define optlen   (G.optlen   )
 #endif
@@ -350,6 +352,7 @@ struct globals {
 	waittime = 5; \
 	rcvsock = -1; \
 	sndsock = -1; \
+	got_timeout = 0; \
 } while (0)
 
 #define outicmp ((struct icmp *)(outip + 1))
@@ -508,7 +511,12 @@ send_probe(int seq, int ttl)
 		}
 	}
 
-	res = xsendto(sndsock, out, len, &dest_lsa->u.sa, dest_lsa->len);
+	res = sendto(sndsock, out, len, 0, &dest_lsa->u.sa, dest_lsa->len);
+	if (res == -1)
+	{
+		printf(" errno %d", errno);
+		return;
+	}
 	if (res != len)
 		bb_info_msg("sent %d octets, ret=%d", len, res);
 }
@@ -618,7 +626,7 @@ packet4_ok(int read_len, const struct sockaddr_in *from, int seq)
 // but defer it to kernel, we can't set source port,
 // and thus can't check it here in the reply
 			/* && up->source == htons(ident) */
-			 && up->uh_dport == htons(port + seq)
+			 && up->dest == htons(port + seq)
 			) {
 				return (type == ICMP_TIMXCEED ? -1 : code + 1);
 			}
@@ -932,7 +940,8 @@ common_traceroute_main(int op, char **argv)
 	signal(SIGALRM, SIG_DFL);
 
 	if (!dest_lsa) {
-		printf("traceroute to %s (bad-hostname)\n", argv[0]);
+		printf("traceroute to %s (%s)\n", argv[0], 
+			got_timeout ? "dns-timeout" : "bad-hostname");
 		free(ptr_to_globals);
 		return 1;
 	}
@@ -1080,7 +1089,20 @@ common_traceroute_main(int op, char **argv)
 			setsockopt_bindtodevice(probe_fd, device);
 		set_nport(dest_lsa, htons(1025));
 		/* dummy connect. makes kernel pick source IP (and port) */
-		xconnect(probe_fd, &dest_lsa->u.sa, dest_lsa->len);
+		if (connect(probe_fd, &dest_lsa->u.sa, dest_lsa->len) == -1)
+		{
+			int s_errno= errno;
+			char *tmpstr= 
+				xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa);
+
+			printf("traceroute to %s (%s), errno %d\n",
+				argv[0], tmpstr, s_errno);
+			free(tmpstr);
+
+			close(probe_fd);
+			/* Is this all, nothing more the clean up? */
+			return 1; 
+		}
 		set_nport(dest_lsa, htons(port));
 
 		/* read IP and port */
@@ -1309,7 +1331,7 @@ static void traceroute_report_err(int err)
 
 static void resolver_timeout(int __attribute((unused)) sig)
 {
-	printf("dns-timeout\n");
-	exit(1);
+	got_timeout= 1;
+	alarm(1);
 }
 #endif

@@ -118,6 +118,10 @@ static int print_host(const char *hostname, const char *header)
 			cur = cur->ai_next;
 		}
 	} else {
+#ifdef ATLAS
+		printf("Name: %s NEWLINE bad-hostname %s", hostname,
+			gai_strerror(rc));
+#endif
 #if ENABLE_VERBOSE_RESOLUTION_ERRORS
 		bb_error_msg("can't resolve '%s': %s", hostname, gai_strerror(rc));
 #else
