@@ -476,15 +476,15 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
 	if(dnsR->ans_count == 0) 
 	{
-		printf ("0 %d UNKNOWN UNKNOWN", dnsR->tc);
+		printf ("0 %d %u UNKNOWN UNKNOWN", dnsR->tc, wire_size);
 	}
 	else 
 	{
 		printf (" %d ", ntohs(dnsR->ans_count));	
 		printf (" %d ",  dnsR->tc);
+		printf (" %u ",  wire_size);
 	}
 
-	printf (" %u ",  wire_size);
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
 		answers[i].name=ReadName(reader,result,&stop);
@@ -646,7 +646,6 @@ static void fatal(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-
 	fprintf(stderr, "tdig: ");
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "\n");
@@ -745,6 +744,7 @@ static void report_err(const char *fmt, ...)
 {
 	int s_errno;
 	va_list ap;
+	va_start(ap, fmt);
         fprintf(stderr, "tdig: ");
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, ": %s\n", strerror(s_errno));
