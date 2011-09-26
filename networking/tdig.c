@@ -1,10 +1,10 @@
 /* 
-RIPE NCC 2011  Atlas. Antony Antony <antony@ripe.net>
+RIPE NCC 2011  Atlas. Antony Antony <antony@ripe.net>,  Philip Homburg <phomburg@ripe.net>
 Parts came from: 
 DNS Query Program on Linux
 Author : Prasshhant Pugalia (prasshhant.p@gmail.com)
 Dated : 29/4/2009
-Also DNSMN GPL version
+Also DNSMN GPL version, RIPE NCC
 */
 #include <errno.h>
 #include <getopt.h>
@@ -583,7 +583,8 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
 		}
 		name[i]='.';
 	}
-	name[i-1]=NULL; //remove the last dot
+	if(i >  0)
+		name[i-1]=NULL; //remove the last dot
 	return name;
 }
 
