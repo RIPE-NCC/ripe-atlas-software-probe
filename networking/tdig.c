@@ -302,6 +302,7 @@ int tdig_main(int argc, char **argv)
 				if (feof(tcp_file))
 				{
 					report("got unexpected EOF from server");
+					fclose(tcp_file);
 					return 0;
 				}
 				if (errno == EINTR)
@@ -314,6 +315,7 @@ int tdig_main(int argc, char **argv)
 				{
 					printf (" TCP-READ-ERROR-SIZE\n");
 					report_err("error reading from server");
+					fclose(tcp_file);
 					return 0;
 				}
 			} 
@@ -325,6 +327,7 @@ int tdig_main(int argc, char **argv)
 				if (feof(tcp_file))
 				{
 					report("got unexpected EOF from server");
+					fclose(tcp_file);
 					return 0;
 				}
 				if (errno == EINTR)
@@ -337,9 +340,11 @@ int tdig_main(int argc, char **argv)
 				{
 					printf (" TCP-READ-ERROR-%d byte\n", wire_size);
 					report_err("error reading from server");
+					fclose(tcp_file);
 					return 0;
 				}
 			} 
+			fclose(tcp_file);
 			
 		}
 	}
