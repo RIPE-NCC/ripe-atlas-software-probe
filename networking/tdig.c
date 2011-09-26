@@ -259,7 +259,6 @@ int tdig_main(int argc, char **argv)
 	qlen =  makequery(dns, edns0, buf, lookupname,  qtype, qclass);
 	// query info 
 	//qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
-	ressave = res;
 	int sendto_len  ;
 	sendto_len = sizeof(struct DNS_HEADER) + qlen + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
 	// sendto_len--;
@@ -353,7 +352,7 @@ int tdig_main(int argc, char **argv)
 			return (0);
 		}
 
-
+		ressave= res;
 		do 
 		{
 			sa.sa_flags= 0;
@@ -472,15 +471,15 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
 	if(dnsR->ans_count == 0) 
 	{
-		printf ("0 %d UNKNOWN UNKNOWN", dnsR->tc);
+		printf ("0 %d %u UNKNOWN UNKNOWN", dnsR->tc, wire_size);
 	}
 	else 
 	{
 		printf (" %d ", ntohs(dnsR->ans_count));	
 		printf (" %d ",  dnsR->tc);
+		printf (" %u ",  wire_size);
 	}
 
-	printf (" %u ",  wire_size);
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
 		answers[i].name=ReadName(reader,result,&stop);
@@ -512,6 +511,7 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 			answers[i].rdata = ReadName(reader,result,&stop);
 			//printf(" %s", answers[i].rdata);
 			reader =  reader + stop;
+			free(answers[i].rdata);
 			answers[i].rdata = ReadName(reader,result,&stop);
 			//printf(" %s", answers[i].rdata);
 		        reader =  reader + stop;
@@ -533,12 +533,15 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 		fflush(stdout);
 		
 		// free mem 
-		if(answers[i].name != NULL) 
-			free (answers[i].name);  
-
 		if(answers[i].rdata != NULL) 
 			free (answers[i].rdata); 
 	}
+
+	for(i=0;i<ntohs(dnsR->ans_count);i++)
+	{
+		free(answers[i].name);
+	}
+
 	printf("\n");
 }
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
