@@ -626,7 +626,7 @@ packet4_ok(int read_len, const struct sockaddr_in *from, int seq)
 // but defer it to kernel, we can't set source port,
 // and thus can't check it here in the reply
 			/* && up->source == htons(ident) */
-			 && up->dest == htons(port + seq)
+			 && up->uh_dport == htons(port + seq)
 			) {
 				return (type == ICMP_TIMXCEED ? -1 : code + 1);
 			}
