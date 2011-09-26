@@ -226,7 +226,7 @@ int tdig_main(int argc, char **argv)
 		}
 	} 
 	if (optind != argc-1)
-		fatal("exactly one server IP address expected");
+		report_err("exactly one server IP address expected");
 	server_ip_str = argv[optind];
 
 	if(atlas_str) {
@@ -350,7 +350,7 @@ int tdig_main(int argc, char **argv)
 		if(err_num)
 		{ 
 			printf("%s ERROR port %s %s\n", server_ip_str, port, gai_strerror(err_num));	
-			return (1);
+			return (0);
 		}
 
 
@@ -402,11 +402,7 @@ int tdig_main(int argc, char **argv)
 				break;
 			}
 		} while ((res = res->ai_next) != NULL);
-		if(!res) {
-			freeaddrinfo(ressave);
-			printf("DNS0 %s no-response\n", server_ip_str);
-			return (1);
-		}
+		freeaddrinfo(ressave);
 	}
 	tRecv_us = monotonic_us();
 	tTrip_us = tRecv_us - tSend_us;
@@ -537,8 +533,8 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 		fflush(stdout);
 		
 		// free mem 
-		//if(answers[i].name != NULL) 
-		//	free (answers[i].name);  
+		if(answers[i].name != NULL) 
+			free (answers[i].name);  
 
 		if(answers[i].rdata != NULL) 
 			free (answers[i].rdata); 
@@ -666,9 +662,11 @@ static int connect_to_name(char *host, char *port)
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	r= getaddrinfo(host, port, &hints, &res);
-	if (r != 0)
-		fatal("unable to resolve '%s': %s", host, gai_strerror(r));
-
+	if (r != 0) 
+		{
+			report_err("unable to resolve '%s': %s", host, gai_strerror(r));		       return (-1);
+		}
+	ressave = res;
 	s_errno= 0;
 	s= -1;
 	for (aip= res; aip != NULL; aip= aip->ai_next)
