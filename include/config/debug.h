@@ -1,1 +1,1 @@
-#undef CONFIG_DEBUG
+#define CONFIG_DEBUG 1

@@ -51,7 +51,8 @@ config ATLASINIT
 	bool "atlasinit"
 	default n
 	help
-	RIPE NCC Atlas initialization and parsing applicaton. antony@rip.net. Aug 2010.
+	RIPE NCC Atlas initialization and parsing applicaton.
+	antony@rip.net. Aug 2010.
 
 config ATLASSERIAL
 	bool "atlasserial"
@@ -741,7 +742,8 @@ config TDIG
         bool "tdig"
         default n
         help
-	 tiny dig. support only limited queries id.sever txt chaos. RIPE NCC 2011
+	 tiny dig. support only limited queries id.sever txt chaos.
+	 RIPE NCC 2011
 
 config TELNET
 	bool "telnet"

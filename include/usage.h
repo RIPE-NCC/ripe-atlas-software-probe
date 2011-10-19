@@ -980,6 +980,22 @@
      "\n	-, -i	Start with an empty environment" \
      "\n	-u	Remove variable from the environment" \
 
+#define eperd_trivial_usage \
+       "-fbSAD -P pidfile -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
+#define eperd_full_usage "\n\n" \
+       "	-f	Foreground" \
+     "\n	-b	Background (default)" \
+     "\n	-S	Log to syslog (default)" \
+     "\n	-l	Set log level. 0 is the most verbose, default 8" \
+	USE_FEATURE_CROND_D( \
+     "\n	-d	Set log level, log to stderr" \
+	) \
+     "\n	-L	Log to file" \
+     "\n	-c	Working dir" \
+     "\n	-A	Atlas specific processing" \
+     "\n	-D	Periodically kick watchdog" \
+     "\n	-P	pidfile to use" \
+
 #define ether_wake_trivial_usage \
        "[-b] [-i iface] [-p aa:bb:cc:dd[:ee:ff]] MAC"
 #define ether_wake_full_usage "\n\n" \

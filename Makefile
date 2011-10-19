@@ -451,6 +451,7 @@ libs-y		:= \
 		debianutils/ \
 		e2fsprogs/ \
 		editors/ \
+		eperd/ \
 		findutils/ \
 		init/ \
 		libbb/ \
