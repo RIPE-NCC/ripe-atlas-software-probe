@@ -70,7 +70,8 @@ int httpget_main(int argc, char *argv[])
 	int c,  i, r, fd, fdF, fdH, fdS, chunked, content_length,
 		result, http_result, opt_delete_file, do_get, do_head, do_post,
 		max_headers, max_body, do_multiline, only_v4, only_v6,
-		do_summary, headers_size, no_body, do_append, do_http10, gerr;
+		do_summary, headers_size, no_body, do_append, do_http10, gerr,
+		out_file_needs_closing;
 	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body;
@@ -109,6 +110,7 @@ int httpget_main(int argc, char *argv[])
 	tcp_fd= -1;
 	tcp_file= NULL;
 	out_file= NULL;
+	out_file_needs_closing= 0;
 	host= NULL;
 	port= NULL;
 	hostport= NULL;
@@ -335,6 +337,7 @@ int httpget_main(int argc, char *argv[])
 			report_err("unable to create '%s'", output_file);
 			goto err;
 		}
+		out_file_needs_closing= 1;
 	}
 	else
 		out_file= stdout;
@@ -586,7 +589,7 @@ leave:
 	if (fd != -1) close(fd);
 	if (tcp_file) fclose(tcp_file);
 	if (tcp_fd != -1) close(tcp_fd);
-	if (out_file) fclose(out_file);
+	if (out_file && out_file_needs_closing) fclose(out_file);
 	if (host) free(host);
 	if (port) free(port);
 	if (hostport) free(hostport);
