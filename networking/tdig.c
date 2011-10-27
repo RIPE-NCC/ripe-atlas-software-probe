@@ -21,8 +21,6 @@ Also DNSMN GPL version, RIPE NCC
 #include <netinet/udp.h>
 #include <arpa/nameser.h>
 #include <netdb.h>
-
-
 #include "libbb.h"
 
 #ifndef ns_t_dnskey
@@ -32,8 +30,6 @@ Also DNSMN GPL version, RIPE NCC
 #ifndef T_DNSKEY
 #define T_DNSKEY ns_t_dnskey  
 #endif 
-
-
 
 u_int32_t get32b(char *p);  
 
@@ -136,13 +132,14 @@ int tdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tdig_main(int argc, char **argv)
 {
 	unsigned char buf[2048];
-	unsigned char lookupname[32];
+	unsigned char lookupname[512]; 
+	unsigned char *lookupstr;
+	char errstr[128];
 	char * server_ip_str;
 	int c;
 	struct QUESTION *qinfo = NULL;
 	optind= 0;
 	u_int16_t qtype; 
-//	struct addrinfo hints, *res, *ressave;
 	int s ,  err_num;;
 	u_int16_t qclass;
 	struct DNS_HEADER *dns = NULL;
@@ -166,6 +163,7 @@ int tdig_main(int argc, char **argv)
 
 	srand (time (0));
 
+	lookupstr = lookupname;
 	tSend_us = monotonic_us();
 	opt_v4_only =  opt_v6_only = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhirs:A:?", longopts, NULL), c != -1)
@@ -190,7 +188,7 @@ int tdig_main(int argc, char **argv)
 				if(opt_edns0 == 0)
 					opt_edns0 = 512; 
 				opt_dnssec = 1;
-				strcpy(lookupname, optarg);
+				lookupstr =  optarg;
 				break;
 
 			case 'd':
@@ -214,7 +212,7 @@ int tdig_main(int argc, char **argv)
 			case 's':
 				qtype = T_SOA;
 				qclass = C_IN;
-				strcpy(lookupname, optarg);
+				lookupstr =  optarg;
 				break;
 			case 't':
 				opt_tcp = 1;
@@ -256,7 +254,7 @@ int tdig_main(int argc, char **argv)
 
 	
 	dns = (struct DNS_HEADER *)&buf;
-	qlen =  makequery(dns, edns0, buf, lookupname,  qtype, qclass);
+	qlen =  makequery(dns, edns0, buf, lookupstr,  qtype, qclass);
 	// query info 
 	//qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + qlen] ; //fill it 
 	int sendto_len  ;
@@ -276,6 +274,7 @@ int tdig_main(int argc, char **argv)
 		if (tcp_fd == -1)
 		{
 			report_err("unable to connect to '%s'", server_ip_str);
+			sprintf (errstr, "unable to connect"); 
 			goto err;
 		}
 		
@@ -283,6 +282,7 @@ int tdig_main(int argc, char **argv)
 		tcp_file= fdopen(tcp_fd, "r+");
 		if (tcp_file == NULL)
 		{
+			sprintf (errstr, "fdopen failed"); 
 			report("fdopen failed");
 			goto err;
 		}
@@ -383,7 +383,7 @@ int tdig_main(int argc, char **argv)
 					break;
 			}
 			inet_ntop (res->ai_family, ptr, addrstr, 100);
-			printf ("DNS%d T %s %s ", res->ai_family == PF_INET6 ? 6 : 4, server_ip_str,  addrstr );
+			printf ("DNS%d U %s %s ", res->ai_family == PF_INET6 ? 6 : 4, server_ip_str,  addrstr );
 
 			tSend_us = monotonic_us();
 			if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {
@@ -418,7 +418,8 @@ leave:
 	return (result);
 
 err:
-        fprintf(stderr, "tdig: leaving with error\n");
+	printf ("ERROR %s %s\n", server_ip_str, errstr);
+        fprintf(stderr, "tdig:ERROR: %s\n", errstr);
         result= 1;
         goto leave;
 }
