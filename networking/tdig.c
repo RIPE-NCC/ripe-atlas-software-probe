@@ -383,7 +383,7 @@ int tdig_main(int argc, char **argv)
 					break;
 			}
 			inet_ntop (res->ai_family, ptr, addrstr, 100);
-			printf ("DNS%d T %s %s ", res->ai_family == PF_INET6 ? 6 : 4, server_ip_str,  addrstr );
+			printf ("DNS%d U %s %s ", res->ai_family == PF_INET6 ? 6 : 4, server_ip_str,  addrstr );
 
 			tSend_us = monotonic_us();
 			if(sendto(s, (char *)buf, sendto_len, 0, res->ai_addr, res->ai_addrlen) == -1) {

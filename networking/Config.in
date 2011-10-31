@@ -220,8 +220,7 @@ config FEATURE_HTTPD_CONFIG_WITH_SCRIPT_INTERPR
 	  This option enables support for running scripts through an
 	  interpreter. Turn this on if you want PHP scripts to work
 	  properly. You need to supply an additional line in your httpd
-	  config file:
-	  *.php:/path/to/your/php
+	  config file: *.php:/path/to/your/php
 
 config FEATURE_HTTPD_SET_REMOTE_PORT_TO_ENV
 	bool "Set REMOTE_PORT environment variable for CGI"

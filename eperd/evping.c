@@ -66,11 +66,10 @@
 #define IPHDR              20
 #define MIN_DATA_SIZE      sizeof(struct evdata)
 #define DEFAULT_DATA_SIZE  (MIN_DATA_SIZE + 44)                   /* calculated as so to be like traditional ping */
-#define MAX_DATA_SIZE      (IP_MAXPACKET - IPHDR - ICMP_MINLEN)
+#define MAX_DATA_SIZE      (4096 - IPHDR - ICMP_MINLEN)
 #define DEFAULT_PKT_SIZE   ICMP_MINLEN + DEFAULT_DATA_SIZE
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
-#define DEFAULT_NOREPLY_TIMEOUT 100            /* 100 msec - 0 is illegal      */
 #define DEFAULT_PING_INTERVAL   1000           /* 1 sec - 0 means flood mode   */
 
 
@@ -96,38 +95,20 @@ struct evdata {
 struct evping_host {
 	struct evping_base *base;
 
-	char *name;                    /* Host identifier as given by the user    */
-	len_and_sockaddr *lsa;		/* IPv[46] address */
+	struct sockaddr_in6 sin6;	/* IPv[46] address */
+	socklen_t socklen;		/* Lenght of socket address */
+
 	int maxpkts;			/* Number of packets to send */
-	char * ipname;                 /* Remote address in dot notation          */
 
 	int index;                     /* Index into the array of hosts           */
 	u_int8_t seq;                  /* ICMP sequence (modulo 256) for next run */
+	int got_reply;
 
-	struct event noreply_timer;    /* Timer to handle ICMP timeout            */
+	//struct event noreply_timer;    /* Timer to handle ICMP timeout            */
 	struct event ping_timer;       /* Timer to ping host at given intervals   */
 
 	/* Packets Counters */
 	counter_t sentpkts;            /* Total # of ICMP Echo Requests sent      */
-	counter_t recvpkts;            /* Total # of ICMP Echo Replies received   */
-	counter_t dropped;             /* # of ICMP packets dropped               */
-
-	/* Bytes counters */
-	counter_t sentbytes;           /* Total # of bytes sent                   */
-	counter_t recvbytes;           /* Total # of bytes received               */
-
-	/* Timestamps */
-	struct timeval firstsent;      /* Time first ICMP request was sent        */
-	struct timeval firstrecv;      /* Time first ICMP reply was received      */
-	struct timeval lastsent;       /* Time last ICMP request was sent         */
-	struct timeval lastrecv;       /* Time last ICMP reply was received       */
-
-	/* Counters for statistics */
-	double shortest;               /* Shortest reply time                     */
-	double longest;                /* Longest reply time                      */
-	double sum;                    /* Sum of reply times                      */
-	double square;                 /* Sum of qquare of reply times            */
-
 
 	evping_callback_type user_callback;
 	void *user_pointer;            /* the pointer given to us for this host   */
@@ -147,7 +128,6 @@ struct evping_base {
 	uint32_t pktsize;              /* Packet size in bytes (ICMP plus User Data) */
 	pid_t pid;                     /* Identifier to send with each ICMP Request  */
 
-	struct timeval tv_noreply;     /* ICMP Echo Reply timeout                    */
 	struct timeval tv_interval;    /* Ping interval between two subsequent pings */
 
 	/* A circular list of hosts to ping. */
@@ -165,7 +145,7 @@ struct evping_base {
 	counter_t foreign;             /* # of ICMP packets we are not looking for   */
 	counter_t illegal;             /* # of ICMP packets with an illegal payload  */
 
-	u_char quiet;
+	u_char packet [MAX_DATA_SIZE];
 
 #ifndef _EVENT_DISABLE_THREAD_SUPPORT
 	void *lock;
@@ -183,6 +163,7 @@ struct evping_base {
 #define EVPING_UNLOCK(base) _EVUTIL_NIL_STMT
 #define ASSERT_LOCKED(base) _EVUTIL_NIL_STMT
 #define EVTHREAD_ALLOC_LOCK(lock, flags) _EVUTIL_NIL_STMT
+#define	EVTHREAD_FREE_LOCK(lock, flags) _EVUTIL_NIL_STMT
 #else
 #define EVPING_LOCK(base)						\
 	do {								\
@@ -297,6 +278,7 @@ static void fmticmp4(u_char *buffer, unsigned size, u_int8_t seq,
 	data->index = idx;                     /* index into an array */
 
 	/* Last, compute ICMP checksum */
+	icmp->icmp_cksum = 0;
 	icmp->icmp_cksum = mkcksum((u_short *) icmp, size);  /* ones complement checksum of struct */
 }
 
@@ -340,48 +322,60 @@ static void fmticmp6(u_char *buffer, unsigned size,
 
 
 /* Attempt to transmit an ICMP Echo Request to a given host */
-static void ping_callback(int __attribute((unused)) unused,
-	const short __attribute((unused)) event, void *h)
+static void ping_xmit(struct evping_host *host)
 {
-	struct evping_host *host = h;
 	struct evping_base *base = host->base;
 
-	u_char packet [MAX_DATA_SIZE] = "";
 	int nsent;
 
-	/* Clean the no reply timer (if any was previously set) */
-	evtimer_del(&host->noreply_timer);
+printf("ping_xmit\n");
 
+	host->got_reply= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
 		if (host->user_callback)
 		{
 		    host->user_callback(PING_ERR_DONE, base->pktsize,
-			host->ipname, 0, 0, NULL,
+			(struct sockaddr *)&host->sin6, host->socklen,
+			0, 0, NULL,
 			host->user_pointer);
 		}
+
+		/* Fake packet sent to kill timer */
+	    	host->sentpkts++;
+
 		return;
 	}
 
 	/* Transmit the request over the network */
-	if (host->lsa->u.sa.sa_family == AF_INET6)
+	if (host->sin6.sin6_family == AF_INET6)
 	{
 		/* Format the ICMP Echo Reply packet to send */
-		fmticmp6(packet, base->pktsize, host->seq, host->index,
+		fmticmp6(base->packet, base->pktsize, host->seq, host->index,
 			base->pid);
 
-		nsent = sendto(base->rawfd6, packet, base->pktsize,
-			MSG_DONTWAIT, &host->lsa->u.sa, host->lsa->len);
+		nsent = sendto(base->rawfd6, base->packet, base->pktsize,
+			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
+			host->socklen);
 	}
 	else
 	{
 		/* Format the ICMP Echo Reply packet to send */
-		fmticmp4(packet, base->pktsize, host->seq, host->index,
+		fmticmp4(base->packet, base->pktsize, host->seq, host->index,
 			base->pid);
 
-		nsent = sendto(base->rawfd4, packet, base->pktsize,
-			MSG_DONTWAIT, &host->lsa->u.sa, host->lsa->len);
+#if 0
+		{ int i;
+			printf("sending:");
+			for (i= 0; i<base->pktsize; i++)
+				printf(" %02x", base->packet[i]);
+			printf("\n");
+		}
+#endif
+		nsent = sendto(base->rawfd4, base->packet, base->pktsize,
+			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
+			host->socklen);
 	}
 
 	if (nsent == base->pktsize)
@@ -389,19 +383,9 @@ static void ping_callback(int __attribute((unused)) unused,
 	    /* One more ICMP Echo Request sent */
 	    base->sentok++;
 
-	    if (!host->sentpkts && !base->quiet)
-	      printf("PING (%s) %d(%d) bytes of data.\n", host->ipname,
-		     base->pktsize - ICMP_MINLEN, nsent + IPHDR);
-
 	    /* Update timestamps and counters */
-	    if (!host->sentpkts)
-	      gettimeofday(&host->firstsent, NULL);
-	    gettimeofday (&host->lastsent, NULL);
 	    host->sentpkts++;
-	    host->sentbytes += nsent;
 
-	    /* Add the timer to handle no reply condition in the given timeout */
-	    evtimer_add(&host->noreply_timer, &base->tv_noreply);
 	  }
 	else
 	  base->sendfail++;
@@ -413,17 +397,24 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 {
 	struct evping_host *host = h;
 
-	host->dropped++;
+	if (!host->got_reply && host->user_callback)
+	{
+		host->user_callback(PING_ERR_TIMEOUT, -1,
+			(struct sockaddr *)&host->sin6, host->socklen,
+			host->seq, -1, &host->base->tv_interval,
+			host->user_pointer);
 
-	/* Add the timer to ping again the host at the given time interval */
-	evtimer_add(&host->ping_timer, &host->base->tv_interval);
+		/* Update the sequence number for the next run */
+		host->seq = (host->seq + 1) % 256;
+	}
 
-	if (host->user_callback)
-	  host->user_callback(PING_ERR_TIMEOUT, -1, host->ipname,
-			      host->seq, -1, &host->base->tv_noreply, host->user_pointer);
+	ping_xmit(host);
 
-	/* Update the sequence number for the next run */
-	host->seq = (host->seq + 1) % 256;
+	if (host->sentpkts <= host->maxpkts)
+	{
+printf("noreply_callback: adding timer\n");
+		evtimer_add(&host->ping_timer, &host->base->tv_interval);
+	}
 }
 
 
@@ -444,14 +435,13 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	struct evping_base *base = arg;
 
 	int nrecv, isDup;
-	u_char packet[MAX_DATA_SIZE];
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
 
 	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
-	struct ip * ip = (struct ip *) packet;
+	struct ip * ip = (struct ip *) base->packet;
 	struct icmphdr * icmp;
-	struct evdata * data = (struct evdata *) (packet + IPHDR + ICMP_MINLEN);
+	struct evdata * data = (struct evdata *) (base->packet + IPHDR + ICMP_MINLEN);
 	int hlen = 0;
 
 	struct timeval now;
@@ -462,8 +452,9 @@ static void ready_callback4 (int __attribute((unused)) unused,
 
 	EVPING_LOCK(base);
 
+// printf("ready_callback4: before recvfrom\n");
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd4, packet, sizeof(packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(base->rawfd4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	  {
 	    /* One more failure */
@@ -471,6 +462,15 @@ static void ready_callback4 (int __attribute((unused)) unused,
 
 	    goto done;
 	  }
+
+#if 0
+		{ int i;
+			printf("received:");
+			for (i= 0; i<nrecv; i++)
+				printf(" %02x", base->packet[i]);
+			printf("\n");
+		}
+#endif
 
 	/* One more ICMP packect received */
 	base->recvok++;
@@ -482,17 +482,23 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	if (nrecv < hlen + ICMP_MINLEN || ip->ip_hl < 5)
 	  {
 	    /* One more too short packet */
+printf("ready_callback4: too short\n");
 	    base->tooshort++;
 
 	    goto done;
 	  }
 
 	/* The ICMP portion */
-	icmp = (struct icmphdr *) (packet + hlen);
+	icmp = (struct icmphdr *) (base->packet + hlen);
 
 	/* Check the ICMP header to drop unexpected packets due to unrecognized id */
 	if (icmp->un.echo.id != base->pid)
 	  {
+#if 0
+		printf("ready_callback4: bad pid: got %d, expect %d\n",
+			icmp->un.echo.id, base->pid);
+#endif
+
 	    /* One more foreign packet */
 	    base->foreign++;
 
@@ -502,6 +508,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* Check the ICMP payload for legal values of the 'index' portion */
 	if (base->argc < data->index)
 	  {
+printf("ready_callback4: illegal\n");
 	    /* One more illegal packet */
 	    base->illegal++;
 
@@ -521,19 +528,8 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	    /* Compute time difference to calculate the round trip */
 	    evutil_timersub (&now, &data->ts, &elapsed);
 
-	    /* Update timestamps */
-	    if (!host->recvpkts)
-	      gettimeofday (&host->firstrecv, NULL);
-	    gettimeofday (&host->lastrecv, NULL);
-	    host->recvpkts++;
-	    host->recvbytes += nrecv;
-
 	    /* Update counters */
 	    usecs = tvtousecs(&elapsed);
-	    host->shortest = MIN(host->shortest, usecs);
-	    host->longest = MAX(host->longest, usecs);
-	    host->sum += usecs;
-	    host->square += (usecs * usecs);
 
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
@@ -543,7 +539,8 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	    if (host->user_callback)
 	    {
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - IPHDR, host->ipname,
+		    nrecv - IPHDR,
+		    (struct sockaddr *)&host->sin6, host->socklen,
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
 		    host->user_pointer);
 	    }
@@ -551,15 +548,15 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	    /* Update the sequence number for the next run */
 	    host->seq = (host->seq + 1) % 256;
 
-	    /* Clean the noreply timer */
-	    evtimer_del(&host->noreply_timer);
-
-	    /* Add the timer to ping again the host at the given time interval */
-	    evtimer_add(&host->ping_timer, &host->base->tv_interval);
+            if (!isDup)
+		host->got_reply= 1;
 	  }
 	else
+	{
+printf("ready_callback4: not an echo reply\n");
 	  /* Handle this condition exactly as the request has expired */
 	  noreply_callback (-1, -1, host);
+	}
 
 done:
 	EVPING_UNLOCK(base);
@@ -582,13 +579,12 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	struct evping_base *base = arg;
 
 	int nrecv, isDup;
-	u_char packet[MAX_DATA_SIZE];
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
 
 	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
-	struct icmp6_hdr * icmp = (struct icmp6_hdr *) packet;
-	struct evdata * data = (struct evdata *) (packet +
+	struct icmp6_hdr * icmp = (struct icmp6_hdr *) base->packet;
+	struct evdata * data = (struct evdata *) (base->packet +
 		offsetof(struct icmp6_hdr, icmp6_data16[2]));
 
 	struct timeval now;
@@ -600,7 +596,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	EVPING_LOCK(base);
 
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd6, packet, sizeof(packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(base->rawfd6, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	  {
 	    /* One more failure */
@@ -645,19 +641,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    /* Compute time difference to calculate the round trip */
 	    evutil_timersub (&now, &data->ts, &elapsed);
 
-	    /* Update timestamps */
-	    if (!host->recvpkts)
-	      gettimeofday (&host->firstrecv, NULL);
-	    gettimeofday (&host->lastrecv, NULL);
-	    host->recvpkts++;
-	    host->recvbytes += nrecv;
-
 	    /* Update counters */
 	    usecs = tvtousecs(&elapsed);
-	    host->shortest = MIN(host->shortest, usecs);
-	    host->longest = MAX(host->longest, usecs);
-	    host->sum += usecs;
-	    host->square += (usecs * usecs);
 
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
@@ -667,7 +652,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    if (host->user_callback)
 	    {
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - IPHDR, host->ipname,
+		    nrecv - IPHDR,\
+		    (struct sockaddr *)&host->sin6, host->socklen,
 		    ntohs(icmp->icmp6_seq), -1, &elapsed,
 		    host->user_pointer);
 	    }
@@ -675,11 +661,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    /* Update the sequence number for the next run */
 	    host->seq = (host->seq + 1) % 256;
 
-	    /* Clean the noreply timer */
-	    evtimer_del(&host->noreply_timer);
-
-	    /* Add the timer to ping again the host at the given time interval */
-	    evtimer_add(&host->ping_timer, &host->base->tv_interval);
+	    if (!isDup)
+		host->got_reply= 1;
 	  }
 	else
 	  /* Handle this condition exactly as the request has expired */
@@ -748,9 +731,6 @@ evping_base_new(struct event_base *event_base)
 	base->pktsize = DEFAULT_PKT_SIZE;
 	base->pid = getpid();
 
-	base->quiet= 1;
-
-	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &base->tv_noreply);
 	msecstotv(DEFAULT_PING_INTERVAL, &base->tv_interval);
 
 	/* Define the callback to handle ICMP Echo Reply and add the raw file descriptor to those monitored for read events */
@@ -776,7 +756,7 @@ evping_base_free(struct evping_base *base,
 	EVPING_UNLOCK(base);
 	EVTHREAD_FREE_LOCK(base->lock, EVTHREAD_LOCKTYPE_RECURSIVE);
 
-	mm_free(base);
+	free(base);
 }
 
 
@@ -787,13 +767,18 @@ evping_base_host_add(struct evping_base *base, const char * name)
 	struct evping_host *host;
 	len_and_sockaddr *lsa;
 	sa_family_t af;
-	char namebuf[NI_MAXHOST];
 
 	/* Attempt to resolv 'name' */
 	af= AF_UNSPEC;
 	lsa= host_and_af2sockaddr(name, 0, af);
 	if (!lsa)
 		return NULL;
+
+	if (lsa->len > sizeof(host->sin6))
+	{
+		free(lsa);
+		return NULL;
+	}
 
 	host = malloc(sizeof(*host));
 	if (!host) return NULL;
@@ -802,21 +787,18 @@ evping_base_host_add(struct evping_base *base, const char * name)
 
 	EVPING_LOCK(base);
 
-	host->lsa= lsa;
-	host->base = base;
-	host->name = strdup(name);
+	memcpy(&host->sin6, &lsa->u.sa, lsa->len);
+	host->socklen= lsa->len;
+	free(lsa); lsa= NULL;
 
-	getnameinfo(&host->lsa->u.sa, host->lsa->len,
-		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
-	host->ipname = strdup(namebuf);
+	host->base = base;
 
 	host->index = base->argc;
 	host->seq = 1;
-	host->shortest = MAXINT;
 
 	/* Define here the callbacks to ping the host and to handle no reply timeouts */
-	evtimer_assign(&host->ping_timer, base->event_base, ping_callback, host);
-	evtimer_assign(&host->noreply_timer, base->event_base, noreply_callback, host);
+	evtimer_assign(&host->ping_timer, base->event_base,
+		noreply_callback, host);
 
 	/* insert this nameserver into the list of them */
 	if (!base->host_head) {
@@ -828,6 +810,7 @@ evping_base_host_add(struct evping_base *base, const char * name)
 	  host->prev = base->host_head;
 	  base->host_head->next = host;
 	  
+#if 0
 	  { struct evping_host *h;
 		printf("evping_base_host_add: after insert, forward:");
 		for (h= base->host_head; h; h= h->next)
@@ -847,6 +830,7 @@ evping_base_host_add(struct evping_base *base, const char * name)
 		}
 		printf("\n");
 	}
+#endif
 	}
 
 	base->argc++;
@@ -888,14 +872,7 @@ evping_delete(struct evping_host *host)
 	}
 	printf("\n");
 
-	evtimer_del(&host->noreply_timer);
 	evtimer_del(&host->ping_timer);
-	free(host->name);
-	host->name= NULL;
-	free(host->ipname);
-	host->ipname= NULL;
-	free(host->lsa);
-	host->lsa= NULL;
 	if (host->next == host)
 	{
 		/* Only element in list */
@@ -934,13 +911,14 @@ evping_delete(struct evping_host *host)
 void
 evping_start(struct evping_host *host, int count)
 {
-	struct timeval asap = { 0, 0 };
-
 	host->maxpkts= count;
 	host->sentpkts= 0;
 
-	/* Schedule to immediately ping this host */
-	evtimer_add(&host->ping_timer, &asap);
+	ping_xmit(host);
+
+	/* Add the timer to handle no reply condition in the given timeout */
+printf("evping_start: adding timer\n");
+	evtimer_add(&host->ping_timer, &host->base->tv_interval);
 }
 
 
@@ -964,45 +942,6 @@ done:
 	return n;
 }
 
-
-/* exported function */
-void
-evping_stats(struct evping_base *base)
-{
-	struct evping_host *host;
-
-	EVPING_LOCK(base);
-	host = base->host_head;
-	if (!host)
-		goto done;
-	do {
-	  	printf("--- %s ping statistics ---\n"
-		       "%lld packets transmitted, %lld received, %.2f%% packet loss, time %.1fms\n",
-		       host->ipname, (long long)host->sentpkts,
-		       (long long)host->recvpkts,
-		       100.0 * (host->sentpkts - host->recvpkts) / ((double) host->sentpkts),
-		       host->sum / 1000.0);
-
-		if (host->recvpkts)
-		  {
-		    double average = host->sum / host->recvpkts;
-		    double deviation = sqrt(((host->recvpkts * host->square) -
-					     (host->sum * host->sum)) / (host->recvpkts * (host->recvpkts - 1.0)));
-
-		    printf ("rtt min/avg/max/sdev = %.3f/%.3f/%.3f/%.3f ms\n\n",
-			    host->shortest / 1000.0,
-			    average / 1000.0,
-			    host->longest / 1000.0,
-			    deviation / 1000.0);
-		  }
-		else
-		  printf ("\n");
-
-		host = host->next;
-	} while (host != base->host_head);
-done:
-	EVPING_UNLOCK(base);
-}
 
 
 /* exported function */

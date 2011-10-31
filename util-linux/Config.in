@@ -71,9 +71,7 @@ config FEATURE_FBSET_READMODE
 	default n
 	depends on FBSET
 	help
-	  This option allows fbset to read the video mode database stored by
-	  default as /etc/fb.modes, which can be used to set frame buffer
-	  device to pre-defined video modes.
+	  This option allows fbset to read the video mode database stored by default as /etc/fb.modes, which can be used to set frame buffer device to pre-defined video modes.
 
 config FDFLUSH
 	bool "fdflush"

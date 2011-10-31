@@ -27,16 +27,19 @@ struct pingstate
 	int duppkts;
 };
 
-static void ping_cb(int result, int bytes, char * dotname, int seq, int ttl, struct timeval * elapsed, void * arg)
+static void ping_cb(int result, int bytes,
+	struct sockaddr *sa, socklen_t socklen,
+	int seq, int ttl, struct timeval * elapsed, void * arg)
 {
 	struct pingstate *pingstate;
 	unsigned long usecs;
 	FILE *fh;
+	char namebuf[NI_MAXHOST];
 
 	pingstate= arg;
 
-	crondlog(LVL7 "in ping_cb: result %d, bytes %d, dotname %s, seq %d, ttl %d",
-		result, bytes, dotname, seq, ttl);
+	crondlog(LVL7 "in ping_cb: result %d, bytes %d, seq %d, ttl %d",
+		result, bytes, seq, ttl);
 
 	if (result == PING_ERR_NONE)
 	{
@@ -72,9 +75,12 @@ static void ping_cb(int result, int bytes, char * dotname, int seq, int ttl, str
 		else
 			fh= stdout;
 
+		getnameinfo(sa, socklen, namebuf, sizeof(namebuf),
+			NULL, 0, NI_NUMERICHOST);
+
 		fprintf(fh, "%s %d %s %s %d %d %d %d",
 			pingstate->atlas, (int)time(NULL),
-			pingstate->hostname, dotname, bytes,
+			pingstate->hostname, namebuf, bytes,
 			pingstate->sentpkts, 
 			pingstate->rcvdpkts, pingstate->duppkts);
 		if (pingstate->rcvdpkts)
@@ -124,7 +130,8 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[])
 	pingevent= evping_base_host_add(ping_base, hostname);
 	if (!pingevent)
 	{
-		crondlog(DIE9 "evping_base_host_add failed");
+		crondlog(LVL9 "evping_base_host_add failed");
+		return NULL;
 	}
 	state= xzalloc(sizeof(*state));
 	state->pingevent= pingevent;

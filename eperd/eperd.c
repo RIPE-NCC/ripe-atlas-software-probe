@@ -16,6 +16,7 @@
 #include "libbb.h"
 #include <syslog.h>
 #include <event2/event.h>
+#include <event2/event_struct.h>
 
 #include "eperd.h"
 
@@ -65,7 +66,7 @@ struct CronLine {
 	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
 	int distr_param;	/* Parameter for distribution, if any */
 	int distr_offset;	/* Current offset to randomize the interval */
-	struct event *event;
+	struct event event;
 	struct testops *testops;
 	void *teststate;
 
@@ -280,7 +281,6 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	if (!updateEventHour)
 		crondlog(DIE9 "event_new failed"); /* exits */
 	tv.tv_sec= 3600;
-	tv.tv_sec= 60;
 	tv.tv_usec= 0;
 	event_add(updateEventHour, &tv);
 		
@@ -493,7 +493,8 @@ static void SynchronizeFile(const char *fileName)
 				crondlog(LVL5 " command:%s", tokens[5]);
 			}
 //bb_error_msg("M[%s]F[%s][%s][%s][%s][%s][%s]", mailTo, tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]);
-			line->event= NULL;
+
+			evtimer_assign(&line->event, EventBase, RunJob, line);
 
 			r= Insert(line);
 			if (!r)
@@ -555,31 +556,14 @@ static void SynchronizeDir(void)
 	 * Re-chdir, in case directory was renamed & deleted, or otherwise
 	 * screwed up.
 	 *
-	 * scan directory and add associated users
+	 * Only load th crontab for 'root'
 	 */
 	unlink(CRONUPDATE);
 	if (chdir(CDir) < 0) {
 		crondlog(DIE9 "can't chdir(%s)", CDir);
 	}
-	{
-		DIR *dir = opendir(".");
-		struct dirent *den;
 
-		if (!dir)
-			crondlog(DIE9 "can't chdir(%s)", "."); /* exits */
-		while ((den = readdir(dir)) != NULL) {
-			if (strchr(den->d_name, '.') != NULL) {
-				continue;
-			}
-			if (getpwnam(den->d_name)) {
-				SynchronizeFile(den->d_name);
-			} else {
-				crondlog(LVL7 "ignoring %s", den->d_name);
-			}
-		}
-		closedir(dir);
-	}
-
+	SynchronizeFile("root");
 	DeleteFile();
 }
 
@@ -654,16 +638,12 @@ static void Start(CronLine *line)
 	line->nextcycle= (now-line->start_time)/line->interval + 1;
 	do_distr(line);
 
-	line->event= event_new(EventBase, -1, EV_TIMEOUT, RunJob,
-		line);
-	if (!line->event)
-		crondlog(DIE9 "event_new failed"); /* exits */
 	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
 		line->distr_offset - now;
 	if (tv.tv_sec < 0)
 		tv.tv_sec= 0;
 	tv.tv_usec= 0;
-	event_add(line->event, &tv);
+	event_add(&line->event, &tv);
 }
 
 /*
@@ -699,8 +679,7 @@ static void DeleteFile(void)
 			line->testops= NULL;
 			line->teststate= NULL;
 		}
-		event_free(line->event);
-		line->event= NULL;
+		event_del(&line->event);
 		free(line->cl_Shell);
 		line->cl_Shell= NULL;
 
@@ -1040,7 +1019,7 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	if (tv.tv_sec < 0)
 		tv.tv_sec= 0;
 	tv.tv_usec= 0;
-	event_add(line->event, &tv);
+	event_add(&line->event, &tv);
 }
 #else
 static void RunJob(const char *user, CronLine *line)

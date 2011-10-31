@@ -50,14 +50,16 @@ extern "C" {
  * The callback that contains the results from an ICMP Echo Request.
  * - result is either one of the error codes previuosly defined
  * - bytes is is either the number of bytes returned in the Echo Reply or -1 in the event of error
- * - dotname contains the hostname in dot notation
+ * - sa contains to remote IP address
+ * - socklen is the length if sa
  * - seq is sequence number
  * - ttl is IP time to live
  * - elapsed is a timeval holding the time spent in the request
  * - arg is the user data passed at the time the activity has been started
  */
 typedef void (*evping_callback_type) (int result, int bytes,
-	char *dotname, int seq, int ttl, struct timeval * elapsed, void * arg);
+	struct sockaddr *sa, socklen_t socklen, int seq, int ttl,
+	struct timeval * elapsed, void * arg);
 
 
 struct evping_base;
@@ -138,14 +140,6 @@ void evping_delete(struct evping_host *host);
   @see evping_base_hosts_add()
  */
 int evping_base_count_hosts(struct evping_base *base);
-
-
-/**
-  Send ICMP ECHO_REQUEST to network hosts.
-
-  @param base the evping_base to which to apply this operation
- */
-void evping_stats(struct evping_base *base);
 
 
 /**
