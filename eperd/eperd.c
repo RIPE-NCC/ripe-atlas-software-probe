@@ -716,6 +716,7 @@ static struct builtin
 } builtin_cmds[]=
 {
 	{ "ping", &ping_ops },
+	{ "traceroute", &traceroute_ops },
 	{ "condmv", &condmv_ops },
 	{ NULL, NULL }
 };
