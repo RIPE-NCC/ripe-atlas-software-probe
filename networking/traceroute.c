@@ -247,6 +247,14 @@
 #include "libbb.h"
 #include "inet_common.h"
 
+#if !STANDALONE_BUSYBOX
+#define uh_sport source
+#define uh_dport dest
+#define uh_ulen len
+#define uh_sum check
+#endif
+
+
 #ifndef IPPROTO_ICMP
 # define IPPROTO_ICMP 1
 #endif
