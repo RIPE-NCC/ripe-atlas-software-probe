@@ -38,6 +38,7 @@ struct testops
 };
 
 extern struct testops ping_ops;
+extern struct testops tdig_ops;
 extern struct testops traceroute_ops;
 extern struct testops condmv_ops;
 
