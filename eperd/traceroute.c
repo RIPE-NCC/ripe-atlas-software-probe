@@ -1825,7 +1825,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
 	maxhops= 32;
 	maxpacksize= 40;
 	duptimeout= 10;
-	parismod= 0;
+	timeout= 1000;
+	parismod= 16;
 	out_filename= NULL;
 	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+";
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
