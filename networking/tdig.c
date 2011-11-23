@@ -31,6 +31,7 @@ Also DNSMN GPL version, RIPE NCC
 #define T_DNSKEY ns_t_dnskey  
 #endif 
 
+static int tcp_fd = -1;
 u_int32_t get32b(char *p);  
 
 void ldns_write_uint16(void *dst, uint16_t data);
@@ -154,7 +155,6 @@ int tdig_main(int argc, char **argv)
 	struct sigaction sa;
 	unsigned long long  tSend_us, tRecv_us, tTrip_us;
 	int opt_tcp = 0;
-	int tcp_fd = 0;
 	int result = 0;
 	FILE *tcp_file;
 	uint8_t wire[1300]; 
@@ -309,7 +309,7 @@ int tdig_main(int argc, char **argv)
 				{
 					report("timeout");
 					//kick_watchdog();
-					sleep(10);
+					return 0;
 				}
 				else
 				{
@@ -345,7 +345,6 @@ int tdig_main(int argc, char **argv)
 				}
 			} 
 			fclose(tcp_file);
-			
 		}
 	}
 	else 
@@ -415,6 +414,8 @@ int tdig_main(int argc, char **argv)
 	alarm(0);
 
 leave:
+	if (tcp_file) fclose(tcp_file);
+        if (tcp_fd != -1) close(tcp_fd);
 	return (result);
 
 err:
@@ -426,7 +427,9 @@ err:
 
 static void got_alarm(int sig)
 {
-	fprintf(stderr, "got alarm, setting alarm again\n");
+	fprintf(stderr, "got an alarm, setting alarm again\n");
+	if (tcp_fd != -1)
+                fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);
 	alarm(1);
 }
 
