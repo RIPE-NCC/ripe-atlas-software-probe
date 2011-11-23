@@ -62,9 +62,6 @@
  * default data size is calculated as to be like the original
  */
 #define IPHDR              20
-#define MIN_DATA_SIZE      sizeof(struct evdata)
-#define DEFAULT_DATA_SIZE  (MIN_DATA_SIZE + 44)          
-#define DEFAULT_PKT_SIZE   ICMP_MINLEN + DEFAULT_DATA_SIZE
 #define MAX_DNS_BUF_SIZE   2048
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
@@ -79,25 +76,18 @@
 #define T_DNSKEY ns_t_dnskey
 #endif
 
+//static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
 static void ChangetoDnsNameFormat(u_char * dns,unsigned char* qry) ;
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
 
 /* Definition for various types of counters */
 typedef uint64_t counter_t;
 
-
-struct evdata {
-	struct timeval ts;
-	uint32_t index;
-};
-
 /* How to keep track of a DNS query session */
 struct tdig_base {
 	struct event_base *event_base;
 
-	evutil_socket_t rawfd;	       /* Raw socket used to nsm hosts              */
-
-	uint32_t pktsize;              /* Packet size in bytes */
+	evutil_socket_t rawfd_v4;	       /* Raw socket used to nsm hosts              */
 
 	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
 	struct timeval tv_interval;    /* between two subsequent queries */
@@ -111,9 +101,10 @@ struct tdig_base {
 	counter_t sentok;              /* # of successful sendto()                   */
 	counter_t recvfail;            /* # of failed recvfrom()                     */
 	counter_t recvok;              /* # of successful recvfrom()                 */
-	counter_t tooshort;            /* # of ICMP packets too short (illegal ICMP) */
-	counter_t foreign;             /* # of ICMP packets we are not looking for   */
-	counter_t illegal;             /* # of ICMP packets with an illegal payload  */
+	counter_t foreign;             /* # of DNS replies we are not looking for   */
+	counter_t illegal;             /* # of DNS packets with an illegal payload  */
+	counter_t sentbytes; 
+	counter_t recvtbytes; 
 
 	u_char quiet;
 
@@ -122,26 +113,19 @@ struct tdig_base {
 	
         struct DNS_HEADER *dns;
 	struct EDNS0_HEADER *edns0;
-
-#ifndef _EVENT_DISABLE_THREAD_SUPPORT
-	void *lock;
-	int lock_count;
-#endif
-
 };
 
-
-static struct tdig_base *base;
+static struct tdig_base *tdig_base;
 
 /* How to keep track of each user query to send dns query */
 static struct query_state {
 
 	struct tdig_base *base;
-	char * name;                 /* Host identifier as given by the user */
+	char * name;                /* Host identifier as given by the user */
 	char * fqname;              /* Full qualified hostname          */ 
 	char * ipname;              /* Remote address in dot notation   */
 	int index;                  /* Index into the array of queries  */
-	u_int8_t seq;               /* query id 16 bit */
+	u_int16_t qryid;             /* query id 16 bit */
 
 	int opt_v4_only ;
 	int opt_v6_only ;
@@ -149,22 +133,26 @@ static struct query_state {
 	int opt_edns0;
 	int opt_dnssec;
 	
-	char * atlas_Str; 
+	char * str_Atlas; 
 	u_int16_t qtype;
 	u_int16_t qclass;
-
 	
 	unsigned char *lookupname;
 	char * server_ip_str;
+	char *out_filename ;
 
+	uint32_t pktsize;              /* Packet size in bytes */
 	struct addrinfo *res, *ressave;
+	
+	struct sockaddr_in remote;     /* store the reply packet src address      */
 
-	struct event noreply_timer;    /* Timer to handle ICMP timeout            */
+
+	struct event noreply_timer;    /* Timer to handle timeout            */
 	struct event nsm_timer;        /* Timer to next query intervals   */
 
 	/* Packets Counters */
-	counter_t sentpkts;            /* Total # of ICMP Echo Requests sent      */
-	counter_t recvpkts;            /* Total # of ICMP Echo Replies received   */
+	counter_t sentpkts;            /* Total # of DNS queries sent      */
+	counter_t recvpkts;            /* Total # of DNS replies received   */
 	counter_t dropped;             /* # of unanswered queries 		  */
 
 	/* Bytes counters */
@@ -245,30 +233,6 @@ struct RES_RECORD
         unsigned char *rdata;
 };
 
-#ifdef _EVENT_DISABLE_THREAD_SUPPORT
-#define EVPING_LOCK(base)  _EVUTIL_NIL_STMT
-#define EVPING_UNLOCK(base) _EVUTIL_NIL_STMT
-#define ASSERT_LOCKED(base) _EVUTIL_NIL_STMT
-#else
-#define EVPING_LOCK(base)						\
-	do {								\
-		if ((base)->lock) {					\
-			EVLOCK_LOCK((base)->lock, EVTHREAD_WRITE);	\
-		}							\
-		++(base)->lock_count;					\
-	} while (0)
-#define EVPING_UNLOCK(base)						\
-	do {								\
-		assert((base)->lock_count > 0);				\
-		--(base)->lock_count;					\
-		if ((base)->lock) {					\
-			EVLOCK_UNLOCK((base)->lock, EVTHREAD_WRITE);	\
-		}							\
-	} while (0)
-#define ASSERT_LOCKED(base) assert((base)->lock_count > 0)
-#endif
-
-
 static struct option longopts[]=
 {
         { "hostname-bind", no_argument, NULL, 'h' },
@@ -276,13 +240,36 @@ static struct option longopts[]=
         { "version-bind", no_argument, NULL, 'b' },
         { "version.server", no_argument, NULL, 'r' },
         { "soa", required_argument, NULL, 's' },
+        { "out-file", required_argument, NULL, 'O' },
         { "edns0", required_argument, NULL, 'e' },
         { "dnssec", no_argument, NULL, 'd' },
         { "dnskey", required_argument, NULL, 'D' },
         { NULL, }
 };
 
+static void *tdig_init(int argc, char *argv[]);
+int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+int evtdig_main(int argc, char **argv) 
+{ 
+ EventBase=event_base_new();
+        if (!EventBase)
+        {
+                crondlog(DIE9 "event_base_new failed"); /* exits */
+        }
 
+
+ struct query_state *qry;
+ qry = tdig_init(argc, argv);
+ if (!qry)
+ {
+             crondlog(DIE9 "new query state failed"); /* exits */
+  }
+
+ tdig_start(qry);  
+ printf ("starting query\n");
+ event_base_dispatch (EventBase);
+ event_base_loopbreak (EventBase);
+}
 
 /* Initialize a struct timeval by converting milliseconds */
 static void
@@ -296,10 +283,11 @@ msecstotv(time_t msecs, struct timeval *tv)
 /* Lookup for a query by its index */
 static struct query*
 tdig_lookup_query( int index)
-{
+{ 
+/*
 	struct query_state *qry;
 
-	qry = base->qry_head;
+	qry = tdig_base->qry_head;
 	if (!qry)
 		goto done;
 	do {
@@ -309,59 +297,50 @@ tdig_lookup_query( int index)
 	} while (qry != base->qry_head);
 done:
 	return NULL;
+*/
 }
 
 
-static void fmt_dns_query(u_char *buf, unsigned size, uint32_t index)
+static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry)
 {
 	u_char *qname;
         struct QUESTION *qinfo = NULL;
         struct EDNS0_HEADER *e;
         int r;
-	unsigned char lookupname[32];
-	u_int16_t qtype;
- 	u_int16_t qclass;
+	uint32_t  size = 0;
 
 
-	/* Temp AA  */
-	strcpy(lookupname , "hostname.bind.");
-	qtype = T_TXT; /* TEXT */
-        qclass = C_CHAOS;
-	int opt_edns0 = 0;
-	
 	//point to the query portion
         qname =(u_char *)&buf[sizeof(struct DNS_HEADER)];
-	ChangetoDnsNameFormat(qname, lookupname); // fill the query portion.
-
-	
+	ChangetoDnsNameFormat(qname, qry->lookupname); // fill the query portion.
 
         qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; 
         size = (strlen((const char*)qname) + 1);
 
-        qinfo->qtype = htons(qtype);
-        qinfo->qclass = htons(qclass);
+        qinfo->qtype = htons(qry->qtype);
+        qinfo->qclass = htons(qry->qclass);
 	
 	e=(struct EDNS0_HEADER*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + sizeof(struct QUESTION) + 2 ) ]; //fill it
 
-        e->qtype = htons(ns_t_opt);
-        e->_edns_udp_size = htons(opt_edns0);
+        e->qtype = htons(qry->qtype);
+        e->_edns_udp_size = htons(qry->opt_edns0);
         //e->_edns_z = htons(128);
         //if(opt_dnssec  == 1)
         {
                 e->DO = 0x80;
         }
         e->len = htons(0);
-        return ;
+        return size ;
 }
 
-/* Attempt to transmit an ICMP Echo Request to a given qry */
+/* Attempt to transmit an DNS Request a given qry to a server*/
 static void tdig_send_query_callback(int unused, const short event, void *h)
 {
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
 
 	u_char packet [MAX_DNS_BUF_SIZE] ;
-	int nsent;
+	uint32_t nsent;
 
 	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
@@ -376,7 +355,8 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 	int r;
         r =  rand();
         r %= 65535;
-	dns->id = (unsigned short) r;
+	qry->qryid = (uint16_t) r;
+	dns->id = (uint16_t) r;
         dns->qr = 0; //This is a query
         dns->opcode = 0; //This is a standard query
         dns->aa = 0; //Not Authoritative
@@ -392,20 +372,21 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
         dns->auth_count = 0;
         dns->add_count = htons(0);
 
-	fmt_dns_query(packet, base->pktsize, qry->index);
-	base->pktsize += sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
+	qry->pktsize = fmt_dns_query(packet, qry);
+	qry->pktsize += sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
 	/* Transmit the request over the network */
 
-	nsent = sendto(base->rawfd, packet,base->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+	nsent = sendto(base->rawfd_v4, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 
-	if (nsent == base->pktsize)
+	if (nsent == qry->pktsize)
 	  {
 	    /* One more DNS Query is sent */
 	    base->sentok++;
+	    base->sentbytes+=nsent;
 
 	    if (!qry->sentpkts && !base->quiet)
 	      printf("PING %s (%s) %d(%d) bytes of data.\n", qry->fqname, qry->ipname,
-		     base->pktsize - ICMP_MINLEN, nsent + IPHDR);
+		     qry->pktsize, nsent);
 
 	    /* Update timestamps and counters */
 	    if (!qry->sentpkts)
@@ -421,7 +402,6 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 	  {
 	  	base->sendfail++;
 		 //perror("send");
-
 	  }
 }
 
@@ -443,7 +423,6 @@ static void noreply_callback(int unused, const short event, void *h)
 	*/
 
 	/* Update the sequence number for the next run */
-	qry->seq = (qry->seq + 1) % 256;
 }
 
 
@@ -453,9 +432,7 @@ static void noreply_callback(int unused, const short event, void *h)
  * It reads a packet from the wire and attempt to decode and relate DNS Request/Reply.
  *
  * To be legal the packet received must be:
- *  o of enough size (> IPHDR + ICMP_MINLEN)
- *  o of ICMP Protocol
- *  o of type ICMP_ECHOREPLY
+ *  o of enough size (> DNS Header size)
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 static void ready_callback (int unused, const short event, void * arg)
@@ -466,12 +443,7 @@ static void ready_callback (int unused, const short event, void * arg)
 	u_char packet[MAX_DNS_BUF_SIZE];
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
-
-	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
-	struct ip * ip = (struct ip *) packet;
-	struct icmphdr * icmp;
-	struct evdata * data = (struct evdata *) (packet + IPHDR + ICMP_MINLEN);
-	int hlen = 0;
+	bzero(packet, MAX_DNS_BUF_SIZE);
 
 	struct timeval now;
 	struct query_state * qry;
@@ -479,22 +451,25 @@ static void ready_callback (int unused, const short event, void * arg)
 	/* Time the packet has been received */
 	gettimeofday(&now, NULL);
 
-	EVPING_LOCK(base);
-
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd, packet, sizeof(packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(base->rawfd_v4, packet, sizeof(packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	{
 		/* One more failure */
 		base->recvfail++;
 		goto done;
-	}
+	} 
+	crondlog(LVL9 "recevied reply udp  %d bytes slen %d" , nrecv, slen );
+
+	printReply(packet, nrecv, 100, qry );
 
 	/* One more ICMP packect received */
 	base->recvok++; 
 
+//AA	
+	goto done;
 	/* Get the pointer to the qry descriptor in our internal table */
-	qry = tdig_lookup_query( data->index);
+	//qry = tdig_lookup_query( data->index);
 	if ( ! qry) 
 		goto done;
 
@@ -503,7 +478,7 @@ static void ready_callback (int unused, const short event, void * arg)
 	time_t usecs;
 
 	/* Compute time difference to calculate the round trip */
-	evutil_timersub (&now, &data->ts, &elapsed);
+	// evutil_timersub (&now, &data->ts, &elapsed);
 
 	/* Update timestamps */
 	if (!qry->recvpkts)
@@ -532,28 +507,38 @@ static void ready_callback (int unused, const short event, void * arg)
 	// noreply_callback (-1, -1, qry);
 
 done:
-	EVPING_UNLOCK(base);
-}
+  return;
+} 
 
-static void *tdig_init(int __attribute((unused)) argc, char *argv[])
+
+static void *tdig_init(int argc, char *argv[])
 {
-	char *str_Atlas;
         const char *hostname;
 	char *check;
-        char *out_filename;
         struct query_state *qry;
 	int c;
-	if(!base)
-		base = tdig_base_new(EventBase);
-	if(!base)
+
+
+	if(!tdig_base)
+		tdig_base = tdig_base_new(EventBase);
+
+	if(!tdig_base)
 		crondlog(DIE9 "tdig_base_new failed");
 
 	 qry=xzalloc(sizeof(*qry));
-
 	int opt_v4_only, opt_v6_only;
 	opt_v4_only =  opt_v6_only = 0;
+	
 
-        while (c= getopt_long(argc, argv, "46dD:e:tbhirs:A:?", longopts, NULL), c != -1)
+	bzero(qry, sizeof(*qry));
+	// initialize per query state variables;
+	qry->qtype = T_TXT; /* TEXT */
+        qry->qclass = C_CHAOS;
+	qry->opt_v4_only = 1; 
+	qry->opt_v6_only = 1; 
+
+	optind = 0;
+        while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
         {
                 switch(c)
                 {
@@ -564,7 +549,7 @@ static void *tdig_init(int __attribute((unused)) argc, char *argv[])
                                 qry->opt_v6_only = 1;
                                 break;
                         case 'A':
-                                qry->atlas_Str = strdup(optarg);
+                                qry->str_Atlas = strdup(optarg);
                                 break;
                         case 'b':
 				qry->lookupname  = strdup ("version.bind.");
@@ -592,6 +577,10 @@ static void *tdig_init(int __attribute((unused)) argc, char *argv[])
                         case 'i':
 				qry->lookupname = strdup("id.server.");
                                 break;
+
+			case 'O':
+				qry->out_filename = strdup(optarg);
+				break;
                         case 'r':
 				qry->lookupname = strdup("version.server.");
                                 break;
@@ -605,13 +594,16 @@ static void *tdig_init(int __attribute((unused)) argc, char *argv[])
                         break;
 
                         default:
-                                fprintf(stderr, "ERROR unknown option %d \n");
+                                fprintf(stderr, "ERROR unknown option 0%o ??\n", c); 
+				break;
                                 return (0);
                 }
         }
 	 if (optind != argc-1)
 		crondlog(DIE9 "exactly one server IP address expected");
+        //qry->server_ip_str = argv[optind];
         qry->server_ip_str = strdup(argv[optind]);
+	qry->base = tdig_base;
 
       return qry;
 }
@@ -623,12 +615,10 @@ tdig_base_new(struct event_base *event_base)
 {
 	struct protoent *proto;
 	evutil_socket_t fd;
-	struct tdig_base *base;
+	struct tdig_base *tdig_base;
 
-	 base= xzalloc(sizeof(*base));
-	 base->event_base= event_base;
+		struct addrinfo hints;
 
-	struct addrinfo hints;
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -636,46 +626,34 @@ tdig_base_new(struct event_base *event_base)
         hints.ai_socktype = SOCK_DGRAM;
         hints.ai_flags = 0;
 
-
 	/* Create an endpoint for communication using raw socket for ICMP calls */
 	if ((fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
 	{
 	  return NULL;
 	} 
 
-	base = mm_malloc(sizeof(struct tdig_base));
-	if (base == NULL)
+	tdig_base= xzalloc(sizeof( struct tdig_base));
+	if (tdig_base == NULL)
 		return (NULL);
-	memset(base, 0, sizeof(struct tdig_base));
 
-	EVTHREAD_ALLOC_LOCK(base->lock, EVTHREAD_LOCKTYPE_RECURSIVE);
-	EVPING_LOCK(base);
+	memset(tdig_base, 0, sizeof(struct tdig_base));
+	tdig_base->event_base = event_base;
 
-	base->event_base = event_base;
+	tdig_base->rawfd_v4 = fd;
+	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
 
-	base->rawfd = fd;
-	evutil_make_socket_nonblocking(base->rawfd);
+	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
+	msecstotv(DEFAULT_PING_INTERVAL, &tdig_base->tv_interval);
 
-	/* Set default values */
-	base->pktsize = DEFAULT_PKT_SIZE;
-	//base->pid = getpid();
+	/* Define the callback to handle UDP Reply and add the raw file descriptor to those monitored for read events */
+	event_assign(&tdig_base->event, tdig_base->event_base, tdig_base->rawfd_v4, EV_READ | EV_PERSIST, ready_callback, tdig_base);
+	event_add(&tdig_base->event, NULL);
 
-	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &base->tv_noreply);
-	msecstotv(DEFAULT_PING_INTERVAL, &base->tv_interval);
-
-	/* Define the callback to handle ICMP Echo Reply and add the raw file descriptor to those monitored for read events */
-	event_add(&base->event, NULL);
-
-	EVPING_UNLOCK(base);
-	return base;
+	return tdig_base;
 }
 
 void tdig_base_free(struct tdig_base *base, int fail_requests)
 {
-	EVPING_LOCK(base);
-
-	EVPING_UNLOCK(base);
-	EVTHREAD_FREE_LOCK(base->lock, EVTHREAD_LOCKTYPE_RECURSIVE);
 
 	mm_free(base);
 }
@@ -683,6 +661,7 @@ void tdig_base_free(struct tdig_base *base, int fail_requests)
 void tdig_start (struct query_state *qry)
 {
 	struct querystent *h;
+	struct timeval asap = { 0, 0 };
 
 	int err_num;
 	struct addrinfo hints, *res;
@@ -701,36 +680,28 @@ void tdig_start (struct query_state *qry)
 		return -1;
 	}
 
-	qry = (struct query_state *) mm_malloc(sizeof(struct query_state));
-	if (!qry) return -1;
-
-	memset(qry, 0, sizeof(struct query_state));
-
-	EVPING_LOCK(base);
-
 	qry->res = res;
 	qry->ressave = res;
 
-	//AA  qry->index = base->argc;  //aa index needs replacing
-	qry->seq = 1;
-
-	/* Define here the callbacks to nsm  the query and to handle no reply timeouts */
-	evtimer_assign(&qry->nsm_timer, base->event_base, tdig_send_query_callback, qry);
-	evtimer_assign(&qry->noreply_timer, base->event_base, noreply_callback, qry);
-
 	/* insert this nameserver into the list of them */
-	if (!base->qry_head) {
+	if (!tdig_base->qry_head) {
 	  qry->next = qry->prev = qry;
-	  base->qry_head = qry;
+	  tdig_base->qry_head = qry;
 	} else {
-	  qry->next = base->qry_head->next;
-	  qry->prev = base->qry_head;
-	  base->qry_head->next = qry;
-	  if (base->qry_head->prev == base->qry_head) {
-	    base->qry_head->prev = qry;
+	  qry->next = tdig_base->qry_head->next;
+	  qry->prev = tdig_base->qry_head;
+	  tdig_base->qry_head->next = qry;
+	  if (tdig_base->qry_head->prev == tdig_base->qry_head) {
+	    tdig_base->qry_head->prev = qry;
 	  }
 	}
-	EVPING_UNLOCK(base);
+	/* Define here the callbacks to nsm  the query and to handle no reply timeouts */
+	evtimer_assign(&qry->nsm_timer, tdig_base->event_base, tdig_send_query_callback, qry);
+	evtimer_assign(&qry->noreply_timer, tdig_base->event_base, noreply_callback, qry); 
+
+ 	evtimer_add(&qry->nsm_timer, &asap);
+
+
 	return 0;
 }
 
@@ -742,7 +713,6 @@ int tdig_base_count_queries(struct tdig_base *base)
 	const struct query_state *qry;
 	int n = 0;
 
-	EVPING_LOCK(base);
 	qry = base->qry_head;
 	if (!qry)
 		goto done;
@@ -751,7 +721,6 @@ int tdig_base_count_queries(struct tdig_base *base)
 		qry = qry->next;
 	} while (qry != base->qry_head);
 done:
-	EVPING_UNLOCK(base);
 	return n;
 }
 
@@ -816,6 +785,10 @@ static int tdig_delete(void *state)
 
         qry= state;
 
+	if(qry->out_filename)
+		free(qry->out_filename);
+	if(qry->lookupname) 
+		free(qry->lookupname);
 /*
         free(trtstate->atlas);
         trtstate->atlas= NULL;
@@ -827,7 +800,108 @@ static int tdig_delete(void *state)
 */
         free(qry);
 
-        return qry;
+        return 1;
+} 
+
+void printReply(unsigned char *result, int wire_size, unsigned long long tTrip_us, struct query_state *qry ) 
+{
+	int i, stop=0;
+	unsigned char *qname, *reader;
+	struct DNS_HEADER *dnsR = NULL;
+	struct RES_RECORD answers[20]; //the replies from the DNS server
+
+	dnsR = (struct DNS_HEADER*) result;
+
+	//point to the query portion
+	qname =(unsigned char*)&result[sizeof(struct DNS_HEADER)];
+
+	//move ahead of the dns header and the query field
+	reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
+
+	/*
+	printf(" : questions  %d  ",ntohs(dnsR->q_count));
+	printf(" : answers %d ",ntohs(dnsR->ans_count));
+	printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
+	printf(" : additional records %d",ntohs(dnsR->add_count));
+	*/
+
+	stop=0;
+
+	printf ("%u.%03u 1 100 ", tTrip_us / 1000 , tTrip_us % 1000);
+	if(dnsR->ans_count == 0) 
+	{
+		printf ("0 %d %u UNKNOWN UNKNOWN", dnsR->tc, wire_size);
+	}
+	else 
+	{
+		printf (" %d ", ntohs(dnsR->ans_count));	
+		printf (" %d ",  dnsR->tc);
+		printf (" %u ",  wire_size);
+	}
+
+	for(i=0;i<ntohs(dnsR->ans_count);i++)
+	{
+		answers[i].name=ReadName(reader,result,&stop);
+		reader = reader + stop;
+
+		answers[i].resource = (struct R_DATA*)(reader);
+		reader = reader + sizeof(struct R_DATA);
+	}
+
+	//print answers
+	for(i=0;i<ntohs(dnsR->ans_count);i++)
+	{
+		answers[i].rdata  = NULL;
+
+		if(ntohs(answers[i].resource->type)==T_TXT) //txt
+		{
+			printf(" TXT ", ntohs(answers[i].resource->data_len));
+			printf(" %s ",answers[i].name);
+			answers[i].rdata = ReadName(reader,result,&stop);
+			reader = reader + stop;
+
+			answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
+			printf(" %s", answers[i].rdata);
+		}
+		else if (ntohs(answers[i].resource->type)== T_SOA)
+		{
+			printf("SOA ");
+			printf(" %s ",answers[i].name);
+			answers[i].rdata = ReadName(reader,result,&stop);
+			//printf(" %s", answers[i].rdata);
+			reader =  reader + stop;
+			free(answers[i].rdata);
+			answers[i].rdata = ReadName(reader,result,&stop);
+			//printf(" %s", answers[i].rdata);
+		        reader =  reader + stop;
+			u_int32_t serial;
+			serial = get32b(reader);
+			printf(" %u ", serial);
+		        reader =  reader + 4;
+		}
+		else if (ntohs(answers[i].resource->type)== T_DNSKEY)
+		{
+			
+			printf("DNSKEY ");
+		}
+		else  
+		{
+
+			printf("DISCARDED-%u ", ntohs(answers[i].resource->type));
+		}
+		fflush(stdout);
+		
+		// free mem 
+		if(answers[i].rdata != NULL) 
+			free (answers[i].rdata); 
+	}
+
+	for(i=0;i<ntohs(dnsR->ans_count);i++)
+	{
+		free(answers[i].name);
+	}
+
+	printf("\n");
 }
 
 struct testops tdig_ops = { tdig_init, tdig_start, tdig_delete };
