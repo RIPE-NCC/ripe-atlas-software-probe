@@ -717,7 +717,6 @@ static struct builtin
 {
 	{ "ping", &ping_ops },
 	{ "traceroute", &traceroute_ops },
-	{ "tdig", &tdig_ops },
 	{ "condmv", &condmv_ops },
 	{ NULL, NULL }
 };
