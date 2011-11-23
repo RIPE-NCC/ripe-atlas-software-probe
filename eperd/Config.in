@@ -13,4 +13,10 @@ config EPERD
 	help
 	    Eperd periodically runs Atlas measurements. It is based on crond.
 
+config EVTDIG
+	bool "evtdig"
+	default n
+	help
+	tiny dig event driven version. support only limited queries 
+         id.sever txt chaos.  RIPE NCC 2011
 endmenu
