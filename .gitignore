@@ -35,6 +35,7 @@ include/config/dfrm.h
 include/config/feature/traceroute/ipv6.h
 include/config/findpid.h
 include/config/httppost.h
+include/config/httpget.h
 include/config/sleepkick.h
 include/config/tdig.h
 include/usage_compressed.h
@@ -45,3 +46,4 @@ scripts/basic/docproc
 scripts/basic/fixdep
 scripts/basic/split-include
 scripts/kconfig/conf
+libevent-2.0.13-stable/sample/.libs/*
