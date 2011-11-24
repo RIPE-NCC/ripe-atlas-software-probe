@@ -1007,17 +1007,6 @@
      "\n     -s | soa <zone> to be implmented " \
      "\n      RIPE NCC 2011 " \
 
-#define evtdig_trivial_usage \
-             "[-h|-i|-b|-s] ... <server IP address>"
-#define evtdig_full_usage "\n\n" \
-    "evtdig:  a tiny implemention dns queries which supports 4 queries\n" \
-     "\n     not implemented:  recursion" \
-     "\n     -h | --hostname-bind hostname.bind txt chaos " \
-     "\n     -i | id-server id.server txt chaos " \
-     "\n     -b | version-bind version-bind txt chaos " \
-     "\n     -s | soa <zone> to be implmented " \
-     "\n      RIPE NCC 2011 " \
-
 #define ether_wake_trivial_usage \
        "[-b] [-i iface] [-p aa:bb:cc:dd[:ee:ff]] MAC"
 #define ether_wake_full_usage "\n\n" \
