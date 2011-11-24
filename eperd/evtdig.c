@@ -44,7 +44,6 @@
 #include <event2/event.h>
 #include <event2/event_struct.h>
 
-
 #undef MIN	/* just in case */
 #undef MAX	/* also, just in case */
 
@@ -65,6 +64,7 @@
 #define DEFAULT_NOREPLY_TIMEOUT 100            /* 100 msec - 0 is illegal      */
 #define DEFAULT_PING_INTERVAL   1000           /* 1 sec - 0 means flood mode   */
 
+// seems T_DNSKEY is not defined header files of lenny and sdk
 #ifndef ns_t_dnskey
 #define ns_t_dnskey   48
 #endif
@@ -84,7 +84,7 @@ typedef uint64_t counter_t;
 struct tdig_base {
 	struct event_base *event_base;
 
-	evutil_socket_t rawfd_v4;	       /* Raw socket used to nsm hosts              */
+	evutil_socket_t rawfd_v4;       /* Raw socket used to nsm hosts              */
 
 	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
 	struct timeval tv_interval;    /* between two subsequent queries */
@@ -102,14 +102,6 @@ struct tdig_base {
 	counter_t illegal;             /* # of DNS packets with an illegal payload  */
 	counter_t sentbytes; 
 	counter_t recvtbytes; 
-
-	u_char quiet;
-
-	u_int16_t qtype; 
-	u_int16_t qclass;  
-	
-        struct DNS_HEADER *dns;
-	struct EDNS0_HEADER *edns0;
 };
 
 static struct tdig_base *tdig_base;
@@ -376,30 +368,26 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 	nsent = sendto(base->rawfd_v4, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 
 	if (nsent == qry->pktsize)
-	  {
-	    /* One more DNS Query is sent */
-	    base->sentok++;
-	    base->sentbytes+=nsent;
+	{
+		/* One more DNS Query is sent */
+		base->sentok++;
+		base->sentbytes+=nsent;
 
-	    if (!qry->sentpkts && !base->quiet)
-	      printf("PING %s (%s) %d(%d) bytes of data.\n", qry->fqname, qry->ipname,
-		     qry->pktsize, nsent);
+		/* Update timestamps and counters */
+		if (!qry->sentpkts)
+			gettimeofday(&qry->firstsent, NULL);
+		gettimeofday (&qry->lastsent, NULL);
+		qry->sentpkts++;
+		qry->sentbytes += nsent;
 
-	    /* Update timestamps and counters */
-	    if (!qry->sentpkts)
-	      gettimeofday(&qry->firstsent, NULL);
-	    gettimeofday (&qry->lastsent, NULL);
-	    qry->sentpkts++;
-	    qry->sentbytes += nsent;
-
-	    /* Add the timer to handle no reply condition in the given timeout */
-	    evtimer_add(&qry->noreply_timer, &base->tv_noreply);
-	  }
+		/* Add the timer to handle no reply condition in the given timeout */
+		evtimer_add(&qry->noreply_timer, &base->tv_noreply);
+	}
 	else 
-	  {
-	  	base->sendfail++;
-		 //perror("send");
-	  }
+	{
+		base->sendfail++;
+		//perror("send");
+	}
 }
 
 
@@ -407,7 +395,6 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 static void noreply_callback(int unused, const short event, void *h)
 {
 	struct query_state *qry = h;
-
 	qry->dropped++;
 
 	/* Add the timer to ping again the host at the given time interval */
@@ -419,9 +406,7 @@ static void noreply_callback(int unused, const short event, void *h)
 			      qry->seq, -1, &qry->base->tv_noreply, qry->user_pointer);
 	*/
 
-	/* Update the sequence number for the next run */
 }
-
 
 /*
  * Called by libevent when the kernel says that the raw socket is ready for reading.
@@ -605,7 +590,6 @@ static void *tdig_init(int argc, char *argv[])
       return qry;
 }
 
-
 /* exported function */
 struct tdig_base *
 tdig_base_new(struct event_base *event_base)
@@ -613,20 +597,18 @@ tdig_base_new(struct event_base *event_base)
 	struct protoent *proto;
 	evutil_socket_t fd;
 	struct tdig_base *tdig_base;
-
-		struct addrinfo hints;
-
+	struct addrinfo hints;
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_flags = 0;
-        hints.ai_socktype = SOCK_DGRAM;
-        hints.ai_flags = 0;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
 
 	/* Create an endpoint for communication using raw socket for ICMP calls */
 	if ((fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
 	{
-	  return NULL;
+		return NULL;
 	} 
 
 	tdig_base= xzalloc(sizeof( struct tdig_base));
@@ -642,7 +624,9 @@ tdig_base_new(struct event_base *event_base)
 	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
 	msecstotv(DEFAULT_PING_INTERVAL, &tdig_base->tv_interval);
 
-	/* Define the callback to handle UDP Reply and add the raw file descriptor to those monitored for read events */
+	// Define the callback to handle UDP Reply 
+	// add the raw file descriptor to those monitored for read events 
+
 	event_assign(&tdig_base->event, tdig_base->event_base, tdig_base->rawfd_v4, EV_READ | EV_PERSIST, ready_callback, tdig_base);
 	event_add(&tdig_base->event, NULL);
 
@@ -697,13 +681,8 @@ void tdig_start (struct query_state *qry)
 	evtimer_assign(&qry->noreply_timer, tdig_base->event_base, noreply_callback, qry); 
 
  	evtimer_add(&qry->nsm_timer, &asap);
-
-
 	return 0;
 }
-
-/*
-
 
 int tdig_base_count_queries(struct tdig_base *base)
 {
@@ -728,23 +707,19 @@ tdig_stats(struct tdig_base *base)
 {
 }
 
-
-/* exported function */
-const char *
-tdig_err_to_string(int err)
+const char * tdig_err_to_string(int err)
 {
-    switch (err) {
-	case PING_ERR_NONE: return "no error";
-	case PING_ERR_TIMEOUT: return "request timed out";
-	case PING_ERR_SHUTDOWN: return "ping subsystem shut down";
-	case PING_ERR_CANCEL: return "ping request canceled";
-	case PING_ERR_UNKNOWN: return "unknown";
-	default: return "[Unknown error code]";
-    }
+	switch (err) {
+		case PING_ERR_NONE: return "no error";
+		case PING_ERR_TIMEOUT: return "request timed out";
+		case PING_ERR_SHUTDOWN: return "ping subsystem shut down";
+		case PING_ERR_CANCEL: return "ping request canceled";
+		case PING_ERR_UNKNOWN: return "unknown";
+		default: return "[Unknown error code]";
+	}
 }
 
 
-/* exported function */
 /* The time since 'tv' in microseconds */
 /*
 time_t
@@ -753,7 +728,6 @@ tvtousecs (struct timeval *tv)
 	return tv->tv_sec * 1000000.0 + tv->tv_usec;
 } 
 */
-
 
 static void ChangetoDnsNameFormat(u_char *  dns,unsigned char* qry)
 {
@@ -775,29 +749,28 @@ static void ChangetoDnsNameFormat(u_char *  dns,unsigned char* qry)
 	*dns++=0;
 }
 
-
 static int tdig_delete(void *state)
 {
-        struct query_state *qry;
+	struct query_state *qry;
 
-        qry= state;
+	qry= state;
 
 	if(qry->out_filename)
 		free(qry->out_filename);
 	if(qry->lookupname) 
 		free(qry->lookupname);
-/*
-        free(trtstate->atlas);
-        trtstate->atlas= NULL;
-        free(trtstate->hostname);
-        trtstate->hostname= NULL;
-        free(trtstate->out_filename);
-        trtstate->out_filename= NULL;
+	/*
+	   free(trtstate->atlas);
+	   trtstate->atlas= NULL;
+	   free(trtstate->hostname);
+	   trtstate->hostname= NULL;
+	   free(trtstate->out_filename);
+	   trtstate->out_filename= NULL;
 
-*/
-        free(qry);
+	 */
+	free(qry);
 
-        return 1;
+	return 1;
 } 
 
 void printReply(unsigned char *result, int wire_size, unsigned long long tTrip_us, struct query_state *qry ) 
@@ -816,11 +789,11 @@ void printReply(unsigned char *result, int wire_size, unsigned long long tTrip_u
 	reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
 	/*
-	printf(" : questions  %d  ",ntohs(dnsR->q_count));
-	printf(" : answers %d ",ntohs(dnsR->ans_count));
-	printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
-	printf(" : additional records %d",ntohs(dnsR->add_count));
-	*/
+	   printf(" : questions  %d  ",ntohs(dnsR->q_count));
+	   printf(" : answers %d ",ntohs(dnsR->ans_count));
+	   printf(" : authoritative servers %d ",ntohs(dnsR->auth_count));
+	   printf(" : additional records %d",ntohs(dnsR->add_count));
+	 */
 
 	stop=0;
 
@@ -870,15 +843,15 @@ void printReply(unsigned char *result, int wire_size, unsigned long long tTrip_u
 			free(answers[i].rdata);
 			answers[i].rdata = ReadName(reader,result,&stop);
 			//printf(" %s", answers[i].rdata);
-		        reader =  reader + stop;
+			reader =  reader + stop;
 			u_int32_t serial;
 			serial = get32b(reader);
 			printf(" %u ", serial);
-		        reader =  reader + 4;
+			reader =  reader + 4;
 		}
 		else if (ntohs(answers[i].resource->type)== T_DNSKEY)
 		{
-			
+
 			printf("DNSKEY ");
 		}
 		else  
@@ -887,7 +860,7 @@ void printReply(unsigned char *result, int wire_size, unsigned long long tTrip_u
 			printf("DISCARDED-%u ", ntohs(answers[i].resource->type));
 		}
 		fflush(stdout);
-		
+
 		// free mem 
 		if(answers[i].rdata != NULL) 
 			free (answers[i].rdata); 
