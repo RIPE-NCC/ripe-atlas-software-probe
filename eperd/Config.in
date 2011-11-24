@@ -17,6 +17,6 @@ config EVTDIG
 	bool "evtdig"
 	default n
 	help
-	tiny dig event driven version. support only limited queries 
-         id.sever txt chaos.  RIPE NCC 2011
+	   tiny dig event driven version. support only limited queries id.sever 
+            txt chaos.  RIPE NCC 2011
 endmenu

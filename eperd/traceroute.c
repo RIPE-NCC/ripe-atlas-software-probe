@@ -272,20 +272,34 @@ static void report(struct trtstate *state)
 	else
 		fh= stdout;
 
+	fprintf(fh, "{ ");
 	if (state->atlas)
-		fprintf(fh, "%s %ld ", state->atlas, (long)time(NULL));
+	{
+		fprintf(fh, "\"id\":\"%s\", \"time\":%ld, ",
+			state->atlas, (long)time(NULL));
+	}
 
 	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-	fprintf(fh, "%s %s ", state->hostname, namebuf);
-	fprintf(fh, "%c%c ", state->do_icmp ? 'I' : 'U',
+	fprintf(fh, "\"name\":\"%s\", \"addr\":\"%s\"",
+		state->hostname, namebuf);
+
+	getnameinfo((struct sockaddr *)&state->loc_sin6, state->loc_socklen,
+		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+
+	fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
+
+	fprintf(fh, ", \"mode\":\"%c%c\"", state->do_icmp ? 'I' : 'U',
 		state->sin6.sin6_family == AF_INET6 ? '6' : '4');
 
-	fprintf(fh, "size:%d ", state->maxpacksize);
+	fprintf(fh, ", \"size\":%d", state->maxpacksize);
 	if (state->parismod)
-		fprintf(fh, "paris-id:%d ", state->paris % state->parismod);
-	fprintf(fh, "%s <EOL>\n", state->result);
+	{
+		fprintf(fh, ", \"paris-id\":%d",
+			state->paris % state->parismod);
+	}
+	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
 	state->result= NULL;
 	state->busy= 0;
@@ -316,6 +330,7 @@ static void send_pkt(struct trtstate *state)
 
 	if (state->sent >= state->trtcount)
 	{
+		add_str(state, " } ] }");
 		if (state->hop >= state->maxhops ||
 			(state->done && !state->not_done))
 		{
@@ -332,9 +347,11 @@ static void send_pkt(struct trtstate *state)
 		if (state->hop - state->last_response_hop > 
 			state->gaplimit)
 		{
+#if 0
 			printf("gaplimit reached: %d > %d + %d\n",
 				state->hop, state->last_response_hop,
 				state->gaplimit);
+#endif
 			if (state->lastditch)
 			{
 				/* Also done with last-ditch probe. */
@@ -345,7 +362,8 @@ static void send_pkt(struct trtstate *state)
 			state->hop= 255;
 		}
 
-		snprintf(line, sizeof(line), "hop:%d ", state->hop);
+		snprintf(line, sizeof(line),
+			", { \"hop\":%d, \"result\": [ ", state->hop);
 		add_str(state, line);
 	}
 	state->seq++;
@@ -354,8 +372,6 @@ static void send_pkt(struct trtstate *state)
 
 	if (state->sin6.sin6_family == AF_INET6)
 	{
-		printf("send_pkt: sending IPv6 packet\n");
-
 		hop= state->hop;
 
 		if (state->do_icmp)
@@ -419,19 +435,23 @@ static void send_pkt(struct trtstate *state)
 				sum= in_cksum_icmp6(&v6_ph, 
 					(unsigned short *)base->packet, len);
 
+#if 0
 				printf(
 			"send_pkt: seq %d, paris %d, cksum= htons(0x%x)\n",
 					state->seq, state->paris,
 					ntohs(sum));
+#endif
 			}
 
 			r= sendto(base->v6icmp_snd, base->packet, len, 0,
 				&state->sin6, state->socklen);
 			if (r == -1)
 			{
-				printf("send_pkt: sendto failed: %s\n",
-					strerror(errno));
-				return;
+				if (errno != EMSGSIZE)
+				{
+					printf("send_pkt: sendto failed: %s\n",
+						strerror(errno));
+				}
 			}
 		}
 		else
@@ -458,6 +478,14 @@ static void send_pkt(struct trtstate *state)
 			v6info->seq= htonl(state->seq);
 			v6info->tv= state->xmit_time;
 
+#if 0
+			printf(
+"send_pkt: IPv6 UDP: pid = htonl(%d), id = htonl(%d), seq = htonl(%d)\n",
+				ntohl(v6info->pid),
+				ntohl(v6info->id),
+				ntohl(v6info->seq));
+#endif
+
 			len= sizeof(*v6info);
 
 			if (state->curpacksize < len)
@@ -474,17 +502,22 @@ static void send_pkt(struct trtstate *state)
 				&state->sin6, state->socklen);
 			if (r == -1)
 			{
-				printf("send_pkt: sendto failed: %s\n",
-					strerror(errno));
-				return;
+				if (errno != EACCES &&
+					errno != ECONNREFUSED)
+				{
+					printf("send_pkt: sendto failed: %s\n",
+						strerror(errno));
+				}
 			}
 		}
 	}
 	else
 	{
+#if 0
 		printf(
 "send_pkt: sending IPv4 packet, do_icmp %d, parismod %d, index %d, state %p\n",
 			state->do_icmp, state->parismod, state->index, state);
+#endif
 
 		if (state->do_icmp)
 		{
@@ -526,10 +559,12 @@ static void send_pkt(struct trtstate *state)
 			icmp_hdr->icmp_cksum=
 				in_cksum((unsigned short *)icmp_hdr, len);
 
+#if 0
 			printf(
 			"send_pkt: seq %d, paris %d, icmp_cksum= htons(%d)\n",
 				state->seq, state->paris,
 				ntohs(icmp_hdr->icmp_cksum));
+#endif
 
 			/* Set hop count */
 			setsockopt(base->v4icmp_snd, IPPROTO_IP, IP_TTL,
@@ -545,10 +580,11 @@ static void send_pkt(struct trtstate *state)
 				&state->sin6, state->socklen);
 			if (r == -1)
 			{
-				printf("send_pkt: sendto failed: %s\n",
-					strerror(errno));
-				state->sent++;
-				return;
+				if (errno != EMSGSIZE)
+				{
+					printf("send_pkt: sendto failed: %s\n",
+						strerror(errno));
+				}
 			}
 		}
 		else
@@ -599,8 +635,6 @@ static void send_pkt(struct trtstate *state)
 				len= state->curpacksize;
 			}
 
-			printf("send_pkt: len = %d\n", len);
-
 			udp_ph.src= ((struct sockaddr_in *)&state->loc_sin6)->
 				sin_addr;
 			udp_ph.dst= ((struct sockaddr_in *)&state->sin6)->
@@ -645,11 +679,6 @@ static void send_pkt(struct trtstate *state)
 			sum= in_cksum_udp(&udp_ph, &udp,
 				(unsigned short *)base->packet, len);
 
-			printf(
-			"send_pkt: seq %d, paris %d, cksum= htons(0x%x)\n",
-				state->seq, state->paris,
-				ntohs(sum));
-
 			/* Set hop count */
 			setsockopt(sock, IPPROTO_IP, IP_TTL,
 				&hop, sizeof(hop));
@@ -662,20 +691,23 @@ static void send_pkt(struct trtstate *state)
 
 			r= sendto(sock, base->packet, len, 0,
 				&state->sin6, state->socklen);
-			r= sendto(sock, base->packet, len, 0,
-				&state->sin6, state->socklen);
 			serrno= errno;
 			if (state->parismod)
 				close(sock);
 			if (r == -1)
 			{
-				printf("send_pkt: sendto failed: %s\n",
-					strerror(serrno));
 				if (serrno != EMSGSIZE)
-					return;
+				{
+					printf("send_pkt: sendto failed: %s\n",
+						strerror(serrno));
+				}
 			}
 		}
 	}
+
+	if (state->sent)
+		add_str(state, " }, ");
+	add_str(state, "{ ");
 
 	/* Increment packets sent */
 	state->sent++;
@@ -705,8 +737,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 	char line[80];
 
 	gettimeofday(&now, NULL);
-
-	printf("in ready_callback4\n");
 
 	base= s;
 
@@ -763,7 +793,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 			 * destination port.
 			 */
 			ind= ntohs(eudp->uh_dport) - BASE_PORT;
-printf("ready_callback4: id for paris: %d\n", ind);
 
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
@@ -779,7 +808,6 @@ printf("ready_callback4: id for paris: %d\n", ind);
 				 * the checksum field.
 				 */
 				ind= ntohs(eudp->uh_sum)-1;
-printf("ready_callback4: id for !paris: %d\n", ind);
 				state= NULL;
 				if (ind >= 0 && ind < base->tabsiz)
 					state= base->table[ind];
@@ -794,11 +822,13 @@ printf("ready_callback4: id for !paris: %d\n", ind);
 				}
 			}
 
+#if 0
 			printf("ready_callback4: from %s",
 				inet_ntoa(remote.sin_addr));
 			printf(" for %s hop %d\n",
 				inet_ntoa(((struct sockaddr_in *)
 				&state->sin6)->sin_addr), state->hop);
+#endif
 
 			if (!state->busy)
 			{
@@ -818,7 +848,7 @@ printf("ready_callback4: id for !paris: %d\n", ind);
 			else
 			{
 				/* Sequence number is in destination field */
-				seq= ntohs(eudp->uh_dport);
+				seq= ntohs(eudp->uh_dport)-BASE_PORT;
 			}
 
 			if (seq != state->seq)
@@ -832,14 +862,14 @@ printf("ready_callback4: id for !paris: %d\n", ind);
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "late:%d ",
+				snprintf(line, sizeof(line), "\"late\":%d",
 					state->seq-seq);
 				add_str(state, line);
 			}
 			else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, "dup ");
+				add_str(state, " }, { \"dup\":true");
 			}
 
 			if (!late && !isDup)
@@ -871,29 +901,34 @@ printf("ready_callback4: id for !paris: %d\n", ind);
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
 
-			snprintf(line, sizeof(line), "from:%s ",
+			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
-			snprintf(line, sizeof(line), "ttl:%d size:%d ",
+			snprintf(line, sizeof(line),
+				", \"ttl\":%d, \"size\":%d",
 				ip->ip_ttl, (int)nrecv);
 			add_str(state, line);
 			if (!late)
 			{
-				snprintf(line, sizeof(line), "rtt:%.3f ", ms);
+				snprintf(line, sizeof(line), ", \"rtt\":%.3f",
+					ms);
 				add_str(state, line);
 			}
 			if (eip->ip_ttl != 1)
 			{
-				snprintf(line, sizeof(line), "ittl:%d ",
+				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
 				add_str(state, line);
 			}
 
+#if 0
 			printf("ready_callback4: from %s, ttl %d",
 				inet_ntoa(remote.sin_addr), ip->ip_ttl);
 			printf(" for %s hop %d\n",
 				inet_ntoa(((struct sockaddr_in *)
 				&state->sin6)->sin_addr), state->hop);
+#endif
 
 			if (icmp->icmp_type == ICMP_TIME_EXCEEDED)
 			{
@@ -907,20 +942,20 @@ printf("ready_callback4: id for !paris: %d\n", ind);
 				switch(icmp->icmp_code)
 				{
 				case ICMP_UNREACH_NET:
-					add_str(state, "!N ");
+					add_str(state, ", \"err\":\"N\"");
 					break;
 				case ICMP_UNREACH_HOST:
-					add_str(state, "!H ");
+					add_str(state, ", \"err\":\"H\"");
 					break;
 				case ICMP_UNREACH_PROTOCOL:
-					add_str(state, "!P ");
+					add_str(state, ", \"err\":\"P\"");
 					break;
 				case ICMP_UNREACH_PORT:
 					break;
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
-printf("nextmtu: %d\n", nextmtu);
-					snprintf(line, sizeof(line), "!F=%d ",
+					snprintf(line, sizeof(line),
+						", \"mtu\":%d",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip)+
@@ -940,15 +975,19 @@ printf("curpacksize: %d\n", state->curpacksize);
 						state->not_done= 1;
 					break;
 				case ICMP_UNREACH_FILTER_PROHIB:
-					add_str(state, "!A ");
+					add_str(state, ", \"err\":\"A\"");
 					break;
 				default:
-					snprintf(line, sizeof(line), "!%d ",
+					snprintf(line, sizeof(line),
+						", \"err\":%d",
 						icmp->icmp_code);
 					add_str(state, line);
 					break;
 				}
 			}
+
+			if (late)
+				add_str(state, " }, { ");
 		}
 		else if (eip->ip_p == IPPROTO_ICMP)
 		{
@@ -1008,7 +1047,8 @@ printf("curpacksize: %d\n", state->curpacksize);
 				return;
 			}
 
-			if (ntohs(eicmp->icmp_cksum) != state->paris)
+			if (state->parismod &&
+				ntohs(eicmp->icmp_cksum) != state->paris)
 			{
 				printf(
 	"ready_callback4: mismatch for paris, got 0x%x, expected 0x%x\n",
@@ -1029,14 +1069,14 @@ printf("curpacksize: %d\n", state->curpacksize);
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "late:%d ",
+				snprintf(line, sizeof(line), "\"late\":%d",
 					state->seq-seq);
 				add_str(state, line);
 			}
 			else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, "dup ");
+				add_str(state, " }, { \"dup\":true");
 			}
 
 			if (!late && !isDup)
@@ -1068,30 +1108,35 @@ printf("curpacksize: %d\n", state->curpacksize);
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
 
-			snprintf(line, sizeof(line), "from:%s ",
+			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
-			snprintf(line, sizeof(line), "ttl:%d size:%d ",
+			snprintf(line, sizeof(line),
+				", \"ttl\":%d, \"size\":%d",
 				ip->ip_ttl, (int)nrecv);
 			add_str(state, line);
 			if (!late)
 			{
-				snprintf(line, sizeof(line), "rtt:%.3f ", ms);
+				snprintf(line, sizeof(line), ", \"rtt\":%.3f",
+					ms);
 				add_str(state, line);
 			}
 
 			if (eip->ip_ttl != 1)
 			{
-				snprintf(line, sizeof(line), "ittl:%d ",
+				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
 				add_str(state, line);
 			}
 
+#if 0
 			printf("ready_callback4: from %s, ttl %d",
 				inet_ntoa(remote.sin_addr), ip->ip_ttl);
 			printf(" for %s hop %d\n",
 				inet_ntoa(((struct sockaddr_in *)
 				&state->sin6)->sin_addr), state->hop);
+#endif
 
 			if (icmp->icmp_type == ICMP_TIME_EXCEEDED)
 			{
@@ -1105,20 +1150,21 @@ printf("curpacksize: %d\n", state->curpacksize);
 				switch(icmp->icmp_code)
 				{
 				case ICMP_UNREACH_NET:
-					add_str(state, "!N ");
+					add_str(state, ", \"err\":\"N\"");
 					break;
 				case ICMP_UNREACH_HOST:
-					add_str(state, "!H ");
+					add_str(state, ", \"err\":\"H\"");
 					break;
 				case ICMP_UNREACH_PROTOCOL:
-					add_str(state, "!P ");
+					add_str(state, ", \"err\":\"P\"");
 					break;
 				case ICMP_UNREACH_PORT:
-					add_str(state, "!p ");
+					add_str(state, ", \"err\":\"p\"");
 					break;
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
-					snprintf(line, sizeof(line), "!F=%d ",
+					snprintf(line, sizeof(line),
+						", \"mtu\":%d",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip))
@@ -1135,10 +1181,11 @@ printf("curpacksize: %d\n", state->curpacksize);
 						state->not_done= 1;
 					break;
 				case ICMP_UNREACH_FILTER_PROHIB:
-					add_str(state, "!A ");
+					add_str(state, ", \"err\":\"A\"");
 					break;
 				default:
-					snprintf(line, sizeof(line), "!%d ",
+					snprintf(line, sizeof(line),
+						", \"err\":%d",
 						icmp->icmp_code);
 					add_str(state, line);
 					break;
@@ -1148,6 +1195,9 @@ printf("curpacksize: %d\n", state->curpacksize);
 			{
 				printf("imcp type %d\n", icmp->icmp_type);
 			}
+
+			if (late)
+				add_str(state, " }, { ");
 		}
 		else
 		{
@@ -1197,11 +1247,36 @@ printf("curpacksize: %d\n", state->curpacksize);
 			return;
 		}
 
-		if (ntohs(icmp->icmp_seq) != state->seq)
+		if (!state->busy)
 		{
 			printf(
+		"ready_callback4: index (%d) is not busy\n",
+				ind);
+			return;
+		}
+
+		late= 0;
+		isDup= 0;
+		seq= ntohs(icmp->icmp_seq);
+		if (seq != state->seq)
+		{
+			if (seq > state->seq)
+			{
+				printf(
 "ready_callback4: mismatch for seq, got 0x%x, expected 0x%x\n",
-				ntohs(icmp->icmp_seq), state->seq);
+					seq, state->seq);
+				return;
+			}
+			late= 1;
+
+			snprintf(line, sizeof(line), "\"late\":%d",
+				state->seq-seq);
+			add_str(state, line);
+		}
+		else if (state->gotresp)
+		{
+			isDup= 1;
+			add_str(state, " }, { \"dup\":true");
 		}
 
 		if (memcmp(&ip->ip_dst,
@@ -1215,34 +1290,57 @@ printf("curpacksize: %d\n", state->curpacksize);
 		ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 			(now.tv_usec-state->xmit_time.tv_usec)/1e3;
 
-		snprintf(line, sizeof(line), "from:%s ",
+		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			(late || isDup) ? ", " : "",
 			inet_ntoa(remote.sin_addr));
 		add_str(state, line);
-		snprintf(line, sizeof(line), "ttl:%d rtt:%.3f ms",
-			ip->ip_ttl, ms);
+		snprintf(line, sizeof(line), ", \"ttl\":%d",
+			ip->ip_ttl);
 		add_str(state, line);
+		if (!late)
+		{
+			snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
+			add_str(state, line);
+		}
 
+#if 0
 		printf("ready_callback4: from %s, ttl %d",
 			inet_ntoa(remote.sin_addr), ip->ip_ttl);
 		printf(" for %s hop %d\n",
 			inet_ntoa(((struct sockaddr_in *)
 			&state->sin6)->sin_addr), state->hop);
+#endif
 
 		/* Done */
 		state->done= 1;
 
-		send_pkt(state);
+		if (late)
+			add_str(state, " }, { ");
+
+		if (!late && !isDup)
+		{
+			if (state->duptimeout)
+			{
+				state->gotresp= 1;
+				interval.tv_sec= state->duptimeout/1000000;
+				interval.tv_usec= state->duptimeout % 1000000;
+				evtimer_add(&state->timer, &interval);
+			}
+			else
+				send_pkt(state);
+		}
 
 		return;
 	}
-	else if (icmp->icmp_type == ICMP_ECHO)
+	else if (icmp->icmp_type == ICMP_ECHO ||
+		icmp->icmp_type == ICMP_ROUTERADVERT)
 	{
 		/* No need to do anything */
 	}
 	else
 	{
-		printf("got type %d\n", icmp->icmp_type);
-		abort();
+		printf("ready_callback4: got type %d\n", icmp->icmp_type);
+		return;
 	}
 }
 
@@ -1274,8 +1372,6 @@ static void ready_callback6(int __attribute((unused)) unused,
 	char cmsgbuf[256];
 
 	gettimeofday(&now, NULL);
-
-	printf("in ready_callback6\n");
 
 	base= s;
 
@@ -1320,7 +1416,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	if (nrecv < sizeof(*icmp))
 	{
 		/* Short packet */
-		printf("ready_callback6: too short %d\n", (int)nrecv);
+		printf("ready_callback6: too short %d (icmp)\n", (int)nrecv);
 		return;
 	}
 
@@ -1335,7 +1431,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 		/* Make sure the packet we have is big enough */
 		if (nrecv < sizeof(*icmp) + sizeof(*eip))
 		{
-			printf("ready_callback6: too short %d\n", (int)nrecv);
+			printf("ready_callback6: too short %d (icmp_ip)\n",
+				(int)nrecv);
 			return;
 		}
 
@@ -1356,7 +1453,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					+ sizeof(*frag))
 				{
 					printf(
-					"ready_callback6: too short %d\n",
+			"ready_callback6: too short %d (icmp+ip+frag)\n",
 						(int)nrecv);
 					return;
 				}
@@ -1383,8 +1480,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 			if (nrecv < sizeof(*icmp) + sizeof(*eip)
 				+ ehdrsiz + sizeof(*v6info))
 			{
-				printf("ready_callback6: too short %d\n",
-					(int)nrecv);
+				printf(
+			"ready_callback6: too short %d (all) from %s\n",
+					(int)nrecv, inet_ntop(AF_INET6,
+					&remote.sin6_addr, buf, sizeof(buf)));
 				return;
 			}
 
@@ -1402,7 +1501,15 @@ static void ready_callback6(int __attribute((unused)) unused,
 				v6info= (struct v6info *)&eicmp[1];
 			}
 
-			ind= ntohs(v6info->id);
+#if 0
+			printf(
+"ready_callback6: pid = htonl(%d), id = htonl(%d), seq = htonl(%d)\n",
+				ntohl(v6info->pid),
+				ntohl(v6info->id),
+				ntohl(v6info->seq));
+#endif
+
+			ind= ntohl(v6info->id);
 
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
@@ -1422,12 +1529,14 @@ static void ready_callback6(int __attribute((unused)) unused,
 				return;
 			}
 
+#if 0
 			printf("ready_callback6: from %s",
 				inet_ntop(AF_INET6, &remote.sin6_addr,
 				buf, sizeof(buf)));
 			printf(" for %s hop %d\n",
 				inet_ntop(AF_INET6, &state->sin6.sin6_addr,
 					buf, sizeof(buf)), state->hop);
+#endif
 
 			if (!state->busy)
 			{
@@ -1452,13 +1561,13 @@ static void ready_callback6(int __attribute((unused)) unused,
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "late:%d ",
+				snprintf(line, sizeof(line), "\"late\":%d",
 					state->seq-seq);
 				add_str(state, line);
 			} else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, "dup ");
+				add_str(state, " }, { \"dup\":true");
 			}
 
 			if (!late && !isDup)
@@ -1513,26 +1622,30 @@ static void ready_callback6(int __attribute((unused)) unused,
 					1e3;
 			}
 
-			snprintf(line, sizeof(line), "from:%s ",
+			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+				(late || isDup) ? ", " : "",
 				inet_ntop(AF_INET6, &remote.sin6_addr,
 				buf, sizeof(buf)));
 			add_str(state, line);
-			snprintf(line, sizeof(line), "ttl:%d rtt:%.3f size:%d ",
+			snprintf(line, sizeof(line),
+				", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
 				rcvdttl, ms, (int)nrecv);
 			add_str(state, line);
 			if (eip->ip6_hops != 1)
 			{
-				snprintf(line, sizeof(line), "ittl:%d ",
+				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip6_hops);
 				add_str(state, line);
 			}
 
+#if 0
 			printf("ready_callback6: from %s, ttl %d",
 				inet_ntop(AF_INET6, &remote.sin6_addr, buf,
 				sizeof(buf)), rcvdttl);
 			printf(" for %s hop %d\n",
 				inet_ntop(AF_INET6, &state->sin6.sin6_addr, buf,
 				sizeof(buf)), state->hop);
+#endif
 
 			if (icmp->icmp6_type == ICMP6_TIME_EXCEEDED)
 			{
@@ -1542,7 +1655,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			else if (icmp->icmp6_type == ICMP6_PACKET_TOO_BIG)
 			{
 				nextmtu= ntohl(icmp->icmp6_mtu);
-				snprintf(line, sizeof(line), "!F=%d ",
+				snprintf(line, sizeof(line), ", \"mtu\":%d",
 					nextmtu);
 				add_str(state, line);
 				siz= sizeof(*eip);
@@ -1564,18 +1677,19 @@ static void ready_callback6(int __attribute((unused)) unused,
 				switch(icmp->icmp6_code)
 				{
 				case ICMP6_DST_UNREACH_NOROUTE:
-					add_str(state, "!N ");
+					add_str(state, ", \"err\":\"N\"");
 					break;
 				case ICMP6_DST_UNREACH_ADDR:
-					add_str(state, "!H ");
+					add_str(state, ", \"err\":\"H\"");
 					break;
 				case ICMP6_DST_UNREACH_NOPORT:
 					break;
 				case ICMP6_DST_UNREACH_ADMIN:
-					add_str(state, "!A ");
+					add_str(state, ", \"err\":\"A\"");
 					break;
 				default:
-					snprintf(line, sizeof(line), "!%d ",
+					snprintf(line, sizeof(line),
+						", \"err\":%d",
 						icmp->icmp6_code);
 					add_str(state, line);
 					break;
@@ -1587,6 +1701,9 @@ static void ready_callback6(int __attribute((unused)) unused,
 			printf("ready_callback6: not UDP or ICMP\n");
 			return;
 		}
+
+		if (late)
+			add_str(state, " }, { ");
 
 		if (!late && !isDup)
 		{
@@ -1608,7 +1725,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 		/* Now check if there is also a header in the packet */
 		if (nrecv < sizeof(*icmp) + sizeof(*v6info))
 		{
-			printf("ready_callback6: too short %d\n",
+			printf("ready_callback6: too short %d (echo reply)\n",
 				(int)nrecv);
 			return;
 		}
@@ -1618,7 +1735,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 		v6info= (struct v6info *)&icmp[1];
 
-		ind= ntohs(v6info->id);
+		ind= ntohl(v6info->id);
 
 		state= NULL;
 		if (ind >= 0 && ind < base->tabsiz)
@@ -1634,12 +1751,14 @@ static void ready_callback6(int __attribute((unused)) unused,
 			return;
 		}
 
+#if 0
 		printf("ready_callback6: from %s",
 			inet_ntop(AF_INET6, &remote.sin6_addr,
 			buf, sizeof(buf)));
 		printf(" for %s hop %d\n",
 			inet_ntop(AF_INET6, &state->sin6.sin6_addr,
 				buf, sizeof(buf)), state->hop);
+#endif
 
 		if (!state->busy)
 		{
@@ -1664,14 +1783,14 @@ static void ready_callback6(int __attribute((unused)) unused,
 			}
 			late= 1;
 
-			snprintf(line, sizeof(line), "late:%d ",
+			snprintf(line, sizeof(line), "\"late\":%d",
 				state->seq-seq);
 			add_str(state, line);
 		}
 		else if (state->gotresp)
 		{
 			isDup= 1;
-			add_str(state, "dup ");
+			add_str(state, " }, { \"dup\":true");
 		}
 
 		if (!late && !isDup)
@@ -1701,20 +1820,27 @@ static void ready_callback6(int __attribute((unused)) unused,
 				1e3;
 		}
 
-		snprintf(line, sizeof(line), "from:%s ",
+		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			(late || isDup) ? ", " : "",
 			inet_ntop(AF_INET6, &remote.sin6_addr,
 			buf, sizeof(buf)));
 		add_str(state, line);
-		snprintf(line, sizeof(line), "ttl:%d rtt:%.3f size:%d ",
+		snprintf(line, sizeof(line),
+			", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
 			rcvdttl, ms, (int)nrecv);
 		add_str(state, line);
 
+#if 0
 		printf("ready_callback6: from %s, ttl %d",
 			inet_ntop(AF_INET6, &remote.sin6_addr, buf,
 			sizeof(buf)), rcvdttl);
 		printf(" for %s hop %d\n",
 			inet_ntop(AF_INET6, &state->sin6.sin6_addr, buf,
 			sizeof(buf)), state->hop);
+#endif
+
+		if (late)
+			add_str(state, " }, { ");
 
 		if (!late && !isDup)
 		{
@@ -1789,11 +1915,13 @@ static void noreply_callback(int __attribute((unused)) unused,
 
 	state= s;
 
+#if 0
 	printf("noreply_callback: gotresp = %d\n",
 		state->gotresp);
+#endif
 
 	if (!state->gotresp)
-		add_str(state, "* ");
+		add_str(state, "\"x\":\"*\"");
 
 	send_pkt(state);
 }
@@ -1898,6 +2026,13 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
 	state->socklen= lsa->len;
 	free(lsa); lsa= NULL;
 
+	if (af == AF_INET6)
+	{
+		char buf[INET6_ADDRSTRLEN];
+		printf("traceroute_init: %s, len %d for %s\n",
+			inet_ntop(AF_INET6, &state->sin6.sin6_addr,
+			buf, sizeof(buf)), state->socklen, state->hostname);
+	}
 
 	evtimer_assign(&state->timer, state->base->event_base,
 		noreply_callback, state);
@@ -1907,14 +2042,12 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
 
 static void traceroute_start(void *state)
 {
+	int serrno;
 	struct trtstate *trtstate;
 	struct trtbase *trtbase;
 	struct sockaddr_in loc_sa4;
 	struct sockaddr_in6 loc_sa6;
 	char line[80];
-	char buf[INET6_ADDRSTRLEN];
-
-	printf("in traceroute_start\n");
 
 	trtstate= state;
 	trtbase= trtstate->base;
@@ -1948,7 +2081,7 @@ static void traceroute_start(void *state)
 	trtstate->result= xmalloc(trtstate->resmax);
 	trtstate->reslen= 0;
 
-	snprintf(line, sizeof(line), "hop:%d ", trtstate->hop);
+	snprintf(line, sizeof(line), "{ \"hop\":%d", trtstate->hop);
 	add_str(trtstate, line);
 
 	if (trtstate->do_icmp)
@@ -1970,10 +2103,12 @@ static void traceroute_start(void *state)
 			{
 				crondlog(DIE9 "getsockname failed");
 			}
+#if 0
 			printf("Got localname: %s\n",
 				inet_ntop(AF_INET6,
 				&trtstate->loc_sin6.sin6_addr,
 				buf, sizeof(buf)));
+#endif
 		}
 		else
 		{
@@ -2002,9 +2137,11 @@ static void traceroute_start(void *state)
 			{
 				crondlog(DIE9 "getsockname failed");
 			}
+#if 0
 			printf("Got localname: %s\n",
 				inet_ntoa(((struct sockaddr_in *)
 				&trtstate->loc_sin6)->sin_addr));
+#endif
 		}
 	}
 	else
@@ -2020,7 +2157,14 @@ static void traceroute_start(void *state)
 			if (connect(sock,
 				&trtstate->sin6, trtstate->socklen) == -1)
 			{
-				crondlog(DIE9 "connect failed");
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+			", \"error\":\"connect failed: %s\" }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				return;
 			}
 			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
 			if (getsockname(sock,
@@ -2030,12 +2174,14 @@ static void traceroute_start(void *state)
 				crondlog(DIE9 "getsockname failed");
 			}
 
+#if 0
 			printf("Got localname: %s:%d\n",
 				inet_ntop(AF_INET6,
 				&trtstate->loc_sin6.sin6_addr,
 				buf, sizeof(buf)),
 				ntohs(((struct sockaddr_in *)&trtstate->
 					loc_sin6)->sin_port));
+#endif
 		}
 		else
 		{
@@ -2083,13 +2229,17 @@ static void traceroute_start(void *state)
 			}
 			if (trtstate->parismod)
 				close(sock);
+#if 0
 			printf("Got localname: %s:%d\n",
 				inet_ntoa(((struct sockaddr_in *)
 				&trtstate->loc_sin6)->sin_addr),
 				ntohs(((struct sockaddr_in *)&trtstate->
 					loc_sin6)->sin_port));
+#endif
 		}
 	}
+
+	add_str(trtstate, ", \"result\": [ ");
 
 	send_pkt(trtstate);
 }

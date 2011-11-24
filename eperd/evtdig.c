@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 RIPE NCC, Antony Antony
+ * Copyright (c) 2011 RIPE NCC, Antony Antony <antony@ripe.net>, <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone <ro...@tecsiel.it>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -652,7 +652,7 @@ tdig_base_new(struct event_base *event_base)
 void tdig_base_free(struct tdig_base *base, int fail_requests)
 {
 
-	mm_free(base);
+	free(base);
 }
 
 void tdig_start (struct query_state *qry)
