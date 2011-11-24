@@ -114,7 +114,7 @@ static struct option longopts[]=
         { NULL, }
 };
 
-struct addrinfo hints, *res, *ressave;
+struct addrinfo hints, *res, *ressave = NULL;
 int dns_id;
 static int opt_dnssec = 0;	
 static int opt_edns0 = 0;
@@ -156,7 +156,7 @@ int tdig_main(int argc, char **argv)
 	unsigned long long  tSend_us, tRecv_us, tTrip_us;
 	int opt_tcp = 0;
 	int result = 0;
-	FILE *tcp_file;
+	FILE *tcp_file = NULL;
 	uint8_t wire[1300]; 
 	char *check;
 	ssize_t wire_size = 0;
@@ -273,7 +273,7 @@ int tdig_main(int argc, char **argv)
 		tcp_fd= connect_to_name(server_ip_str, port);
 		if (tcp_fd == -1)
 		{
-			report_err("unable to connect to '%s'", server_ip_str);
+			printf("%s UNABLE-TO-CONNECT-TCP-ERROR\n", server_ip_str);
 			sprintf (errstr, "unable to connect"); 
 			goto err;
 		}
@@ -307,13 +307,13 @@ int tdig_main(int argc, char **argv)
 				}
 				if (errno == EINTR)
 				{
-					report("timeout");
-					//kick_watchdog();
-					return 0;
+					sprintf (errstr, "TCP-EINTR-ERROR-GOTALARM"); 
+					report("TCP-EINTR-ERROR-GOTALARM");
+					goto err;
 				}
 				else
 				{
-					printf (" TCP-READ-ERROR-SIZE\n");
+					printf ("TCP-READ-ERROR-SIZE\n");
 					report_err("error reading from server");
 					fclose(tcp_file);
 					return 0;
@@ -345,6 +345,7 @@ int tdig_main(int argc, char **argv)
 				}
 			} 
 			fclose(tcp_file);
+			tcp_file = NULL;
 		}
 	}
 	else 
@@ -353,7 +354,7 @@ int tdig_main(int argc, char **argv)
 		if(err_num)
 		{ 
 			printf("%s ERROR port %s %s\n", server_ip_str, port, gai_strerror(err_num));	
-			return (0);
+			return (1);
 		}
 
 		ressave= res;
@@ -406,6 +407,7 @@ int tdig_main(int argc, char **argv)
 			}
 		} while ((res = res->ai_next) != NULL);
 		freeaddrinfo(ressave);
+		ressave = NULL;
 	}
 	tRecv_us = monotonic_us();
 	tTrip_us = tRecv_us - tSend_us;
@@ -414,10 +416,11 @@ int tdig_main(int argc, char **argv)
 	alarm(0);
 
 leave:
+		
+	if (ressave) freeaddrinfo(ressave);
 	if (tcp_file) fclose(tcp_file);
         if (tcp_fd != -1) close(tcp_fd);
 	return (result);
-
 err:
 	printf ("ERROR %s %s\n", server_ip_str, errstr);
         fprintf(stderr, "tdig:ERROR: %s\n", errstr);
@@ -676,9 +679,10 @@ static int connect_to_name(char *host, char *port)
 	hints.ai_socktype= SOCK_STREAM;
 	r= getaddrinfo(host, port, &hints, &res);
 	if (r != 0) 
-		{
-			report_err("unable to resolve '%s': %s", host, gai_strerror(r));		       return (-1);
-		}
+	{
+		report_err("unable to resolve '%s': %s", host, gai_strerror(r));
+		return (-1);
+	}
 	ressave = res;
 	s_errno= 0;
 	s= -1;
@@ -713,7 +717,9 @@ static int connect_to_name(char *host, char *port)
 		s= -1;
 	}
 
-	freeaddrinfo(res);
+	freeaddrinfo(ressave);
+	ressave = NULL;
+
 	if (s == -1)
 		errno= s_errno;
 	return s;
