@@ -423,14 +423,14 @@ leave:
 	return (result);
 err:
 	printf ("ERROR %s %s\n", server_ip_str, errstr);
-        fprintf(stderr, "tdig:ERROR: %s\n", errstr);
+        fprintf(stderr, "tdig:ERROR: %s %s\n",server_ip_str, errstr);
         result= 1;
         goto leave;
 }
 
 static void got_alarm(int sig)
 {
-	fprintf(stderr, "got an alarm, setting alarm again\n");
+	fprintf(stderr, "tdig: got an alarm, setting alarm again\n");
 	if (tcp_fd != -1)
                 fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);
 	alarm(1);
