@@ -301,9 +301,9 @@ int tdig_main(int argc, char **argv)
 			{
 				if (feof(tcp_file))
 				{
-					report("got unexpected EOF from server");
-					fclose(tcp_file);
-					return 0;
+					sprintf(errstr, "UNEXPECTED-EOF-FROM-SERVER");
+					report("UNEXPECTED-EOF-FROM-SERVER");
+					goto err;
 				}
 				if (errno == EINTR)
 				{
