@@ -1855,18 +1855,20 @@ static void ready_callback6(int __attribute((unused)) unused,
 				send_pkt(state);
 		}
 	}
-	else if (icmp->icmp6_type == MLD_LISTENER_QUERY /* 130 */ ||
+	else if (icmp->icmp6_type == ICMP6_ECHO_REQUEST /* 128 */ ||
+		icmp->icmp6_type == MLD_LISTENER_QUERY /* 130 */ ||
 		icmp->icmp6_type == MLD_LISTENER_REPORT /* 131 */ ||
 		icmp->icmp6_type == ND_ROUTER_ADVERT /* 134 */ ||
 		icmp->icmp6_type == ND_NEIGHBOR_SOLICIT /* 135 */ ||
-		icmp->icmp6_type == ND_NEIGHBOR_ADVERT /* 136 */)
+		icmp->icmp6_type == ND_NEIGHBOR_ADVERT /* 136 */ ||
+		icmp->icmp6_type == ND_REDIRECT /* 137 */)
 	{
 		/* No need to do anything */
 	}
 	else
 	{
-		printf("got type %d\n", icmp->icmp6_type);
-		abort();
+		printf("ready_callback6: got type %d\n", icmp->icmp6_type);
+		return;
 	}
 }
 
@@ -2094,7 +2096,14 @@ static void traceroute_start(void *state)
 			if (connect(trtbase->v6icmp_snd,
 				&trtstate->sin6, trtstate->socklen) == -1)
 			{
-				crondlog(DIE9 "connect failed");
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+			", \"error\":\"connect failed: %s\" }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				return;
 			}
 			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
 			if (getsockname(trtbase->v6icmp_snd,
@@ -2246,9 +2255,26 @@ static void traceroute_start(void *state)
 
 static int traceroute_delete(void *state)
 {
+	int ind;
 	struct trtstate *trtstate;
+	struct trtbase *base;
 
 	trtstate= state;
+
+	printf("traceroute_delete: state %p, index %d, busy %d\n",
+		state, trtstate->index, trtstate->busy);
+
+	if (trtstate->busy)
+		return 0;
+
+	base= trtstate->base;
+	ind= trtstate->index;
+
+	if (base->table[ind] != trtstate)
+		crondlog(DIE9 "strange, state not in table");
+	base->table[ind]= NULL;
+
+	event_del(&trtstate->timer);
 
 	free(trtstate->atlas);
 	trtstate->atlas= NULL;

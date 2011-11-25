@@ -72,7 +72,6 @@ struct CronLine {
 
 	/* For cleanup */
 	char needs_delete;
-	char busy;
 
 	/* For debugging */
 	time_t lasttime;
@@ -1005,6 +1004,9 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	
 	if (now > line->end_time)
 		return;			/* This job has expired */
+
+	if (line->needs_delete)
+		return;			/* Line is to be deleted */
 
 	line->testops->start(line->teststate);
 
