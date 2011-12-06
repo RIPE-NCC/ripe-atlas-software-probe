@@ -49,6 +49,12 @@ struct trtbase
 	struct trtstate **table;
 	int tabsiz;
 
+	/* For standalone traceroute. Called when a traceroute instance is
+	 * done. Just one pointer for all instances. It is up to the caller
+	 * to keep it consistent.
+	 */
+	void (*done)(void *state);
+
 	u_char packet[MAX_DATA_SIZE];
 };
 
@@ -290,7 +296,7 @@ static void report(struct trtstate *state)
 
 	fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
 
-	fprintf(fh, ", \"mode\":\"%c%c\"", state->do_icmp ? 'I' : 'U',
+	fprintf(fh, ", \"mode\":\"%s%c\"", state->do_icmp ? "ICMP" : "UDP",
 		state->sin6.sin6_family == AF_INET6 ? '6' : '4');
 
 	fprintf(fh, ", \"size\":%d", state->maxpacksize);
@@ -306,6 +312,9 @@ static void report(struct trtstate *state)
 
 	if (state->out_filename)
 		fclose(fh);
+
+	if (state->base->done)
+		state->base->done(state);
 }
 
 static void send_pkt(struct trtstate *state)
@@ -797,6 +806,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
 				state= base->table[ind];
+			if (state && state->sin6.sin6_family != AF_INET)
+				state= NULL;
 			if (state && state->do_icmp)
 				state= NULL;	
 			if (state && !state->parismod)
@@ -811,6 +822,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 				state= NULL;
 				if (ind >= 0 && ind < base->tabsiz)
 					state= base->table[ind];
+				if (state && state->sin6.sin6_family != AF_INET)
+					state= NULL;
 				if (state && state->do_icmp)
 					state= NULL;	
 				if (state && state->parismod)
@@ -832,6 +845,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 			if (!state->busy)
 			{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 				printf(
 			"ready_callback4: index (%d) is not busy\n",
 					ind);
@@ -856,8 +870,9 @@ static void ready_callback4(int __attribute((unused)) unused,
 				if (seq > state->seq)
 				{
 					printf(
-	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x\n",
-						seq, state->seq);
+	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x (for %s)\n",
+						seq, state->seq,
+						state->hostname);
 					return;
 				}
 				late= 1;
@@ -874,29 +889,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 			if (!late && !isDup)
 				state->last_response_hop= state->hop;
-
-			if (memcmp(&eip->ip_src,
-				&((struct sockaddr_in *)&state->loc_sin6)->
-				sin_addr, sizeof(eip->ip_src)) != 0)
-			{
-				printf("ready_callback4: changed source %s\n",
-					inet_ntoa(eip->ip_src));
-			}
-			if (memcmp(&eip->ip_dst,
-				&((struct sockaddr_in *)&state->sin6)->
-				sin_addr, sizeof(eip->ip_dst)) != 0)
-			{
-				printf(
-				"ready_callback4: changed destination %s\n",
-					inet_ntoa(eip->ip_dst));
-			}
-			if (memcmp(&ip->ip_dst,
-				&((struct sockaddr_in *)&state->loc_sin6)->
-				sin_addr, sizeof(eip->ip_src)) != 0)
-			{
-				printf("ready_callback4: weird destination %s\n",
-					inet_ntoa(ip->ip_dst));
-			}
 
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
@@ -920,6 +912,30 @@ static void ready_callback4(int __attribute((unused)) unused,
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
 				add_str(state, line);
+			}
+
+			if (memcmp(&eip->ip_src,
+				&((struct sockaddr_in *)&state->loc_sin6)->
+				sin_addr, sizeof(eip->ip_src)) != 0)
+			{
+				printf("ready_callback4: changed source %s\n",
+					inet_ntoa(eip->ip_src));
+			}
+			if (memcmp(&eip->ip_dst,
+				&((struct sockaddr_in *)&state->sin6)->
+				sin_addr, sizeof(eip->ip_dst)) != 0)
+			{
+				snprintf(line, sizeof(line),
+					", \"edst\":\"%s\"",
+					inet_ntoa(eip->ip_dst));
+				add_str(state, line);
+			}
+			if (memcmp(&ip->ip_dst,
+				&((struct sockaddr_in *)&state->loc_sin6)->
+				sin_addr, sizeof(eip->ip_src)) != 0)
+			{
+				printf("ready_callback4: weird destination %s\n",
+					inet_ntoa(ip->ip_dst));
 			}
 
 #if 0
@@ -1032,6 +1048,11 @@ printf("curpacksize: %d\n", state->curpacksize);
 				return;
 			}
 
+			if (state->sin6.sin6_family != AF_INET)
+			{
+				return;
+			}
+
 			if (!state->do_icmp)
 			{
 				printf(
@@ -1041,6 +1062,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 			}
 			if (!state->busy)
 			{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 				printf(
 			"ready_callback4: index (%d) is not busy\n",
 					ind);
@@ -1051,8 +1073,9 @@ printf("curpacksize: %d\n", state->curpacksize);
 				ntohs(eicmp->icmp_cksum) != state->paris)
 			{
 				printf(
-	"ready_callback4: mismatch for paris, got 0x%x, expected 0x%x\n",
-					ntohs(eicmp->icmp_cksum), state->paris);
+	"ready_callback4: mismatch for paris, got 0x%x, expected 0x%x (%s)\n",
+					ntohs(eicmp->icmp_cksum), state->paris,
+					state->hostname);
 			}
 
 			late= 0;
@@ -1063,8 +1086,9 @@ printf("curpacksize: %d\n", state->curpacksize);
 				if (seq > state->seq)
 				{
 					printf(
-	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x\n",
-						seq, state->seq);
+	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x (for %s)\n",
+						seq, state->seq,
+						state->hostname);
 					return;
 				}
 				late= 1;
@@ -1081,29 +1105,6 @@ printf("curpacksize: %d\n", state->curpacksize);
 
 			if (!late && !isDup)
 				state->last_response_hop= state->hop;
-
-			if (memcmp(&eip->ip_src,
-				&((struct sockaddr_in *)&state->loc_sin6)->
-				sin_addr, sizeof(eip->ip_src)) != 0)
-			{
-				printf("ready_callback4: changed source %s\n",
-					inet_ntoa(eip->ip_src));
-			}
-			if (memcmp(&eip->ip_dst,
-				&((struct sockaddr_in *)&state->sin6)->
-				sin_addr, sizeof(eip->ip_dst)) != 0)
-			{
-				printf(
-				"ready_callback4: changed destination %s\n",
-					inet_ntoa(eip->ip_dst));
-			}
-			if (memcmp(&ip->ip_dst,
-				&((struct sockaddr_in *)&state->loc_sin6)->
-				sin_addr, sizeof(eip->ip_src)) != 0)
-			{
-				printf("ready_callback4: weird destination %s\n",
-					inet_ntoa(ip->ip_dst));
-			}
 
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
@@ -1128,6 +1129,30 @@ printf("curpacksize: %d\n", state->curpacksize);
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
 				add_str(state, line);
+			}
+
+			if (memcmp(&eip->ip_src,
+				&((struct sockaddr_in *)&state->loc_sin6)->
+				sin_addr, sizeof(eip->ip_src)) != 0)
+			{
+				printf("ready_callback4: changed source %s\n",
+					inet_ntoa(eip->ip_src));
+			}
+			if (memcmp(&eip->ip_dst,
+				&((struct sockaddr_in *)&state->sin6)->
+				sin_addr, sizeof(eip->ip_dst)) != 0)
+			{
+				snprintf(line, sizeof(line),
+					", \"edst\":\"%s\"",
+					inet_ntoa(eip->ip_dst));
+				add_str(state, line);
+			}
+			if (memcmp(&ip->ip_dst,
+				&((struct sockaddr_in *)&state->loc_sin6)->
+				sin_addr, sizeof(eip->ip_src)) != 0)
+			{
+				printf("ready_callback4: weird destination %s\n",
+					inet_ntoa(ip->ip_dst));
 			}
 
 #if 0
@@ -1201,7 +1226,8 @@ printf("curpacksize: %d\n", state->curpacksize);
 		}
 		else
 		{
-			printf("ready_callback4: not UDP or ICMP\n");
+			printf("ready_callback4: not UDP or ICMP (%d\n",
+				eip->ip_p);
 			return;
 		}
 
@@ -1247,8 +1273,14 @@ printf("curpacksize: %d\n", state->curpacksize);
 			return;
 		}
 
+		if (state->sin6.sin6_family != AF_INET)
+		{
+			return;
+		}
+
 		if (!state->busy)
 		{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 			printf(
 		"ready_callback4: index (%d) is not busy\n",
 				ind);
@@ -1263,8 +1295,8 @@ printf("curpacksize: %d\n", state->curpacksize);
 			if (seq > state->seq)
 			{
 				printf(
-"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x\n",
-					seq, state->seq);
+"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x, for %s\n",
+					seq, state->seq, state->hostname);
 				return;
 			}
 			late= 1;
@@ -1514,6 +1546,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
 				state= base->table[ind];
+
+			if (state && state->sin6.sin6_family != AF_INET6)
+				state= NULL;
+
 			if (state)
 			{
 				if ((eudp && state->do_icmp) ||
@@ -1540,6 +1576,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 			if (!state->busy)
 			{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 				printf(
 			"ready_callback6: index (%d) is not busy\n",
 					ind);
@@ -1586,9 +1623,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 				sizeof(eip->ip6_dst)) != 0)
 			{
 				printf(
-				"ready_callback6: changed destination %s\n",
+			"ready_callback6: changed destination %s for %s\n",
 					inet_ntop(AF_INET6, &eip->ip6_dst,
-					buf, sizeof(buf)));
+					buf, sizeof(buf)),
+					state->hostname);
 			}
 			if (memcmp(&dstaddr,
 				&state->loc_sin6.sin6_addr,
@@ -1698,7 +1736,9 @@ static void ready_callback6(int __attribute((unused)) unused,
 		}
 		else
 		{
-			printf("ready_callback6: not UDP or ICMP\n");
+			printf(
+			"ready_callback6: not UDP or ICMP (ip6_nxt = %d)\n",
+				eip->ip6_nxt);
 			return;
 		}
 
@@ -1740,6 +1780,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 		state= NULL;
 		if (ind >= 0 && ind < base->tabsiz)
 			state= base->table[ind];
+
+		if (state && state->sin6.sin6_family != AF_INET6)
+			state= NULL;
+
 		if (state && !state->do_icmp)
 		{
 			state= NULL;	
@@ -1762,6 +1806,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 		if (!state->busy)
 		{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 			printf(
 		"ready_callback6: index (%d) is not busy\n",
 				ind);
@@ -1928,7 +1973,8 @@ static void noreply_callback(int __attribute((unused)) unused,
 	send_pkt(state);
 }
 
-static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
+static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
+	void (*done)(void *state))
 {
 	int i, opt, do_icmp, do_v6, dont_fragment;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
@@ -1991,7 +2037,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
 	state->gaplimit= gaplimit;
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
-	state->atlas= strdup(str_Atlas);
+	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
 	state->hostname= strdup(hostname);
 	state->do_icmp= do_icmp;
 	state->do_v6= do_v6;
@@ -2020,6 +2066,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[])
 	}
 	state->index= i;
 	trt_base->table[i]= state;
+	trt_base->done= done;
 
 	printf("traceroute_init: state %p, index %d\n",
 		state, state->index);

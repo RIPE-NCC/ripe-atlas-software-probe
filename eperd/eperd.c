@@ -829,7 +829,7 @@ static void atlas_init(CronLine *line)
 	for (i= 0; i<argc; i++)
 		crondlog(LVL7 "atlas_run: argv[%d] = '%s'", i, argv[i]);
 
-	state= bp->testops->init(argc, argv);
+	state= bp->testops->init(argc, argv, 0);
 	if (!state)
 		return;
 	line->teststate= state;

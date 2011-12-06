@@ -32,7 +32,7 @@ extern struct globals G;
 
 struct testops
 {
-	void *(*init)(int argc, char *argv[]);
+	void *(*init)(int argc, char *argv[], void (*done)(void *teststate));
 	void (*start)(void *teststate);
 	int (*delete)(void *teststate);
 };

@@ -232,7 +232,7 @@ static struct option longopts[]=
         { NULL, }
 };
 
-static void *tdig_init(int argc, char *argv[]);
+static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
 { 
@@ -244,7 +244,7 @@ int evtdig_main(int argc, char **argv)
 
 
  struct query_state *qry;
- qry = tdig_init(argc, argv);
+ qry = tdig_init(argc, argv, 0);
  if (!qry)
  {
              crondlog(DIE9 "new query state failed"); /* exits */
@@ -476,7 +476,7 @@ done:
 } 
 
 
-static void *tdig_init(int argc, char *argv[])
+static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 {
         const char *hostname;
 	char *check;

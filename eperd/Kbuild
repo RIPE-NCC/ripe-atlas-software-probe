@@ -5,4 +5,4 @@
 # Licensed under the GPL v2, see the file LICENSE in this tarball.
 
 lib-y:=
-lib-$(CONFIG_EPERD)      += eperd.o condmv.o ping.o evping.o traceroute.o evtdig.o
+lib-$(CONFIG_EPERD)      += eperd.o condmv.o ping.o evping.o traceroute.o evtdig.o evtraceroute.o

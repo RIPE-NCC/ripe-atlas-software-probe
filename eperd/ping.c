@@ -95,7 +95,8 @@ static void ping_cb(int result, int bytes,
 	}
 }
 
-static void *ping_init(int __attribute((unused)) argc, char *argv[])
+static void *ping_init(int __attribute((unused)) argc, char *argv[],
+	void (*done)(void *state))
 {
 	static struct evping_base *ping_base;
 

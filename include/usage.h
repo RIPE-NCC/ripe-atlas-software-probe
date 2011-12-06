@@ -1018,6 +1018,11 @@
      "\n	-i iface	Interface to use (default eth0)" \
      "\n	-p pass		Append four or six byte password PW to the packet" \
 
+#define evtraceroute_trivial_usage \
+       "todo"
+#define evtraceroute_full_usage "\n\n" \
+     "todo"
+
 #define expand_trivial_usage \
        "[-i] [-t NUM] [FILE|-]"
 #define expand_full_usage "\n\n" \
