@@ -17,7 +17,8 @@ struct condmvstate
 	int force;
 };
 
-static void *condmv_init(int argc, char *argv[])
+static void *condmv_init(int argc, char *argv[],
+	void (*done)(void *state) UNUSED_PARAM)
 {
 	char *opt_add, *from, *to;
 	unsigned opt;

@@ -39,7 +39,7 @@
 #include <math.h>
 #include <assert.h>
 #include "eperd.h" 
-#include "evping.h"
+#include "eping.h"
 
 #include <event2/event.h>
 #include <event2/event_struct.h>
