@@ -44,7 +44,7 @@ static sa_family_t family;
 static const char *user_agent= "httpget for atlas.ripe.net";
 static int tcp_fd= -1;
 
-static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
+static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
 static int check_result(FILE *tcp_file, int *result);
 static int eat_headers(FILE *tcp_file, int *chunked, int *content_length,
@@ -121,6 +121,7 @@ int httpget_main(int argc, char *argv[])
 	do_multiline= 0;
 	http_result= -1;
 	dir_length= 0;
+	headers_size= 0;
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
@@ -234,7 +235,10 @@ int httpget_main(int argc, char *argv[])
 		}
 	}
 
-	parse_url(url, &host, &port, &hostport, &path);
+	if (!parse_url(url, &host, &port, &hostport, &path))
+	{
+		goto err;
+	}
 
 	//printf("host: %s\n", host);
 	//printf("port: %s\n", port);
@@ -625,18 +629,26 @@ static int write_to_tcp_fd (int fd, FILE *tcp_file)
 }
 
 
-static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
+static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp)
 {
 	char *item;
 	const char *cp, *np, *prefix;
 	size_t len;
 
+	*hostp= NULL;
+	*portp= NULL;
+	*hostportp= NULL;
+	*pathp= NULL;
+
 	/* the url must start with 'http://' */
 	prefix= "http://";
 	len= strlen(prefix);
 	if (strncasecmp(prefix, url, len) != 0)
-		fatal("bad prefix in url '%s'", url);
+	{
+		report("bad prefix in url '%s'", url);
+		goto fail;
+	}
 
 	cp= url+len;
 
@@ -650,7 +662,10 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= cp+len;
 	}
 	if (len == 0)
-		fatal("missing host part in url '%s'", url);
+	{
+		report("missing host part in url '%s'", url);
+		return 0;
+	}
 	item= malloc(len+1);
 	if (!item) fatal("out of memory");
 	memcpy(item, cp, len);
@@ -677,11 +692,12 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= strchr(cp, ']');
 		if (np == NULL || np == cp+1)
 		{
-			fatal("malformed IPv6 address literal in url '%s'",
+			report("malformed IPv6 address literal in url '%s'",
 				url);
+			goto fail;
 		}
 	}
-	/* Should handle IPv6 address literals */
+
 	np= strchr(np, ':');
 	if (np != NULL)
 		len= np-cp;
@@ -691,7 +707,10 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= cp+len;
 	}
 	if (len == 0)
-		fatal("missing host part in url '%s'", url);
+	{
+		report("missing host part in url '%s'", url);
+		goto fail;
+	}
 	item= malloc(len+1);
 	if (!item) fatal("out of memory");
 	if (cp[0] == '[')
@@ -719,6 +738,31 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	memcpy(item, cp, len);
 	item[len]= '\0';
 	*portp= item;
+
+	return 1;
+
+fail:
+	if (*hostp)
+	{
+		free(*hostp);
+		*hostp= NULL;
+	}
+	if (*portp)
+	{
+		free(*portp);
+		*portp= NULL;
+	}
+	if (*hostportp)
+	{
+		free(*hostportp);
+		*hostportp= NULL;
+	}
+	if (*pathp)
+	{
+		free(*pathp);
+		*pathp= NULL;
+	}
+	return 0;
 }
 
 static int check_result(FILE *tcp_file, int *result)

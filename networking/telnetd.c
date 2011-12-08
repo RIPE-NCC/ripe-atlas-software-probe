@@ -35,10 +35,11 @@
 #define ATLAS 1
 
 #ifdef ATLAS
+#include <string.h>
 #include <unistd.h>
 #include <linux/reboot.h>
 
-#define LOGIN_PREFIX	"(telnet) "
+#define LOGIN_PREFIX	"Atlas probe, see http://atlas.ripe.net/\r\n\r\n"
 #define LOGIN_PROMPT	" login: "
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
@@ -112,6 +113,7 @@ static int start_crontab(struct tsession *ts, char *line);
 static void add_to_crontab(struct tsession *ts, char *line);
 static void end_crontab(struct tsession *ts);
 static void do_oneoff(struct tsession *ts, char *line);
+static int get_probe_id(void);
 #endif
 
 /* Globals */
@@ -489,7 +491,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 {
 	fd_set rdfdset, wrfdset;
 	unsigned opt;
-	int count;
+	int count, probe_id;
 	int num_totty;
 	struct tsession *ts;
 	char *line;
@@ -499,6 +501,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned portnbr = 23;
 	char *opt_bindaddr = NULL;
 	char *opt_portnbr;
+	char buf[80];
 #else
 	enum {
 		IS_INETD = 1,
@@ -641,8 +644,11 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			char *hostname;
 
 			hostname= safe_gethostname();
+			probe_id= get_probe_id();
 			add_2sock(new_ts, LOGIN_PREFIX);
-			add_2sock(new_ts, hostname);
+			snprintf(buf, sizeof(buf), "Probe %d (%s)",
+				probe_id, hostname);
+			add_2sock(new_ts, buf);
 			add_2sock(new_ts, LOGIN_PROMPT);
 			free(hostname);
 #endif /* ATLAS */
@@ -1315,4 +1321,35 @@ static void do_oneoff(struct tsession *ts, char *line)
 	/* And rename back. Ignore any errors */
 	rename(filename_new, filename);
 }
+
+static int get_probe_id(void)
+{
+	int probe_id;
+	size_t len;
+	char *check;
+	const char *key;
+	FILE *fp;
+	char buf[80];
+
+	fp= fopen("/home/atlas/status/reg_init_reply.txt", "r");
+	if (!fp)
+		return -1;
+
+	probe_id= -1;
+	while (fgets(buf, sizeof(buf), fp) != NULL)
+	{
+		if (strchr(buf, '\n') == NULL)
+			continue;
+		key= "PROBE_ID ";
+		len= strlen(key);
+
+		if (strncmp(buf, key, len) != 0 || strlen(buf) <= len)
+			continue;
+		probe_id= strtol(buf+len, &check, 10);
+		break;
+	}
+	fclose(fp);
+	return probe_id;
+}
+
 #endif /* ATLAS */
