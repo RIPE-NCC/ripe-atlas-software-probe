@@ -78,18 +78,34 @@ static void ping_cb(int result, int bytes,
 		getnameinfo(sa, socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		fprintf(fh, "%s %d %s %s %d %d %d %d",
-			pingstate->atlas, (int)time(NULL),
+#define DBQ(str) "\"" #str "\""
+
+		fprintf(fh, "{ ");
+		if (pingstate->atlas)
+		{
+			fprintf(fh, DBQ(id) ":" DBQ(%s),
+				pingstate->atlas);
+		}
+
+		fprintf(fh, "%s" DBQ(time) ":%d, " DBQ(name) ":" DBQ(%s)
+			", " DBQ(addr) ":" DBQ(%s)
+			", " DBQ(size) ":%d"
+			", " DBQ(sent) ":%d"
+			", " DBQ(rcvd) ":%d"
+			", " DBQ(dup) ":%d",
+			pingstate->atlas ? ", " : "", (int)time(NULL),
 			pingstate->hostname, namebuf, bytes,
 			pingstate->sentpkts, 
 			pingstate->rcvdpkts, pingstate->duppkts);
 		if (pingstate->rcvdpkts)
 		{
-			fprintf(fh, " %.3f %.3f %.3f", pingstate->min/1e3,
+			fprintf(fh, ", " DBQ(min) ":%.3f"
+				", " DBQ(avg) ":%.3f"
+				", " DBQ(max) ":%.3f", pingstate->min/1e3,
 				pingstate->sum/1e3/pingstate->sentpkts, 
 				pingstate->max/1e3);
 		}
-		fprintf(fh, "\n");
+		fprintf(fh, " }\n");
 		if (pingstate->out_filename)
 			fclose(fh);
 	}
@@ -122,6 +138,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	/* Parse arguments */
 	pingcount= 3;
 	out_filename= NULL;
+	str_Atlas= NULL;
 	/* exactly one argument needed; -v and -q don't mix; -c NUM, -w NUM, -W NUM */
 	opt_complementary = "=1:q--v:v--q:c+:w+:W+";
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &str_s, &deadline,
@@ -137,11 +154,11 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state= xzalloc(sizeof(*state));
 	state->pingevent= pingevent;
 	state->pingcount= pingcount;
-	state->atlas= strdup(str_Atlas);
+	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
 	state->hostname= strdup(hostname);
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 
-	evping_ping(pingevent, ping_cb, state);
+	evping_ping(pingevent, ping_cb, state, done);
 
 	return state;
 }

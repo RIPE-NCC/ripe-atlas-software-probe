@@ -145,6 +145,8 @@ struct evping_base {
 	counter_t foreign;             /* # of ICMP packets we are not looking for   */
 	counter_t illegal;             /* # of ICMP packets with an illegal payload  */
 
+	void (*done)(void *state);	/* Called when a ping is done */
+
 	u_char packet [MAX_DATA_SIZE];
 
 #ifndef _EVENT_DISABLE_THREAD_SUPPORT
@@ -340,6 +342,8 @@ printf("ping_xmit\n");
 			(struct sockaddr *)&host->sin6, host->socklen,
 			0, 0, NULL,
 			host->user_pointer);
+		    if (host->base->done)
+			host->base->done(host);
 		}
 
 		/* Fake packet sent to kill timer */
@@ -741,6 +745,8 @@ evping_base_new(struct event_base *event_base)
 	event_add(&base->event4, NULL);
 	event_add(&base->event6, NULL);
 
+	base->done= 0;
+
 	EVPING_UNLOCK(base);
 	return base;
 }
@@ -842,10 +848,12 @@ evping_base_host_add(struct evping_base *base, const char * name)
 
 /* exported function */
 void
-evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr)
+evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr,
+	void (*done)(void *state))
 {
 	host->user_callback = callback;
 	host->user_pointer = ptr;
+	host->base->done= done;
 }
 
 void

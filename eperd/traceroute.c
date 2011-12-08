@@ -42,6 +42,8 @@ struct trtbase
 	int v4udp_snd;
 	int v6udp_snd;
 
+	int my_pid;
+
 	struct event event4;
 	struct event event6;
 
@@ -398,12 +400,12 @@ static void send_pkt(struct trtstate *state)
 			icmp6_hdr->icmp6_type= ICMP6_ECHO_REQUEST;
 			icmp6_hdr->icmp6_code= 0;
 			icmp6_hdr->icmp6_cksum= 0;
-			icmp6_hdr->icmp6_id= htons(getpid());
+			icmp6_hdr->icmp6_id= htons(base->my_pid);
 			icmp6_hdr->icmp6_seq= htons(state->seq);
 
 			v6info= (struct v6info *)&icmp6_hdr[1];
 			v6info->fuzz= 0;
-			v6info->pid= htonl(getpid());
+			v6info->pid= htonl(base->my_pid);
 			v6info->id= htonl(state->index);
 			v6info->seq= htonl(state->seq);
 			v6info->tv= state->xmit_time;
@@ -481,7 +483,7 @@ static void send_pkt(struct trtstate *state)
 
 			v6info= (struct v6info *)base->packet;
 			v6info->fuzz= 0;
-			v6info->pid= htonl(getpid());
+			v6info->pid= htonl(base->my_pid);
 			v6info->id= htonl(state->index);
 			v6info->seq= htonl(state->seq);
 			v6info->tv= state->xmit_time;
@@ -1325,8 +1327,8 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			(late || isDup) ? ", " : "",
 			inet_ntoa(remote.sin_addr));
 		add_str(state, line);
-		snprintf(line, sizeof(line), ", \"ttl\":%d",
-			ip->ip_ttl);
+		snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
+			ip->ip_ttl, (int)nrecv);
 		add_str(state, line);
 		if (!late)
 		{
@@ -1539,6 +1541,12 @@ static void ready_callback6(int __attribute((unused)) unused,
 				ntohl(v6info->id),
 				ntohl(v6info->seq));
 #endif
+
+			if (ntohl(v6info->pid) != base->my_pid)
+			{
+				/* From a different process */
+				return;
+			}
 
 			ind= ntohl(v6info->id);
 
@@ -1774,6 +1782,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 		v6info= (struct v6info *)&icmp[1];
 
+		if (ntohl(v6info->pid) != base->my_pid)
+		{
+			/* From a different process */
+			return;
+		}
+
 		ind= ntohl(v6info->id);
 
 		state= NULL;
@@ -1935,6 +1949,8 @@ static struct trtbase *traceroute_base_new(struct event_base
 	base->v6icmp_snd= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	base->v4udp_snd= xsocket(AF_INET, SOCK_DGRAM, 0);
 	base->v6udp_snd= xsocket(AF_INET6, SOCK_DGRAM, 0);
+
+	base->my_pid= getpid();
 
 	on = 1;
 	setsockopt(base->v6icmp_rcv, IPPROTO_IPV6, IPV6_RECVPKTINFO,

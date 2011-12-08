@@ -114,14 +114,13 @@ struct evping_host *evping_base_host_add(struct evping_base *base,
   @param callback a callback function to invoke when each request is completed/elapsed
   @param ptr an argument to pass to the callback function
  */
-void evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr);
 
 /**
   Send ICMP ECHO_REQUEST to a host.
 
   @param host the evping_host to which to apply this operation
  */
-void evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr);
+void evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr, void (*done)(void *state));
 
 void evping_start(struct evping_host *host, int count);
 
