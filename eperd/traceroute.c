@@ -12,7 +12,6 @@ traceroute.c
 #include <netinet/udp.h>
 
 #include "eperd.h"
-#include "evping.h"
 
 #if !STANDALONE_BUSYBOX
 #define uh_sport source

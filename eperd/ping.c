@@ -6,7 +6,7 @@ ping.c
 #include <event2/event.h>
 
 #include "eperd.h"
-#include "evping.h"
+#include "eping.h"
 
 #define PING_OPT_STRING ("qvc:s:w:W:I:A:O:4D6")
 
