@@ -120,7 +120,8 @@ struct evping_host *evping_base_host_add(struct evping_base *base,
 
   @param host the evping_host to which to apply this operation
  */
-void evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr, void (*done)(void *state));
+void evping_ping(struct evping_host *host, size_t size,
+	evping_callback_type callback, void *ptr, void (*done)(void *state));
 
 void evping_start(struct evping_host *host, int count);
 

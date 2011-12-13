@@ -279,7 +279,7 @@ static void report(struct trtstate *state)
 	else
 		fh= stdout;
 
-	fprintf(fh, "{ ");
+	fprintf(fh, "RESULT { ");
 	if (state->atlas)
 	{
 		fprintf(fh, "\"id\":\"%s\", \"time\":%ld, ",

@@ -65,7 +65,6 @@
  */
 #define IPHDR              20
 #define MIN_DATA_SIZE      sizeof(struct evdata)
-#define DEFAULT_DATA_SIZE  (MIN_DATA_SIZE + 44)                   /* calculated as so to be like traditional ping */
 #define MAX_DATA_SIZE      (4096 - IPHDR - ICMP_MINLEN)
 #define DEFAULT_PKT_SIZE   ICMP_MINLEN + DEFAULT_DATA_SIZE
 
@@ -97,6 +96,7 @@ struct evping_host {
 
 	struct sockaddr_in6 sin6;	/* IPv[46] address */
 	socklen_t socklen;		/* Lenght of socket address */
+	size_t maxsize;
 
 	int maxpkts;			/* Number of packets to send */
 
@@ -108,6 +108,7 @@ struct evping_host {
 	struct event ping_timer;       /* Timer to ping host at given intervals   */
 
 	/* Packets Counters */
+	size_t cursize;
 	counter_t sentpkts;            /* Total # of ICMP Echo Requests sent      */
 
 	evping_callback_type user_callback;
@@ -125,14 +126,13 @@ struct evping_base {
 	evutil_socket_t rawfd4;	       /* Raw socket used to ping hosts (IPv4)              */
 	evutil_socket_t rawfd6;	       /* Raw socket used to ping hosts (IPv6)              */
 
-	uint32_t pktsize;              /* Packet size in bytes (ICMP plus User Data) */
 	pid_t pid;                     /* Identifier to send with each ICMP Request  */
 
 	struct timeval tv_interval;    /* Ping interval between two subsequent pings */
 
-	/* A circular list of hosts to ping. */
-	struct evping_host *host_head;
-	unsigned argc;                 /* # of hosts to be pinged                    */
+	/* A list of hosts to ping. */
+	struct evping_host **table;
+	int tabsiz;
 
 	struct event event4;            /* Used to detect read events on raw socket   */
 	struct event event6;            /* Used to detect read events on raw socket   */
@@ -195,25 +195,6 @@ msecstotv(time_t msecs, struct timeval *tv)
 }
 
 
-/* Lookup for a host by its index */
-static struct evping_host *
-evping_lookup_host(struct evping_base *base, int idx)
-{
-	struct evping_host *host;
-
-	host = base->host_head;
-	if (!host)
-		goto done;
-	do {
-		if (host->index == idx)
-		  return host;
-		host = host->next;
-	} while (host != base->host_head);
-done:
-	return NULL;
-}
-
-
 /*
  * Checksum routine for Internet Protocol family headers (C Version).
  * From ping examples in W. Richard Stevens "Unix Network Programming" book.
@@ -260,13 +241,23 @@ static int mkcksum(u_short *p, int n)
  * to keep an unique integer used as index in the array
  * ho hosts being monitored
  */
-static void fmticmp4(u_char *buffer, unsigned size, u_int8_t seq,
+static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	uint32_t idx, pid_t pid)
 {
+	size_t minlen;
 	struct icmp *icmp = (struct icmp *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + ICMP_MINLEN);
 
 	struct timeval now;
+
+	minlen= ICMP_MINLEN + sizeof(*data);
+	if (*sizep < minlen)
+		*sizep= minlen;
+	if (*sizep > MAX_DATA_SIZE)
+		*sizep= MAX_DATA_SIZE;
+
+	if (*sizep > minlen)
+		memset(buffer+minlen, '\0', *sizep-minlen);
 
 	/* The ICMP header (no checksum here until user data has been filled in) */
 	icmp->icmp_type = ICMP_ECHO;             /* type of message */
@@ -281,7 +272,7 @@ static void fmticmp4(u_char *buffer, unsigned size, u_int8_t seq,
 
 	/* Last, compute ICMP checksum */
 	icmp->icmp_cksum = 0;
-	icmp->icmp_cksum = mkcksum((u_short *) icmp, size);  /* ones complement checksum of struct */
+	icmp->icmp_cksum = mkcksum((u_short *) icmp, *sizep);  /* ones complement checksum of struct */
 }
 
 
@@ -300,13 +291,23 @@ static void fmticmp4(u_char *buffer, unsigned size, u_int8_t seq,
  * to keep an unique integer used as index in the array
  * ho hosts being monitored
  */
-static void fmticmp6(u_char *buffer, unsigned size,
+static void fmticmp6(u_char *buffer, size_t *sizep,
 	u_int8_t seq, uint32_t idx, pid_t pid)
 {
+	size_t minlen;
 	struct icmp6_hdr *icmp = (struct icmp6_hdr *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + offsetof(struct icmp6_hdr, icmp6_data16[2]));
 
 	struct timeval now;
+
+	minlen= offsetof(struct icmp6_hdr, icmp6_data16[2]) + sizeof(*data);
+	if (*sizep < minlen)
+		*sizep= minlen;
+	if (*sizep > MAX_DATA_SIZE)
+		*sizep= MAX_DATA_SIZE;
+
+	if (*sizep > minlen)
+		memset(buffer+minlen, '\0', *sizep-minlen);
 
 	/* The ICMP header (no checksum here until user data has been filled in) */
 	icmp->icmp6_type = ICMP6_ECHO_REQUEST;   /* type of message */
@@ -338,7 +339,7 @@ printf("ping_xmit\n");
 		/* Done. */
 		if (host->user_callback)
 		{
-		    host->user_callback(PING_ERR_DONE, base->pktsize,
+		    host->user_callback(PING_ERR_DONE, host->cursize,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			0, 0, NULL,
 			host->user_pointer);
@@ -356,17 +357,17 @@ printf("ping_xmit\n");
 	if (host->sin6.sin6_family == AF_INET6)
 	{
 		/* Format the ICMP Echo Reply packet to send */
-		fmticmp6(base->packet, base->pktsize, host->seq, host->index,
+		fmticmp6(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-		nsent = sendto(base->rawfd6, base->packet, base->pktsize,
+		nsent = sendto(base->rawfd6, base->packet, host->cursize,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
 	}
 	else
 	{
 		/* Format the ICMP Echo Reply packet to send */
-		fmticmp4(base->packet, base->pktsize, host->seq, host->index,
+		fmticmp4(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
 #if 0
@@ -377,12 +378,12 @@ printf("ping_xmit\n");
 			printf("\n");
 		}
 #endif
-		nsent = sendto(base->rawfd4, base->packet, base->pktsize,
+		nsent = sendto(base->rawfd4, base->packet, host->cursize,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
 	}
 
-	if (nsent == base->pktsize)
+	if (nsent > 0)
 	  {
 	    /* One more ICMP Echo Request sent */
 	    base->sentok++;
@@ -510,9 +511,8 @@ printf("ready_callback4: too short\n");
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
-	if (base->argc < data->index)
+	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
 	  {
-printf("ready_callback4: illegal\n");
 	    /* One more illegal packet */
 	    base->illegal++;
 
@@ -520,7 +520,7 @@ printf("ready_callback4: illegal\n");
 	  }
 
 	/* Get the pointer to the host descriptor in our internal table */
-	host = evping_lookup_host(base, data->index);
+	host= base->table[data->index];
 
 	/* Check for Destination Host Unreachable */
 	if (icmp->type == ICMP_ECHOREPLY)
@@ -624,7 +624,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
-	if (base->argc < data->index)
+	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
 	  {
 	    /* One more illegal packet */
 	    base->illegal++;
@@ -633,7 +633,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  }
 
 	/* Get the pointer to the host descriptor in our internal table */
-	host = evping_lookup_host(base, data->index);
+	host= base->table[data->index];
 
 	/* Check for Destination Host Unreachable */
 	if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
@@ -681,37 +681,31 @@ done:
 struct evping_base *
 evping_base_new(struct event_base *event_base)
 {
-	struct protoent *proto;
+	int p_proto;
+	struct protoent *protop;
 	evutil_socket_t fd4, fd6;
 	struct evping_base *base;
 
-	static struct protoent icmp_default;
-
-
 	/* Check if the ICMP protocol is available on this system */
-	if (!(proto = getprotobyname("icmp"))) {
-	  icmp_default.p_name= "icmp";
-	  icmp_default.p_aliases= NULL;
-	  icmp_default.p_proto= IPPROTO_ICMP;
-	  proto= &icmp_default;
-	  //return NULL;
-	}
+	protop = getprotobyname("icmp");
+	if (protop)
+		p_proto= protop->p_proto;
+	else
+		p_proto= IPPROTO_ICMP;
 
 	/* Create an endpoint for communication using raw socket for ICMP calls */
-	if ((fd4 = socket(AF_INET, SOCK_RAW, proto->p_proto)) == -1) {
+	if ((fd4 = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
 	  return NULL;
 	}
 
 	/* Check if the ICMP6 protocol is available on this system */
-	if (!(proto = getprotobyname("icmp6"))) {
-	  icmp_default.p_name= "icmp6";
-	  icmp_default.p_aliases= NULL;
-	  icmp_default.p_proto= IPPROTO_ICMPV6;
-	  proto= &icmp_default;
-	  //return NULL;
-	}
+	protop = getprotobyname("icmp6");
+	if (protop)
+		p_proto= protop->p_proto;
+	else
+		p_proto= IPPROTO_ICMPV6;
 
-	if ((fd6 = socket(AF_INET6, SOCK_RAW, proto->p_proto)) == -1) {
+	if ((fd6 = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
 	  close(fd4);
 	  return NULL;
 	}
@@ -726,13 +720,15 @@ evping_base_new(struct event_base *event_base)
 
 	base->event_base = event_base;
 
+	base->tabsiz= 10;
+	base->table= xzalloc(base->tabsiz * sizeof(*base->table));
+
 	base->rawfd4 = fd4;
 	base->rawfd6 = fd6;
 	evutil_make_socket_nonblocking(base->rawfd4);
 	evutil_make_socket_nonblocking(base->rawfd6);
 
 	/* Set default values */
-	base->pktsize = DEFAULT_PKT_SIZE;
 	base->pid = getpid();
 
 	msecstotv(DEFAULT_PING_INTERVAL, &base->tv_interval);
@@ -770,6 +766,7 @@ evping_base_free(struct evping_base *base,
 struct evping_host *
 evping_base_host_add(struct evping_base *base, const char * name)
 {
+	int i, newsiz;
 	struct evping_host *host;
 	len_and_sockaddr *lsa;
 	sa_family_t af;
@@ -799,47 +796,29 @@ evping_base_host_add(struct evping_base *base, const char * name)
 
 	host->base = base;
 
-	host->index = base->argc;
 	host->seq = 1;
 
 	/* Define here the callbacks to ping the host and to handle no reply timeouts */
 	evtimer_assign(&host->ping_timer, base->event_base,
 		noreply_callback, host);
 
-	/* insert this nameserver into the list of them */
-	if (!base->host_head) {
-	  host->next = host->prev = host;
-	  base->host_head = host;
-	} else {
-	  host->next = base->host_head->next;
-	  host->next->prev= host;
-	  host->prev = base->host_head;
-	  base->host_head->next = host;
-	  
-#if 0
-	  { struct evping_host *h;
-		printf("evping_base_host_add: after insert, forward:");
-		for (h= base->host_head; h; h= h->next)
-		{
-			printf(" %p", h);
-			if (h->next == base->host_head)
-				break;
-		}
-		printf("\n");
-
-		printf("evping_base_host_add: after insert, reverse:");
-		for (h= base->host_head; h; h= h->prev)
-		{
-			printf(" %p", h);
-			if (h->prev == base->host_head)
-				break;
-		}
-		printf("\n");
+	for (i= 0; i<base->tabsiz; i++)
+	{
+		if (base->table[i] == NULL)
+			break;
 	}
-#endif
+	if (i >= base->tabsiz)
+	{
+		newsiz= 2*base->tabsiz;
+		base->table= xrealloc(base->table,
+			newsiz*sizeof(*base->table));
+		for (i= base->tabsiz; i<newsiz; i++)
+			base->table[i]= NULL;
+		i= base->tabsiz;
+		base->tabsiz= newsiz;
 	}
-
-	base->argc++;
+	host->index= i;
+	base->table[i]= host;
 
 	EVPING_UNLOCK(base);
 	return host;
@@ -848,9 +827,11 @@ evping_base_host_add(struct evping_base *base, const char * name)
 
 /* exported function */
 void
-evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr,
+evping_ping(struct evping_host *host, size_t size,
+	evping_callback_type callback, void *ptr,
 	void (*done)(void *state))
 {
+	host->maxsize = size;
 	host->user_callback = callback;
 	host->user_pointer = ptr;
 	host->base->done= done;
@@ -859,60 +840,14 @@ evping_ping(struct evping_host *host, evping_callback_type callback, void *ptr,
 void
 evping_delete(struct evping_host *host)
 {
-	struct evping_host *h;
 	struct evping_base *base= host->base;
 
-	printf("evping_delete: before delete, forward:");
-	for (h= base->host_head; h; h= h->next)
-	{
-		printf(" %p", h);
-		if (h->next == base->host_head)
-			break;
-	}
-	printf("\n");
-
-	printf("evping_delete: before delete, reverse:");
-	for (h= base->host_head; h; h= h->prev)
-	{
-		printf(" %p", h);
-		if (h->prev == base->host_head)
-			break;
-	}
-	printf("\n");
-
 	evtimer_del(&host->ping_timer);
-	if (host->next == host)
-	{
-		/* Only element in list */
-		host->base->host_head= NULL;
-	}
-	else
-	{
-		host->next->prev= host->prev;
-		host->prev->next= host->next;
-		if (host->base->host_head == host)
-			host->base->host_head= host->next;
-	}
+
+	assert(base->table[host->index] == host);
+	base->table[host->index]= NULL;
+
 	free(host);
-
-	printf("evping_delete: after delete, forward:");
-	for (h= base->host_head; h; h= h->next)
-	{
-		printf(" %p", h);
-		if (h->next == base->host_head)
-			break;
-	}
-	printf("\n");
-
-	printf("evping_delete: after delete, reverse:");
-	for (h= base->host_head; h; h= h->prev)
-	{
-		printf(" %p", h);
-		if (h->prev == base->host_head)
-			break;
-	}
-	printf("\n");
-
 }
 
 /* exported function */
@@ -921,6 +856,7 @@ evping_start(struct evping_host *host, int count)
 {
 	host->maxpkts= count;
 	host->sentpkts= 0;
+	host->cursize= host->maxsize;
 
 	ping_xmit(host);
 
@@ -934,18 +870,15 @@ printf("evping_start: adding timer\n");
 int
 evping_base_count_hosts(struct evping_base *base)
 {
-	const struct evping_host *host;
-	int n = 0;
+	int i, n = 0;
 
 	EVPING_LOCK(base);
-	host = base->host_head;
-	if (!host)
-		goto done;
-	do {
-		++n;
-		host = host->next;
-	} while (host != base->host_head);
-done:
+	for (i= 0; i<base->tabsiz; i++)
+	{
+		if (base->table[i])
+			n++;
+	}
+
 	EVPING_UNLOCK(base);
 	return n;
 }

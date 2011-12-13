@@ -8,7 +8,7 @@ ping.c
 #include "eperd.h"
 #include "eping.h"
 
-#define PING_OPT_STRING ("qvc:s:w:W:I:A:O:4D6")
+#define PING_OPT_STRING ("c:s:A:O:4D6")
 
 struct pingstate
 {
@@ -80,7 +80,7 @@ static void ping_cb(int result, int bytes,
 
 #define DBQ(str) "\"" #str "\""
 
-		fprintf(fh, "{ ");
+		fprintf(fh, "RESULT { ");
 		if (pingstate->atlas)
 		{
 			fprintf(fh, DBQ(id) ":" DBQ(%s),
@@ -102,7 +102,7 @@ static void ping_cb(int result, int bytes,
 			fprintf(fh, ", " DBQ(min) ":%.3f"
 				", " DBQ(avg) ":%.3f"
 				", " DBQ(max) ":%.3f", pingstate->min/1e3,
-				pingstate->sum/1e3/pingstate->sentpkts, 
+				pingstate->sum/1e3/pingstate->rcvdpkts, 
 				pingstate->max/1e3);
 		}
 		fprintf(fh, " }\n");
@@ -118,12 +118,9 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 	int opt;
 	unsigned pingcount; /* must be int-sized */
-	unsigned deadline;
-	unsigned timeout;
-	char *str_I;
-	char *str_Atlas;
+	unsigned size;
 	const char *hostname;
-	char *str_s;
+	char *str_Atlas;
 	char *out_filename;
 	struct pingstate *state;
 	struct evping_host *pingevent;
@@ -137,12 +134,13 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Parse arguments */
 	pingcount= 3;
-	out_filename= NULL;
+	size= 0;
 	str_Atlas= NULL;
-	/* exactly one argument needed; -v and -q don't mix; -c NUM, -w NUM, -W NUM */
-	opt_complementary = "=1:q--v:v--q:c+:w+:W+";
-	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &str_s, &deadline,
-		&timeout, &str_I, &str_Atlas, &out_filename);
+	out_filename= NULL;
+	/* exactly one argument needed; -c NUM */
+	opt_complementary = "=1:c+:s+";
+	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
+		&str_Atlas, &out_filename);
 	hostname = argv[optind];
 
 	pingevent= evping_base_host_add(ping_base, hostname);
@@ -158,7 +156,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->hostname= strdup(hostname);
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 
-	evping_ping(pingevent, ping_cb, state, done);
+	evping_ping(pingevent, size, ping_cb, state, done);
 
 	return state;
 }

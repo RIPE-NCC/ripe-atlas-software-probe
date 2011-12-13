@@ -1021,6 +1021,13 @@
 #define evping_trivial_usage \
        "todo"
 #define evping_full_usage "\n\n" \
+	"\nOptions:" \
+	"\n	-c <count>	Number of packets" \
+	"\n	-s <size>	Size" \
+	"\n	-A <id>		Atlas measurement ID" \
+	"\n	-O <out file>	Output file name" \
+	"\n	-4		IPv4" \
+	"\n	-6		IPv6" \
      "todo"
 
 #define evtraceroute_trivial_usage \
