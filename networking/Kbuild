@@ -35,6 +35,7 @@ lib-$(CONFIG_PSCAN)        += pscan.o
 lib-$(CONFIG_ROUTE)        += route.o
 lib-$(CONFIG_RXTXRPT)      += rxtxrpt.o
 lib-$(CONFIG_SLATTACH)     += slattach.o
+lib-$(CONFIG_SSLGETCERT)   += sslgetcert.o
 lib-$(CONFIG_TC)           += tc.o
 lib-$(CONFIG_TDIG)         += tdig.o
 lib-$(CONFIG_TELNET)       += telnet.o

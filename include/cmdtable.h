@@ -11,6 +11,7 @@ int httppost_main(int argc, char *argv[]);
 int nslookup_main(int argc, char *argv[]);
 int ping6_main(int argc, char *argv[]);
 int ping_main(int argc, char *argv[]);
+int sslgetcert_main(int argc, char *argv[]);
 int tdig_main(int argc, char *argv[]);
 int traceroute_main(int argc, char *argv[]);
 
@@ -27,6 +28,7 @@ static struct builtin
 	{ "nslookup", nslookup_main },
 	{ "ping6", ping6_main },
 	{ "ping", ping_main },
+	{ "sslgetcert", sslgetcert_main },
 	{ "tdig", tdig_main },
 	{ "traceroute", traceroute_main },
 	{ NULL, 0 }

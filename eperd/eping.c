@@ -331,8 +331,6 @@ static void ping_xmit(struct evping_host *host)
 
 	int nsent;
 
-printf("ping_xmit\n");
-
 	host->got_reply= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
@@ -417,7 +415,6 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 
 	if (host->sentpkts <= host->maxpkts)
 	{
-printf("noreply_callback: adding timer\n");
 		evtimer_add(&host->ping_timer, &host->base->tv_interval);
 	}
 }
@@ -861,7 +858,6 @@ evping_start(struct evping_host *host, int count)
 	ping_xmit(host);
 
 	/* Add the timer to handle no reply condition in the given timeout */
-printf("evping_start: adding timer\n");
 	evtimer_add(&host->ping_timer, &host->base->tv_interval);
 }
 

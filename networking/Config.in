@@ -727,6 +727,12 @@ config SLATTACH
 	  slattach is a small utility to attach network interfaces to serial
 	  lines.
 
+config SSLGETCERT
+	bool "sslgetcert"
+	default n
+	help 
+	  simple simple program to get certificates from an ssl server
+
 #config TC
 #	bool "tc"
 #	default n

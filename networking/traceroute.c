@@ -1107,6 +1107,17 @@ common_traceroute_main(int op, char **argv)
 				argv[0], tmpstr, s_errno);
 			free(tmpstr);
 
+			if (rcvsock != -1)
+			{
+				close(rcvsock);
+				rcvsock= -1;
+			}
+			if (sndsock != -1)
+			{
+				close(sndsock);
+				sndsock= -1;
+			}
+
 			close(probe_fd);
 			/* Is this all, nothing more the clean up? */
 			return 1; 

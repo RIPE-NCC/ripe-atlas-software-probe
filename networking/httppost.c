@@ -30,14 +30,18 @@ struct option longopts[]=
 static char *time_tolerance;
 static char buffer[1024];
 
+/* Result sent by controller when input is acceptable. */
+#define OK_STR	"OK\n"
+
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
 static int check_result(FILE *tcp_file);
 static int eat_headers(FILE *tcp_file, int *chunked, int *content_length);
 static int connect_to_name(char *host, char *port);
 char *do_dir(char *dir_name, off_t *lenp);
-static int copy_chunked(FILE *in_file, FILE *out_file);
-static int copy_bytes(FILE *in_file, FILE *out_file, size_t len);
+static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp);
+static int copy_bytes(FILE *in_file, FILE *out_file, size_t len,
+	int *found_okp);
 static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
 static void report(const char *fmt, ...);
@@ -51,7 +55,7 @@ int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
 	int c,  r, fd, fdF, fdH, fdS, tcp_fd, chunked, content_length, result;
-	int opt_delete_file;
+	int opt_delete_file, found_ok;
 	char *url, *host, *port, *hostport, *path, *filelist, *p;
 	char *post_dir, *post_file, *output_file, *post_footer, *post_header;
 	FILE *tcp_file, *out_file;
@@ -310,17 +314,19 @@ int httppost_main(int argc, char *argv[])
 
 	if (chunked)
 	{
-		if (!copy_chunked(tcp_file, out_file))
+		if (!copy_chunked(tcp_file, out_file, &found_ok))
 			goto err;
 	}
 	else if (content_length)
 	{
-		if (!copy_bytes(tcp_file, out_file, content_length))
+		if (!copy_bytes(tcp_file, out_file, content_length, &found_ok))
 			goto err;
 	}
-	fprintf(stderr, "httppost: deleting files\n");
-	if ( opt_delete_file == 1 )
+	if (!found_ok)
+		fprintf(stderr, "httppost: reply text was not equal to OK\n");
+	if ( opt_delete_file == 1  && found_ok)
 	{
+		fprintf(stderr, "httppost: deleting files\n");
 		if (post_file)
 			unlink (post_file);
 		if (post_dir)
@@ -793,10 +799,13 @@ char *do_dir(char *dir_name, off_t *lenp)
 	return list;
 }
 
-static int copy_chunked(FILE *in_file, FILE *out_file)
+static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 {
+	int i;
 	size_t len, offset, size;
-	char *cp, *line, *check;
+	char *cp, *line, *check, *okp;
+
+	okp= OK_STR;
 
 	for (;;)
 	{
@@ -837,6 +846,18 @@ static int copy_chunked(FILE *in_file, FILE *out_file)
 			if (fwrite(buffer, size, 1, out_file) != 1)
 				fatal_err("error writing output");
 			offset += size;
+
+			for (i= 0; i<size; i++)
+			{
+				if (!okp)
+					break;
+				if (*okp != buffer[i] || *okp == '\0')
+				{
+					okp= NULL;
+					break;
+				}
+				okp++;
+			}
 		}
 
 		/* Expect empty line after data */
@@ -878,12 +899,17 @@ static int copy_chunked(FILE *in_file, FILE *out_file)
 
 		fprintf(stderr, "httppost: got end-of-chunk line '%s'\n", line);
 	}
+	*found_okp= (okp != NULL && *okp == '\0');
 	return 1;
 }
 
-static int copy_bytes(FILE *in_file, FILE *out_file, size_t len)
+static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 {
+	int i;
 	size_t offset, size;
+	char *okp;
+
+	okp= OK_STR;
 
 	offset= 0;
 
@@ -900,7 +926,20 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len)
 		if (fwrite(buffer, size, 1, out_file) != 1)
 			fatal_err("error writing output");
 		offset += size;
+
+		for (i= 0; i<size; i++)
+		{
+			if (!okp)
+				break;
+			if (*okp != buffer[i] || *okp == '\0')
+			{
+				okp= NULL;
+				break;
+			}
+			okp++;
+		}
 	}
+	*found_okp= (okp != NULL && *okp == '\0');
 	return 1;
 }
 

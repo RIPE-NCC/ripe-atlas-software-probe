@@ -3916,6 +3916,16 @@
        "$ split TODO foo\n" \
        "$ cat TODO | split -a 2 -l 2 TODO_\n"
 
+#define sslgetcert_trivial_usage \
+	"-[46] [-A <id>] [-p <port>] <hostname>"
+#define sslgetcert_full_usage "\n\n" \
+	"\nOptions:" \
+	"\n	-A <id>		Atlas measurement ID" \
+	"\n	-p <port>	Port (default https)" \
+	"\n	-4		IPv4" \
+	"\n	-6		IPv6" \
+     "todo"
+
 #define start_stop_daemon_trivial_usage \
        "[OPTIONS] [-S|-K] ... [-- arguments...]"
 #define start_stop_daemon_full_usage "\n\n" \
