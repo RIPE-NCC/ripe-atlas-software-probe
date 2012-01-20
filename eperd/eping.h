@@ -41,6 +41,7 @@ extern "C" {
 #define PING_ERR_DONE      3	   /* Max number of packets to send has been
 				    * reached.
 				    */
+#define PING_ERR_SENDTO    4       /* Sendto system call failed */
 #define PING_ERR_SHUTDOWN 10       /* The request was canceled because the PING subsystem was shut down */
 #define PING_ERR_CANCEL   12       /* The request was canceled via a call to evping_cancel_request */
 #define PING_ERR_UNKNOWN  16       /* An unknown error occurred */
@@ -58,8 +59,9 @@ extern "C" {
  * - arg is the user data passed at the time the activity has been started
  */
 typedef void (*evping_callback_type) (int result, int bytes,
-	struct sockaddr *sa, socklen_t socklen, int seq, int ttl,
-	struct timeval * elapsed, void * arg);
+	struct sockaddr *sa, socklen_t socklen,
+	struct sockaddr *loc_sa, socklen_t loc_socklen,
+	int seq, int ttl, struct timeval * elapsed, void * arg);
 
 
 struct evping_base;
@@ -104,7 +106,7 @@ void evping_base_free(struct evping_base *base, int fail_requests);
   @return 0 if successful, or -1 if an error occurred
  */
 struct evping_host *evping_base_host_add(struct evping_base *base,	
-	const char *name);
+	sa_family_t af, const char *name);
 
 
 /**

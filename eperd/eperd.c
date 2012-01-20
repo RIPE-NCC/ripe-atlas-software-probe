@@ -714,9 +714,9 @@ static struct builtin
 	struct testops *testops;
 } builtin_cmds[]=
 {
-	{ "ping", &ping_ops },
-	{ "tdig", &tdig_ops },
-	{ "traceroute", &traceroute_ops },
+	{ "evping", &ping_ops },
+	{ "evtdig", &tdig_ops },
+	{ "evtraceroute", &traceroute_ops },
 	{ "condmv", &condmv_ops },
 	{ NULL, NULL }
 };

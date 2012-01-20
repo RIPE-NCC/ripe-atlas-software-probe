@@ -27,8 +27,9 @@ struct option longopts[]=
 	{ NULL, }
 };
 
-static char *time_tolerance;
 static char buffer[1024];
+static int tcp_fd;
+static time_t start_time;
 
 /* Result sent by controller when input is acceptable. */
 #define OK_STR	"OK\n"
@@ -36,7 +37,7 @@ static char buffer[1024];
 static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
 static int check_result(FILE *tcp_file);
-static int eat_headers(FILE *tcp_file, int *chunked, int *content_length);
+static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t *timep);
 static int connect_to_name(char *host, char *port);
 char *do_dir(char *dir_name, off_t *lenp);
 static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp);
@@ -54,11 +55,13 @@ static void kick_watchdog(void);
 int httppost_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httppost_main(int argc, char *argv[])
 {
-	int c,  r, fd, fdF, fdH, fdS, tcp_fd, chunked, content_length, result;
+	int c,  r, fd, fdF, fdH, fdS, chunked, content_length, result;
 	int opt_delete_file, found_ok;
 	char *url, *host, *port, *hostport, *path, *filelist, *p;
-	char *post_dir, *post_file, *output_file, *post_footer, *post_header;
+	char *post_dir, *post_file, *atlas_id, *output_file, *post_footer, *post_header;
+	char *time_tolerance;
 	FILE *tcp_file, *out_file;
+	time_t server_time;
 	struct stat sbF, sbH, sbS;
 	off_t     cLength, dir_length;
 	struct sigaction sa;
@@ -67,6 +70,7 @@ int httppost_main(int argc, char *argv[])
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
+	atlas_id= NULL;
 	output_file= NULL;
 	opt_delete_file = 0;
 	time_tolerance = NULL;
@@ -86,10 +90,13 @@ int httppost_main(int argc, char *argv[])
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "O:?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "A:O:?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
+		case 'A':
+			atlas_id= optarg;
+			break;
 		case 'O':
 			output_file= optarg;
 			break;
@@ -207,6 +214,8 @@ int httppost_main(int argc, char *argv[])
 		}
 	}
 
+	time(&start_time);
+
 	sa.sa_flags= 0;
 	sa.sa_handler= got_alarm;
 	sigemptyset(&sa.sa_mask);
@@ -228,7 +237,6 @@ int httppost_main(int argc, char *argv[])
 		report("fdopen failed");
 		goto err;
 	}
-	tcp_fd= -1;
 
 	fprintf(stderr, "httppost: sending request\n");
 	fprintf(tcp_file, "POST %s HTTP/1.1\r\n", path);
@@ -296,8 +304,50 @@ int httppost_main(int argc, char *argv[])
 	if (!check_result(tcp_file))
 		goto err;
 	fprintf(stderr, "httppost: getting reply headers \n");
-	if (!eat_headers(tcp_file, &chunked, &content_length))
+	server_time= 0;
+	if (!eat_headers(tcp_file, &chunked, &content_length, &server_time))
 		goto err;
+
+	if (time_tolerance && server_time > 0)
+	{
+		/* Try to set time from server */
+		time_t now, tolerance;
+
+		tolerance= strtoul(time_tolerance, &p, 10);
+		if (p[0] != '\0')
+		{
+			fatal("unable to parse tolerance '%s'",
+				time_tolerance);
+		}
+		now= time(NULL);
+		if (now < server_time-tolerance || now > server_time+tolerance)
+		{
+			if (now-start_time > 5)
+			{
+				fprintf(stderr,
+					"not setting time, server took too long to reply (%d)\n",
+					now-start_time);
+				if (atlas_id)
+				{
+					printf(
+		"RESULT %s ongoing %d httppost not setting time, start %d, local %d, remote %d\n",
+						atlas_id, time(NULL), start_time, now, server_time);
+				}
+			}
+			else
+			{
+				fprintf(stderr, "setting time, time difference is %ld\n",
+					(long)server_time-now);
+				stime(&server_time);
+				if (atlas_id)
+				{
+					printf(
+			"RESULT %s ongoing %d httppost setting time, local %d, remote %d\n",
+						atlas_id, time(NULL), now, server_time);
+				}
+			}
+		}
+	}
 
 	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
@@ -348,7 +398,11 @@ leave:
 	if (fdF != -1) close(fdF);
 	if (fdS != -1) close(fdS);
 	if (fd != -1) close(fd);
-	if (tcp_file) fclose(tcp_file);
+	if (tcp_file)
+	{
+		fclose(tcp_file);
+		tcp_fd= -1;
+	}
 	if (tcp_fd != -1) close(tcp_fd);
 	if (out_file) fclose(out_file);
 	if (host) free(host);
@@ -371,6 +425,7 @@ err:
 static int write_to_tcp_fd (int fd, FILE *tcp_file)
 {
 	int r;
+
 	/* Copy file */
 	while(r= read(fd, buffer, sizeof(buffer)), r > 0)
 	{
@@ -379,7 +434,6 @@ static int write_to_tcp_fd (int fd, FILE *tcp_file)
 			report_err("error writing to tcp connection");
 			return 0;
 		}
-		kick_watchdog();
 		alarm(10);
 	}
 	if (r == -1)
@@ -490,7 +544,6 @@ static int check_result(FILE *tcp_file)
 	size_t len;
 	char *cp, *check, *line;
 	const char *prefix;
-
 	
 	while (fgets(buffer, sizeof(buffer), tcp_file) == NULL)
 	{
@@ -502,7 +555,6 @@ static int check_result(FILE *tcp_file)
 		if (errno == EINTR)
 		{
 			report("timeout");
-			kick_watchdog();
 			sleep(10);
 		}
 		else
@@ -548,7 +600,7 @@ static int check_result(FILE *tcp_file)
 	return 1;
 }
 
-static int eat_headers(FILE *tcp_file, int *chunked, int *content_length)
+static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t *timep)
 {
 	char *line, *cp, *ncp, *check;
 	size_t len;
@@ -571,35 +623,19 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length)
 
 		fprintf(stderr, "httppost: got line '%s'\n", line);
 
-		if (time_tolerance && strncmp(line, "Date: ", 6) == 0)
+		if (strncmp(line, "Date: ", 6) == 0)
 		{
-			/* Try to set time from server */
-			time_t now, tim, tolerance;
+			/* Parse date header */
 			struct tm tm;
 
-			tolerance= strtoul(time_tolerance, &cp, 10);
-			if (cp[0] != '\0')
-			{
-				fatal("unable to parse tolerance '%s'",
-					time_tolerance);
-			}
 			cp= strptime(line+6, "%a, %d %b %Y %H:%M:%S ", &tm);
 			if (!cp || strcmp(cp, "GMT") != 0)
 			{
 				fprintf(stderr, "unable to parse time '%s'\n",
 					line+6);
 			}
-			tim= timegm(&tm);
-			now= time(NULL);
-			if (now < tim-tolerance || now > tim+tolerance)
-			{
-				fprintf(stderr,
-				"setting time, time difference is %ld\n",
-					(long)tim-now);
-				stime(&tim);
-			}
+			*timep= timegm(&tm);
 		}
-
 
 		cp= line;
 		skip_spaces(cp, &ncp);
@@ -803,7 +839,8 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 {
 	int i;
 	size_t len, offset, size;
-	char *cp, *line, *check, *okp;
+	char *cp, *line, *check;
+	const char *okp;
 
 	okp= OK_STR;
 
@@ -907,7 +944,7 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 {
 	int i;
 	size_t offset, size;
-	char *okp;
+	const char *okp;
 
 	okp= OK_STR;
 
@@ -955,6 +992,12 @@ static void skip_spaces(const char *cp, char **ncp)
 
 static void got_alarm(int sig __attribute__((unused)) )
 {
+	if (tcp_fd != -1 && time(NULL) > start_time+60)
+	{
+		report("setting tcp_fd to nonblock");
+		fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);
+	}
+	kick_watchdog();
 	report("got alarm, setting alarm again");
 	alarm(1);
 }

@@ -8,7 +8,13 @@ ping.c
 #include "eperd.h"
 #include "eping.h"
 
-#define PING_OPT_STRING ("c:s:A:O:4D6")
+#define PING_OPT_STRING ("46c:s:A:O:")
+
+enum 
+{
+	opt_4 = (1 << 0),
+	opt_6 = (1 << 1),
+};
 
 struct pingstate
 {
@@ -29,17 +35,22 @@ struct pingstate
 
 static void ping_cb(int result, int bytes,
 	struct sockaddr *sa, socklen_t socklen,
-	int seq, int ttl, struct timeval * elapsed, void * arg)
+	struct sockaddr *loc_sa, socklen_t loc_socklen,
+	int seq, int ttl UNUSED_PARAM,
+	struct timeval * elapsed, void * arg)
 {
 	struct pingstate *pingstate;
 	unsigned long usecs;
 	FILE *fh;
 	char namebuf[NI_MAXHOST];
+	char loc_namebuf[NI_MAXHOST];
 
 	pingstate= arg;
 
+#if 0
 	crondlog(LVL7 "in ping_cb: result %d, bytes %d, seq %d, ttl %d",
 		result, bytes, seq, ttl);
+#endif
 
 	if (result == PING_ERR_NONE)
 	{
@@ -63,7 +74,7 @@ static void ping_cb(int result, int bytes,
 		/* Got a duplicate ping reply */
 		pingstate->duppkts++;
 	}
-	if (result == PING_ERR_DONE)
+	if (result == PING_ERR_DONE || result == PING_ERR_SENDTO)
 	{
 		if (pingstate->out_filename)
 		{
@@ -77,6 +88,10 @@ static void ping_cb(int result, int bytes,
 
 		getnameinfo(sa, socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
+		loc_namebuf[0]= '\0';
+		getnameinfo(loc_sa, loc_socklen, loc_namebuf,
+			sizeof(loc_namebuf),
+			NULL, 0, NI_NUMERICHOST);
 
 #define DBQ(str) "\"" #str "\""
 
@@ -89,13 +104,16 @@ static void ping_cb(int result, int bytes,
 
 		fprintf(fh, "%s" DBQ(time) ":%d, " DBQ(name) ":" DBQ(%s)
 			", " DBQ(addr) ":" DBQ(%s)
+			", " DBQ(srcaddr) ":" DBQ(%s)
+			", " DBQ(mode) ":" DBQ(ICMP%c)
 			", " DBQ(size) ":%d"
 			", " DBQ(sent) ":%d"
 			", " DBQ(rcvd) ":%d"
 			", " DBQ(dup) ":%d",
 			pingstate->atlas ? ", " : "", (int)time(NULL),
-			pingstate->hostname, namebuf, bytes,
-			pingstate->sentpkts, 
+			pingstate->hostname, namebuf, loc_namebuf,
+			sa->sa_family == AF_INET6 ? '6' : '4',
+			bytes, pingstate->sentpkts, 
 			pingstate->rcvdpkts, pingstate->duppkts);
 		if (pingstate->rcvdpkts)
 		{
@@ -104,6 +122,11 @@ static void ping_cb(int result, int bytes,
 				", " DBQ(max) ":%.3f", pingstate->min/1e3,
 				pingstate->sum/1e3/pingstate->rcvdpkts, 
 				pingstate->max/1e3);
+		}
+		if (result == PING_ERR_SENDTO)
+		{
+			fprintf(fh, ", " DBQ(error) ": " DBQ(sendto failed: %s),
+				strerror(seq));
 		}
 		fprintf(fh, " }\n");
 		if (pingstate->out_filename)
@@ -119,6 +142,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	int opt;
 	unsigned pingcount; /* must be int-sized */
 	unsigned size;
+	sa_family_t af;
 	const char *hostname;
 	char *str_Atlas;
 	char *out_filename;
@@ -143,7 +167,12 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		&str_Atlas, &out_filename);
 	hostname = argv[optind];
 
-	pingevent= evping_base_host_add(ping_base, hostname);
+	af= AF_UNSPEC;
+	if (opt & opt_4)
+		af= AF_INET;
+	if (opt & opt_6)
+		af= AF_INET6;
+	pingevent= evping_base_host_add(ping_base, af, hostname);
 	if (!pingevent)
 	{
 		crondlog(LVL9 "evping_base_host_add failed");

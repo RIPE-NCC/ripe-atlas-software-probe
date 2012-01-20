@@ -46,10 +46,6 @@
 #include "eping.h"
 #include <event2/thread.h>
 
-//#include "mm-internal.h"
-//#include "evthread-internal.h"
-
-
 #undef MIN	/* just in case */
 #undef MAX	/* also, just in case */
 
@@ -96,6 +92,8 @@ struct evping_host {
 
 	struct sockaddr_in6 sin6;	/* IPv[46] address */
 	socklen_t socklen;		/* Lenght of socket address */
+	struct sockaddr_in6 loc_sin6;	/* Local IPv[46] address */
+	socklen_t loc_socklen;		/* Lenght of socket address */
 	size_t maxsize;
 
 	int maxpkts;			/* Number of packets to send */
@@ -339,6 +337,7 @@ static void ping_xmit(struct evping_host *host)
 		{
 		    host->user_callback(PING_ERR_DONE, host->cursize,
 			(struct sockaddr *)&host->sin6, host->socklen,
+			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
 			0, 0, NULL,
 			host->user_pointer);
 		    if (host->base->done)
@@ -391,7 +390,22 @@ static void ping_xmit(struct evping_host *host)
 
 	  }
 	else
+	{
 	  base->sendfail++;
+	  host->sentpkts++;
+
+	  /* Report the failure and stop */
+	  if (host->user_callback)
+	  {
+		host->user_callback(PING_ERR_SENDTO, host->cursize,
+			(struct sockaddr *)&host->sin6, host->socklen,
+			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
+			errno, 0, NULL,
+			host->user_pointer);
+		if (host->base->done)
+			host->base->done(host);
+	  }
+	}
 }
 
 
@@ -404,6 +418,7 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 	{
 		host->user_callback(PING_ERR_TIMEOUT, -1,
 			(struct sockaddr *)&host->sin6, host->socklen,
+			NULL, 0,
 			host->seq, -1, &host->base->tv_interval,
 			host->user_pointer);
 
@@ -439,6 +454,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	int nrecv, isDup;
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
+	struct sockaddr_in *sin4p;
 
 	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
 	struct ip * ip = (struct ip *) base->packet;
@@ -532,6 +548,13 @@ printf("ready_callback4: too short\n");
 	    /* Update counters */
 	    usecs = tvtousecs(&elapsed);
 
+	    /* Set destination address of packet as local address */
+	    memset(&host->loc_sin6, '\0', sizeof(host->loc_sin6));
+	    sin4p= (struct sockaddr_in *)&host->loc_sin6;
+	    sin4p->sin_family= AF_INET;
+	    sin4p->sin_addr= ip->ip_dst;
+	    host->loc_socklen= sizeof(*sin4p);
+
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
 	     * care?
@@ -542,6 +565,7 @@ printf("ready_callback4: too short\n");
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,
 		    (struct sockaddr *)&host->sin6, host->socklen,
+		    NULL, 0,
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
 		    host->user_pointer);
 	    }
@@ -581,7 +605,6 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 	int nrecv, isDup;
 	struct sockaddr_in remote;                  /* responding internet address */
-	socklen_t slen = sizeof(struct sockaddr);
 
 	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
 	struct icmp6_hdr * icmp = (struct icmp6_hdr *) base->packet;
@@ -590,14 +613,29 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 	struct timeval now;
 	struct evping_host * host;
+	struct cmsghdr *cmsgptr;
+	struct sockaddr_in6 *sin6p;
+	struct msghdr msg;
+	struct iovec iov[1];
+	char cmsgbuf[256];
 
 	/* Time the packet has been received */
 	gettimeofday(&now, NULL);
 
 	EVPING_LOCK(base);
 
+	iov[0].iov_base= base->packet;
+	iov[0].iov_len= sizeof(base->packet);
+	msg.msg_name= &remote;
+	msg.msg_namelen= sizeof(remote);
+	msg.msg_iov= iov;
+	msg.msg_iovlen= 1;
+	msg.msg_control= cmsgbuf;
+	msg.msg_controllen= sizeof(cmsgbuf);
+	msg.msg_flags= 0;			/* Not really needed */
+
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd6, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv= recvmsg(base->rawfd6, &msg, MSG_DONTWAIT);
 	if (nrecv < 0)
 	  {
 	    /* One more failure */
@@ -645,6 +683,24 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    /* Update counters */
 	    usecs = tvtousecs(&elapsed);
 
+	    /* Set destination address of packet as local address */
+	    memset(&host->loc_sin6, '\0', sizeof(host->loc_sin6));
+	    host->loc_socklen= sizeof(*sin6p);
+	    for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
+		    cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
+	    {
+		    if (cmsgptr->cmsg_len == 0)
+			    break;	/* Can this happen? */
+		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			    cmsgptr->cmsg_type == IPV6_PKTINFO)
+		    {
+			    sin6p= &host->loc_sin6;
+			    sin6p->sin6_family= AF_INET6;
+			    sin6p->sin6_addr= ((struct in6_pktinfo *)
+				    CMSG_DATA(cmsgptr))->ipi6_addr;
+		    }
+	    }
+
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
 	     * care?
@@ -655,6 +711,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,\
 		    (struct sockaddr *)&host->sin6, host->socklen,
+		    NULL, 0,
 		    ntohs(icmp->icmp6_seq), -1, &elapsed,
 		    host->user_pointer);
 	    }
@@ -678,7 +735,7 @@ done:
 struct evping_base *
 evping_base_new(struct event_base *event_base)
 {
-	int p_proto;
+	int p_proto, on;
 	struct protoent *protop;
 	evutil_socket_t fd4, fd6;
 	struct evping_base *base;
@@ -706,6 +763,9 @@ evping_base_new(struct event_base *event_base)
 	  close(fd4);
 	  return NULL;
 	}
+
+	on = 1;
+	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
 
 	base = malloc(sizeof(struct evping_base));
 	if (base == NULL)
@@ -761,15 +821,13 @@ evping_base_free(struct evping_base *base,
 
 /* exported function */
 struct evping_host *
-evping_base_host_add(struct evping_base *base, const char * name)
+evping_base_host_add(struct evping_base *base, sa_family_t af, const char * name)
 {
 	int i, newsiz;
 	struct evping_host *host;
 	len_and_sockaddr *lsa;
-	sa_family_t af;
 
 	/* Attempt to resolv 'name' */
-	af= AF_UNSPEC;
 	lsa= host_and_af2sockaddr(name, 0, af);
 	if (!lsa)
 		return NULL;
@@ -790,6 +848,8 @@ evping_base_host_add(struct evping_base *base, const char * name)
 	memcpy(&host->sin6, &lsa->u.sa, lsa->len);
 	host->socklen= lsa->len;
 	free(lsa); lsa= NULL;
+	memset(&host->loc_sin6, '\0', sizeof(host->loc_sin6));
+	host->loc_socklen= 0;
 
 	host->base = base;
 

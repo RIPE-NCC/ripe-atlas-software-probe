@@ -13,7 +13,7 @@ traceroute.c
 
 #include "eperd.h"
 
-#if !STANDALONE_BUSYBOX
+#ifndef STANDALONE_BUSYBOX
 #define uh_sport source
 #define uh_dport dest
 #define uh_ulen len
@@ -292,6 +292,7 @@ static void report(struct trtstate *state)
 	fprintf(fh, "\"name\":\"%s\", \"addr\":\"%s\"",
 		state->hostname, namebuf);
 
+	namebuf[0]= '\0';
 	getnameinfo((struct sockaddr *)&state->loc_sin6, state->loc_socklen,
 		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
@@ -454,13 +455,20 @@ static void send_pkt(struct trtstate *state)
 			}
 
 			r= sendto(base->v6icmp_snd, base->packet, len, 0,
-				&state->sin6, state->socklen);
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
 			if (r == -1)
 			{
 				if (errno != EMSGSIZE)
 				{
-					printf("send_pkt: sendto failed: %s\n",
-						strerror(errno));
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				"\"error\":\"sendto failed: %s\" ] }",
+						strerror(serrno));
+					add_str(state, line);
+					report(state);
+					return;
 				}
 			}
 		}
@@ -509,14 +517,22 @@ static void send_pkt(struct trtstate *state)
 			}
 
 			r= sendto(base->v6udp_snd, base->packet, len, 0,
-				&state->sin6, state->socklen);
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
 			if (r == -1)
 			{
 				if (errno != EACCES &&
-					errno != ECONNREFUSED)
+					errno != ECONNREFUSED &&
+					errno != EMSGSIZE)
 				{
-					printf("send_pkt: sendto failed: %s\n",
-						strerror(errno));
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				"\"error\":\"sendto failed: %s\" ] }",
+						strerror(serrno));
+					add_str(state, line);
+					report(state);
+					return;
 				}
 			}
 		}
@@ -587,13 +603,20 @@ static void send_pkt(struct trtstate *state)
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
 			r= sendto(base->v4icmp_snd, base->packet, len, 0,
-				&state->sin6, state->socklen);
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
 			if (r == -1)
 			{
 				if (errno != EMSGSIZE)
 				{
-					printf("send_pkt: sendto failed: %s\n",
-						strerror(errno));
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				"\"error\":\"sendto failed: %s\" ] }",
+						strerror(serrno));
+					add_str(state, line);
+					report(state);
+					return;
 				}
 			}
 		}
@@ -612,7 +635,13 @@ static void send_pkt(struct trtstate *state)
 					(struct sockaddr *)&state->loc_sin6,
 					state->loc_socklen) == -1)
 				{
-					printf("bind failed\n");
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				"\"error\":\"bind failed: %s\" ] }",
+						strerror(serrno));
+					add_str(state, line);
+					report(state);
 					close(sock);
 					return;
 				}
@@ -700,7 +729,7 @@ static void send_pkt(struct trtstate *state)
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
 			r= sendto(sock, base->packet, len, 0,
-				&state->sin6, state->socklen);
+				(struct sockaddr *)&state->sin6, state->socklen);
 			serrno= errno;
 			if (state->parismod)
 				close(sock);
@@ -708,8 +737,14 @@ static void send_pkt(struct trtstate *state)
 			{
 				if (serrno != EMSGSIZE)
 				{
-					printf("send_pkt: sendto failed: %s\n",
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				"\"error\":\"sendto failed: %s\" ] }",
 						strerror(serrno));
+					add_str(state, line);
+					report(state);
+					return;
 				}
 			}
 		}
@@ -2089,6 +2124,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	memcpy(&state->sin6, &lsa->u.sa, lsa->len);
 	state->socklen= lsa->len;
 	free(lsa); lsa= NULL;
+	memset(&state->loc_sin6, '\0', sizeof(state->loc_sin6));
+	state->loc_socklen= 0;
 
 	if (af == AF_INET6)
 	{
@@ -2156,7 +2193,8 @@ static void traceroute_start(void *state)
 			loc_sa6.sin6_family= AF_INET;
 
 			if (connect(trtbase->v6icmp_snd,
-				&trtstate->sin6, trtstate->socklen) == -1)
+				(struct sockaddr *)&trtstate->sin6,
+				trtstate->socklen) == -1)
 			{
 				serrno= errno;
 
@@ -2188,18 +2226,18 @@ static void traceroute_start(void *state)
 			((struct sockaddr_in *)&trtstate->sin6)->sin_port=
 				htons(0x8000);
 
-#if 0
-			if (bind(trtbase->v4icmp_snd,
-				&loc_sa4, sizeof(loc_sa4)) == -1)
-			{
-				crondlog(DIE9 "bind failed");
-			}
-#endif
-
 			if (connect(trtbase->v4icmp_snd,
-				&trtstate->sin6, trtstate->socklen) == -1)
+				(struct sockaddr *)&trtstate->sin6,
+				trtstate->socklen) == -1)
 			{
-				crondlog(DIE9 "connect failed");
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+			", \"error\":\"connect failed: %s\" }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				return;
 			}
 			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
 			if (getsockname(trtbase->v4icmp_snd,
@@ -2225,10 +2263,11 @@ static void traceroute_start(void *state)
 			loc_sa6.sin6_family= AF_INET6;
 			sock= trtbase->v6udp_snd;
 
-			if (connect(sock,
-				&trtstate->sin6, trtstate->socklen) == -1)
+			if (connect(sock, (struct sockaddr *)&trtstate->sin6,
+				trtstate->socklen) == -1)
 			{
 				serrno= errno;
+printf("%s, %d\n", __FILE__, __LINE__);
 
 				snprintf(line, sizeof(line),
 			", \"error\":\"connect failed: %s\" }",
@@ -2275,9 +2314,18 @@ static void traceroute_start(void *state)
 				{
 					crondlog(DIE9 "socket failed");
 				}
-				if (bind(sock, &loc_sa4, sizeof(loc_sa4)) == -1)
+				if (bind(sock, (struct sockaddr *)&loc_sa4,
+					sizeof(loc_sa4)) == -1)
 				{
-					crondlog(DIE9 "bind failed");
+					serrno= errno;
+
+					snprintf(line, sizeof(line),
+				", \"error\":\"bind failed: %s\" }",
+						strerror(serrno));
+					add_str(trtstate, line);
+					report(trtstate);
+					close(sock);
+					return;
 				}
 			}
 			else
@@ -2286,10 +2334,18 @@ static void traceroute_start(void *state)
 			}
 
 
-			if (connect(sock,
-				&trtstate->sin6, trtstate->socklen) == -1)
+			if (connect(sock, (struct sockaddr *) &trtstate->sin6,
+				trtstate->socklen) == -1)
 			{
-				crondlog(DIE9 "connect failed");
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+			", \"error\":\"connect failed: %s\" }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				close(sock);
+				return;
 			}
 			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
 			if (getsockname(sock,
