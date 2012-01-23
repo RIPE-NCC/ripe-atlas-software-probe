@@ -11,6 +11,7 @@ struct globals {
 	CronLine *LineBase;
 	CronLine *oldLine;
 	struct event_base *EventBase;
+	struct evdns_base *DnsBase;
 };
 extern struct globals G;
 #define LogLevel           (G.LogLevel               )
@@ -20,6 +21,7 @@ extern struct globals G;
 #define FileBase           (G.FileBase               )
 #define oldLine            (G.oldLine                )
 #define EventBase          (G.EventBase              )
+#define DnsBase            (G.DnsBase                )
 
 #define LVL5  "\x05"
 #define LVL7  "\x07"
