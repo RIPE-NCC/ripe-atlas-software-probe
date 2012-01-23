@@ -588,7 +588,7 @@ done:
 
 #endif
 
-static void process_reply(void * arg, int nrecv, struct sockaddr_in remote, struct timeval now)
+static void process_reply(void * arg, int nrecv, struct sockaddr_in remote4, struct sockaddr_in6 remote6,  struct timeval now)
 {
 	struct tdig_base *base = arg;
 
@@ -629,26 +629,59 @@ static void ready_callback4 (int unused, const short event, void * arg)
 {
 	struct tdig_base *base = arg;
 	int nrecv;
-	struct sockaddr_in remote;                  /* responding internet address */
+	struct sockaddr_in remote4;                  /* responding internet address */
+	struct sockaddr_in6 remote6;               
 	socklen_t slen = sizeof(struct sockaddr);
 	bzero(base->packet, MAX_DNS_BUF_SIZE);
 	struct timeval rectime;
 	/* Time the packet has been received */
 	gettimeofday(&rectime, NULL);
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote4, &slen);
 	if (nrecv < 0)
 	{
 		/* One more failure */
 		base->recvfail++;
 		return ;
 	}
-	process_reply(arg, nrecv, remote, rectime);
+	process_reply(arg, nrecv, remote4, remote6, rectime);
 	return;
 } 
 
 static void ready_callback6 (int unused, const short event, void * arg)
 {
+	struct tdig_base *base = arg;
+        int nrecv; 
+	struct timeval rectime;
+	/* Time the packet has been received */
+        gettimeofday(&rectime, NULL);
+	struct msghdr msg;
+        struct iovec iov[1];
+	char buf[INET6_ADDRSTRLEN];
+	struct sockaddr_in6 remote6;
+	struct sockaddr_in remote4;
+	char cmsgbuf[256];
+
+	iov[0].iov_base= base->packet;
+	iov[0].iov_len= sizeof(base->packet);
+
+	msg.msg_name= &remote6;
+        msg.msg_namelen= sizeof(remote6);
+        msg.msg_iov= iov;
+        msg.msg_iovlen= 1;
+        msg.msg_control= cmsgbuf;
+        msg.msg_controllen= sizeof(cmsgbuf);
+        msg.msg_flags= 0;                       /* Not really needed */
+
+        nrecv= recvmsg(base->rawfd_v6, &msg, MSG_DONTWAIT);
+        if (nrecv == -1)
+        {
+                /* Strange, read error */
+                printf("ready_callback6: read error '%s'\n", strerror(errno));
+                return;
+        }
+	process_reply(arg, nrecv, remote4, remote6, rectime);
+	
        return;
 }
 
@@ -678,8 +711,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	// initialize per query state variables;
 	qry->qtype = T_TXT; /* TEXT */
         qry->qclass = C_CHAOS;
-	qry->opt_v4_only = 1; 
-	qry->opt_v6_only = 1; 
+	qry->opt_v4_only = 0; 
+	qry->opt_v6_only = 0; 
 	qry->str_Atlas = NULL;
 	qry->out_filename = NULL;
 	qry->opt_proto = 17; 
@@ -835,11 +868,25 @@ void tdig_start (struct query_state *qry)
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_family = AF_INET;	
 	hints.ai_flags = 0;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 	char port[] = "domain";
+	
+	
+	if(qry->opt_v6_only == 1) 
+	{
+		hints.ai_family = AF_INET6;
+	}
+	else if(qry->opt_v4_only == 1)
+        {
+                hints.ai_family = AF_INET;
+        }
+
+	if( (qry->opt_v4_only == 1 )  && (qry->opt_v6_only == 1) )
+	{
+		hints.ai_family = AF_UNSPEC;
+	}
 
 	if ( ( err_num  = getaddrinfo(qry->server_name, port , &hints, &res)))
 	{
