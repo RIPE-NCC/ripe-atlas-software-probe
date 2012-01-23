@@ -96,6 +96,7 @@ struct tdig_base {
 	struct event_base *event_base;
 
 	evutil_socket_t rawfd_v4;       /* Raw socket used to nsm hosts              */
+	evutil_socket_t rawfd_v6;       /* Raw socket used to nsm hosts              */
 
 	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
 	struct timeval tv_interval;    /* between two subsequent queries */
@@ -103,7 +104,8 @@ struct tdig_base {
 	/* A circular list of user queries */
 	struct query_state *qry_head;
 
-	struct event event;            /* Used to detect read events on raw socket   */
+	struct event event4;            /* Used to detect read events on raw socket   */
+	struct event event6;            /* Used to detect read events on raw socket   */
 
 	counter_t sendfail;            /* # of failed sendto()                       */
 	counter_t sentok;              /* # of successful sendto()                   */
@@ -113,6 +115,8 @@ struct tdig_base {
 	counter_t illegal;             /* # of DNS packets with an illegal payload  */
 	counter_t sentbytes; 
 	counter_t recvtbytes; 
+
+	u_char packet [MAX_DNS_BUF_SIZE] ;
 	
 	/* used only for the stand alone version */
 	void (*done)(void *state);
@@ -397,7 +401,15 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 		do
 		{
 			gettimeofday(&qry->xmit_time, NULL);
-			nsent = sendto(base->rawfd_v4, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+			switch (qry->res->ai_family)
+			{
+				case AF_INET:
+					nsent = sendto(base->rawfd_v4, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+					break;
+				case AF_INET6:
+					nsent = sendto(base->rawfd_v6, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+					break;
+			}
 
 			if (nsent == qry->pktsize)
 			{
@@ -518,16 +530,16 @@ static void noreply_callback(int unused, const short event, void *h)
  *  o of enough size (> DNS Header size)
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
-static void ready_callback (int unused, const short event, void * arg)
+
+#if 0
+static void ready_callback4 (int unused, const short event, void * arg)
 {
 	struct tdig_base *base = arg;
 
 	int nrecv;
 	struct DNS_HEADER *dnsR = NULL;
-	u_char packet[MAX_DNS_BUF_SIZE];
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
-	bzero(packet, MAX_DNS_BUF_SIZE);
 
 	struct timeval now;
 	struct query_state * qry;
@@ -536,7 +548,7 @@ static void ready_callback (int unused, const short event, void * arg)
 	gettimeofday(&now, NULL);
 
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd_v4, packet, sizeof(packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	{
 		/* One more failure */
@@ -544,7 +556,7 @@ static void ready_callback (int unused, const short event, void * arg)
 		goto done;
 	} 
 
-	dnsR = (struct DNS_HEADER*) packet;
+	dnsR = (struct DNS_HEADER*) base->packet;
 		/* One more ICMP packect received */
 	base->recvok++; 
 
@@ -560,7 +572,7 @@ static void ready_callback (int unused, const short event, void * arg)
 	qry->recvbytes += nrecv;
 	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 +
                                 (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
-	printReply(packet, nrecv, qry );
+	printReply(base->packet, nrecv, qry );
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -572,7 +584,73 @@ static void ready_callback (int unused, const short event, void * arg)
 
 done:
   return;
+}
+
+#endif
+
+static void process_reply(void * arg, int nrecv, struct sockaddr_in remote, struct timeval now)
+{
+	struct tdig_base *base = arg;
+
+	struct DNS_HEADER *dnsR = NULL;
+	u_char packet[MAX_DNS_BUF_SIZE];
+
+	struct query_state * qry;
+
+	dnsR = (struct DNS_HEADER*) base->packet;
+	base->recvok++; 
+
+	/* Get the pointer to the qry descriptor in our internal table */
+	qry = tdig_lookup_query( ntohs(dnsR->id));
+
+	if ( ! qry) 
+		goto done;
+
+	/* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
+
+	qry->recvpkts++;
+	qry->recvbytes += nrecv;
+	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 +
+                                (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
+	printReply(base->packet, nrecv, qry );
+
+	/* Clean the noreply timer */
+	evtimer_del(&qry->noreply_timer);
+	if(base->done)
+		{
+			tdig_delete(qry);
+			base->done(qry);
+		}
+done:
+  return;
+}
+
+static void ready_callback4 (int unused, const short event, void * arg)
+{
+	struct tdig_base *base = arg;
+	int nrecv;
+	struct sockaddr_in remote;                  /* responding internet address */
+	socklen_t slen = sizeof(struct sockaddr);
+	bzero(base->packet, MAX_DNS_BUF_SIZE);
+	struct timeval rectime;
+	/* Time the packet has been received */
+	gettimeofday(&rectime, NULL);
+	/* Receive data from the network */
+	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	if (nrecv < 0)
+	{
+		/* One more failure */
+		base->recvfail++;
+		return ;
+	}
+	process_reply(arg, nrecv, remote, rectime);
+	return;
 } 
+
+static void ready_callback6 (int unused, const short event, void * arg)
+{
+       return;
+}
 
 
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
@@ -685,7 +763,8 @@ struct tdig_base *
 tdig_base_new(struct event_base *event_base)
 {
 	struct protoent *proto;
-	evutil_socket_t fd;
+	evutil_socket_t fd6;
+	evutil_socket_t fd4;
 	struct tdig_base *tdig_base;
 	struct addrinfo hints;
 
@@ -696,19 +775,31 @@ tdig_base_new(struct event_base *event_base)
 	hints.ai_flags = 0;
 
 	/* Create an endpoint for communication using raw socket for ICMP calls */
-	if ((fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
+	if ((fd4 = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
 	{
+		return NULL;
+	} 
+
+	hints.ai_family = AF_INET6;
+	if ((fd6 = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
+	{
+		close(fd4);
 		return NULL;
 	} 
 
 	tdig_base= xzalloc(sizeof( struct tdig_base));
 	if (tdig_base == NULL)
+	{
+		close(fd4);
+		close(fd6);
 		return (NULL);
+	}
 
 	memset(tdig_base, 0, sizeof(struct tdig_base));
 	tdig_base->event_base = event_base;
 
-	tdig_base->rawfd_v4 = fd;
+	tdig_base->rawfd_v4 = fd4;
+	tdig_base->rawfd_v6 = fd6;
 	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
 
 	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
@@ -717,8 +808,13 @@ tdig_base_new(struct event_base *event_base)
 	// Define the callback to handle UDP Reply 
 	// add the raw file descriptor to those monitored for read events 
 
-	event_assign(&tdig_base->event, tdig_base->event_base, tdig_base->rawfd_v4, EV_READ | EV_PERSIST, ready_callback, tdig_base);
-	event_add(&tdig_base->event, NULL);
+	event_assign(&tdig_base->event4, tdig_base->event_base, tdig_base->rawfd_v4, 
+			EV_READ | EV_PERSIST, ready_callback4, tdig_base);
+	event_add(&tdig_base->event4, NULL);
+
+	event_assign(&tdig_base->event6, tdig_base->event_base, tdig_base->rawfd_v6, 
+			EV_READ | EV_PERSIST, ready_callback6, tdig_base);
+	event_add(&tdig_base->event6, NULL);
 
 	return tdig_base;
 }
