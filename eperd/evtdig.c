@@ -25,10 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef HAVE_CONFIG_H
-#include "event-config.h"
-#endif
-
 #include "libbb.h"
 #include <netdb.h>
 #include <getopt.h>
@@ -39,7 +35,6 @@
 #include <math.h>
 #include <assert.h>
 #include "eperd.h" 
-#include "eping.h"
 
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -83,12 +78,6 @@
 #define T_DNSKEY ns_t_dnskey
 #endif
 
-//static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
-static void ChangetoDnsNameFormat(u_char * dns,unsigned char* qry) ;
-struct tdig_base *tdig_base_new(struct event_base *event_base); 
-void readcb_tcp(struct bufferevent *bev, void *ptr);
-void eventcb_tcp(struct bufferevent *bev, short events, void *ptr);
-
 /* Definition for various types of counters */
 typedef uint64_t counter_t;
 
@@ -118,9 +107,8 @@ struct tdig_base {
 	counter_t recvtbytes; 	
 	counter_t timedout;
 
-
 	u_char packet [MAX_DNS_BUF_SIZE] ;
-	
+
 	/* used only for the stand alone version */
 	void (*done)(void *state);
 };
@@ -128,13 +116,13 @@ struct tdig_base {
 static struct tdig_base *tdig_base;
 
 /* How to keep track of each user query to send dns query */
-static struct query_state {
+struct query_state {
 
 	struct tdig_base *base;
 	char * name;                /* Host identifier as given by the user */
 	char * fqname;              /* Full qualified hostname          */ 
 	char * ipname;              /* Remote address in dot notation   */
-	struct sockaddr_in *remote4;  /* source address of return packet */
+	struct sockaddr *remote4;  /* source address of return packet */
 	struct sockaddr_in6 *remote6 ; /* source address of return packet */
 	u_int16_t qryid;             /* query id 16 bit */
 	int tcp_fd;
@@ -144,21 +132,22 @@ static struct query_state {
 
 	int opt_v4_only ;
 	int opt_v6_only ;
+	int opt_AF;
 	int opt_proto;
 	int opt_edns0;
 	int opt_dnssec;
-	
+
 	char * str_Atlas; 
 	u_int16_t qtype;
 	u_int16_t qclass;
-	
+
 	unsigned char *lookupname;
 	char * server_name;
 	char *out_filename ;
 
 	uint32_t pktsize;              /* Packet size in bytes */
 	struct addrinfo *res, *ressave, *ressent;
-	
+
 	struct sockaddr_in remote;     /* store the reply packet src address      */
 
 
@@ -180,8 +169,10 @@ static struct query_state {
 	struct query_state *next, *prev;
 
 	char *result;
-        size_t reslen;
-        size_t resmax;
+	size_t reslen;
+	size_t resmax; 
+
+	u_char *outbuff;
 };
 //DNS header structure
 struct DNS_HEADER
@@ -207,70 +198,82 @@ struct DNS_HEADER
 
 struct EDNS0_HEADER
 {
-        /** EDNS0 available buffer size, see RFC2671 */
-        u_int16_t qtype;
-        uint16_t _edns_udp_size;
-        u_int8_t _edns_x; // combined rcode and edns version both zeros.
-        u_int8_t _edns_y; // combined rcode and edns version both zeros.
-        //u_int16_t _edns_z;
-        u_int16_t DO ;
-        u_int16_t len ;
-        u_int8_t _edns_d;
+	/** EDNS0 available buffer size, see RFC2671 */
+	u_int16_t qtype;
+	uint16_t _edns_udp_size;
+	u_int8_t _edns_x; // combined rcode and edns version both zeros.
+	u_int8_t _edns_y; // combined rcode and edns version both zeros.
+	//u_int16_t _edns_z;
+	u_int16_t DO ;
+	u_int16_t len ;
+	u_int8_t _edns_d;
 };
 
 //Constant sized fields of query structure
 struct QUESTION
 {
-        u_int16_t qtype;
-        u_int16_t qclass;
+	u_int16_t qtype;
+	u_int16_t qclass;
 };
 
 //Constant sized fields of the resource record structure
 #pragma pack(push, 1)
 struct R_DATA
 {
-        u_int16_t type;
-        u_int16_t _class;
-        u_int32_t ttl;
-        u_int16_t data_len;
+	u_int16_t type;
+	u_int16_t _class;
+	u_int32_t ttl;
+	u_int16_t data_len;
 };
 #pragma pack(pop)
 
 //Pointers to resource record contents
 struct RES_RECORD
 {
-        unsigned char *name;
-        struct R_DATA *resource;
-        unsigned char *rdata;
+	unsigned char *name;
+	struct R_DATA *resource;
+	unsigned char *rdata;
 };
 
 static struct option longopts[]=
 {
-        { "hostname-bind", no_argument, NULL, 'h' },
-        { "id-server", no_argument, NULL, 'i' },
-        { "version-bind", no_argument, NULL, 'b' },
-        { "version.server", no_argument, NULL, 'r' },
-        { "soa", required_argument, NULL, 's' },
-        { "out-file", required_argument, NULL, 'O' },
-        { "edns0", required_argument, NULL, 'e' },
-        { "dnssec", no_argument, NULL, 'd' },
-        { "dnskey", required_argument, NULL, 'D' },
-        { NULL, }
+	{ "hostname-bind", no_argument, NULL, 'h' },
+	{ "id-server", no_argument, NULL, 'i' },
+	{ "version-bind", no_argument, NULL, 'b' },
+	{ "version.server", no_argument, NULL, 'r' },
+	{ "soa", required_argument, NULL, 's' },
+	{ "out-file", required_argument, NULL, 'O' },
+	{ "edns0", required_argument, NULL, 'e' },
+	{ "dnssec", no_argument, NULL, 'd' },
+	{ "dnskey", required_argument, NULL, 'D' },
+	{ NULL, }
 };
 
-static void done(void *state UNUSED_PARAM)
-{
-        //fprintf(stderr, "And we are done\n");
-        exit(0);
-}
 
-static void add_str(struct query_state *qry, const char *str);
+//static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
 static int tdig_delete(void *state);
+static void ChangetoDnsNameFormat(u_char * dns,unsigned char* qry) ;
+struct tdig_base *tdig_base_new(struct event_base *event_base); 
+void readcb_tcp(struct bufferevent *bev, void *ptr);
+void eventcb_tcp(struct bufferevent *bev, short events, void *ptr);
+void tdig_start (struct query_state *qry);
+void printReply(struct query_state *qry, int wire_size, unsigned char *result );
+static void done(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
+static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struct sockaddr_in6 *remote6,  struct timeval now);
+static void mk_dns_buff(struct query_state *qry,  u_char *packet);
+
+/* move the next functions from tdig.c */
+u_int32_t get32b (char *p);
+void ldns_write_uint16(void *dst, uint16_t data);
+unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
+/* from tdig.c */
+
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
 { 
-	int r;
+	struct query_state *qry;
+
 	EventBase=event_base_new();
 	if (!EventBase)
 	{
@@ -278,7 +281,6 @@ int evtdig_main(int argc, char **argv)
 	}
 
 	DnsBase = evdns_base_new(EventBase, 1);
-	struct query_state *qry;
 	qry = tdig_init(argc, argv, done);
 	if (!qry)
 	{
@@ -288,27 +290,35 @@ int evtdig_main(int argc, char **argv)
 	tdig_start(qry);  
 	printf ("starting query\n");
 
-   event_base_dispatch (EventBase);
-  event_base_loopbreak (EventBase);
+	event_base_dispatch (EventBase);
+	event_base_loopbreak (EventBase);
+	return 0;
 }
+
+static void done(void *state UNUSED_PARAM)
+{
+	//fprintf(stderr, "And we are done\n");
+	exit(0);
+}
+
 
 static void add_str(struct query_state *qry, const char *str)
 {
-        size_t len;
-        len= strlen(str);
-        if (qry->reslen + len+1 > qry->resmax)
-        {
-                qry->resmax= qry->reslen + len+1 + 80;
-                qry->result= xrealloc(qry->result, qry->resmax);
-        }
-        memcpy(qry->result+qry->reslen, str, len+1);
-        qry->reslen += len;
-        //printf("add_str: result = '%s'\n", state->result);
+	size_t len;
+	len= strlen(str);
+	if (qry->reslen + len+1 > qry->resmax)
+	{
+		qry->resmax= qry->reslen + len+1 + 80;
+		qry->result= xrealloc(qry->result, qry->resmax);
+	}
+	memcpy(qry->result+qry->reslen, str, len+1);
+	qry->reslen += len;
+	//printf("add_str: result = '%s'\n", state->result);
 }
 
 
 /* Initialize a struct timeval by converting milliseconds */
-static void
+	static void
 msecstotv(time_t msecs, struct timeval *tv)
 {
 	tv->tv_sec  = msecs / 1000;
@@ -317,82 +327,47 @@ msecstotv(time_t msecs, struct timeval *tv)
 
 
 /* Lookup for a query by its index */
-static struct query* tdig_lookup_query( int index)
+static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx)
 { 
 	struct query_state *qry;
 
-	qry = tdig_base->qry_head;
+	qry = base->qry_head;
 	if (!qry)
 		return NULL;
 	do {
-		if (qry->qryid == index)
+		if (qry->qryid == idx)
 		{
 			//AA chnage to LVL5
-			crondlog(LVL9 "found matching query id %d", index);
-			
+			crondlog(LVL9 "found matching query id %d", idx);
 			return qry;
 		}
 		qry = qry->next;
-	} while (qry != tdig_base->qry_head);
+	} while (qry != base->qry_head);
 
 	return NULL;
 }
 
-
+#if 0
 static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry)
 {
 	u_char *qname;
-        struct QUESTION *qinfo = NULL;
-        struct EDNS0_HEADER *e;
-        int r;
+	struct QUESTION *qinfo = NULL;
+	struct EDNS0_HEADER *e;
 	uint32_t  size = 0;
 
-
-	//point to the query portion
-        qname =(u_char *)&buf[sizeof(struct DNS_HEADER)];
-	ChangetoDnsNameFormat(qname, qry->lookupname); // fill the query portion.
-
-        qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; 
-        size = (strlen((const char*)qname) + 1);
-
-        qinfo->qtype = htons(qry->qtype);
-        qinfo->qclass = htons(qry->qclass);
-	
-	e=(struct EDNS0_HEADER*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + sizeof(struct QUESTION) + 2 ) ]; //fill it
-
-        e->qtype = htons(qry->qtype);
-        e->_edns_udp_size = htons(qry->opt_edns0);
-        //e->_edns_z = htons(128);
-        //if(opt_dnssec  == 1)
-        {
-                e->DO = 0x80;
-        }
-        e->len = htons(0);
-        return size ;
+	return size ;
 }
+#endif
 
-/* Attempt to transmit an DNS Request a given qry to a server*/
-static void tdig_send_query_callback(int unused, const short event, void *h)
+static void mk_dns_buff(struct query_state *qry,  u_char *packet) 
 {
-	struct query_state *qry = h;
-	struct tdig_base *base = qry->base;
-	int serrno;
-	char line[80];
-
-	u_char packet [MAX_DNS_BUF_SIZE] ;
-	uint32_t nsent;
-
-	/* Clean the no reply timer (if any was previously set) */
-	evtimer_del(&qry->noreply_timer);
-
-	bzero(packet, MAX_DNS_BUF_SIZE);
-	/* Format the DNS Qeury packet to send */
-
-
 	struct DNS_HEADER *dns = NULL;
-	dns = (struct DNS_HEADER *)&packet;
-
+	u_char *qname;
+	struct QUESTION *qinfo = NULL;
+	struct EDNS0_HEADER *e;
 	int r;
+
+	dns = (struct DNS_HEADER *)packet;
 	srand ( time(NULL) );
 	r =  rand();
 	r %= 65535;
@@ -412,28 +387,67 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 	dns->ans_count = 0;
 	dns->auth_count = 0;
 	dns->add_count = htons(0);
-	qry->pktsize = fmt_dns_query(packet, qry);
+
+	//point to the query portion
+	qname =(u_char *)&packet[sizeof(struct DNS_HEADER)];
+	ChangetoDnsNameFormat(qname, qry->lookupname); // fill the query portion.
+
+	qinfo =(struct QUESTION*)&packet[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; 
+	qry->pktsize  = (strlen((const char*)qname) + 1);
+
+	qinfo->qtype = htons(qry->qtype);
+	qinfo->qclass = htons(qry->qclass);
+
+	e=(struct EDNS0_HEADER*)&packet[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + sizeof(struct QUESTION) + 2 ) ]; //fill it
+
+	e->qtype = htons(qry->qtype);
+	e->_edns_udp_size = htons(qry->opt_edns0);
+	//e->_edns_z = htons(128);
+	//if(opt_dnssec  == 1)
+	{
+		e->DO = 0x80;
+	}
+	e->len = htons(0);
+
 	qry->pktsize += sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
 
 	/* Transmit the request over the network */
+}
+
+/* Attempt to transmit an DNS Request a given qry to a server*/
+static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
+{
+	struct query_state *qry = h;
+	struct tdig_base *base = qry->base;
+	int serrno;
+	char line[80];
+	uint32_t nsent;
+	u_char *outbuff;
+	int err = 0;
+
+	/* Clean the no reply timer (if any was previously set) */
+	evtimer_del(&qry->noreply_timer);
 
 	if(qry->opt_proto == 17)  //UDP 
-	{
+	{	
+		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
+		bzero(outbuff, MAX_DNS_BUF_SIZE);
+		qry->outbuff = outbuff;
+		mk_dns_buff(qry, outbuff);
 		do
 		{
 			gettimeofday(&qry->xmit_time, NULL);
 			switch (qry->res->ai_family)
 			{
 				case AF_INET:
-					nsent = sendto(base->rawfd_v4, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+					nsent = sendto(base->rawfd_v4, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 					break;
 				case AF_INET6:
-					nsent = sendto(base->rawfd_v6, packet,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
+					nsent = sendto(base->rawfd_v6, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 					break;
 			}
 
 			qry->ressent = qry->res;
-
 			if (nsent == qry->pktsize)
 			{
 				/* One more DNS Query is sent */
@@ -442,105 +456,110 @@ static void tdig_send_query_callback(int unused, const short event, void *h)
 
 				qry->sentbytes += nsent;
 
+				err  = 0;
 				/* Add the timer to handle no reply condition in the given timeout */
 				evtimer_add(&qry->noreply_timer, &base->tv_noreply);
 			}
 			else 
 			{
+				err  = 1;
 				base->sendfail++;
 				serrno= errno; 
 				sprintf(line, "\"senderror\" : \"%s\" ,", strerror(serrno)); 
 				add_str(qry, line);
 				//perror("send"); 
-				printReply (qry, 0, NULL);
-				return;
 			}
 		} while ((qry->res = qry->res->ai_next) != NULL);
+		free (outbuff);
+		outbuff = NULL;
+		if(err) 
+		{
+			printReply (qry, 0, NULL);
+			return;
+		}
 	}
 	else{ //TCP yet to be complted.
-		uint8_t wire[1300];
-		int wire_wrote = 0;
-		/*
-		   qry->tcp_fd= connect_to_tcp(qry);
-		   if (qry->tcp_fd == -1)
-		   {
-		   crondlog(DIE9 "%s UNABLE-TO-CONNECT-TCP-ERROR\n", qry->server_name);
-		// goto err;
-		}
-
-		// Stdio makes life easy
-		qry->tcp_file= fdopen(qry->tcp_fd, "r+");
-		if (qry->tcp_file == NULL)
-		{
-		printf ("fdopen failed");
-		// sprintf (errstr, "fdopen failed");
-		crondlog(DIE9 "fdopen failed %s", qry->server_name);
-		// goto err;
-		}
-
-		 */
 		qry->bev_tcp =  bufferevent_socket_new(qry->base->event_base, -1, BEV_OPT_CLOSE_ON_FREE);
-		bufferevent_setcb(qry->bev_tcp, readcb_tcp, NULL, eventcb_tcp, qry->base);
+		bufferevent_setcb(qry->bev_tcp, readcb_tcp, NULL, eventcb_tcp, qry);
 		bufferevent_enable(qry->bev_tcp, EV_READ|EV_WRITE);
-		evbuffer_add_printf(bufferevent_get_output(qry->bev_tcp), "GET /\r\n");
-		int rc;
-		bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase, AF_UNSPEC, qry->server_name, 80);
-		if(rc < 0) {
-			crondlog(LVL9 "error in hostname %s", qry->server_name); 
-		event_base_dispatch(qry->base);
-		}
-
+		bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase,
+				qry->opt_AF, qry->server_name, 53);
 		crondlog(LVL9 "dispatched tcp callback %s", qry->server_name);
-
-		/*
-		   qry->tcp_fd= -1;
-		   ldns_write_uint16(wire, qry->pktsize );
-		   memcpy(wire + 2, packet, qry->pktsize);
-		   wire_wrote = fwrite(wire, (qry->pktsize+2), 1, qry->tcp_file);
-		   fflush( qry->tcp_file);
-		   crondlog(LVL9 "send packet to %s wrote %d len %d", qry->server_name, wire_wrote, (qry->pktsize + 2));
-		 */
 	}
 }
 
 void readcb_tcp(struct bufferevent *bev, void *ptr)
 {
-    char buf[1024];
-    int n;
-    struct evbuffer *input = bufferevent_get_input(bev);
-    while ((n = evbuffer_remove(input, buf, sizeof(buf))) > 0) {
-        fwrite(buf, 1, n, stdout);
-    }
+	struct query_state *qry = ptr;
+	int n;
+	u_char b2[2];
+	struct timeval rectime;	
+	struct evbuffer *input ;
+	int wire_size;
+
+	gettimeofday(&rectime, NULL);
+	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
+	printf("read was called\n");
+	evbuffer_remove(input, b2, 2 );
+	wire_size = ldns_read_uint16(b2);
+
+	input = bufferevent_get_input(bev);
+	n = evbuffer_remove(input, qry->base->packet, wire_size );
+	printf (" got %d bytes to process\n", n);
+	bufferevent_free(bev);
+	process_reply(qry->base, n, NULL, NULL, rectime); 	
+
+
+	// AA not sure if I want to empty the buffer in while. However if the size too big generate error message.
+	/*
+	   while ((n = evbuffer_remove(input, qry->base->packet, MAX_DNS_BUF_SIZE )) > 0) {
+	   printf (" got %d bytes to process\n", n);
+	   process_reply(qry->base, n, NULL, NULL, rectime); 	
+
+	   } */
+
 }
 
 void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 {
 	struct query_state *qry = ptr;
+	u_char *outbuff;
+	uint16_t payload_len ;
+	u_char wire[1300];
 
-    if (events & BEV_EVENT_CONNECTED) {
-        printf("Connect okay.\n");
-    } else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF)) {
-         struct event_base *base = ptr;
-         if (events & BEV_EVENT_ERROR) {
-                 int err = bufferevent_socket_get_dns_error(bev);
-                 if (err)
-                         printf("DNS error: %s\n", evutil_gai_strerror(err));
-         }
-         printf("Closing\n");
-         bufferevent_free(bev);
-         event_base_loopexit(base, NULL);
-    }
+	if (events & BEV_EVENT_CONNECTED) {
+		printf("Connect okay.\n");
+		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
+		bzero(outbuff, MAX_DNS_BUF_SIZE);
+		qry->outbuff = outbuff;
+		mk_dns_buff(qry, outbuff);
+		payload_len = (uint16_t) qry->pktsize;
+		ldns_write_uint16(wire, qry->pktsize);
+		memcpy(wire + 2, outbuff, qry->pktsize);
+		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
+
+	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF)) {
+		struct event_base *base = ptr;
+		if (events & BEV_EVENT_ERROR) {
+			int err = bufferevent_socket_get_dns_error(bev);
+			if (err)
+				printf("DNS error: %s\n", evutil_gai_strerror(err));
+		}
+		printf("Closing\n");
+		bufferevent_free(bev);
+		event_base_loopexit(base, NULL);
+	}
 }
 
 
 /* The callback to handle timeouts due to destination host unreachable condition */
-static void noreply_callback(int unused, const short event, void *h)
+static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
 	char line[80];
 	struct query_state *qry = h;
 	qry->base->timedout++;
-	fprintf(stderr, "\"timedout\" : 1 , ");
-	add_str(qry, "\"timedout\" : 1 , ");
+	sprintf(line, "\"timedout\" : 1 , ");
+	add_str(qry, line);
 	printReply (qry, 0, NULL);
 	return;
 }
@@ -560,7 +579,6 @@ static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struc
 	struct tdig_base *base = arg;
 
 	struct DNS_HEADER *dnsR = NULL;
-	u_char packet[MAX_DNS_BUF_SIZE];
 
 	struct query_state * qry;
 
@@ -568,7 +586,7 @@ static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struc
 	base->recvok++; 
 
 	/* Get the pointer to the qry descriptor in our internal table */
-	qry = tdig_lookup_query( ntohs(dnsR->id));
+	qry = tdig_lookup_query(base, ntohs(dnsR->id));
 
 	if ( ! qry) 
 		return;
@@ -588,19 +606,20 @@ static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struc
 	return;
 }
 
-static void ready_callback4 (int unused, const short event, void * arg)
+static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
 	struct tdig_base *base = arg;
 	int nrecv;
 	struct sockaddr *remote4;                  /* responding internet address */
 	struct sockaddr_in6 *remote6 ;
+	socklen_t slen;
+	struct timeval rectime;
 
 	remote4 = xzalloc(sizeof(struct sockaddr));
 	remote6 = NULL;
 
-	socklen_t slen = sizeof(struct sockaddr);
+	slen = sizeof(struct sockaddr);
 	bzero(base->packet, MAX_DNS_BUF_SIZE);
-	struct timeval rectime;
 	/* Time the packet has been received */
 
 	gettimeofday(&rectime, NULL);
@@ -616,19 +635,20 @@ static void ready_callback4 (int unused, const short event, void * arg)
 	return;
 } 
 
-static void ready_callback6 (int unused, const short event, void * arg)
+static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
 	struct tdig_base *base = arg;
-        int nrecv; 
+	int nrecv; 
 	struct timeval rectime;
-	/* Time the packet has been received */
-        gettimeofday(&rectime, NULL);
 	struct msghdr msg;
-        struct iovec iov[1];
-	char buf[INET6_ADDRSTRLEN];
+	struct iovec iov[1];
+	//char buf[INET6_ADDRSTRLEN];
 	struct sockaddr *remote6;
 	struct sockaddr_in *remote4;
 	char cmsgbuf[256];
+
+	/* Time the packet has been received */
+	gettimeofday(&rectime, NULL);
 
 	remote6 = xzalloc(sizeof(struct sockaddr_in6));
 	remote4 = NULL;
@@ -637,32 +657,31 @@ static void ready_callback6 (int unused, const short event, void * arg)
 	iov[0].iov_len= sizeof(base->packet);
 
 	msg.msg_name= remote6;
-        msg.msg_namelen= sizeof( struct sockaddr_in6);
-        msg.msg_iov= iov;
-        msg.msg_iovlen= 1;
-        msg.msg_control= cmsgbuf;
-        msg.msg_controllen= sizeof(cmsgbuf);
-        msg.msg_flags= 0;                       /* Not really needed */
+	msg.msg_namelen= sizeof( struct sockaddr_in6);
+	msg.msg_iov= iov;
+	msg.msg_iovlen= 1;
+	msg.msg_control= cmsgbuf;
+	msg.msg_controllen= sizeof(cmsgbuf);
+	msg.msg_flags= 0;                       /* Not really needed */
 
-        nrecv= recvmsg(base->rawfd_v6, &msg, MSG_DONTWAIT);
-        if (nrecv == -1)
-        {
-                /* Strange, read error */
-                printf("ready_callback6: read error '%s'\n", strerror(errno));
-                return;
-        }
+	nrecv= recvmsg(base->rawfd_v6, &msg, MSG_DONTWAIT);
+	if (nrecv == -1)
+	{
+		/* Strange, read error */
+		printf("ready_callback6: read error '%s'\n", strerror(errno));
+		return;
+	}
 	process_reply(arg, nrecv, remote4, remote6, rectime);
-	
-       return;
-}
 
+	return;
+}
 
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 {
-        const char *hostname;
 	char *check;
-        struct query_state *qry;
+	struct query_state *qry;
 	int c;
+	int opt_v4_only, opt_v6_only;
 
 	if(!tdig_base)
 		tdig_base = tdig_base_new(EventBase);
@@ -684,15 +703,14 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	tdig_base->timedout = 0;
 
 
-	 qry=xzalloc(sizeof(*qry));
-	int opt_v4_only, opt_v6_only;
+	qry=xzalloc(sizeof(*qry));
 	opt_v4_only =  opt_v6_only = 0;
-	
+
 
 	bzero(qry, sizeof(*qry));
 	// initialize per query state variables;
 	qry->qtype = T_TXT; /* TEXT */
-        qry->qclass = C_CHAOS;
+	qry->qclass = C_CHAOS;
 	qry->opt_v4_only = 0; 
 	qry->opt_v6_only = 0; 
 	qry->str_Atlas = NULL;
@@ -704,86 +722,90 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->str_Atlas = NULL;
 
 	optind = 0;
-        while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
-        {
-                switch(c)
-                {
-                        case '4':
-                                qry->opt_v4_only = 1;
-                                break;
-                        case '6':
-                                qry->opt_v6_only = 1;
-                                break;
-                        case 'A':
-                                qry->str_Atlas = strdup(optarg);
-                                break;
-                        case 'b':
-				qry->lookupname  = strdup ("version.bind.");
-                                break;
-                        case 'D':
-                                qry->qtype = T_DNSKEY;
-                                qry->qclass = C_IN;
-                                if(qry->opt_edns0 == 0)
-                                        qry->opt_edns0 = 512;
-                                qry->opt_dnssec = 1;
-                                qry->lookupname  = strdup(optarg);
-                                break;
+	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
+	{
+		switch(c)
+		{
+			case '4':
+				qry->opt_v4_only = 1;
+				qry->opt_AF = AF_INET;
+				break;
+			case '6':
+				qry->opt_v6_only = 1;
+				qry->opt_AF = AF_INET6;
+				break;
+			case 'A':
+				qry->str_Atlas = strdup(optarg);
+				break;
+			case 'b':
+				qry->lookupname  = (u_char *) strdup ("version.bind.");
+				break;
+			case 'D':
+				qry->qtype = T_DNSKEY;
+				qry->qclass = C_IN;
+				if(qry->opt_edns0 == 0)
+					qry->opt_edns0 = 512;
+				qry->opt_dnssec = 1;
+				qry->lookupname  = (u_char *) strdup(optarg);
+				break;
 
-                        case 'd':
-                                qry->opt_dnssec = 1;
-                                if(qry->opt_edns0 == 0)
-                                        qry->opt_edns0 = 512;
-                                break;
-                        case 'e':
-                                qry->opt_edns0= strtoul(optarg, &check, 10);
-                                break;
-                        case 'h':
-				qry->lookupname = strdup("hostname.bind.");
-                                break;
-                        case 'i':
-				qry->lookupname = strdup("id.server.");
-                                break;
+			case 'd':
+				qry->opt_dnssec = 1;
+				if(qry->opt_edns0 == 0)
+					qry->opt_edns0 = 512;
+				break;
+			case 'e':
+				qry->opt_edns0= strtoul(optarg, &check, 10);
+				break;
+			case 'h':
+				qry->lookupname = (u_char *) strdup("hostname.bind.");
+				break;
+			case 'i':
+				qry->lookupname = (u_char *) strdup("id.server.");
+				break;
 
 			case 'O':
 				qry->out_filename = strdup(optarg);
 				break;
-                        case 'r':
-				qry->lookupname = strdup("version.server.");
-                                break;
-			case 's':
-                                qry->qtype = T_SOA;
-                                qry->qclass = C_IN;
-                                qry->lookupname =  strdup(optarg);
-                                break;
-                        case 't':
-                                qry->opt_proto = 6;
-                        break;
-
-                        default:
-                                fprintf(stderr, "ERROR unknown option 0%o ??\n", c); 
+			case 'r':
+				qry->lookupname = (u_char *) strdup("version.server.");
 				break;
-                                return (0);
-                }
-        }
-	 if (optind != argc-1)
+			case 's':
+				qry->qtype = T_SOA;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+			case 't':
+				qry->opt_proto = 6;
+				break;
+
+			default:
+				fprintf(stderr, "ERROR unknown option 0%o ??\n", c); 
+				break;
+				return (0);
+		}
+	}
+	if (optind != argc-1)
 		crondlog(DIE9 "exactly one server IP address expected");
-	 if(opt_v6_only  = 0)
-		 opt_v4_only = 1;
-        qry->server_name = strdup(argv[optind]);
+	if(qry->opt_v6_only  == 0)
+	{
+		qry->opt_v4_only = 1;
+		qry->opt_AF = AF_INET;
+	}
+	qry->server_name = strdup(argv[optind]);
 	qry->base = tdig_base;
 
-      return qry;
+	return qry;
 }
 
 /* exported function */
-struct tdig_base *
+	struct tdig_base *
 tdig_base_new(struct event_base *event_base)
 {
-	struct protoent *proto;
 	evutil_socket_t fd6;
 	evutil_socket_t fd4;
-	struct tdig_base *tdig_base;
 	struct addrinfo hints;
+	int on = 1;
 
 	bzero(&hints,sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -818,14 +840,13 @@ tdig_base_new(struct event_base *event_base)
 	tdig_base->rawfd_v4 = fd4;
 	tdig_base->rawfd_v6 = fd6;
 
-	int on = 1;
-        setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
+	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
 
-        on = 1;
-        setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on));
+	on = 1;
+	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on));
 
 	//memset(&tdig_base-->loc_sin6, '\0', sizeof(tdig_base-->loc_sin6));
-        //tdig_base-->loc_socklen= 0;
+	//tdig_base-->loc_socklen= 0;
 
 	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
 
@@ -846,36 +867,29 @@ tdig_base_new(struct event_base *event_base)
 	return tdig_base;
 }
 
-void tdig_base_free(struct tdig_base *base, int fail_requests)
-{
-
-	free(base);
-}
-
 void tdig_start (struct query_state *qry)
 {
-	struct querystent *h;
 	struct timeval asap = { 0, 0 };
 
 	int err_num;
 	struct addrinfo hints, *res;
+	char port[] = "domain";
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_flags = 0;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
-	char port[] = "domain";
-	
-	
+
+
 	if(qry->opt_v6_only == 1) 
 	{
 		hints.ai_family = AF_INET6;
 	}
 	else if(qry->opt_v4_only == 1)
-        {
-                hints.ai_family = AF_INET;
-        }
+	{
+		hints.ai_family = AF_INET;
+	}
 
 	if( (qry->opt_v4_only == 1 )  && (qry->opt_v6_only == 1) )
 	{
@@ -885,7 +899,7 @@ void tdig_start (struct query_state *qry)
 	if ( ( err_num  = getaddrinfo(qry->server_name, port , &hints, &res)))
 	{
 		printf("%s ERROR port %s %s\n", qry->server_name, port, gai_strerror(err_num));
-		return -1;
+		return ;
 	}
 
 	qry->res = res;
@@ -893,24 +907,25 @@ void tdig_start (struct query_state *qry)
 
 	/* insert this nameserver into the list of them */
 	if (!tdig_base->qry_head) {
-	  qry->next = qry->prev = qry;
-	  tdig_base->qry_head = qry;
+		qry->next = qry->prev = qry;
+		tdig_base->qry_head = qry;
 	} else {
-	  qry->next = tdig_base->qry_head->next;
-	  qry->prev = tdig_base->qry_head;
-	  tdig_base->qry_head->next = qry;
-	  if (tdig_base->qry_head->prev == tdig_base->qry_head) {
-	    tdig_base->qry_head->prev = qry;
-	  }
+		qry->next = tdig_base->qry_head->next;
+		qry->prev = tdig_base->qry_head;
+		tdig_base->qry_head->next = qry;
+		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
+			tdig_base->qry_head->prev = qry;
+		}
 	}
 	/* initialize callbacks: no reply timeout and sendpacket */
 	evtimer_assign(&qry->nsm_timer, tdig_base->event_base, tdig_send_query_callback, qry);
 	evtimer_assign(&qry->noreply_timer, tdig_base->event_base, noreply_callback, qry); 
 
- 	evtimer_add(&qry->nsm_timer, &asap);
-	return 0;
+	evtimer_add(&qry->nsm_timer, &asap);
+	return ;
 }
 
+#if 0
 int tdig_base_count_queries(struct tdig_base *base)
 {
 	const struct query_state *qry;
@@ -929,28 +944,19 @@ int tdig_base_count_queries(struct tdig_base *base)
 
 
 /* exported function */
-void
+	void
 tdig_stats(struct tdig_base *base)
 {
 }
 
-const char * tdig_err_to_string(int err)
-{
-	switch (err) {
-		case PING_ERR_NONE: return "no error";
-		case PING_ERR_TIMEOUT: return "request timed out";
-		case PING_ERR_SHUTDOWN: return "ping subsystem shut down";
-		case PING_ERR_CANCEL: return "ping request canceled";
-		case PING_ERR_UNKNOWN: return "unknown";
-		default: return "[Unknown error code]";
-	}
-}
+#endif
 
 static void ChangetoDnsNameFormat(u_char *  dns,unsigned char* qry)
 {
 	char *s;
+	int lock = 0, i;
+
 	s = dns;
-	int lock = 0 , i;
 	for(i = 0 ; i < (int)strlen((char*)qry) ; i++)
 	{
 		//printf ("%c", qry[i] );
@@ -980,10 +986,10 @@ static void free_qry_inst(struct query_state *qry)
 		qry->resmax = 0;
 	}
 	if(qry->ressave )
-        {
-                freeaddrinfo(qry->ressave);
-                qry->ressave  = NULL;
-        }
+	{
+		freeaddrinfo(qry->ressave);
+		qry->ressave  = NULL;
+	}
 
 	if( qry->remote6) 
 	{
@@ -1000,7 +1006,7 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		terminator = qry->base->done;
 		event_base = qry->base->event_base;
-		
+
 		tdig_delete(qry);
 		event_base_loopbreak(event_base);
 		event_base_free(event_base);
@@ -1018,8 +1024,8 @@ static int tdig_delete(void *state)
 
 	if(qry->out_filename)
 	{ 
-			free(qry->out_filename);
-			qry->out_filename = NULL ;
+		free(qry->out_filename);
+		qry->out_filename = NULL ;
 	}
 	if(qry->lookupname) 
 	{
@@ -1029,7 +1035,7 @@ static int tdig_delete(void *state)
 	if( qry->str_Atlas) 
 	{
 		free( qry->str_Atlas);
-		 qry->str_Atlas = NULL;
+		qry->str_Atlas = NULL;
 	}
 	if(qry->server_name)
 	{
@@ -1059,8 +1065,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	void *ptr;
 	char addrstr[100];
 	FILE *fh; 
-	char buf[INET6_ADDRSTRLEN];
-
+	//char buf[INET6_ADDRSTRLEN];
+	u_int32_t serial;
 
 	if (qry->out_filename)
 	{
@@ -1161,7 +1167,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					answers[i].rdata = ReadName(reader,result,&stop);
 					//printf(" %s", answers[i].rdata);
 					reader =  reader + stop;
-					u_int32_t serial;
 					serial = get32b(reader);
 					fprintf(fh, " , \"SERIAL\" : %u", serial);
 					reader =  reader + 4;
@@ -1194,61 +1199,12 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fprintf (fh , " }"); //result
 	} 
 
-	fprintf(fh, "%s \"end\": 0");
+	fprintf(fh, " \"end\": 0");
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
-                fclose(fh);
+		fclose(fh);
 	free_qry_inst(qry);
 }
 
-
-int connect_to_tcp(struct query_state *qry)
-{
-	int r, s, s_errno;
-	//struct addrinfo *res, *aip;
-	struct addrinfo  *aip;
-	struct addrinfo hints;
-	char addrstr[100];
-	void *ptr;
-	struct addrinfo *res;
- 	char port[] = "domain";	
-
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_socktype= SOCK_STREAM;
-	r= getaddrinfo(qry->server_name, port, &hints, &res);
-	if (r != 0)
-	{
-		crondlog(DIE9 "unable to resolve %s : %s", qry->server_name, 
-			gai_strerror(r));
-		return (-1);
-	}
-	qry->res = res;
-        qry->ressave = res;
-
-	s_errno= 0;
-	s= -1;
-	for (aip= res; aip != NULL; aip= aip->ai_next)
-	{
-		s= socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-		if (s == -1)
-		{
-			s_errno= errno;
-			continue;
-		}
-
-		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
-		{
-			break;
-		}
-
-		s_errno= errno;
-		close(s);
-		s= -1;
-	}
-
-	if (s == -1)
-		errno= s_errno;
-	return s;
-} 
 struct testops tdig_ops = { tdig_init, tdig_start, tdig_delete }; 
