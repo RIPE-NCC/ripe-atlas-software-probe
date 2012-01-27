@@ -464,7 +464,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"\"error\":\"sendto failed: %s\" ] }",
+				"%s\"error\":\"sendto failed: %s\" ] }",
+						state->sent ? ", " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -528,7 +529,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"\"error\":\"sendto failed: %s\" ] }",
+				"%s\"error\":\"sendto failed: %s\" ] }",
+						state->sent ? ", " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -612,7 +614,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"\"error\":\"sendto failed: %s\" ] }",
+				"%s\"error\":\"sendto failed: %s\" ] }",
+						state->sent ? ", " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -729,7 +732,8 @@ static void send_pkt(struct trtstate *state)
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
 			r= sendto(sock, base->packet, len, 0,
-				(struct sockaddr *)&state->sin6, state->socklen);
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
 			serrno= errno;
 			if (state->parismod)
 				close(sock);
@@ -740,7 +744,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"\"error\":\"sendto failed: %s\" ] }",
+				"%s\"error\":\"sendto failed: %s\" ] }",
+						state->sent ? ", " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);

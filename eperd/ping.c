@@ -119,9 +119,12 @@ static void ping_cb(int result, int bytes,
 		{
 			fprintf(fh, ", " DBQ(min) ":%.3f"
 				", " DBQ(avg) ":%.3f"
-				", " DBQ(max) ":%.3f", pingstate->min/1e3,
+				", " DBQ(max) ":%.3f"
+				", " DBQ(ttl) ":%d",
+				pingstate->min/1e3,
 				pingstate->sum/1e3/pingstate->rcvdpkts, 
-				pingstate->max/1e3);
+				pingstate->max/1e3, 
+				ttl);
 		}
 		if (result == PING_ERR_SENDTO)
 		{

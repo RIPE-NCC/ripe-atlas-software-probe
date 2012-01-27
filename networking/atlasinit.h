@@ -28,6 +28,6 @@ extern const int default_rereg_time; /* 7d */
 
 enum { ALL, DEBUG, INFO, WARN, ERROR } error_level;
 
-void atlas_log( int level, char *msg, ... );
+void atlas_log( int level, const char *msg, ... );
 
 #endif

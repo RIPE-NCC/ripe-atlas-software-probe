@@ -35,8 +35,12 @@ enum
 /*********************************************************************
  * Set these constants to your liking
  */
-static int read_wait (FILE *read_from, char *type, int wait);
-static int print_re_reg_time(int reregister_time);
+static int read_wait (FILE *read_from, const char *type, int waittime);
+static int reg_init_main( int argc, char *argv[] );
+static int con_hello_main( int argc, char *argv[] );
+static int con_init_main( int argc, char *argv[] );
+static void since_last_main (int argc, char *argv[]);
+static void print_token_ver (FILE * write_to, int flag_rereg);
 
 const char atlas_log_file[]="./probe.log";
 const int atlas_log_level=INFO;
@@ -52,6 +56,7 @@ const char atlas_resolv_conf[] = "./resolv.conf.vol";
 const char atlas_network_v4_info[] = "/home/atlas/status/network_v4_info.txt";
 const char atlas_network_v4_static_info[] = "/home/atlas/status/network_v4_static_info.txt";
 const char atlas_network_v6_static_info[] = "/home/atlas/status/network_v6_static_info.txt";
+const char atlas_network_dns_static_info[] = "/home/atlas/status/network_dns_static_info.txt";
 
 const int max_lines = 16; /* maximum lines we'll process */
 const int min_rereg_time = 100; 
@@ -110,22 +115,23 @@ int atlasinit_main( int argc, char *argv[] )
 	return 0;
 }
 
-void print_token_ver (FILE * write_to, int flag_rereg) 
+static void print_token_ver (FILE * write_to, int flag_rereg) 
 {
 float root_fs_ver = 0;
 FILE *fp = xfopen_for_read("/proc/version");
+FILE *fpv = fopen("/home/atlas/state/FIRMWARE_APPS_VERSION", "r");
+	char *my_mac ;
+
 bzero( line, ATLAS_BUF_SIZE );
 fscanf (fp, "%s", line);
 fscanf (fp, "%s", line);
 fscanf (fp, "%s", line);
-FILE *fpv = fopen("/home/atlas/state/FIRMWARE_APPS_VERSION", "r");
 if(fpv)
 	fscanf (fpv, "%f", &root_fs_ver);
 	else 
 	  root_fs_ver=3100; 
 	if(flag_rereg >  0)
 	fprintf(write_to, "P_TO_R_INIT\n");
-	char *my_mac ;
 	my_mac = getenv("ETHER_SCANNED");
 	fprintf(write_to, "TOKEN_SPECS probev1 %s", line);
 	if (my_mac !=  NULL) 
@@ -134,11 +140,9 @@ if(fpv)
 	if(flag_rereg >  0)
 	fprintf(write_to, "REASON_FOR_REGISTRATION %s\n", str_reason);
 	fclose(fp);
-return 0;
 }
 
-int since_last_main (int argc, char *argv[]);
-int since_last_main (int argc, char *argv[])
+static void since_last_main (int argc, char *argv[])
 {
 	FILE *thenfile;
 	int then;
@@ -160,12 +164,10 @@ int since_last_main (int argc, char *argv[])
         }
 }
 
-int con_hello_main( int argc, char *argv[] );
-int con_hello_main( int argc, char *argv[] )
+static int con_hello_main( int argc, char *argv[] )
 {
 	/* read response from P_TO_C_HELLO  */
 	FILE *read_from = stdin;
-	FILE *write_to = stdout;
 	int ret = 0;
 
 	time_t mytime = time(0);
@@ -187,14 +189,16 @@ int con_hello_main( int argc, char *argv[] )
         	fgets( line, MAX_READ, read_from );
        		while( !feof(read_from) && l<=max_lines ) {
                 	if( strncmp(line,"CONTROLLER_TIMESTAMP ", 21)==0 ) {
-			 	sscanf( line+21, "%d", &con_time);
 				int timediff2 ;
+
+			 	sscanf( line+21, "%d", &con_time);
 				timediff2 = ( mytime - con_time )  *  ( mytime - con_time );
 				printf ("Mytime %d controller time %d\n",(int)mytime , (int)con_time);
 				if( timediff2 > 4 ) {
+					struct timeval tval;
+
 					atlas_log( INFO, "Time difference is %d seconds, set time ?\n", timediff2);
 					printf  ("Set mytime \n");
-					struct timeval tval;
 					tval.tv_sec = con_time;
 					tval.tv_usec = 0;
 					settimeofday( &tval, NULL);
@@ -214,11 +218,9 @@ int con_hello_main( int argc, char *argv[] )
 		fclose (read_from);
 	return ret;
 } 
-int con_init_main( int argc, char *argv[] );
-int con_init_main( int argc, char *argv[] )
+static int con_init_main( int argc, char *argv[] )
 {
 	FILE *read_from = stdin;
-	FILE *write_to = stdout;
 	int ret = 0;
 
 	int remote_port;
@@ -244,10 +246,10 @@ int con_init_main( int argc, char *argv[] )
 			}
 			else if ( strncmp(line,"SESSION_ID", 10)==0 ) 
 			{
-
 				FILE *f = fopen( atlas_con_hello, "wt" );
-				fprintf  (f, "P_TO_C_HELLO\nSESSION_ID %s", line+11);
 			        FILE *f1  = fopen( atlas_con_session_id, "wt" );
+
+				fprintf  (f, "P_TO_C_HELLO\nSESSION_ID %s", line+11);
 				fprintf  (f1, "SESSION_ID %s\n", line+11);
 				print_token_ver (f, 0 );
 				fclose (f);
@@ -265,8 +267,9 @@ int con_init_main( int argc, char *argv[] )
 	}	
 	else if  (strncmp(line,"REFUSED\n",8) == 0 )
 	{
-		unlink(atlas_con_hello);
 		FILE *f = fopen( atlas_force_reg, "wt" );
+
+		unlink(atlas_con_hello);
 		bzero( line, ATLAS_BUF_SIZE );
         	fgets( line, MAX_READ, read_from );
 		fprintf (f,"REASON=%s\n", line+8);
@@ -286,11 +289,11 @@ int con_init_main( int argc, char *argv[] )
 	return ret;
 
 } 
-static int read_wait (FILE *read_from, char *type, int wait)
+static int read_wait (FILE *read_from, const char *type, int waittime)
 {
 	unsigned delay;
 	time_t mytime = time(0);
-	if(wait < 1)
+	if(waittime < 1)
 	{
 		bzero( line, ATLAS_BUF_SIZE );
         	fgets( line, MAX_READ, read_from );
@@ -304,7 +307,7 @@ static int read_wait (FILE *read_from, char *type, int wait)
 	}
 	else 
 	{
-		delay = wait;
+		delay = waittime;
 	}
 	mytime = time(0);
 	if(delay >  max_rereg_time ) {
@@ -319,16 +322,15 @@ static int read_wait (FILE *read_from, char *type, int wait)
 	return (delay);
 }
 
-int reg_init_main( int argc, char *argv[] );
-int reg_init_main( int argc, char *argv[] )
+static int reg_init_main( int argc, char *argv[] )
 {
 
 	time_t mytime;
 	FILE *read_from = stdin;
-	FILE *write_to = stdout;
 
 	char *token;
-	char *search = " ";
+	const char *search = " ";
+	const char *search_nl = " \n";
 	int ret = 0;
 
 	int reregister_time = default_rereg_time;
@@ -348,23 +350,30 @@ int reg_init_main( int argc, char *argv[] )
 
 	if( strncmp(line,"OK\n",3) == 0 ) {
 		int l=1;
-		bzero( line, ATLAS_BUF_SIZE );
-		fgets( line, MAX_READ, read_from );
 		int n_controller = 0;
 		char *host_name;
 		char *type;
 		char *key;
+		int do_rm_dns_static_info;
+
+		bzero( line, ATLAS_BUF_SIZE );
+		fgets( line, MAX_READ, read_from );
+
+		do_rm_dns_static_info= 1;
 		while( !feof(read_from) && l<=max_lines ) {
 			if( strncmp(line,"CONTROLLER ", 11)==0 ) {
+				FILE *f;
+				char *ptr;
+
 				n_controller++;
 				/* TODO: one can check whether it's about the right length and syntax */
 
-				char *ptr = strchr( line+11, ' ' );
+				ptr = strchr( line+11, ' ' );
 				if( ptr==NULL ) {
 					atlas_log( ERROR, "CONTROLLER line is suspicious (line %d)\n", l );
 					return 1;
 				}
-				FILE *f = fopen( atlas_contr_known_hosts, "wt" );
+				f = fopen( atlas_contr_known_hosts, "wt" );
 				if( f==NULL ) {
 		         		atlas_log( ERROR, "Unable to append to file %s\n", atlas_contr_known_hosts );
 					return 1;
@@ -397,13 +406,15 @@ int reg_init_main( int argc, char *argv[] )
 			} 
 			else if( strncmp(line,"REGSERVER_TIMESTAMP ", 20)==0 ) {
 				int regserver_time;
-				sscanf( line+20, "%d", &regserver_time );
 				int timediff2 ;
+
+				sscanf( line+20, "%d", &regserver_time );
 				timediff2 = ( mytime - regserver_time )  *  ( mytime - regserver_time );
 				if( timediff2 > 4 ) {
+					struct timeval tval;
+
 					atlas_log( INFO, "Time difference is %d seconds, what to do now?\n", (int)(mytime-regserver_time) );
 
-					struct timeval tval;
 					tval.tv_sec = regserver_time;
 					tval.tv_usec = 0;
 				 	settimeofday( &tval, NULL);
@@ -438,16 +449,16 @@ int reg_init_main( int argc, char *argv[] )
 			else if( strncmp(line,"DHCPV4 False ", 13)==0 ) 
 			{
 				FILE *f = fopen(atlas_netconfig_v4, "wt");
-				if( f==NULL ) {
-                                        atlas_log( ERROR, "Unable to create  %s\n", atlas_netconfig_v4 );
-                                        return 1;
-                                }
-	
 				char *ipv4_address;
 				char *netmask;
 				char *broadcast; 
 				char *ipv4_gw;
 
+				if( f==NULL ) {
+                                        atlas_log( ERROR, "Unable to create  %s\n", atlas_netconfig_v4 );
+                                        return 1;
+                                }
+	
 				// Statically configured probe.
 //DHCPV4 False IPV4ADDRESS 10.0.0.151 IPV4NETMASK 255.255.255.0 IPV4NETWORK 10.0.0.0 IPV4BROADCAST 10.0.0.255 IPV4GATEWAY 10.0.0.137
 				// fprintf (f, "%s\n", line);
@@ -470,7 +481,7 @@ int reg_init_main( int argc, char *argv[] )
 				token = strtok(NULL, search);      // 
 			 	fprintf (f, "/sbin/route add default gw %s\n", token); 
 				ipv4_gw = token;
-				ipv4_gw[(strlen(ipv4_gw) - 1)] = NULL;
+				ipv4_gw[(strlen(ipv4_gw) - 1)] = '\0';
 		
 				// put parts in the shell script to make network info file
 
@@ -503,15 +514,15 @@ int reg_init_main( int argc, char *argv[] )
 
 			{
 				FILE *f = fopen(atlas_netconfig_v6, "wt");
+				char *ipv6_address;
+				char *prefixlen;
+				char *ipv6_gw;
+
 				if( f==NULL ) {
                                         atlas_log( ERROR, "Unable to create  %s\n", atlas_netconfig_v6 );
                                         return 1;
                                 }
 	
-				char *ipv6_address;
-				char *prefixlen;
-				char *ipv6_gw;
-
 				// Statically configured probe.
 
 				//fprintf (f, "%s\n", line);
@@ -522,16 +533,16 @@ int reg_init_main( int argc, char *argv[] )
 				token = strtok(NULL, search);      // 
 				prefixlen = token;	
 			 	fprintf  (f, "/sbin/ifconfig eth0 0.0.0.0\n");
-			 	fprintf  (f, "/sbin/ifconfig eth0 %s\/%s\n", ipv6_address, prefixlen);
+			 	fprintf  (f, "/sbin/ifconfig eth0 %s/%s\n", ipv6_address, prefixlen);
 
 				token = strtok(NULL, search);      // IPV6GATEWAY
 				token = strtok(NULL, search);      // 
 				ipv6_gw = token;
-				ipv6_gw[(strlen(ipv6_gw) - 1)] = NULL;
+				ipv6_gw[(strlen(ipv6_gw) - 1)] = '\0';
 				///sbin/route -A inet6 add default gw fe80::13:0:0:1 dev eth0
 			 	fprintf (f, "/sbin/route -A inet6 add default gw %s dev eth0\n", ipv6_gw); 
 				// second file for static  network info
-				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s\/%s\" >    %s \n", ipv6_address, prefixlen, atlas_network_v6_static_info );
+				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s/%s\" >    %s \n", ipv6_address, prefixlen, atlas_network_v6_static_info );
 				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw , atlas_network_v6_static_info );
 
 				fclose(f);
@@ -539,24 +550,44 @@ int reg_init_main( int argc, char *argv[] )
 			}
 			else if( strncmp(line,"DNS_SERVERS ", 11)==0 ) 
 			{
-				FILE *f = fopen(atlas_resolv_conf, "wt");
+				FILE *f, *f1;
+
+				f = fopen(atlas_resolv_conf, "wt");
 				if( f==NULL ) {
-                                        atlas_log( ERROR, "Unable to create  %s\n", atlas_resolv_conf );
+                                        atlas_log(ERROR,
+						"Unable to create  %s\n",
+						atlas_resolv_conf );
                                         return 1;
                                 }
+
+				f1 = fopen(atlas_network_dns_static_info, "wt");
+				if( f1==NULL ) {
+                                        atlas_log(ERROR,
+						"Unable to create  %s\n",
+						atlas_network_dns_static_info);
+					fclose(f);
+                                        return 1;
+                                }
+
 
 				// Statically configured probe.
 				//DNS_SERVERS 8.8.8.8 194.109.6.66
 				// fprintf (f, "%s\n", line);
-				token = strtok(line+11, search); //
+				token = strtok(line+11, search_nl); //
+			 	fprintf (f1, "STATIC_DNS");
 				while  (token != NULL) 
 				{
 			 		fprintf (f, "nameserver %s\n", token);
-					token = strtok(NULL, search);
+					fprintf (f1, " %s", token);
+					token = strtok(NULL, search_nl);
 				}
+				fprintf (f1, "\n");
+
 				fclose(f);
+				fclose(f1);
+
+				do_rm_dns_static_info= 0;
 			}
-	
 			else if( strncmp(line,"FIRMWARE_KERNEL ", 16)==0 ) 
 			{
 			}
@@ -564,6 +595,8 @@ int reg_init_main( int argc, char *argv[] )
 			fgets( line, MAX_READ, read_from );
 			l++;
 		}
+		if (do_rm_dns_static_info)
+			unlink(atlas_network_dns_static_info);
 	}
 	else if  (strncmp(line,"WAIT\n",5) == 0 ) 
 	{
@@ -581,7 +614,7 @@ int reg_init_main( int argc, char *argv[] )
 }
 
 
-void atlas_log( int level, char *msg, ... )
+void atlas_log( int level UNUSED_PARAM, const char *msg UNUSED_PARAM, ... )
 {
 /*
 	if( atlas_log_level<=level )

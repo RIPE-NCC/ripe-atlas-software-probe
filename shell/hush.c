@@ -4558,7 +4558,7 @@ static int builtin_buddyinfo(char **argv)
 	{
 		fReboot = 0; // env variable is set sow we check for low thershhold
 	}
-        printf ("RESULT 9001.0 ongoing %d ", (int)time(0));
+        printf ("RESULT 9001 ongoing %d ", (int)time(0));
 	if (my_mac !=  NULL)
 		printf("%s ", my_mac);
 	else

@@ -99,10 +99,12 @@ struct evping_host {
 	int maxpkts;			/* Number of packets to send */
 
 	int index;                     /* Index into the array of hosts           */
-	u_int8_t seq;                  /* ICMP sequence (modulo 256) for next run */
+	u_int8_t seq;                  /* ICMP sequence (modulo 256) for next
+					* run
+					*/
+	u_int8_t rcvd_ttl;		/* TTL in (last) reply packet */
 	int got_reply;
 
-	//struct event noreply_timer;    /* Timer to handle ICMP timeout            */
 	struct event ping_timer;       /* Timer to ping host at given intervals   */
 
 	/* Packets Counters */
@@ -338,7 +340,7 @@ static void ping_xmit(struct evping_host *host)
 		    host->user_callback(PING_ERR_DONE, host->cursize,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
-			0, 0, NULL,
+			0, host->rcvd_ttl, NULL,
 			host->user_pointer);
 		    if (host->base->done)
 			host->base->done(host);
@@ -554,6 +556,7 @@ printf("ready_callback4: too short\n");
 	    sin4p->sin_family= AF_INET;
 	    sin4p->sin_addr= ip->ip_dst;
 	    host->loc_socklen= sizeof(*sin4p);
+	    host->rcvd_ttl= ip->ip_ttl;
 
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
@@ -699,6 +702,11 @@ static void ready_callback6 (int __attribute((unused)) unused,
 			    sin6p->sin6_addr= ((struct in6_pktinfo *)
 				    CMSG_DATA(cmsgptr))->ipi6_addr;
 		    }
+		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			    cmsgptr->cmsg_type == IPV6_HOPLIMIT)
+		    {
+			    host->rcvd_ttl= *(int *)CMSG_DATA(cmsgptr);
+		    }
 	    }
 
 	    /* Report everything with the wrong sequence number as a dup. 
@@ -766,6 +774,9 @@ evping_base_new(struct event_base *event_base)
 
 	on = 1;
 	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
+
+	on = 1;
+	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on));
 
 	base = malloc(sizeof(struct evping_base));
 	if (base == NULL)
