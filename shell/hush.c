@@ -4456,6 +4456,7 @@ static int builtin_sleepkick (char **argv)
 #define WATCHDOGDEV "/dev/watchdog"
 	unsigned duration;
 	unsigned watchdog;
+	int modDuration = 0;
 	if (argv[1] == NULL) 
 		return (1);
 	
@@ -4470,7 +4471,6 @@ static int builtin_sleepkick (char **argv)
 		watchdog =  xatou(argv[2]);
 		iMax =   (int) (duration / watchdog);
 
-		int modDuration = 0;
 		if( duration >= watchdog)
 		{
 			modDuration =   duration % watchdog;
@@ -4497,6 +4497,7 @@ static int builtin_sleepkick (char **argv)
 	{
 		sleep(duration);
 	}
+	return 0;
 }
 
 static int builtin_add(char **argv)
@@ -4527,7 +4528,7 @@ static int builtin_epoch (char **argv)
 		printf("%d\n", r2);
 		return EXIT_SUCCESS;
 	}
-	printf ("%d\n", (time(0)));
+	printf ("%ld\n", (time(0)));
 	return EXIT_SUCCESS;
 }
 
@@ -4535,25 +4536,29 @@ static int builtin_buddyinfo(char **argv)
 {
 	char *lowmemChar;
 	unsigned lowmem = 0;
-	
+	FILE *fp = xfopen_for_read("/proc/buddyinfo");
+        FILE *fp1 = xfopen_for_read("/proc/buddyinfo");
+	char aa[10];
+	char *my_mac ;
+	int i = 0;
+	int j = 0;
+	int memBlock = 4;
+	int fReboot = 1; // don't reboot 
+	int freeMem = 0;
+	int jMax = 64; // enough
+	struct sysinfo info; 
+
 	lowmemChar =  argv[1];
+
 	if(lowmemChar) 
 		lowmem = xatou(lowmemChar);
-
-        FILE *fp = xfopen_for_read("/proc/buddyinfo");
-        char aa[10];
         fscanf(fp, "%s", aa); 
         fscanf(fp, "%s", aa);
         fscanf(fp, "%s", aa);
         fscanf(fp, "%s", aa);
 
-	char *my_mac ;
         my_mac = getenv("ETHER_SCANNED");
 
-        int i = 0;
-        int j = 0;
-	int memBlock = 4;
-	int fReboot = 1; // don't reboot 
 	if (lowmem >= 4 ) 
 	{
 		fReboot = 0; // env variable is set sow we check for low thershhold
@@ -4564,12 +4569,9 @@ static int builtin_buddyinfo(char **argv)
 	else
 		printf( "AAAAAABBBBBB ");
 	/* get uptime and print it */
-	struct sysinfo info; 
 	sysinfo(&info);
  	printf ("%-7ld", info.uptime );
-	int freeMem = 0;
-	int jMax = 64; // enough
-
+	
         for (j=0; j < jMax; j++)  
         {
                 if (fscanf(fp, "%d", &i) != 1)
@@ -4597,7 +4599,6 @@ static int builtin_buddyinfo(char **argv)
 	printf (" %-5d " ,  freeMem);
 
 	fclose (fp);
-        FILE *fp1 = xfopen_for_read("/proc/buddyinfo");
         fscanf(fp1, "%s", aa);
         fscanf(fp1, "%s", aa);
         fscanf(fp1, "%s", aa);
@@ -4618,11 +4619,11 @@ static int builtin_buddyinfo(char **argv)
 		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
 		return (EXIT_FAILURE);
 	}
+	return 0;
 }
 
 static int builtin_findpid(char **argv)
 {
-	pid_t* pidList;
 	procps_status_t* p = NULL;
 	int found = 0;
 
@@ -4633,7 +4634,7 @@ static int builtin_findpid(char **argv)
 			if (comm_match(p, argv[1])
                 /* or we require argv0 to match (essential for matching reexeced
  /proc/self/exe)*/
-                 	|| (p->argv0 && strcmp(bb_basename(p->argv0), argv) == 0)
+                 	|| (p->argv0 && strcmp(bb_basename(p->argv0), *argv) == 0)
                 /* TODO: we can also try /proc/NUM/exe link, do we want that? */
                 ) 
 			{
@@ -4682,15 +4683,15 @@ static int builtin_rxtxrpt(char **argv)
 
 static int builtin_rchoose(char **argv)
 {
-	srand (time (0));
 	int argc = 0;
+	int r = rand();
+	srand (time (0));
         while (*argv) {
                 argc++;
                 argv++;
         }
 	argv -= argc;
 	argv++;
-	int r = rand();
 	r %= (argc - 1);
 	printf ("%s\n", argv[r]);
 	return fflush(stdout);
@@ -4698,7 +4699,6 @@ static int builtin_rchoose(char **argv)
 
 static int builtin_sub(char **argv)
 {
-	char cBuf[16];
 	char *p;
 	int r1;
 	int r2;
