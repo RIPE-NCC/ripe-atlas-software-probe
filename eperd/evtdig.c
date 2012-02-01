@@ -48,6 +48,7 @@
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
 #define JD(key, val) fprintf(fh, "\"" #key"\" : \"%d\" , ",  val); 
 #define JLD(key, val) fprintf(fh, "\"" #key"\" :  %ld , ",  val); 
+#define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
 
 #undef MIN	/* just in case */
 #undef MAX	/* also, just in case */
@@ -55,19 +56,19 @@
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
-
-/* Packets definitions */
-
-/* Max IP packet size is 65536 while fixed IP header size is 20;
- * the traditional ping program transmits 56 bytes of data, so the
- * default data size is calculated as to be like the original
- */
-#define IPHDR              20
 #define MAX_DNS_BUF_SIZE   2048
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
-#define DEFAULT_NOREPLY_TIMEOUT 100            /* 100 msec - 0 is illegal      */
-#define DEFAULT_PING_INTERVAL   1000           /* 1 sec - 0 means flood mode   */
+#define DEFAULT_NOREPLY_TIMEOUT 1000           /* 1000 msec - 0 is illegal      */
+#define DEFAULT_RETRY_INTERVAL  1000           /* 1 sec - 0 means flood mode   */
+#define DEFAULT_TCP_CONNECT_TIMEOUT  5         /* in seconds */
+#define DEFAULT_LINE_LENGTH 80 
+
+/* state of the dns query */
+#define STATUS_DNS_RESOLV 		1001
+#define STATUS_TCP_CONNECTING 		1002
+#define STATUS_TCP_CONNECTED 		1003
+#define STATUS_TCP_WRITE 		1004
 
 // seems T_DNSKEY is not defined header files of lenny and sdk
 #ifndef ns_t_dnskey
@@ -122,8 +123,6 @@ struct query_state {
 	char * name;                /* Host identifier as given by the user */
 	char * fqname;              /* Full qualified hostname          */ 
 	char * ipname;              /* Remote address in dot notation   */
-	struct sockaddr *remote4;  /* source address of return packet */
-	struct sockaddr_in6 *remote6 ; /* source address of return packet */
 	u_int16_t qryid;             /* query id 16 bit */
 	int tcp_fd;
 	FILE *tcp_file;
@@ -171,6 +170,7 @@ struct query_state {
 	char *result;
 	size_t reslen;
 	size_t resmax; 
+	int st ; 
 
 	u_char *outbuff;
 };
@@ -248,6 +248,7 @@ static struct option longopts[]=
 	{ "dnskey", required_argument, NULL, 'D' },
 	{ NULL, }
 };
+static	char line[DEFAULT_LINE_LENGTH];
 
 
 //static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
@@ -260,12 +261,13 @@ void tdig_start (struct query_state *qry);
 void printReply(struct query_state *qry, int wire_size, unsigned char *result );
 static void done(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
-static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struct sockaddr_in6 *remote6,  struct timeval now);
+static void process_reply(void * arg, int nrecv,  struct timeval now);
 static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 
 /* move the next functions from tdig.c */
 u_int32_t get32b (char *p);
 void ldns_write_uint16(void *dst, uint16_t data);
+uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 /* from tdig.c */
 
@@ -372,6 +374,9 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	r =  rand();
 	r %= 65535;
 	qry->qryid = (uint16_t) r; // host is storing int host byte order
+	//crondlog(LVL9 "%s() : %d dns qry id %d",__FILE__, __LINE__, qry->qryid);
+	crondlog(LVL9 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
+	BLURT(LVL9 "dns qyery id %d", qry->qryid);
 	dns->id = (uint16_t) htons(r); 
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
@@ -420,7 +425,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
 	int serrno;
-	char line[80];
 	uint32_t nsent;
 	u_char *outbuff;
 	int err = 0;
@@ -482,8 +486,9 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		qry->bev_tcp =  bufferevent_socket_new(qry->base->event_base, -1, BEV_OPT_CLOSE_ON_FREE);
 		bufferevent_setcb(qry->bev_tcp, readcb_tcp, NULL, eventcb_tcp, qry);
 		bufferevent_enable(qry->bev_tcp, EV_READ|EV_WRITE);
-		bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase,
-				qry->opt_AF, qry->server_name, 53);
+		bufferevent_settimeout(qry->bev_tcp, DEFAULT_TCP_CONNECT_TIMEOUT, DEFAULT_TCP_CONNECT_TIMEOUT );
+		bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase, qry->opt_AF , qry->server_name, 53);
+
 		crondlog(LVL9 "dispatched tcp callback %s", qry->server_name);
 	}
 }
@@ -499,25 +504,21 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 
 	gettimeofday(&rectime, NULL);
 	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
-	printf("read was called\n");
-	evbuffer_remove(input, b2, 2 );
-	wire_size = ldns_read_uint16(b2);
 
 	input = bufferevent_get_input(bev);
-	n = evbuffer_remove(input, qry->base->packet, wire_size );
-	printf (" got %d bytes to process\n", n);
-	bufferevent_free(bev);
-	process_reply(qry->base, n, NULL, NULL, rectime); 	
+	evbuffer_remove(input, b2, 2 );
+	wire_size = ldns_read_uint16(b2);
+ 	while ((n = evbuffer_remove(input, qry->base->packet, wire_size )) > 0) {
+		if(n) {
+			crondlog(LVL9 "in readcb %d bytes, red %d ", wire_size, n);
+			crondlog(LVL9 "qry pointer address readcb %p \
+qry.id, %d", qry->qryid);
+			crondlog(LVL9 "DBG: base pointer address readcb %p",  qry->base );
+			process_reply(qry->base, n, rectime); 	
 
-
-	// AA not sure if I want to empty the buffer in while. However if the size too big generate error message.
-	/*
-	   while ((n = evbuffer_remove(input, qry->base->packet, MAX_DNS_BUF_SIZE )) > 0) {
-	   printf (" got %d bytes to process\n", n);
-	   process_reply(qry->base, n, NULL, NULL, rectime); 	
-
-	   } */
-
+			bufferevent_free(bev);
+		}
+	}
 }
 
 void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
@@ -526,6 +527,7 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 	u_char *outbuff;
 	uint16_t payload_len ;
 	u_char wire[1300];
+	int serrno;
 
 	if (events & BEV_EVENT_CONNECTED) {
 		printf("Connect okay.\n");
@@ -536,18 +538,27 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		payload_len = (uint16_t) qry->pktsize;
 		ldns_write_uint16(wire, qry->pktsize);
 		memcpy(wire + 2, outbuff, qry->pktsize);
+		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
 
-	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF)) {
+	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
 		struct event_base *base = ptr;
 		if (events & BEV_EVENT_ERROR) {
-			int err = bufferevent_socket_get_dns_error(bev);
-			if (err)
-				printf("DNS error: %s\n", evutil_gai_strerror(err));
+			serrno = bufferevent_socket_get_dns_error(bev);
+			if (serrno)
+				snprintf(line, DEFAULT_LINE_LENGTH, "\"dnserror\" : \" %s\n", evutil_gai_strerror(serrno));
+		} 
+		else if (events & BEV_EVENT_TIMEOUT) {
+			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"TIMEOUT could be read/write or connect\"");
+		}	
+		else if (events & BEV_EVENT_EOF) {
+			serrno = errno; 
+			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"Unexpectd EOF %s", strerror(serrno));
 		}
-		printf("Closing\n");
+		add_str(qry, line);
 		bufferevent_free(bev);
-		event_base_loopexit(base, NULL);
+		printReply (qry, 0, NULL);
+		//event_base_loopexit(base, NULL);
 	}
 }
 
@@ -555,7 +566,6 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 /* The callback to handle timeouts due to destination host unreachable condition */
 static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	char line[80];
 	struct query_state *qry = h;
 	qry->base->timedout++;
 	sprintf(line, "\"timedout\" : 1 , ");
@@ -574,7 +584,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struct sockaddr_in6 *remote6,  struct timeval now)
+static void process_reply(void * arg, int nrecv, struct timeval now)
 {
 	struct tdig_base *base = arg;
 
@@ -585,11 +595,16 @@ static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struc
 	dnsR = (struct DNS_HEADER*) base->packet;
 	base->recvok++; 
 
+
+	crondlog(LVL9 "DBG: base address process reply %p, nrec %d", base, nrecv);
 	/* Get the pointer to the qry descriptor in our internal table */
 	qry = tdig_lookup_query(base, ntohs(dnsR->id));
 
-	if ( ! qry) 
+	if ( ! qry) {
+		crondlog(LVL9 "DBG: no match found for qry id i %d",\
+ntohs(dnsR->id));
 		return;
+	}
 
 	/* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
 
@@ -597,8 +612,6 @@ static void process_reply(void * arg, int nrecv, struct sockaddr *remote4, struc
 	qry->recvbytes += nrecv;
 	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 +
 		(now.tv_usec-qry->xmit_time.tv_usec)/1e3;
-	qry->remote4 = remote4;
-	qry->remote6 = remote6;
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -610,13 +623,9 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 {
 	struct tdig_base *base = arg;
 	int nrecv;
-	struct sockaddr *remote4;                  /* responding internet address */
-	struct sockaddr_in6 *remote6 ;
+	struct sockaddr remote4;                  /* responding internet address */
 	socklen_t slen;
 	struct timeval rectime;
-
-	remote4 = xzalloc(sizeof(struct sockaddr));
-	remote6 = NULL;
 
 	slen = sizeof(struct sockaddr);
 	bzero(base->packet, MAX_DNS_BUF_SIZE);
@@ -624,14 +633,15 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 
 	gettimeofday(&rectime, NULL);
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, remote4, &slen);
+	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet),
+MSG_DONTWAIT, &remote4, &slen);
 	if (nrecv < 0)
 	{
 		/* One more failure */
 		base->recvfail++;
 		return ;
 	}
-	process_reply(arg, nrecv, remote4, remote6, rectime);
+	process_reply(arg, nrecv, rectime);
 	return;
 } 
 
@@ -643,20 +653,16 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	struct msghdr msg;
 	struct iovec iov[1];
 	//char buf[INET6_ADDRSTRLEN];
-	struct sockaddr *remote6;
-	struct sockaddr_in *remote4;
+	struct sockaddr remote6;
 	char cmsgbuf[256];
 
 	/* Time the packet has been received */
 	gettimeofday(&rectime, NULL);
 
-	remote6 = xzalloc(sizeof(struct sockaddr_in6));
-	remote4 = NULL;
-
 	iov[0].iov_base= base->packet;
 	iov[0].iov_len= sizeof(base->packet);
 
-	msg.msg_name= remote6;
+	msg.msg_name= &remote6;
 	msg.msg_namelen= sizeof( struct sockaddr_in6);
 	msg.msg_iov= iov;
 	msg.msg_iovlen= 1;
@@ -671,7 +677,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 		printf("ready_callback6: read error '%s'\n", strerror(errno));
 		return;
 	}
-	process_reply(arg, nrecv, remote4, remote6, rectime);
+	process_reply(arg, nrecv, rectime);
 
 	return;
 }
@@ -720,6 +726,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
+	qry->result= NULL; 
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
@@ -851,7 +858,7 @@ tdig_base_new(struct event_base *event_base)
 	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
 
 	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
-	msecstotv(DEFAULT_PING_INTERVAL, &tdig_base->tv_interval);
+	msecstotv(DEFAULT_RETRY_INTERVAL, &tdig_base->tv_interval);
 
 	// Define the callback to handle UDP Reply 
 	// add the raw file descriptor to those monitored for read events 
@@ -989,17 +996,6 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		freeaddrinfo(qry->ressave);
 		qry->ressave  = NULL;
-	}
-
-	if( qry->remote6) 
-	{
-		free( qry->remote6);
-		qry->remote6 = NULL;
-	}
-	if( qry->remote4) 
-	{
-		free( qry->remote4);
-		qry->remote4 = NULL;
 	}
 
 	if(qry->base->done)
@@ -1198,7 +1194,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 		fprintf (fh , " }"); //result
 	} 
-
+	if(qry->result) 
+		fprintf(fh, "%s ," , qry->result);
 	fprintf(fh, " \"end\": 0");
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
