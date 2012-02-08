@@ -539,8 +539,8 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		ldns_write_uint16(wire, qry->pktsize);
 		memcpy(wire + 2, outbuff, qry->pktsize);
 		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
-		base->sentok++;
-		base->sentbytes+= (qry->pktsize +2);
+		qry->base->sentok++;
+		qry->base->sentbytes+= (qry->pktsize +2);
 		qry->sentbytes += (qry->pktsize +2);
 		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
@@ -561,7 +561,7 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		bufferevent_free(bev);
 		printReply (qry, 0, NULL);
 		//event_base_loopexit(base, NULL);
-		base->sendfail++;
+		qry->base->sendfail++;
 	}
 }
 
