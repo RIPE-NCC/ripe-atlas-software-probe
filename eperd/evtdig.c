@@ -510,7 +510,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 	wire_size = ldns_read_uint16(b2);
  	while ((n = evbuffer_remove(input, qry->base->packet, wire_size )) > 0) {
 		if(n) {
-			crondlog(LVL9 "in readcb %d bytes, red %d ", wire_size, n);
+			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  wire_size, n);
 			crondlog(LVL9 "qry pointer address readcb %p \
 qry.id, %d", qry->qryid);
 			crondlog(LVL9 "DBG: base pointer address readcb %p",  qry->base );

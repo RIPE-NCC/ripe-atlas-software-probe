@@ -254,6 +254,12 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 		crondlog(DIE9 "event_base_new failed"); /* exits */
 	}
 
+	DnsBase = evdns_base_new(EventBase, 1); 
+	if(!DnsBase) {
+		event_base_free(EventBase);
+		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+	}
+
 	fd= open(URANDOM_DEV, O_RDONLY);
 
 	/* Best effort, just ignore errors */
