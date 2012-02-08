@@ -457,9 +457,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				/* One more DNS Query is sent */
 				base->sentok++;
 				base->sentbytes+=nsent;
-
 				qry->sentbytes += nsent;
-
 				err  = 0;
 				/* Add the timer to handle no reply condition in the given timeout */
 				evtimer_add(&qry->noreply_timer, &base->tv_noreply);
@@ -508,6 +506,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 	input = bufferevent_get_input(bev);
 	evbuffer_remove(input, b2, 2 );
 	wire_size = ldns_read_uint16(b2);
+	evtimer_del(&qry->noreply_timer); /* Clean the noreply timer */
  	while ((n = evbuffer_remove(input, qry->base->packet, wire_size )) > 0) {
 		if(n) {
 			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  wire_size, n);
@@ -530,7 +529,8 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 	int serrno;
 
 	if (events & BEV_EVENT_CONNECTED) {
-		printf("Connect okay.\n");
+		crondlog(LVL9 "Connect okay %s", qry->server_name);
+		printf ("Connect okay %s\n", qry->server_name);
 		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
 		bzero(outbuff, MAX_DNS_BUF_SIZE);
 		qry->outbuff = outbuff;
@@ -538,9 +538,11 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		payload_len = (uint16_t) qry->pktsize;
 		ldns_write_uint16(wire, qry->pktsize);
 		memcpy(wire + 2, outbuff, qry->pktsize);
-		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
-
+		base->sentok++;
+		base->sentbytes+= (qry->pktsize +2);
+		qry->sentbytes += (qry->pktsize +2);
+		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
 		struct event_base *base = ptr;
 		if (events & BEV_EVENT_ERROR) {
@@ -559,6 +561,7 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		bufferevent_free(bev);
 		printReply (qry, 0, NULL);
 		//event_base_loopexit(base, NULL);
+		base->sendfail++;
 	}
 }
 
