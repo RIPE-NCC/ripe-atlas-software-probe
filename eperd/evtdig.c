@@ -959,6 +959,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	struct query_state *qry;
 
 	base = h;	
+	if(!base->qry_head )
+		return;
+
 	qry = base->qry_head;
 
 	if (qry->out_filename) {
@@ -971,7 +974,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	
 	BLURT(LVL9 "tdig_stats called");
 	fprintf(fh, "{ ");
-	JS(id, "19809" ); 
+	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
 	JS1(time, %ld,  now.tv_sec);
 	JLD(sendfail , base->sendfail);
