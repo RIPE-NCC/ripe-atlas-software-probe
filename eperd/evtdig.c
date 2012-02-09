@@ -86,6 +86,7 @@ typedef uint64_t counter_t;
 /* How to keep track of a DNS query session */
 struct tdig_base {
 	struct event_base *event_base;
+	struct evdns_base *evdns;
 
 	evutil_socket_t rawfd_v4;       /* Raw socket used to nsm hosts              */
 	evutil_socket_t rawfd_v6;       /* Raw socket used to nsm hosts              */
@@ -279,10 +280,18 @@ int evtdig_main(int argc, char **argv)
 		crondlog(DIE9 "event_base_new failed"); /* exits */
 	}
 
+	qry = tdig_init(argc, argv, done);
+	if(!qry) {
+		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+		event_base_free	(EventBase);
+		return 1;
+	}
+
 	DnsBase = evdns_base_new(EventBase, 1);
-	if (!qry)
-	{
-		crondlog(DIE9 "new query state failed"); /* exits */
+	if (!DnsBase) {
+		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+		event_base_free	(EventBase);
+		return 1;
 	}
 
 	tdig_start(qry);  
@@ -782,6 +791,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	}
 	qry->server_name = strdup(argv[optind]);
 	qry->base = tdig_base;
+	qry->base->evdns = DnsBase;
 
 	return qry;
 }
@@ -794,7 +804,6 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	struct addrinfo hints;
 	int on = 1;
 	struct timeval tv;
-
 	
 	bzero(&hints,sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -985,7 +994,8 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JLD(timedout , base->timedout);
 
 	fprintf(fh, " }\n");
-	fclose (fh);
+	if (qry->out_filename) 
+		fclose (fh);
 	// reuse timeval now
 	now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
 	now.tv_usec =  0;
@@ -1037,6 +1047,10 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		terminator = qry->base->done;
 		event_base = qry->base->event_base;
+		if(qry->base->evdns) {
+			evdns_base_free(qry->base->evdns, 0);
+			qry->base->evdns = NULL;
+		}
 		tdig_delete(qry);
 		event_base_loopbreak(event_base);
 		event_base_free(event_base);
@@ -1225,7 +1239,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 			free(answers[i].name);
 		}
 
-		fprintf (fh , " }"); //result
+		fprintf (fh , " },"); //result
 	} 
 	if(qry->result) 
 		fprintf(fh, "%s ," , qry->result);
