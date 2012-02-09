@@ -46,8 +46,8 @@
 #define DQC(str) "\"" #str "\" : "
 #define JS(key, val) fprintf(fh, "\"" #key"\" : \"%s\" , ",  val); 
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
-#define JD(key, val) fprintf(fh, "\"" #key"\" : \"%d\" , ",  val); 
-#define JLD(key, val) fprintf(fh, "\"" #key"\" :  %ld , ",  val); 
+#define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
+#define JLD(key, val) fprintf(fh, "\"" #key"\" : %ld , ",  val); 
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
 
 #undef MIN	/* just in case */
@@ -63,6 +63,7 @@
 #define DEFAULT_RETRY_INTERVAL  1000           /* 1 sec - 0 means flood mode   */
 #define DEFAULT_TCP_CONNECT_TIMEOUT  5         /* in seconds */
 #define DEFAULT_LINE_LENGTH 80 
+#define DEFAULT_STATS_REPORT_INTERVEL 60 		/* in seconds */
 
 /* state of the dns query */
 #define STATUS_DNS_RESOLV 		1001
@@ -97,6 +98,7 @@ struct tdig_base {
 
 	struct event event4;            /* Used to detect read events on raw socket   */
 	struct event event6;            /* Used to detect read events on raw socket   */
+	struct event statsReportEvent;
 
 	counter_t sendfail;            /* # of failed sendto()                       */
 	counter_t sentok;              /* # of successful sendto()                   */
@@ -105,11 +107,10 @@ struct tdig_base {
 	counter_t foreign;             /* # of DNS replies we are not looking for   */
 	counter_t illegal;             /* # of DNS packets with an illegal payload  */
 	counter_t sentbytes; 
-	counter_t recvtbytes; 	
+	counter_t recvbytes; 	
 	counter_t timedout;
 
 	u_char packet [MAX_DNS_BUF_SIZE] ;
-
 	/* used only for the stand alone version */
 	void (*done)(void *state);
 };
@@ -154,11 +155,6 @@ struct query_state {
 	struct event nsm_timer;        /* Timer to next query intervals   */
 	struct timeval xmit_time;	
 	double triptime;
-
-	/* Bytes counters */
-	counter_t sentbytes;           /* Total # of bytes sent                   */
-	counter_t recvbytes;           /* Total # of bytes received               */
-
 
 	//tdig_callback_type user_callback;
 	void *user_callback;
@@ -252,6 +248,7 @@ static	char line[DEFAULT_LINE_LENGTH];
 
 
 //static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
+static void tdig_stats(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h);
 static int tdig_delete(void *state);
 static void ChangetoDnsNameFormat(u_char * dns,unsigned char* qry) ;
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
@@ -283,7 +280,6 @@ int evtdig_main(int argc, char **argv)
 	}
 
 	DnsBase = evdns_base_new(EventBase, 1);
-	qry = tdig_init(argc, argv, done);
 	if (!qry)
 	{
 		crondlog(DIE9 "new query state failed"); /* exits */
@@ -348,18 +344,6 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx)
 
 	return NULL;
 }
-
-#if 0
-static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry)
-{
-	u_char *qname;
-	struct QUESTION *qinfo = NULL;
-	struct EDNS0_HEADER *e;
-	uint32_t  size = 0;
-
-	return size ;
-}
-#endif
 
 static void mk_dns_buff(struct query_state *qry,  u_char *packet) 
 {
@@ -457,7 +441,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				/* One more DNS Query is sent */
 				base->sentok++;
 				base->sentbytes+=nsent;
-				qry->sentbytes += nsent;
 				err  = 0;
 				/* Add the timer to handle no reply condition in the given timeout */
 				evtimer_add(&qry->noreply_timer, &base->tv_noreply);
@@ -486,7 +469,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		bufferevent_enable(qry->bev_tcp, EV_READ|EV_WRITE);
 		bufferevent_settimeout(qry->bev_tcp, DEFAULT_TCP_CONNECT_TIMEOUT, DEFAULT_TCP_CONNECT_TIMEOUT );
 		bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase, qry->opt_AF , qry->server_name, 53);
-
 		crondlog(LVL9 "dispatched tcp callback %s", qry->server_name);
 	}
 }
@@ -499,7 +481,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 	struct timeval rectime;	
 	struct evbuffer *input ;
 	int wire_size;
-
+	struct DNS_HEADER *dnsR = NULL;
 	gettimeofday(&rectime, NULL);
 	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
@@ -509,12 +491,23 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 	evtimer_del(&qry->noreply_timer); /* Clean the noreply timer */
  	while ((n = evbuffer_remove(input, qry->base->packet, wire_size )) > 0) {
 		if(n) {
+			evtimer_del(&qry->noreply_timer);
 			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  wire_size, n);
-			crondlog(LVL9 "qry pointer address readcb %p \
-qry.id, %d", qry->qryid);
+			crondlog(LVL9 "qry pointer address readcb %p qry.id, %d", qry->qryid);
 			crondlog(LVL9 "DBG: base pointer address readcb %p",  qry->base );
-			process_reply(qry->base, n, rectime); 	
-
+			//process_reply(qry->base, n, rectime); 	
+			dnsR = (struct DNS_HEADER*) qry->base->packet;
+			if ( ntohs(dnsR->id)  == qry->qryid ) {
+				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;	
+				printReply (qry, n, qry->base->packet);
+			}
+			else {
+				sprintf(line, "\"tcperror\" : \"id mismatch error\" ,");
+				printf( "tcperror : id mismatch error %s\n", qry->server_name);
+				add_str(qry, line);
+				printReply (qry, 0, NULL);
+			}
+			/* Clean the noreply timer */
 			bufferevent_free(bev);
 		}
 	}
@@ -538,13 +531,12 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		payload_len = (uint16_t) qry->pktsize;
 		ldns_write_uint16(wire, qry->pktsize);
 		memcpy(wire + 2, outbuff, qry->pktsize);
+		gettimeofday(&qry->xmit_time, NULL);
 		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
 		qry->base->sentok++;
 		qry->base->sentbytes+= (qry->pktsize +2);
-		qry->sentbytes += (qry->pktsize +2);
 		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
-		struct event_base *base = ptr;
 		if (events & BEV_EVENT_ERROR) {
 			serrno = bufferevent_socket_get_dns_error(bev);
 			if (serrno)
@@ -612,9 +604,8 @@ ntohs(dnsR->id));
 	/* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
 
 	qry->base->recvok++;
-	qry->recvbytes += nrecv;
-	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 +
-		(now.tv_usec-qry->xmit_time.tv_usec)/1e3;
+	qry->base->recvbytes += nrecv;
+	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 + (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -636,8 +627,7 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 
 	gettimeofday(&rectime, NULL);
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet),
-MSG_DONTWAIT, &remote4, &slen);
+	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, &remote4, &slen);
 	if (nrecv < 0)
 	{
 		/* One more failure */
@@ -685,6 +675,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	return;
 }
 
+/* this called for each query/line in eperd */
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 {
 	char *check;
@@ -700,21 +691,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 	tdig_base->done = done;
 
-
-	tdig_base->sendfail = 0;
-	tdig_base->sentok  = 0;
-	tdig_base->recvfail  = 0;
-	tdig_base->recvok  = 0;
-	tdig_base->foreign  = 0;
-	tdig_base->illegal  = 0;
-	tdig_base->sentbytes  = 0;
-	tdig_base->recvtbytes = 0;
-	tdig_base->timedout = 0;
-
-
 	qry=xzalloc(sizeof(*qry));
 	opt_v4_only =  opt_v6_only = 0;
-
 
 	bzero(qry, sizeof(*qry));
 	// initialize per query state variables;
@@ -808,15 +786,16 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	return qry;
 }
 
-/* exported function */
-	struct tdig_base *
-tdig_base_new(struct event_base *event_base)
+/* called only once. Initialize tdig_base variables here */
+struct tdig_base * tdig_base_new(struct event_base *event_base)
 {
 	evutil_socket_t fd6;
 	evutil_socket_t fd4;
 	struct addrinfo hints;
 	int on = 1;
+	struct timeval tv;
 
+	
 	bzero(&hints,sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_flags = 0;
@@ -843,6 +822,17 @@ tdig_base_new(struct event_base *event_base)
 		close(fd6);
 		return (NULL);
 	}
+
+	tdig_base->qry_head = NULL;
+	tdig_base->sendfail = 0;
+	tdig_base->sentok  = 0;
+	tdig_base->recvfail  = 0;
+	tdig_base->recvok  = 0;
+	tdig_base->foreign  = 0;
+	tdig_base->illegal  = 0;
+	tdig_base->sentbytes  = 0;
+	tdig_base->recvbytes = 0;
+	tdig_base->timedout = 0;
 
 	memset(tdig_base, 0, sizeof(struct tdig_base));
 	tdig_base->event_base = event_base;
@@ -873,6 +863,11 @@ tdig_base_new(struct event_base *event_base)
 	event_assign(&tdig_base->event6, tdig_base->event_base, tdig_base->rawfd_v6, 
 			EV_READ | EV_PERSIST, ready_callback6, tdig_base);
 	event_add(&tdig_base->event6, NULL);
+	
+	evtimer_assign(&tdig_base->statsReportEvent, tdig_base->event_base, tdig_stats, tdig_base);
+	tv.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+	tv.tv_usec =  0;
+	event_add(&tdig_base->statsReportEvent, &tv);
 
 	return tdig_base;
 }
@@ -880,6 +875,7 @@ tdig_base_new(struct event_base *event_base)
 void tdig_start (struct query_state *qry)
 {
 	struct timeval asap = { 0, 0 };
+	FILE *fh; 
 
 	int err_num;
 	struct addrinfo hints, *res;
@@ -919,6 +915,7 @@ void tdig_start (struct query_state *qry)
 	if (!tdig_base->qry_head) {
 		qry->next = qry->prev = qry;
 		tdig_base->qry_head = qry;
+		tdig_stats( 0, 0, tdig_base); // call this first time to initial values.
 	} else {
 		qry->next = tdig_base->qry_head->next;
 		qry->prev = tdig_base->qry_head;
@@ -952,14 +949,46 @@ int tdig_base_count_queries(struct tdig_base *base)
 	return n;
 }
 
+#endif
 
-/* exported function */
-	void
-tdig_stats(struct tdig_base *base)
+static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
+	struct timeval now;
+	FILE *fh;	
+	struct tdig_base *base;
+	struct query_state *qry;
+
+	base = h;	
+	qry = base->qry_head;
+
+	if (qry->out_filename) {
+		fh= fopen(qry->out_filename, "a");
+		if (!fh)
+			crondlog(DIE9 "unable to append to '%s'", qry->out_filename);
+	}
+	else
+		fh = stdout;
+	
+	BLURT(LVL9 "tdig_stats called");
+	fprintf(fh, "{ ");
+	JS(id, "19809" ); 
+	gettimeofday(&now, NULL); 
+	JS1(time, %ld,  now.tv_sec);
+	JLD(sendfail , base->sendfail);
+	JLD(sentok , base->sentok);
+	JLD(recvok , base->recvok);
+	JLD(sentbytes , base->sentbytes);
+	JLD(recvbytes , base->recvbytes);
+	JLD(timedout , base->timedout);
+
+	fprintf(fh, " }\n");
+	fclose (fh);
+	// reuse timeval now
+	now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+	now.tv_usec =  0;
+	event_add(&tdig_base->statsReportEvent, &now);
 }
 
-#endif
 
 static void ChangetoDnsNameFormat(u_char *  dns,unsigned char* qry)
 {
@@ -1005,13 +1034,11 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		terminator = qry->base->done;
 		event_base = qry->base->event_base;
-
 		tdig_delete(qry);
 		event_base_loopbreak(event_base);
 		event_base_free(event_base);
 		terminator(qry);
 	}
-
 }
 
 
