@@ -86,7 +86,6 @@ typedef uint64_t counter_t;
 /* How to keep track of a DNS query session */
 struct tdig_base {
 	struct event_base *event_base;
-	struct evdns_base *evdns;
 
 	evutil_socket_t rawfd_v4;       /* Raw socket used to nsm hosts              */
 	evutil_socket_t rawfd_v6;       /* Raw socket used to nsm hosts              */
@@ -299,6 +298,8 @@ int evtdig_main(int argc, char **argv)
 
 	event_base_dispatch (EventBase);
 	event_base_loopbreak (EventBase);
+	if(EventBase)
+	event_base_free(EventBase);
 	return 0;
 }
 
@@ -791,8 +792,6 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	}
 	qry->server_name = strdup(argv[optind]);
 	qry->base = tdig_base;
-	qry->base->evdns = DnsBase;
-
 	return qry;
 }
 
@@ -1030,6 +1029,7 @@ static void free_qry_inst(struct query_state *qry)
 
 	void (*terminator)(void *state);
 	struct event_base *event_base;
+	struct tdig_base *tbase;
 
 	if(qry->result) 
 	{
@@ -1047,11 +1047,13 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		terminator = qry->base->done;
 		event_base = qry->base->event_base;
-		if(qry->base->evdns) {
-			evdns_base_free(qry->base->evdns, 0);
-			qry->base->evdns = NULL;
+		if(DnsBase) {
+			evdns_base_free(DnsBase, 0);
+			DnsBase = NULL;
 		}
+		tbase = qry->base;
 		tdig_delete(qry);
+		free(tbase);
 		event_base_loopbreak(event_base);
 		event_base_free(event_base);
 		terminator(qry);
