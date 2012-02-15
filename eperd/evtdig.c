@@ -981,7 +981,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 		fh = stdout;
 	
 	BLURT(LVL9 "tdig_stats called");
-	fprintf(fh, "{ ");
+	fprintf(fh, "RESULT { ");
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
 	JS1(time, %ld,  now.tv_sec);
@@ -1123,7 +1123,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	else
 		fh = stdout;
 
-	fprintf(fh, "{ ");
+	fprintf(fh, "RESULT { ");
 	if(qry->str_Atlas) 
 	{
 
@@ -1185,7 +1185,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				reader = reader + sizeof(struct R_DATA);
 			}
 
-			fprintf (fh, ", \"answers\" : [ ");
+			fprintf (fh, ", \"answers\" : [ { ");
 			//print answers
 			for(i=0;i<ntohs(dnsR->ans_count);i++)
 			{
@@ -1233,7 +1233,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
 			} 
-			fprintf (fh, " ]");
+			fprintf (fh, " } ]");
 		}
 
 		for(i=0;i<ntohs(dnsR->ans_count);i++)
