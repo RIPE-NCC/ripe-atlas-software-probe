@@ -103,7 +103,8 @@ struct evping_host {
 					* run
 					*/
 	u_int8_t rcvd_ttl;		/* TTL in (last) reply packet */
-	int got_reply;
+	char got_reply;
+	char send_error;
 
 	struct event ping_timer;       /* Timer to ping host at given intervals   */
 
@@ -332,6 +333,7 @@ static void ping_xmit(struct evping_host *host)
 	int nsent;
 
 	host->got_reply= 0;
+	host->send_error= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
@@ -369,14 +371,6 @@ static void ping_xmit(struct evping_host *host)
 		fmticmp4(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-#if 0
-		{ int i;
-			printf("sending:");
-			for (i= 0; i<base->pktsize; i++)
-				printf(" %02x", base->packet[i]);
-			printf("\n");
-		}
-#endif
 		nsent = sendto(base->rawfd4, base->packet, host->cursize,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
@@ -395,6 +389,7 @@ static void ping_xmit(struct evping_host *host)
 	{
 	  base->sendfail++;
 	  host->sentpkts++;
+	  host->send_error= 1;
 
 	  /* Report the failure and stop */
 	  if (host->user_callback)
@@ -404,8 +399,6 @@ static void ping_xmit(struct evping_host *host)
 			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
 			errno, 0, NULL,
 			host->user_pointer);
-		if (host->base->done)
-			host->base->done(host);
 	  }
 	}
 }
@@ -416,9 +409,9 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 {
 	struct evping_host *host = h;
 
-	if (!host->got_reply && host->user_callback)
+	if (!host->got_reply && !host->send_error && host->user_callback)
 	{
-		host->user_callback(PING_ERR_TIMEOUT, -1,
+		host->user_callback(PING_ERR_TIMEOUT, host->cursize,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			NULL, 0,
 			host->seq, -1, &host->base->tv_interval,
@@ -568,7 +561,7 @@ printf("ready_callback4: too short\n");
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,
 		    (struct sockaddr *)&host->sin6, host->socklen,
-		    NULL, 0,
+		    (struct sockaddr *)&host->loc_sin6, host->loc_socklen,
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
 		    host->user_pointer);
 	    }
@@ -719,8 +712,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    	host->user_callback(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,\
 		    (struct sockaddr *)&host->sin6, host->socklen,
-		    NULL, 0,
-		    ntohs(icmp->icmp6_seq), -1, &elapsed,
+		    (struct sockaddr *)&host->loc_sin6, host->loc_socklen,
+		    ntohs(icmp->icmp6_seq), host->rcvd_ttl, &elapsed,
 		    host->user_pointer);
 	    }
 

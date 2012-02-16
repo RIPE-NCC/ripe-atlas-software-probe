@@ -13,6 +13,8 @@ traceroute.c
 
 #include "eperd.h"
 
+#define DBQ(str) "\"" #str "\""
+
 #ifndef STANDALONE_BUSYBOX
 #define uh_sport source
 #define uh_dport dest
@@ -282,8 +284,11 @@ static void report(struct trtstate *state)
 	fprintf(fh, "RESULT { ");
 	if (state->atlas)
 	{
-		fprintf(fh, "\"id\":\"%s\", \"time\":%ld, ",
-			state->atlas, (long)time(NULL));
+		fprintf(fh, DBQ(id) ":" DBQ(%s)
+			", " DBQ(fw) ":%d"
+			", " DBQ(time) ":%ld, ",
+			state->atlas, get_atlas_fw_version(),
+			(long)time(NULL));
 	}
 
 	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,

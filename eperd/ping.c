@@ -8,6 +8,8 @@ ping.c
 #include "eperd.h"
 #include "eping.h"
 
+#define DBQ(str) "\"" #str "\""
+
 #define PING_OPT_STRING ("46c:s:A:O:")
 
 enum 
@@ -18,32 +20,118 @@ enum
 
 struct pingstate
 {
+	/* Parameters */
 	char *atlas;
 	char *hostname;
 	int pingcount;
 	char *out_filename;
 
+	/* State */
+	struct sockaddr_in6 sin6;
+	socklen_t socklen;
+	struct sockaddr_in6 loc_sin6;
+	socklen_t loc_socklen;
+	int busy;
+	char got_reply;
+	char first;
+	unsigned char ttl;
+	unsigned size;
+
 	struct evping_host *pingevent;
 
-	unsigned long min;
-	unsigned long max;
-	unsigned long sum;
-	int sentpkts;
-	int rcvdpkts;
-	int duppkts;
+	char *result;
+	size_t reslen;
+	size_t resmax;
 };
+
+static void add_str(struct pingstate *state, const char *str)
+{
+	size_t len;
+
+	len= strlen(str);
+	if (state->reslen + len+1 > state->resmax)
+	{
+		state->resmax= state->reslen + len+1 + 80;
+		state->result= xrealloc(state->result, state->resmax);
+	}
+	memcpy(state->result+state->reslen, str, len+1);
+	state->reslen += len;
+	//printf("add_str: result = '%s'\n", state->result);
+}
+
+static void report(struct pingstate *state)
+{
+	FILE *fh;
+	char namebuf[NI_MAXHOST];
+
+	if (state->out_filename)
+	{
+		fh= fopen(state->out_filename, "a");
+		if (!fh)
+			crondlog(DIE9 "unable to append to '%s'",
+				state->out_filename);
+	}
+	else
+		fh= stdout;
+
+	fprintf(fh, "RESULT { ");
+	if (state->atlas)
+	{
+		fprintf(fh, DBQ(id) ":" DBQ(%s)
+			", " DBQ(fw) ":%d"
+			", " DBQ(time) ":%ld, ",
+			state->atlas, get_atlas_fw_version(),
+			(long)time(NULL));
+	}
+
+	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
+		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+
+	fprintf(fh, "\"name\":\"%s\", \"addr\":\"%s\"",
+		state->hostname, namebuf);
+
+	if (state->got_reply)
+	{
+		namebuf[0]= '\0';
+		getnameinfo((struct sockaddr *)&state->loc_sin6,
+			state->loc_socklen, namebuf, sizeof(namebuf),
+			NULL, 0, NI_NUMERICHOST);
+
+		fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
+	}
+
+	fprintf(fh, ", \"mode\":\"ICMP%c\"",
+		state->sin6.sin6_family == AF_INET6 ? '6' : '4');
+
+	if (state->got_reply)
+		fprintf(fh, ", " DBQ(ttl) ":%d", state->ttl);
+
+	fprintf(fh, ", " DBQ(size) ":%d", state->size);
+
+	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
+	free(state->result);
+	state->result= NULL;
+	state->busy= 0;
+
+	if (state->out_filename)
+		fclose(fh);
+
+#if 0
+	if (state->base->done)
+		state->base->done(state);
+#endif
+}
 
 static void ping_cb(int result, int bytes,
 	struct sockaddr *sa, socklen_t socklen,
 	struct sockaddr *loc_sa, socklen_t loc_socklen,
-	int seq, int ttl UNUSED_PARAM,
+	int seq, int ttl,
 	struct timeval * elapsed, void * arg)
 {
 	struct pingstate *pingstate;
 	unsigned long usecs;
-	FILE *fh;
 	char namebuf[NI_MAXHOST];
-	char loc_namebuf[NI_MAXHOST];
+	char line[256];
 
 	pingstate= arg;
 
@@ -52,88 +140,90 @@ static void ping_cb(int result, int bytes,
 		result, bytes, seq, ttl);
 #endif
 
-	if (result == PING_ERR_NONE)
+	if (pingstate->first)
+	{
+		memcpy(&pingstate->sin6, sa, socklen);
+		pingstate->socklen= socklen;
+
+		pingstate->size= bytes;
+		pingstate->ttl= ttl;
+	}
+
+	if (result == PING_ERR_NONE || result == PING_ERR_DUP)
 	{
 		/* Got a ping reply */
 		usecs= (elapsed->tv_sec * 1000000 + elapsed->tv_usec);
-		if (usecs < pingstate->min)
-			pingstate->min= usecs;
-		if (usecs > pingstate->max)
-			pingstate->max= usecs;
-		pingstate->sum += usecs;
-		pingstate->sentpkts++;
-		pingstate->rcvdpkts++;
+
+		snprintf(line, sizeof(line),
+			"%s{ ", pingstate->first ? "" : ", ");
+		add_str(pingstate, line);
+		pingstate->first= 0;
+		if (result == PING_ERR_DUP)
+		{
+			add_str(pingstate, DBQ(dup) ":1, ");
+		}
+
+		snprintf(line, sizeof(line),
+			DBQ(rtt) ":%f",
+			usecs/1000.);
+		add_str(pingstate, line);
+
+		if (!pingstate->got_reply)
+		{
+			memcpy(&pingstate->loc_sin6, loc_sa, loc_socklen);
+			pingstate->loc_socklen= loc_socklen;
+				
+			pingstate->got_reply= 1;
+		}
+
+		if (pingstate->size != bytes)
+		{
+			snprintf(line, sizeof(line),
+				", " DBQ(size) ":%d", bytes);
+			add_str(pingstate, line);
+			pingstate->size= bytes;
+		}
+		if (pingstate->ttl != ttl)
+		{
+			snprintf(line, sizeof(line),
+				", " DBQ(ttl) ":%d", ttl);
+			add_str(pingstate, line);
+			pingstate->ttl= ttl;
+		}
+		if (memcmp(&pingstate->loc_sin6, loc_sa, loc_socklen) != 0)
+		{
+			namebuf[0]= '\0';
+			getnameinfo(loc_sa, loc_socklen, namebuf,
+				sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+
+			snprintf(line, sizeof(line),
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+			add_str(pingstate, line);
+		}
+
+		add_str(pingstate, " }");
 	}
 	if (result == PING_ERR_TIMEOUT)
 	{
 		/* No ping reply */
-		pingstate->sentpkts++;
+
+		snprintf(line, sizeof(line),
+			"%s{ " DBQ(x) ":" DBQ("*") " }",
+			pingstate->first ? "" : ", ");
+		add_str(pingstate, line);
+		pingstate->first= 0;
 	}
-	if (result == PING_ERR_DUP)
+	if (result == PING_ERR_SENDTO)
 	{
-		/* Got a duplicate ping reply */
-		pingstate->duppkts++;
+		snprintf(line, sizeof(line),
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " }",
+			pingstate->first ? "" : ", ", strerror(seq));
+		add_str(pingstate, line);
+		pingstate->first= 0;
 	}
-	if (result == PING_ERR_DONE || result == PING_ERR_SENDTO)
+	if (result == PING_ERR_DONE)
 	{
-		if (pingstate->out_filename)
-		{
-			fh= fopen(pingstate->out_filename, "a");
-			if (!fh)
-				crondlog(DIE9 "unable to append to '%s'",
-					pingstate->out_filename);
-		}
-		else
-			fh= stdout;
-
-		getnameinfo(sa, socklen, namebuf, sizeof(namebuf),
-			NULL, 0, NI_NUMERICHOST);
-		loc_namebuf[0]= '\0';
-		getnameinfo(loc_sa, loc_socklen, loc_namebuf,
-			sizeof(loc_namebuf),
-			NULL, 0, NI_NUMERICHOST);
-
-#define DBQ(str) "\"" #str "\""
-
-		fprintf(fh, "RESULT { ");
-		if (pingstate->atlas)
-		{
-			fprintf(fh, DBQ(id) ":" DBQ(%s),
-				pingstate->atlas);
-		}
-
-		fprintf(fh, "%s" DBQ(time) ":%d, " DBQ(name) ":" DBQ(%s)
-			", " DBQ(addr) ":" DBQ(%s)
-			", " DBQ(srcaddr) ":" DBQ(%s)
-			", " DBQ(mode) ":" DBQ(ICMP%c)
-			", " DBQ(size) ":%d"
-			", " DBQ(sent) ":%d"
-			", " DBQ(rcvd) ":%d"
-			", " DBQ(dup) ":%d",
-			pingstate->atlas ? ", " : "", (int)time(NULL),
-			pingstate->hostname, namebuf, loc_namebuf,
-			sa->sa_family == AF_INET6 ? '6' : '4',
-			bytes, pingstate->sentpkts, 
-			pingstate->rcvdpkts, pingstate->duppkts);
-		if (pingstate->rcvdpkts)
-		{
-			fprintf(fh, ", " DBQ(min) ":%.3f"
-				", " DBQ(avg) ":%.3f"
-				", " DBQ(max) ":%.3f"
-				", " DBQ(ttl) ":%d",
-				pingstate->min/1e3,
-				pingstate->sum/1e3/pingstate->rcvdpkts, 
-				pingstate->max/1e3, 
-				ttl);
-		}
-		if (result == PING_ERR_SENDTO)
-		{
-			fprintf(fh, ", " DBQ(error) ": " DBQ(sendto failed: %s),
-				strerror(seq));
-		}
-		fprintf(fh, " }\n");
-		if (pingstate->out_filename)
-			fclose(fh);
+		report(pingstate);
 	}
 }
 
@@ -188,6 +278,10 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->hostname= strdup(hostname);
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 
+	state->result= NULL;
+	state->reslen= 0;
+	state->resmax= 0;
+
 	evping_ping(pingevent, size, ping_cb, state, done);
 
 	return state;
@@ -199,12 +293,14 @@ static void ping_start(void *state)
 
 	pingstate= state;
 
-	pingstate->min= ULONG_MAX;
-	pingstate->max= 0;
-	pingstate->sum= 0;
-	pingstate->sentpkts= 0;
-	pingstate->rcvdpkts= 0;
-	pingstate->duppkts= 0;
+	if (pingstate->result) free(pingstate->result);
+	pingstate->resmax= 80;
+	pingstate->result= xmalloc(pingstate->resmax);
+	pingstate->reslen= 0;
+
+	pingstate->first= 1;
+	pingstate->got_reply= 0;
+
 	evping_start(pingstate->pingevent, pingstate->pingcount);
 }
 

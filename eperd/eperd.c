@@ -49,6 +49,7 @@
 #endif
 
 #define URANDOM_DEV	"/dev/urandom"
+#define ATLAS_FW_VERSION	"/home/atlas/state/FIRMWARE_APPS_VERSION"
 
 struct CronLine {
 	struct CronLine *cl_Next;
@@ -144,6 +145,36 @@ void crondlog(const char *ctl, ...)
 	va_end(va);
 	if (ctl[0] & 0x80)
 		exit(20);
+}
+
+int get_atlas_fw_version(void)
+{
+	static fw_version= -1;
+
+	int r, fw;
+	FILE *file;
+
+	if (fw_version != -1)
+		return fw_version;
+
+	file= fopen(ATLAS_FW_VERSION, "r");
+	if (file == NULL)
+	{
+		crondlog(LVL9 "get_atlas_fw_version: unable to open '%s': %s",
+			ATLAS_FW_VERSION, strerror(errno));
+		return -1;
+	}
+	r= fscanf(file, "%d", &fw);
+	fclose(file);
+	if (r == -1)
+	{
+		crondlog(LVL9 "get_atlas_fw_version: unable to read from '%s'",
+			ATLAS_FW_VERSION);
+		return -1;
+	}
+
+	fw_version= fw;
+	return fw;
 }
 
 static void my_exit(void)
@@ -578,6 +609,8 @@ static void SynchronizeDir(void)
 static int Insert(CronLine *line)
 {
 	CronLine *last;
+	struct timeval tv;
+	time_t now;
 
 	if (oldLine)
 	{
@@ -610,8 +643,22 @@ static int Insert(CronLine *line)
 
 	if (oldLine)
 	{
-		crondlog(LVL7 "found match for line '%s'", line->cl_Shell);
+		crondlog(LVL7 "Insert: found match for line '%s'",
+			line->cl_Shell);
+		crondlog(LVL7 "Insert: setting end time to %d", line->end_time);
+		oldLine->end_time= line->end_time;
 		oldLine->needs_delete= 0;
+
+		/* Reschedule event */
+		now= time(NULL);
+		tv.tv_sec= oldLine->nextcycle*oldLine->interval +
+			oldLine->start_time +
+			oldLine->distr_offset - now;
+		if (tv.tv_sec < 0)
+			tv.tv_sec= 0;
+		tv.tv_usec= 0;
+		event_add(&oldLine->event, &tv);
+
 		return 0;
 	}
 
@@ -1007,19 +1054,28 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	line= arg;
 
 	now= time(NULL);
+
+	crondlog(LVL7 "RunJob for %p, '%s'\n", arg, line->cl_Shell);
+	crondlog(LVL7 "RubJob, now %d, end_time %d\n", now, line->end_time);
 	
 	if (now > line->end_time)
+	{
+		crondlog(LVL7 "RunJob: expired\n");
 		return;			/* This job has expired */
+	}
 
 	if (line->needs_delete)
+	{
+		crondlog(LVL7 "RunJob: needs delete\n");
 		return;			/* Line is to be deleted */
+	}
 
 	line->testops->start(line->teststate);
 
 	line->nextcycle++;
 	if (line->start_time + line->nextcycle*line->interval < now)
 	{
-		crondlog(LVL9 "recomputing nextcycle");
+		crondlog(LVL7 "recomputing nextcycle");
 		line->nextcycle= (now-line->start_time)/line->interval + 1;
 	}
 
