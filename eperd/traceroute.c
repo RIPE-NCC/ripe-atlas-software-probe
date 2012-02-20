@@ -33,6 +33,19 @@ traceroute.c
 #define BASE_PORT	(0x8000 + 666)
 #define MAX_DATA_SIZE   (4096)
 
+#define DBQ(str) "\"" #str "\""
+
+#define ICMPEXT_VERSION_SHIFT 4
+
+#define ICMPEXT_MPLS	1
+#define ICMPEXT_MPLS_IN	1
+
+#define MPLS_LABEL_SHIFT 12
+#define MPLS_EXT_SHIFT 9
+#define MPLS_EXT_MASK 0x7
+#define MPLS_S_BIT 0x100
+#define MPLS_TTL_MASK 0xff
+
 struct trtbase
 {
 	struct event_base *event_base;
@@ -774,12 +787,97 @@ static void send_pkt(struct trtstate *state)
 
 }
 
+static void do_mpls(struct trtstate *state, unsigned char *packet,
+	size_t size)
+{
+	int o, exp, s, ttl;
+	uint32_t v, label;
+	char line[256];
+
+	add_str(state, ", " DBQ(mpls) ": [");
+
+	for (o= 0; o+4 <= size; o += 4)
+	{
+		v= (ntohl(*(uint32_t *)&packet[o]));
+		label= (v >> MPLS_LABEL_SHIFT);
+		exp= ((v >> MPLS_EXT_SHIFT) & MPLS_EXT_MASK);
+		s= !!(v & MPLS_S_BIT);
+		ttl= (v & MPLS_TTL_MASK);
+
+		snprintf(line, sizeof(line), "%s { " DBQ(label) ":%d, "
+			DBQ(exp) ":%d, " DBQ(s) ":%d, " DBQ(ttl) ":%d }",
+			o == 0 ? "" : ",",
+			label, exp, s, ttl);
+		add_str(state, line);
+	}
+
+	add_str(state, " ]");
+}
+
+static void do_icmp_multi(struct trtstate *state,
+	unsigned char *packet, size_t size, int pre_rfc4884)
+{
+	int o, len;
+	uint16_t cksum;
+	uint8_t class, ctype, version;
+	char line[256];
+
+	if (size < 4)
+	{
+		printf("do_icmp_multi: not enough for ICMP extension header\n");
+		return;
+	}
+	cksum= in_cksum((unsigned short *)packet, size);
+	if (cksum != 0)
+	{
+		/* There is also anoption for a zero checksum. */
+		if (!pre_rfc4884)
+			printf("do_icmp_multi: bad checksum\n");
+		return;
+	}
+
+	version= (*(uint8_t *)packet >> ICMPEXT_VERSION_SHIFT);
+
+	snprintf(line, sizeof(line), ", " DBQ(icmpext) ": { "
+		DBQ(version) ":%d" ", " DBQ(rfc4884) ":%d",
+		version, !pre_rfc4884);
+	add_str(state, line);
+
+	add_str(state, ", " DBQ(obj) ": [");
+
+	o= 4;
+	while (o+4 < size)
+	{
+		len= ntohs(*(uint16_t *)&packet[o]);
+		class= packet[o+2];
+		ctype= packet[o+3];
+
+		snprintf(line, sizeof(line), "%s { " DBQ(class) ":%d, "
+			DBQ(type) ":%d",
+			o == 4 ? "" : ",", class, ctype);
+		add_str(state, line);
+
+		if (len < 4 || o+len > size)
+		{
+			printf("do_icmp_multi: bad len %d\n", len);
+			break;
+		}
+		if (class == ICMPEXT_MPLS && ctype == ICMPEXT_MPLS_IN)
+			do_mpls(state, packet+o+4, len-4);
+		o += len;
+
+		add_str(state, " }");
+	}
+
+	add_str(state, " ] }");
+}
+
 static void ready_callback4(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	struct trtbase *base;
 	struct trtstate *state;
-	int hlen, ehlen, ind, nextmtu, late, isDup;
+	int hlen, ehlen, ind, nextmtu, late, isDup, icmp_prefixlen, offset;
 	unsigned seq;
 	ssize_t nrecv;
 	socklen_t slen;
@@ -1277,6 +1375,46 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			return;
 		}
 
+		/* RFC-4884, Multi-Part ICMP messages */
+		icmp_prefixlen= (ntohs(icmp->icmp_pmvoid) & 0xff) * 4;
+		if (icmp_prefixlen != 0)
+		{
+			
+			printf("icmp_pmvoid: 0x%x for %s\n", icmp->icmp_pmvoid, state->hostname);
+			printf("icmp_prefixlen: 0x%x for %s\n", icmp_prefixlen, inet_ntoa(remote.sin_addr));
+			offset= hlen + ICMP_MINLEN + icmp_prefixlen;
+			if (nrecv > offset)
+			{
+				do_icmp_multi(state, base->packet+offset,
+					nrecv-offset, 0 /*!pre_rfc4884*/);
+			}
+			else
+			{
+				printf(
+			"ready_callback4: too short %d (Multi-Part ICMP)\n",
+					(int)nrecv);
+				return;
+			}
+		}
+		else if (nrecv > hlen + ICMP_MINLEN + 128)
+		{
+			/* Try old style extensions */
+			icmp_prefixlen= 128;
+			offset= hlen + ICMP_MINLEN + icmp_prefixlen;
+			if (nrecv > offset)
+			{
+				do_icmp_multi(state, base->packet+offset,
+					nrecv-offset, 1 /*pre_rfc4884*/);
+			}
+			else
+			{
+				printf(
+			"ready_callback4: too short %d (Multi-Part ICMP)\n",
+					(int)nrecv);
+				return;
+			}
+		}
+
 		if (!late && !isDup)
 		{
 			if (state->duptimeout)
@@ -1426,7 +1564,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	ssize_t nrecv;
-	int ind, rcvdttl, late, isDup, nxt;
+	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset;
 	unsigned nextmtu, seq;
 	size_t ehdrsiz, siz;
 	struct trtbase *base;
@@ -1792,6 +1930,46 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			"ready_callback6: not UDP or ICMP (ip6_nxt = %d)\n",
 				eip->ip6_nxt);
 			return;
+		}
+
+		/* RFC-4884, Multi-Part ICMP messages */
+		icmp_prefixlen= icmp->icmp6_data8[0] * 8;
+		if (icmp_prefixlen != 0)
+		{
+			
+			printf("icmp6_data8[0]: 0x%x for %s\n", icmp->icmp6_data8[0], state->hostname);
+			printf("icmp_prefixlen: 0x%x for %s\n", icmp_prefixlen, inet_ntop(AF_INET6, &state->sin6.sin6_addr, buf, sizeof(buf)));
+			offset= sizeof(*icmp) + icmp_prefixlen;
+			if (nrecv > offset)
+			{
+				do_icmp_multi(state, base->packet+offset,
+					nrecv-offset, 0 /*!pre_rfc4884*/);
+			}
+			else
+			{
+				printf(
+			"ready_callback6: too short %d (Multi-Part ICMP)\n",
+					(int)nrecv);
+				return;
+			}
+		}
+		else if (nrecv > 128)
+		{
+			/* Try old style extensions */
+			icmp_prefixlen= 128;
+			offset= sizeof(*icmp) + icmp_prefixlen;
+			if (nrecv > offset)
+			{
+				do_icmp_multi(state, base->packet+offset,
+					nrecv-offset, 1 /*pre_rfc4884*/);
+			}
+			else
+			{
+				printf(
+			"ready_callback4: too short %d (Multi-Part ICMP)\n",
+					(int)nrecv);
+				return;
+			}
 		}
 
 		if (late)
