@@ -70,6 +70,7 @@
 #define STATUS_TCP_CONNECTING 		1002
 #define STATUS_TCP_CONNECTED 		1003
 #define STATUS_TCP_WRITE 		1004
+#define STATUS_FREE 			0
 
 // seems T_DNSKEY is not defined header files of lenny and sdk
 #ifndef ns_t_dnskey
@@ -109,6 +110,8 @@ struct tdig_base {
 	counter_t sentbytes; 
 	counter_t recvbytes; 	
 	counter_t timedout;
+	counter_t queries; 	
+	counter_t activeqry;
 
 	u_char packet [MAX_DNS_BUF_SIZE] ;
 	/* used only for the stand alone version */
@@ -166,7 +169,7 @@ struct query_state {
 	char *result;
 	size_t reslen;
 	size_t resmax; 
-	int st ; 
+	int qst ; 
 
 	u_char *outbuff;
 };
@@ -718,6 +721,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
 	qry->result= NULL; 
+	tdig_base->activeqry++;
+	qry->qst = 0;
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
@@ -841,6 +846,7 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	tdig_base->sentbytes  = 0;
 	tdig_base->recvbytes = 0;
 	tdig_base->timedout = 0;
+	tdig_base->activeqry = 0;
 
 	memset(tdig_base, 0, sizeof(struct tdig_base));
 	tdig_base->event_base = event_base;
@@ -895,6 +901,7 @@ void tdig_start (struct query_state *qry)
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 
+	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
 	{
@@ -913,6 +920,7 @@ void tdig_start (struct query_state *qry)
 	if ( ( err_num  = getaddrinfo(qry->server_name, port , &hints, &res)))
 	{
 		printf("%s ERROR port %s %s\n", qry->server_name, port, gai_strerror(err_num));
+		qry->qst = STATUS_FREE;
 		return ;
 	}
 
@@ -991,6 +999,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JLD(sentbytes , base->sentbytes);
 	JLD(recvbytes , base->recvbytes);
 	JLD(timedout , base->timedout);
+	JLD(queries , base->activeqry);
 
 	fprintf(fh, " }\n");
 	if (qry->out_filename) 
@@ -1042,6 +1051,7 @@ static void free_qry_inst(struct query_state *qry)
 		freeaddrinfo(qry->ressave);
 		qry->ressave  = NULL;
 	}
+	qry->qst = STATUS_FREE;
 
 	if(qry->base->done)
 	{
@@ -1066,6 +1076,9 @@ static int tdig_delete(void *state)
 	struct query_state *qry;
 
 	qry = state;
+	
+	if (qry->qst )
+		return 0;
 
 	if(qry->out_filename)
 	{ 
@@ -1087,16 +1100,12 @@ static int tdig_delete(void *state)
 		free(qry->server_name);
 		qry->server_name = NULL;
 	}
+	qry->next->prev = qry->prev; 
+	qry->prev->next = qry->next;
+	if(qry->base->qry_head == qry) 
+		qry->base->qry_head = qry->next;
+	qry->base->activeqry--;
 
-	/*
-	   free(trtstate->atlas);
-	   trtstate->atlas= NULL;
-	   free(trtstate->hostname);
-	   trtstate->hostname= NULL;
-	   free(trtstate->out_filename);
-	   trtstate->out_filename= NULL;
-
-	 */
 	free(qry);
 	return 1;
 } 
