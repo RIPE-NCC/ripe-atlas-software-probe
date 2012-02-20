@@ -518,7 +518,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 				printReply (qry, n, qry->base->packet);
 			}
 			else {
-				sprintf(line, "\"tcperror\" : \"id mismatch error\" ,");
+				sprintf(line, "\"tcperror\" : \"id mismatch error red %d\" ,", n);
 				printf( "tcperror : id mismatch error %s\n", qry->server_name);
 				add_str(qry, line);
 				printReply (qry, 0, NULL);
