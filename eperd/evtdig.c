@@ -45,9 +45,12 @@
 #define DQ(str) "\"" #str "\""
 #define DQC(str) "\"" #str "\" : "
 #define JS(key, val) fprintf(fh, "\"" #key"\" : \"%s\" , ",  val); 
+#define JSDOT(key, val) fprintf(fh, "\"" #key"\" : \"%s.\" , ",  val); 
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
 #define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
 #define JLD(key, val) fprintf(fh, "\"" #key"\" : %ld , ",  val); 
+#define JU(key, val) fprintf(fh, "\"" #key"\" : %u , ",  val); 
+#define JU_NC(key, val) fprintf(fh, "\"" #key"\" : %u",  val); 
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
 
 #undef MIN	/* just in case */
@@ -1203,7 +1206,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
 					fprintf(fh, " \"TYPE\" : \"TXT\"");
-					fprintf(fh, " , \"NAME\" : \"%s\" ",answers[i].name);
+					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
 					answers[i].rdata = ReadName(reader,result,&stop);
 					reader = reader + stop;
 
@@ -1212,17 +1215,18 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
-					fprintf(fh, " \"TYPE\" : \"SOA\"");
-					fprintf(fh, " , \"NAME\" : \"%s\" ",answers[i].name);
+					JS(TYPE, "SOA");
+					JSDOT(NAME, answers[i].name);
+					JU(TTL, ntohl(answers[i].resource->ttl));
 					answers[i].rdata = ReadName(reader,result,&stop);
-					//printf(" %s", answers[i].rdata);
+					JSDOT( MNAME, answers[i].rdata);
 					reader =  reader + stop;
 					free(answers[i].rdata);
 					answers[i].rdata = ReadName(reader,result,&stop);
-					//printf(" %s", answers[i].rdata);
+					JSDOT( RNAME, answers[i].rdata);
 					reader =  reader + stop;
 					serial = get32b(reader);
-					fprintf(fh, " , \"SERIAL\" : %u", serial);
+					JU_NC(SERIAL, serial);
 					reader =  reader + 4;
 				}
 				else if (ntohs(answers[i].resource->type)== T_DNSKEY)
@@ -1263,3 +1267,5 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 }
 
 struct testops tdig_ops = { tdig_init, tdig_start, tdig_delete }; 
+
+
