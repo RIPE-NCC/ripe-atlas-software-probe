@@ -133,6 +133,7 @@ struct query_state {
 	u_int16_t qryid;             /* query id 16 bit */
 	int tcp_fd;
 	FILE *tcp_file;
+	int wire_size;
 
 	struct bufferevent *bev_tcp;
 
@@ -264,7 +265,7 @@ void tdig_start (struct query_state *qry);
 void printReply(struct query_state *qry, int wire_size, unsigned char *result );
 static void done(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
-static void process_reply(void * arg, int nrecv,  struct timeval now);
+static void process_reply(void * arg, int nrecv, struct timeval now, int af, void *remote);
 static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 
 /* move the next functions from tdig.c */
@@ -339,9 +340,55 @@ msecstotv(time_t msecs, struct timeval *tv)
 	tv->tv_usec = msecs % 1000 * 1000;
 }
 
+int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b) 
+{
+	struct sockaddr_in *a4;
+	struct sockaddr_in *b4;
+	struct sockaddr_in6 *a6;
+	struct sockaddr_in6 *b6;
+	char buf[INET6_ADDRSTRLEN];
+
+	if(af_a != af_b) {
+		crondlog(LVL9 "address family mismatch in  %d ", __LINE__);
+		return -1;
+	}
+ 
+	if(af_a == AF_INET ) {
+		a4 = (struct sockaddr_in *) a;
+		b4 = (struct sockaddr_in *) b;
+		if( memcmp ( &(a4->sin_addr),  &(b4->sin_addr), sizeof(struct in_addr)) == 0) {
+			return 0;
+		}
+		else 
+			return 1;
+	}
+	else if(af_a == AF_INET6 ) {
+		a6 = (struct sockaddr_in6 *) a;
+		b6 = (struct sockaddr_in6 *) b;
+		if( memcmp ( &(a6->sin6_addr),  &(b6->sin6_addr), sizeof(struct in6_addr)) == 0) {
+			inet_ntop(AF_INET6, &(a6->sin6_addr), buf, sizeof(buf));
+			crondlog(LVL9 "address6 match  A %s", buf);
+			inet_ntop(AF_INET6, &(b6->sin6_addr), buf, sizeof(buf));
+			crondlog(LVL9 "address6 match  B %s", buf);
+
+			return 0;
+		}
+		else {
+			inet_ntop(AF_INET6, &(a6->sin6_addr), buf, sizeof(buf));
+			crondlog(LVL9 "address6 mismatch  A %s", buf);
+			inet_ntop(AF_INET6, &(b6->sin6_addr), buf, sizeof(buf));
+			crondlog(LVL9 "address mismatch  B %s", buf);
+
+
+			return 1;
+		}
+	}
+	return 1;
+}
+
 
 /* Lookup for a query by its index */
-static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx)
+static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, int af, void * remote)
 { 
 	struct query_state *qry;
 
@@ -353,7 +400,13 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx)
 		{
 			//AA chnage to LVL5
 			crondlog(LVL9 "found matching query id %d", idx);
-			return qry;
+			if( ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
+				crondlog(LVL9 "matching id and address id %d", idx);
+				return qry;
+			}
+			else {
+				crondlog(LVL9 "matching id and address mismatch id %d", idx);
+			} 
 		}
 		qry = qry->next;
 	} while (qry != base->qry_head);
@@ -496,22 +549,21 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 	u_char b2[2];
 	struct timeval rectime;	
 	struct evbuffer *input ;
-	int wire_size;
 	struct DNS_HEADER *dnsR = NULL;
 	gettimeofday(&rectime, NULL);
 	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
 	input = bufferevent_get_input(bev);
-	evbuffer_remove(input, b2, 2 );
-	wire_size = ldns_read_uint16(b2);
-	evtimer_del(&qry->noreply_timer); /* Clean the noreply timer */
- 	while ((n = evbuffer_remove(input, qry->base->packet, wire_size )) > 0) {
+	if(qry->wire_size == 0) {
+		evbuffer_remove(input, b2, 2 );
+		qry->wire_size = ldns_read_uint16(b2);
+	}
+ 	while ((n = evbuffer_remove(input, qry->base->packet, qry->wire_size )) > 0) {
 		if(n) {
 			evtimer_del(&qry->noreply_timer);
-			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  wire_size, n);
+			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  qry->wire_size, n);
 			crondlog(LVL9 "qry pointer address readcb %p qry.id, %d", qry->qryid);
 			crondlog(LVL9 "DBG: base pointer address readcb %p",  qry->base );
-			//process_reply(qry->base, n, rectime); 	
 			dnsR = (struct DNS_HEADER*) qry->base->packet;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
 				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;	
@@ -525,6 +577,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 			}
 			/* Clean the noreply timer */
 			bufferevent_free(bev);
+			qry->wire_size = 0;
 		}
 	}
 }
@@ -579,7 +632,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 {
 	struct query_state *qry = h;
 	qry->base->timedout++;
-	sprintf(line, "\"timedout\" : 1 , ");
+	sprintf(line, "\"timedout\" : 1");
 	add_str(qry, line);
 	printReply (qry, 0, NULL);
 	return;
@@ -595,7 +648,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct timeval now)
+static void process_reply(void * arg, int nrecv, struct timeval now, int af, void *remote )
 {
 	struct tdig_base *base = arg;
 
@@ -609,8 +662,8 @@ static void process_reply(void * arg, int nrecv, struct timeval now)
 
 	crondlog(LVL9 "DBG: base address process reply %p, nrec %d", base, nrecv);
 	/* Get the pointer to the qry descriptor in our internal table */
-	qry = tdig_lookup_query(base, ntohs(dnsR->id));
-
+	qry = tdig_lookup_query(base, ntohs(dnsR->id), af, remote);
+	
 	if ( ! qry) {
 		crondlog(LVL9 "DBG: no match found for qry id i %d",\
 ntohs(dnsR->id));
@@ -621,6 +674,7 @@ ntohs(dnsR->id));
 
 	qry->base->recvok++;
 	qry->base->recvbytes += nrecv;
+	gettimeofday(&now, NULL);  // lave this till fix now from ready_callback6 corruption; ghoost
 	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 + (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
 
 	/* Clean the noreply timer */
@@ -633,10 +687,13 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 {
 	struct tdig_base *base = arg;
 	int nrecv;
-	struct sockaddr remote4;                  /* responding internet address */
+	struct sockaddr_in remote4;                  /* responding internet address */
+	struct sockaddr_in6 remote6; 
 	socklen_t slen;
 	struct timeval rectime;
-
+	remote6.sin6_family = 0;
+	remote6.sin6_port = 0;
+	
 	slen = sizeof(struct sockaddr);
 	bzero(base->packet, MAX_DNS_BUF_SIZE);
 	/* Time the packet has been received */
@@ -650,7 +707,7 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 		base->recvfail++;
 		return ;
 	}
-	process_reply(arg, nrecv, rectime);
+	process_reply(arg, nrecv, rectime, remote4.sin_family, &remote4);
 	return;
 } 
 
@@ -662,8 +719,12 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	struct msghdr msg;
 	struct iovec iov[1];
 	//char buf[INET6_ADDRSTRLEN];
-	struct sockaddr remote6;
+	struct sockaddr_in6 remote6;
+	struct sockaddr_in remote4;
 	char cmsgbuf[256];
+
+	remote4.sin_family =  0;
+	remote4.sin_port =  0;
 
 	/* Time the packet has been received */
 	gettimeofday(&rectime, NULL);
@@ -686,7 +747,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 		printf("ready_callback6: read error '%s'\n", strerror(errno));
 		return;
 	}
-	process_reply(arg, nrecv, rectime);
+	process_reply(arg, nrecv, rectime, remote6.sin6_family, &remote6);
 
 	return;
 }
@@ -726,6 +787,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->result= NULL; 
 	tdig_base->activeqry++;
 	qry->qst = 0;
+	qry->wire_size = 0;
+	qry->triptime = 0;
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
@@ -892,7 +955,6 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 void tdig_start (struct query_state *qry)
 {
 	struct timeval asap = { 0, 0 };
-	FILE *fh; 
 
 	int err_num;
 	struct addrinfo hints, *res;
@@ -1240,7 +1302,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					fprintf(fh, " , \"error\" : \"UNKNOWN\"");
 					fprintf(fh, " , \"len\" : %u", answers[i].resource->data_len );
 				}
-				fflush(stdout);
+				fflush(fh);
 
 				// free mem 
 				if(answers[i].rdata != NULL) 
