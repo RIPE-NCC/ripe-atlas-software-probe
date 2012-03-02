@@ -202,12 +202,16 @@ struct DNS_HEADER
 struct EDNS0_HEADER
 {
 	/** EDNS0 available buffer size, see RFC2671 */
-	u_int16_t qtype;
+	u_int16_t otype;
 	uint16_t _edns_udp_size;
 	u_int8_t _edns_x; // combined rcode and edns version both zeros.
 	u_int8_t _edns_y; // combined rcode and edns version both zeros.
 	//u_int16_t _edns_z;
 	u_int16_t DO ;
+}; 
+
+struct EDNS_NSID 
+{
 // EDNS OPT pseudo-RR : eg NSID RFC 5001 
 	uint16_t len;
 	u_int16_t otype;
@@ -423,6 +427,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	u_char *qname;
 	struct QUESTION *qinfo = NULL;
 	struct EDNS0_HEADER *e;
+	struct EDNS_NSID *n;
 	int r;
 
 	dns = (struct DNS_HEADER *)packet;
@@ -458,19 +463,21 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	qinfo->qtype = htons(qry->qtype);
 	qinfo->qclass = htons(qry->qclass);
 
-	qry->pktsize  = (strlen((const char*)qname) + 1) + sizeof(struct DNS_HEADER)  + sizeof(struct QUESTION);
+	qry->pktsize  = (strlen((const char*)qname) + 1) + sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) ;
 	e=(struct EDNS0_HEADER*)&packet[ qry->pktsize + 1 ];
 
-	e->qtype = htons(ns_t_opt);
+	e->otype = htons(ns_t_opt);
 	e->_edns_udp_size = htons(qry->opt_edns0);
 	//e->_edns_z = htons(128);
 	//if(opt_dnssec  == 1)
 	{
 		e->DO = 0x80;
-	}
-	e->len =  htons(4);
-	e->otype = htons(3);
-	qry->pktsize  += sizeof(struct EDNS0_HEADER) + 1;
+	} 
+	qry->pktsize  += sizeof(struct EDNS0_HEADER) ;
+	n=(struct EDNS_NSID*)&packet[ qry->pktsize + 1 ];
+	n->len =  htons(4);
+	n->otype = htons(3);
+	qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
 
 	/* Transmit the request over the network */
 }
