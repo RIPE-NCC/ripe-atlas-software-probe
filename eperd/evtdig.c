@@ -197,7 +197,7 @@ struct DNS_HEADER
 	u_int16_t add_count; // number of resource entries
 };
 
-// EDNS0
+// EDNS OPT pseudo-RR : EDNS0
 
 struct EDNS0_HEADER
 {
@@ -208,9 +208,12 @@ struct EDNS0_HEADER
 	u_int8_t _edns_y; // combined rcode and edns version both zeros.
 	//u_int16_t _edns_z;
 	u_int16_t DO ;
-	u_int16_t len ;
-	u_int8_t _edns_d;
+// EDNS OPT pseudo-RR : eg NSID RFC 5001 
+	uint16_t len;
+	u_int16_t otype;
+	u_int16_t odata; 
 };
+
 
 //Constant sized fields of query structure
 struct QUESTION
@@ -444,30 +447,30 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->q_count = htons(1); //we have only 1 question
 	dns->ans_count = 0;
 	dns->auth_count = 0;
-	dns->add_count = htons(0);
+	dns->add_count = htons(1);
 
 	//point to the query portion
 	qname =(u_char *)&packet[sizeof(struct DNS_HEADER)];
 	ChangetoDnsNameFormat(qname, qry->lookupname); // fill the query portion.
 
 	qinfo =(struct QUESTION*)&packet[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)]; 
-	qry->pktsize  = (strlen((const char*)qname) + 1);
 
 	qinfo->qtype = htons(qry->qtype);
 	qinfo->qclass = htons(qry->qclass);
 
-	e=(struct EDNS0_HEADER*)&packet[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + sizeof(struct QUESTION) + 2 ) ]; //fill it
+	qry->pktsize  = (strlen((const char*)qname) + 1) + sizeof(struct DNS_HEADER)  + sizeof(struct QUESTION);
+	e=(struct EDNS0_HEADER*)&packet[ qry->pktsize + 1 ];
 
-	e->qtype = htons(qry->qtype);
+	e->qtype = htons(ns_t_opt);
 	e->_edns_udp_size = htons(qry->opt_edns0);
 	//e->_edns_z = htons(128);
 	//if(opt_dnssec  == 1)
 	{
 		e->DO = 0x80;
 	}
-	e->len = htons(0);
-
-	qry->pktsize += sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) + sizeof(struct EDNS0_HEADER) ;
+	e->len =  htons(4);
+	e->otype = htons(3);
+	qry->pktsize  += sizeof(struct EDNS0_HEADER) + 1;
 
 	/* Transmit the request over the network */
 }
@@ -507,6 +510,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			qry->ressent = qry->res;
 			if (nsent == qry->pktsize)
 			{
+				crondlog(LVL9 "send qry  %d bytes", qry->pktsize);
 				/* One more DNS Query is sent */
 				base->sentok++;
 				base->sentbytes+=nsent;
@@ -789,6 +793,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->qst = 0;
 	qry->wire_size = 0;
 	qry->triptime = 0;
+	qry->opt_edns0 = 1280;
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
