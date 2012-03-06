@@ -39,10 +39,11 @@ struct testops
 	int (*delete)(void *teststate);
 };
 
-extern struct testops ping_ops;
-extern struct testops traceroute_ops;
-extern struct testops tdig_ops;
 extern struct testops condmv_ops;
+extern struct testops httpget_ops;
+extern struct testops ping_ops;
+extern struct testops tdig_ops;
+extern struct testops traceroute_ops;
 
 void crondlog(const char *ctl, ...);
 int get_atlas_fw_version(void);

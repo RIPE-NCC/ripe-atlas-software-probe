@@ -17,6 +17,7 @@
 #include <syslog.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
+#include <event2/dns.h>
 
 #include "eperd.h"
 
@@ -283,6 +284,11 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	if (!EventBase)
 	{
 		crondlog(DIE9 "event_base_new failed"); /* exits */
+	}
+	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
+	if (!DnsBase)
+	{
+		crondlog(DIE9 "evdns_base_new failed"); /* exits */
 	}
 
 	DnsBase = evdns_base_new(EventBase, 1); 

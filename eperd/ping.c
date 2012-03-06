@@ -208,7 +208,7 @@ static void ping_cb(int result, int bytes,
 		/* No ping reply */
 
 		snprintf(line, sizeof(line),
-			"%s{ " DBQ(x) ":" DBQ("*") " }",
+			"%s{ " DBQ(x) ":" DBQ(*) " }",
 			pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
 		pingstate->first= 0;
