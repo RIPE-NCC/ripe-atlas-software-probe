@@ -301,13 +301,6 @@ static void restart_connect(struct hgstate *state)
 		interval.tv_usec= 0;
 		evtimer_add(&state->timer, &interval);
 
-	{
-		char namebuf[NI_MAXHOST];
-		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
-		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
-		printf("%s, %d: connecting to '%s'\n", __FILE__, __LINE__, namebuf);
-	}
-
 		gettimeofday(&state->start, NULL);
 		if (bufferevent_socket_connect(bev,
 			state->dns_curr->ai_addr,
@@ -323,7 +316,6 @@ static void restart_connect(struct hgstate *state)
 	}
 
 	/* Something went wrong */
-	printf("Connect failed\n");
 	state->bev= NULL;
 	bufferevent_free(bev);
 	evutil_freeaddrinfo(state->dns_res);
@@ -644,7 +636,21 @@ static void report(struct hgstate *state)
 	fprintf(fh, "%s }\n", state->result);
 	free(state->result);
 	state->result= NULL;
+	state->resmax= 0;
+	state->reslen= 0;
 	state->busy= 0;
+
+	if (state->dns_res)
+	{
+		evutil_freeaddrinfo(state->dns_res);
+		state->dns_res= NULL;
+		state->dns_curr= NULL;
+	}
+	if (state->bev)
+	{
+		bufferevent_free(state->bev);
+		state->bev= NULL;
+	}
 
 	if (state->out_filename)
 		fclose(fh);
@@ -747,7 +753,7 @@ static void err_chunked(struct hgstate *state, const char *reason)
 	report(state);
 }
 
-static void readcb(struct bufferevent *bev, void *ptr)
+static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 {
 	int r, major, minor, need_line, no_body;
 	size_t len;
@@ -755,7 +761,6 @@ static void readcb(struct bufferevent *bev, void *ptr)
 	const char *prefix, *kw;
 	struct hgstate *state;
 	struct timeval endtime;
-	char buf[256];
 
 	state= ptr;
 
@@ -1343,6 +1348,7 @@ static void create_bev(struct hgstate *state)
 
 static void err_reading(struct hgstate *state)
 {
+	struct timeval endtime;
 	switch(state->readstate)
 	{
 	case READ_STATUS:
@@ -1370,6 +1376,9 @@ static void err_reading(struct hgstate *state)
 			add_str(state, ", " DBQ(err) ":"
 				DBQ(error reading body));
 		}
+		gettimeofday(&endtime, NULL);
+		state->resptime= (endtime.tv_sec-state->start.tv_sec)*1e3 +
+			(endtime.tv_usec-state->start.tv_usec)/1e3;
 		report(state);
 		break;
 	default:
@@ -1381,8 +1390,6 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
 	struct hgstate *hgstate;
 	char line[80];
-
-	printf("eventcb\n");
 
 	hgstate= ptr;
 	if (hgstate->connecting)
@@ -1409,7 +1416,6 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 			snprintf(line, sizeof(line),
 				", " DBQ(err) ":" DBQ(connect: %s),
 				strerror(errno));
-printf("adding str '%s'\n", line);
 			add_str(hgstate, line);
 
 			restart_connect(hgstate);
@@ -1497,12 +1503,21 @@ static void httpget_start(void *state)
 
 	hgstate= state;
 
+	if (hgstate->busy)
+	{
+		printf("httget_start: busy\n");
+		return;
+	}
+	hgstate->busy= 1;
+
 	hgstate->connecting= 1;
 	hgstate->readstate= READ_STATUS;
 	hgstate->writestate= WRITE_HEADER;
 
 	hgstate->linelen= 0;
 	hgstate->lineoffset= 0;
+	hgstate->headers_size= 0;
+	hgstate->tot_headers= 0;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
@@ -1854,41 +1869,37 @@ err:
 
 static int httpget_delete(void *state)
 {
-	assert(0);
-	abort();
-#if 0
 	int ind;
-	struct trtstate *trtstate;
-	struct trtbase *base;
+	struct hgstate *hgstate;
+	struct hgbase *base;
 
-	trtstate= state;
+	hgstate= state;
 
-	printf("traceroute_delete: state %p, index %d, busy %d\n",
-		state, trtstate->index, trtstate->busy);
+	printf("httpget_delete: state %p, index %d, busy %d\n",
+		state, hgstate->index, hgstate->busy);
 
-	if (trtstate->busy)
+	if (hgstate->busy)
 		return 0;
 
-	base= trtstate->base;
-	ind= trtstate->index;
+	base= hgstate->base;
+	ind= hgstate->index;
 
-	if (base->table[ind] != trtstate)
+	if (base->table[ind] != hgstate)
 		crondlog(DIE9 "strange, state not in table");
 	base->table[ind]= NULL;
 
-	event_del(&trtstate->timer);
+	event_del(&hgstate->timer);
 
-	free(trtstate->atlas);
-	trtstate->atlas= NULL;
-	free(trtstate->hostname);
-	trtstate->hostname= NULL;
-	free(trtstate->out_filename);
-	trtstate->out_filename= NULL;
+	free(hgstate->atlas);
+	hgstate->atlas= NULL;
+	free(hgstate->hostport);
+	hgstate->hostport= NULL;
+	free(hgstate->path);
+	hgstate->path= NULL;
 
-	free(trtstate);
+	free(hgstate);
 
 	return 1;
-#endif
 }
 
 struct testops httpget_ops = { httpget_init, httpget_start,

@@ -773,6 +773,7 @@ static struct builtin
 	struct testops *testops;
 } builtin_cmds[]=
 {
+	{ "evhttpget", &httpget_ops },
 	{ "evping", &ping_ops },
 	{ "evtdig", &tdig_ops },
 	{ "evtraceroute", &traceroute_ops },
