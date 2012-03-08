@@ -13,6 +13,12 @@ config EPERD
 	help
 	    Eperd periodically runs Atlas measurements. It is based on crond.
 
+config EVHTTPGET
+       bool "evhttpget"
+       default n
+       help
+               standalone version of event-driven httpget
+
 config EVPING
 	bool "evping"
 	default n

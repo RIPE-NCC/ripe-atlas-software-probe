@@ -1018,6 +1018,11 @@
      "\n	-i iface	Interface to use (default eth0)" \
      "\n	-p pass		Append four or six byte password PW to the packet" \
 
+#define evhttpget_trivial_usage \
+       "todo"
+#define evhttpget_full_usage "\n\n" \
+     "todo"
+
 #define evping_trivial_usage \
        "todo"
 #define evping_full_usage "\n\n" \
