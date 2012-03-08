@@ -170,9 +170,10 @@ struct query_state {
 	/* these objects are kept in a circular list */
 	struct query_state *next, *prev;
 
-	char *result;
-	size_t reslen;
-	size_t resmax; 
+	char *err; 
+	
+	size_t errlen;
+	size_t errmax; 
 	int qst ; 
 
 	u_char *outbuff;
@@ -282,6 +283,11 @@ uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 /* from tdig.c */
 
+/* sslcert */
+void buf_add_b64(struct buf *buf, void *data, size_t len);
+void buf_add(struct buf *buf, const void *data, size_t len);
+
+
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
 { 
@@ -328,13 +334,13 @@ static void add_str(struct query_state *qry, const char *str)
 {
 	size_t len;
 	len= strlen(str);
-	if (qry->reslen + len+1 > qry->resmax)
+	if (qry->errlen + len+1 > qry->errmax)
 	{
-		qry->resmax= qry->reslen + len+1 + 80;
-		qry->result= xrealloc(qry->result, qry->resmax);
+		qry->errmax= qry->err + len+1 + 80;
+		qry->err= xrealloc(qry->err, qry->errmax);
 	}
-	memcpy(qry->result+qry->reslen, str, len+1);
-	qry->reslen += len;
+	memcpy(qry->err+qry->errlen, str, len+1);
+	qry->errlen += len;
 	//printf("add_str: result = '%s'\n", state->result);
 }
 
@@ -530,7 +536,9 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				err  = 1;
 				base->sendfail++;
 				serrno= errno; 
-				sprintf(line, "\"senderror\" : \"%s\" ,", strerror(serrno)); 
+				if(qry->errlen > 0) 
+					sprintf(line, ", "); 
+				sprintf(line, "\"senderror\" : \"%s\"", strerror(serrno)); 
 				add_str(qry, line);
 				//perror("send"); 
 			}
@@ -581,7 +589,9 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 				printReply (qry, n, qry->base->packet);
 			}
 			else {
-				sprintf(line, "\"tcperror\" : \"id mismatch error red %d\" ,", n);
+				if(qry->errlen > 0) 
+					sprintf(line, ", "); 
+				sprintf(line, "\"idmismatch\" : \"mismatch id from tcp fd %d\" ,", n);
 				printf( "tcperror : id mismatch error %s\n", qry->server_name);
 				add_str(qry, line);
 				printReply (qry, 0, NULL);
@@ -619,14 +629,24 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
 		if (events & BEV_EVENT_ERROR) {
 			serrno = bufferevent_socket_get_dns_error(bev);
-			if (serrno)
+			if (serrno) {
+
+				if(qry->errlen > 0) 
+					sprintf(line, ", "); 
 				snprintf(line, DEFAULT_LINE_LENGTH, "\"dnserror\" : \" %s\n", evutil_gai_strerror(serrno));
+			}
 		} 
 		else if (events & BEV_EVENT_TIMEOUT) {
+
+			if(qry->errlen > 0) 
+				sprintf(line, ", "); 
 			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"TIMEOUT could be read/write or connect\"");
 		}	
 		else if (events & BEV_EVENT_EOF) {
 			serrno = errno; 
+
+			if(qry->errlen > 0) 
+				sprintf(line, ", "); 
 			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"Unexpectd EOF %s", strerror(serrno));
 		}
 		add_str(qry, line);
@@ -795,7 +815,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
-	qry->result= NULL; 
+	qry->err= NULL; 
 	tdig_base->activeqry++;
 	qry->qst = 0;
 	qry->wire_size = 0;
@@ -1117,11 +1137,11 @@ static void free_qry_inst(struct query_state *qry)
 	struct event_base *event_base;
 	struct tdig_base *tbase;
 
-	if(qry->result) 
+	if(qry->err) 
 	{
-		free(qry->result);
-		qry->result= NULL;
-		qry->resmax = 0;
+		free(qry->err);
+		qry->err= NULL;
+		qry->errmax = 0;
 	}
 	if(qry->ressave )
 	{
@@ -1330,9 +1350,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 		fprintf (fh , " },"); //result
 	} 
-	if(qry->result) 
-		fprintf(fh, "%s ," , qry->result);
-	fprintf(fh, " \"end\": 0");
+	if(qry->err) 
+		fprintf(fh, "\"error\" : { %s }" , qry->err);
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
