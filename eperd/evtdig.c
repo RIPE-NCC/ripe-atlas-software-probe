@@ -87,6 +87,16 @@
 /* Definition for various types of counters */
 typedef uint64_t counter_t;
 
+
+struct buf
+{
+        size_t offset;
+        size_t size;
+        size_t maxsize;
+        char *buf;
+        int fd;
+};
+
 /* How to keep track of a DNS query session */
 struct tdig_base {
 	struct event_base *event_base;
@@ -284,8 +294,9 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 /* from tdig.c */
 
 /* sslcert */
-void buf_add_b64(struct buf *buf, void *data, size_t len);
+void buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl);
 void buf_add(struct buf *buf, const void *data, size_t len);
+void buf_cleanup(struct buf *buf);
 
 
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -1218,6 +1229,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	FILE *fh; 
 	//char buf[INET6_ADDRSTRLEN];
 	u_int32_t serial;
+	struct buf tmpbuf;
 
 	if (qry->out_filename)
 	{
@@ -1278,8 +1290,13 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fprintf (fh, " , \"ANCOUNT\" : %d ", ntohs(dnsR->ans_count ));
 		fprintf (fh, " , \"QDCOUNT\" : %u ",ntohs(dnsR->q_count));
 		fprintf (fh, " , \"AA\" : %d" , ntohs(dnsR->auth_count));
-		fprintf (fh, " , \"ARCOUNT\" : %d",ntohs(dnsR->add_count));
-
+		fprintf (fh, " , \"ARCOUNT\" : %d , ",ntohs(dnsR->add_count));
+		
+		buf_init(&tmpbuf, -1);
+		buf_add_b64(&tmpbuf, result, wire_size,0);
+		JS(wbuf, tmpbuf.buf );
+		buf_cleanup(&tmpbuf); 
+		
 		if (dnsR->ans_count > 0)
 		{
 			for(i=0;i<ntohs(dnsR->ans_count);i++)
@@ -1348,10 +1365,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 			free(answers[i].name);
 		}
 
-		fprintf (fh , " },"); //result
+		fprintf (fh , " }"); //result
 	} 
 	if(qry->err) 
-		fprintf(fh, "\"error\" : { %s }" , qry->err);
+		fprintf(fh, ", \"error\" : { %s }" , qry->err);
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
