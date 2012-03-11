@@ -1299,6 +1299,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		
 		if (dnsR->ans_count > 0)
 		{
+			fprintf (fh, "\"answers\" : [ ");
 			for(i=0;i<ntohs(dnsR->ans_count);i++)
 			{
 				answers[i].name=ReadName(reader,result,&stop);
@@ -1306,23 +1307,23 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 				answers[i].resource = (struct R_DATA*)(reader);
 				reader = reader + sizeof(struct R_DATA);
-			}
 
-			fprintf (fh, ", \"answers\" : [ { ");
-			//print answers
-			for(i=0;i<ntohs(dnsR->ans_count);i++)
-			{
 				answers[i].rdata  = NULL;
+
+				if(i > 0) 
+					fprintf(fh, ", ");
+				fprintf(fh, " { ");
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
+
 					fprintf(fh, " \"TYPE\" : \"TXT\"");
 					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
 					answers[i].rdata = ReadName(reader,result,&stop);
 					reader = reader + stop;
 
 					answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-					fprintf(fh, " , \"RDATA\" : \"%s\"", answers[i].rdata);
+					fprintf(fh, " , \"RDATA\" : \"%s\" }", answers[i].rdata);
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
@@ -1337,27 +1338,32 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					JSDOT( RNAME, answers[i].rdata);
 					reader =  reader + stop;
 					serial = get32b(reader);
-					JU_NC(SERIAL, serial);
+					JU(SERIAL, serial);
+					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len));
 					reader =  reader + 4;
+					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
 				}
 				else if (ntohs(answers[i].resource->type)== T_DNSKEY)
 				{
-					fprintf(fh, " \"TYPE\" : \"DNSKEY\"");
+					JS(TYPE,  "DNSKEY");
+					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
+					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
 				else  
 				{
 
-					fprintf(fh, " \"TYPE\" : %u", ntohs(answers[i].resource->type));
-					fprintf(fh, " , \"error\" : \"UNKNOWN\"");
-					fprintf(fh, " , \"len\" : %u", answers[i].resource->data_len );
+					fprintf(fh, " \"TYPE\" : %u ", ntohs(answers[i].resource->type));
+					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
+					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
+				fprintf(fh, " } ");
 				fflush(fh);
 
 				// free mem 
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
 			} 
-			fprintf (fh, " } ]");
+			fprintf (fh, " ]");
 		}
 
 		for(i=0;i<ntohs(dnsR->ans_count);i++)
