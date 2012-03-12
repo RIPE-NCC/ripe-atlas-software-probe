@@ -258,9 +258,10 @@ struct RES_RECORD
 
 static struct option longopts[]=
 {
-	{ "hostname-bind", no_argument, NULL, 'h' },
-	{ "id-server", no_argument, NULL, 'i' },
-	{ "version-bind", no_argument, NULL, 'b' },
+	{ "any", required_argument, NULL, 128 },
+	{ "hostname.bind", no_argument, NULL, 'h' },
+	{ "id.server", no_argument, NULL, 'i' },
+	{ "version.bind", no_argument, NULL, 'b' },
 	{ "version.server", no_argument, NULL, 'r' },
 	{ "soa", required_argument, NULL, 's' },
 	{ "out-file", required_argument, NULL, 'O' },
@@ -891,6 +892,12 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_proto = 6;
 				break;
 
+			case 128:
+				qry->qtype = T_ANY;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+
 			default:
 				fprintf(stderr, "ERROR unknown option 0%o ??\n", c); 
 				break;
@@ -1343,12 +1350,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					reader =  reader + 4;
 					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
 				}
-				else if (ntohs(answers[i].resource->type)== T_DNSKEY)
-				{
-					JS(TYPE,  "DNSKEY");
-					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
-					reader =  reader + ntohs(answers[i].resource->data_len);
-				}
 				else  
 				{
 
@@ -1358,7 +1359,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				}
 				fprintf(fh, " } ");
 				fflush(fh);
-
 				// free mem 
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
