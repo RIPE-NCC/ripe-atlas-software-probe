@@ -59,7 +59,7 @@
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
-#define MAX_DNS_BUF_SIZE   2048
+#define MAX_DNS_BUF_SIZE   3192
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
 #define DEFAULT_NOREPLY_TIMEOUT 1000           /* 1000 msec - 0 is illegal      */
@@ -258,7 +258,10 @@ struct RES_RECORD
 
 static struct option longopts[]=
 {
-	{ "any", required_argument, NULL, 128 },
+	{ "a", required_argument, NULL, 100001 },
+	{ "ns", required_argument, NULL, 100002 },
+	{ "aaaa", required_argument, NULL, 100028 },
+	{ "any", required_argument, NULL, 100255 },
 	{ "hostname.bind", no_argument, NULL, 'h' },
 	{ "id.server", no_argument, NULL, 'i' },
 	{ "version.bind", no_argument, NULL, 'b' },
@@ -892,7 +895,31 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_proto = 6;
 				break;
 
-			case 128:
+			case 100001:
+				qry->qtype = T_A;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+
+			case 100002:
+				qry->qtype = T_NS;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+
+			case 100012:
+				qry->qtype = T_PTR;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+
+			case 100028:
+				qry->qtype = T_AAAA;
+				qry->qclass = C_IN;
+				qry->lookupname =  (u_char *) strdup(optarg);
+				break;
+
+			case 100255:
 				qry->qtype = T_ANY;
 				qry->qclass = C_IN;
 				qry->lookupname =  (u_char *) strdup(optarg);
