@@ -1,15 +1,13 @@
 #include "libbb.h"
-
-
 #define BUF_CHUNK       4096
 
 struct buf
 {
-        size_t offset;
-        size_t size;
-        size_t maxsize;
-        char *buf;
-        int fd;
+	size_t offset;
+	size_t size;
+	size_t maxsize;
+	char *buf;
+	int fd;
 };
 
 void buf_init(struct buf *buf, int fd)
@@ -90,25 +88,25 @@ void buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 	}
 	switch(len-i)
 	{
-	case 0:	break;	/* Nothing to do */
-	case 1:
-		v= (p[0] << 16);
-		str[0]= b64[(v >> 18) & 63];
-		str[1]= b64[(v >> 12) & 63];
-		str[2]= '=';
-		str[3]= '=';
-		buf_add(buf, str, 4);
-		break;
-	case 2:
-		v= (p[0] << 16) + (p[1] << 8);
-		str[0]= b64[(v >> 18) & 63];
-		str[1]= b64[(v >> 12) & 63];
-		str[2]= b64[(v >> 6) & 63];
-		str[3]= '=';
-		buf_add(buf, str, 4);
-		break;
-	default:
-		fprintf(stderr, "bad state in buf_add_b64");
+		case 0:	break;	/* Nothing to do */
+		case 1:
+			v= (p[0] << 16);
+			str[0]= b64[(v >> 18) & 63];
+			str[1]= b64[(v >> 12) & 63];
+			str[2]= '=';
+			str[3]= '=';
+			buf_add(buf, str, 4);
+			break;
+		case 2:
+			v= (p[0] << 16) + (p[1] << 8);
+			str[0]= b64[(v >> 18) & 63];
+			str[1]= b64[(v >> 12) & 63];
+			str[2]= b64[(v >> 6) & 63];
+			str[3]= '=';
+			buf_add(buf, str, 4);
+			break;
+		default:
+			fprintf(stderr, "bad state in buf_add_b64");
 	}
 }
 
