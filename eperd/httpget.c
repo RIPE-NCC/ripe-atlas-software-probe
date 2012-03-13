@@ -18,23 +18,22 @@ Created:	Jan 2012 by Philip Homburg for RIPE NCC
 #define DBQ(str) "\"" #str "\""
 
 #define MAX_LINE_LEN	2048	/* We don't deal with lines longer than this */
+#define POST_BUF_SIZE	2048	/* Big enough to be efficient? */
 
 #define CONN_TO		   5	/* Should get connection CONN_TO seconds */
 
 static struct option longopts[]=
 {
-	{ "append",	no_argument, NULL, 'a' },
-	{ "delete-file", no_argument, NULL, 'd' },
+	{ "all",	no_argument, NULL, 'a' },
+	{ "combine",	no_argument, NULL, 'c' },
 	{ "get",	no_argument, NULL, 'g' },
 	{ "head",	no_argument, NULL, 'E' },
 	{ "post",	no_argument, NULL, 'P' },
 	{ "post-file",	required_argument, NULL, 'p' },
-	{ "post-dir",	required_argument, NULL, 'D' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
 	{ "store-headers", required_argument, NULL, 'H' },
 	{ "store-body",	required_argument, NULL, 'B' },
-	{ "summary",	no_argument, NULL, 'S' },
 	{ "user-agent",	required_argument, NULL, 'u' },
 	{ NULL, }
 };
@@ -42,7 +41,8 @@ static struct option longopts[]=
 enum readstate { READ_STATUS, READ_HEADER, READ_BODY, READ_SIMPLE,
 	READ_CHUNKED, READ_CHUNK_BODY, READ_CHUNK_END, READ_CHUNKED_TRAILER,
 	READ_DONE };
-enum writestate { WRITE_HEADER, WRITE_DONE };
+enum writestate { WRITE_HEADER, WRITE_POST_HEADER, WRITE_POST_FILE,
+	WRITE_POST_FOOTER, WRITE_DONE };
 
 struct hgbase
 {
@@ -61,18 +61,26 @@ struct hgbase
 struct hgstate
 {
 	/* Parameters */
+	char *output_file;
 	char *atlas;
-	char do_v6;
+	char do_all;
+	char do_combine;
+	char only_v4;
+	char only_v6;
 	char do_get;
 	char do_head;
 	char do_post;
 	char do_http10;
-	const char *user_agent;
+	char *user_agent;
+	char *post_header;
+	char *post_file;
+	char *post_footer;
 	int max_headers;
 	int max_body;
 
 	/* State */
 	char busy;
+	char dnsip;
 	char dnserr;
 	char connecting;
 	char *host;
@@ -83,7 +91,6 @@ struct hgstate
 	struct evutil_addrinfo *dns_curr;
 	struct bufferevent *bev;
 	struct event timer;
-	char *out_filename;
 	enum readstate readstate;
 	enum writestate writestate;
 	int http_result;
@@ -93,8 +100,12 @@ struct hgstate
 	int tot_chunked;
 	int content_length;
 	int content_offset;
+	int subid;
+	int submax;
 	struct timeval start;
 	double resptime;
+	FILE *post_fh;
+	char *post_buf;
 
 	char *line;
 	size_t linemax;		/* Allocated size of line */
@@ -275,8 +286,11 @@ static void restart_connect(struct hgstate *state)
 	struct timeval interval;
 
 	/* Delete old bev */
-	bufferevent_free(state->bev);
-	state->bev= NULL;
+	if (state->bev)
+	{
+		bufferevent_free(state->bev);
+		state->bev= NULL;
+	}
 
 	/* And create a new one */
 	create_bev(state);
@@ -295,7 +309,8 @@ static void restart_connect(struct hgstate *state)
 			state->socklen);
 
 		/* Clear result */
-		state->reslen= 0;
+		if (!state->do_all || !state->do_combine)
+			state->reslen= 0;
 
 		interval.tv_sec= CONN_TO;
 		interval.tv_usec= 0;
@@ -316,10 +331,14 @@ static void restart_connect(struct hgstate *state)
 	}
 
 	/* Something went wrong */
+	bufferevent_free(state->bev);
 	state->bev= NULL;
-	bufferevent_free(bev);
-	evutil_freeaddrinfo(state->dns_res);
-	state->dns_res= NULL;
+	if (state->dns_res)
+	{
+		evutil_freeaddrinfo(state->dns_res);
+		state->dns_res= NULL;
+		state->dns_curr= NULL;
+	}
 	report(state);
 }
 
@@ -332,19 +351,22 @@ static void timeout_callback(int __attribute((unused)) unused,
 
 	if (state->connecting)
 	{
-		add_str(state, ", " DBQ(err) ":" DBQ(connect: timeout));
-		restart_connect(state);
+		add_str(state, DBQ(err) ":" DBQ(connect: timeout) ", ");
+		if (state->do_all)
+			report(state);
+		else
+			restart_connect(state);
 		return;
 	}
 	switch(state->readstate)
 	{
 	case READ_STATUS:
-		add_str(state, ", " DBQ(err) ":" DBQ(timeout reading status));
+		add_str(state, DBQ(err) ":" DBQ(timeout reading status) ", ");
 		report(state);
 		break;
 	case READ_HEADER:
 		if (state->max_headers)
-			add_str(s, " ]");
+			add_str(s, " ], ");
 		add_str(state, ", " DBQ(err) ":" DBQ(timeout reading headers));
 		report(state);
 		break;
@@ -353,7 +375,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 		if (state->max_body)
 			add_str(s, " ]");
 #endif
-		add_str(state, ", " DBQ(err) ":" DBQ(timeout reading body));
+		add_str(state, DBQ(err) ":" DBQ(timeout reading body) ", ");
 		report(state);
 		break;
 	case READ_CHUNKED:
@@ -362,23 +384,24 @@ static void timeout_callback(int __attribute((unused)) unused,
 		if (state->max_body)
 			add_str(s, " ]");
 #endif
-		add_str(state, ", " DBQ(err) ":" DBQ(timeout reading chunk));
+		add_str(state, DBQ(err) ":" DBQ(timeout reading chunk) ", ");
 		report(state);
 		break;
 	default:
-		printf("in timeout_callback, unhandled cased\n");
+		printf("in timeout_callback, unhandled cased: %d\n",
+			state->readstate);
 	}
 }
 
 static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state))
 {
-	int c, i, opt_delete_file, do_get, do_head, do_post,
+	int c, i, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
-		do_summary, do_append, do_http10;
+		do_all, do_http10;
 	size_t newsiz;
 	char *url, *check;
-	char *post_dir, *post_file, *output_file, *post_footer, *post_header,
+	char *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
@@ -386,22 +409,20 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Arguments */
 	do_http10= 0;
-	do_append= 0;
+	do_all= 0;
+	do_combine= 0;
 	do_get= 1;
 	do_head= 0;
 	do_post= 0;
-	post_dir= NULL; 
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
 	output_file= NULL;
-	opt_delete_file = 0;
 	store_headers= NULL;
 	store_body= NULL;
 	A_arg= NULL;
 	only_v4= 0;
 	only_v6= 0;
-	do_summary= 0;
 	user_agent= "httpget for atlas.ripe.net";
 
 	if (!hg_base)
@@ -414,7 +435,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "01A:O:46?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "01aA:cO:46?", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -424,17 +445,17 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		case '1':
 			do_http10= 0;
 			break;
-		case 'a':				/* --append */
-			do_append= 1;
+		case 'a':				/* --all */
+			do_all= 1;
 			break;
 		case 'A':
 			A_arg= optarg;
 			break;
+		case 'c':				/* --combine */
+			do_combine= 1;
+			break;
 		case 'O':
 			output_file= optarg;
-			break;
-		case 'd':
-			opt_delete_file = 1;
 			break;
 		case 'g':				/* --get */
 			do_get = 1;
@@ -451,16 +472,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			do_head = 0;
 			do_post = 1;
 			break;
-		case 'D':
-			post_dir = optarg;		/* --post-dir */
-			break;
 		case 'h':				/* --post-header */
 			post_header= optarg;
 			break;
 		case 'f':				/* --post-footer */
 			post_footer= optarg;
 			break;
-
 		case 'p':				/* --post-file */
 			post_file= optarg;
 			break;
@@ -469,9 +486,6 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'B':				/* --store-body */
 			store_body= optarg;
-			break;
-		case 'S':				/* --summary */
-			do_summary= 1;
 			break;
 		case '4':
 			only_v4= 1;
@@ -498,8 +512,6 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	max_headers= 0;
 	max_body= UINT_MAX;	/* default is to write out the entire body */
-	if (do_summary)
-		max_body= 0;	/* default to no body if we want a summary */
 
 	if (store_headers)
 	{
@@ -537,17 +549,28 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state= xzalloc(sizeof(*state));
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
+	state->output_file= output_file ? strdup(output_file) : NULL;
 	state->host= host;
 	state->port= port;
 	state->hostport= hostport;
 	state->path= path;
+	state->do_all= do_all;
+	state->do_combine= !!do_combine;
 	state->do_get= do_get;
 	state->do_head= do_head;
 	state->do_post= do_post;
+	state->post_header= post_header ? strdup(post_header) : NULL;
+	state->post_file= post_file ? strdup(post_file) : NULL;
+	state->post_footer= post_footer ? strdup(post_footer) : NULL;
 	state->do_http10= do_http10;
-	state->user_agent= user_agent;
+	state->user_agent= user_agent ? strdup(user_agent) : NULL;
 	state->max_headers= max_headers;
 	state->max_body= max_body;
+
+	state->only_v4= 2;
+
+	state->only_v4= !!only_v4;	/* Gcc bug? */
+	state->only_v6= !!only_v6;
 
 	evtimer_assign(&state->timer, state->base->event_base,
 		timeout_callback, state);
@@ -581,64 +604,131 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 static void report(struct hgstate *state)
 {
-	int done;
+	int done, do_output;
 	FILE *fh;
 	char namebuf[NI_MAXHOST];
+	char line[160];
 
 	event_del(&state->timer);
 
-	if (state->out_filename)
-	{
-		fh= fopen(state->out_filename, "a");
-		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
-				state->out_filename);
-	}
-	else
-		fh= stdout;
+	state->subid++;
 
-	fprintf(fh, "RESULT { ");
-	if (state->atlas)
+	do_output= 1;
+	if (state->do_all && state->do_combine && state->subid<state->submax)
 	{
-		fprintf(fh, "\"id\":\"%s\", \"time\":%ld, ",
-			state->atlas, (long)time(NULL));
+		do_output= 0;
 	}
 
-	fprintf(fh, DBQ(mode) ":" DBQ(%s%c/%c),
-		state->do_get ? "GET" : state->do_head ? "HEAD" : "POST", 
-		state->sin6.sin6_family == AF_INET6 ? '6' : '4',
-		state->do_http10 ? '0' : '1');
+	fh= NULL;
+	if (do_output)
+	{
+		if (state->output_file)
+		{
+			fh= fopen(state->output_file, "a");
+			if (!fh)
+				crondlog(DIE9 "unable to append to '%s'",
+					state->output_file);
+		}
+		else
+			fh= stdout;
+
+		fprintf(fh, "RESULT { ");
+		if (state->atlas)
+		{
+			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
+				DBQ(time) ":%ld, ",
+				state->atlas, (long)time(NULL));
+		}
+	}
+
+	if (state->do_all && !state->dnserr)
+	{
+		if (state->do_combine)
+		{
+			snprintf(line, sizeof(line), DBQ(time) ":%ld, ",
+				(long)time(NULL));
+		}
+		else
+		{
+			snprintf(line, sizeof(line), DBQ(subid) ":%d, "
+				DBQ(submax) ":%d, ",
+				state->subid, state->submax);
+		}
+		add_str(state, line);
+	}
 
 	if (!state->dnserr)
 	{
+		snprintf(line, sizeof(line), 
+			DBQ(mode) ":" DBQ(%s%c/%c),
+			state->do_get ? "GET" : state->do_head ? "HEAD" : "POST", 
+			state->sin6.sin6_family == AF_INET6 ? '6' : '4',
+			state->do_http10 ? '0' : '1');
+		add_str(state, line);
+
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-		fprintf(fh, ", " DBQ(addr) ":" DBQ(%s), namebuf);
+		snprintf(line, sizeof(line), ", " DBQ(addr) ":" DBQ(%s),
+			namebuf);
+		add_str(state, line);
 	}
 
-	done= (state->readstate == READ_DONE);
-	if (done)
+	if (!state->connecting && !state->dnserr)
 	{
 		namebuf[0]= '\0';
 		getnameinfo((struct sockaddr *)&state->loc_sin6,
 			state->loc_socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
-
-		fprintf(fh, ", " DBQ(rt) ":%f", state->resptime);
-		fprintf(fh, ", " DBQ(res) ":%d", state->http_result);
-		fprintf(fh, ", " DBQ(hsize) ":%d", state->headers_size);
-		fprintf(fh, ", " DBQ(bsize) ":%d", state->content_offset);
+		snprintf(line, sizeof(line), ", " DBQ(srcaddr) ":" DBQ(%s),
+			namebuf);
+		add_str(state, line);
 	}
 
-	fprintf(fh, "%s }\n", state->result);
-	free(state->result);
-	state->result= NULL;
-	state->resmax= 0;
-	state->reslen= 0;
-	state->busy= 0;
+	done= (state->readstate == READ_DONE);
+	if (done)
+	{
+		snprintf(line, sizeof(line),
+			", " DBQ(rt) ":%f"
+			", " DBQ(res) ":%d"
+			", " DBQ(hsize) ":%d"
+			", " DBQ(bsize) ":%d",
+			state->resptime,
+			state->http_result, state->headers_size,
+			state->content_offset);
+		add_str(state, line);
+	}
+
+	if (state->do_all && state->do_combine && !state->dnserr)
+	{
+		add_str(state, " }");
+		if (!do_output)
+			add_str(state, ", ");
+		else
+			add_str(state, " ]");
+	}
+
+	if (do_output)
+	{
+		fprintf(fh, "%s }\n", state->result);
+		free(state->result);
+		state->result= NULL;
+		state->resmax= 0;
+		state->reslen= 0;
+
+		if (state->output_file)
+			fclose(fh);
+	}
+
+	free(state->post_buf);
+	state->post_buf= NULL;
+
+	if (state->do_all && state->subid < state->submax)
+	{
+		restart_connect(state);
+		return;
+	}
 
 	if (state->dns_res)
 	{
@@ -652,11 +742,9 @@ static void report(struct hgstate *state)
 		state->bev= NULL;
 	}
 
-	if (state->out_filename)
-		fclose(fh);
-
 	if (state->base->done)
 		state->base->done(state);
+	state->busy= 0;
 }
 
 static int get_input(struct hgstate *state)
@@ -726,8 +814,8 @@ static void add_str(struct hgstate *state, const char *str)
 static void err_status(struct hgstate *state, const char *reason)
 {
 	char line[80];
-	snprintf(line, sizeof(line), ", "
-		DBQ(err) ":" DBQ(bad status line: %s),
+	snprintf(line, sizeof(line),
+		DBQ(err) ":" DBQ(bad status line: %s) ", ", 
 		reason);
 	add_str(state, line);
 	report(state);
@@ -736,9 +824,10 @@ static void err_status(struct hgstate *state, const char *reason)
 static void err_header(struct hgstate *state, const char *reason)
 {
 	char line[80];
-	snprintf(line, sizeof(line), " ], "
-		DBQ(err) ":" DBQ(bad header line: %s),
-		reason);
+	if (state->max_headers != 0)
+		add_str(state, " ], ");
+	snprintf(line, sizeof(line),
+		DBQ(err) ":" DBQ(bad header line: %s) ", ", reason);
 	add_str(state, line);
 	report(state);
 }
@@ -746,8 +835,7 @@ static void err_header(struct hgstate *state, const char *reason)
 static void err_chunked(struct hgstate *state, const char *reason)
 {
 	char line[80];
-	snprintf(line, sizeof(line), ", "
-		DBQ(err) ":" DBQ(bad chunk line: %s),
+	snprintf(line, sizeof(line), DBQ(err) ":" DBQ(bad chunk line: %s) ", ",
 		reason);
 	add_str(state, line);
 	report(state);
@@ -804,8 +892,9 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 					if (state->linelen-state->lineoffset >=
 						MAX_LINE_LEN)
 					{
-						add_str(state, ", " DBQ(err)
-							":" DBQ(line too long));
+						add_str(state, DBQ(err) ":"
+							DBQ(line too long)
+							", ");
 						report(state);
 					}
 					return;
@@ -871,7 +960,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
 			if (state->max_headers)
 			{
-				add_str(state, ", " DBQ(header) ": [");
+				add_str(state, DBQ(header) ": [");
 			}
 
 			continue;
@@ -901,7 +990,8 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 						add_str(state, ",");
 					add_str(state, " \"\"");
 				}
-				add_str(state, " ]");
+				if (state->max_headers)
+					add_str(state, " ], ");
 				state->readstate= READ_BODY;
 				continue;
 			}
@@ -1277,52 +1367,151 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	}
 }
 
+static int post_file(struct hgstate *state, const char *filename)
+{
+	int r;
+	FILE *fh;
+
+	if (!state->post_fh)
+	{
+		fh= fopen(filename, "r");
+		if (fh == NULL)
+		{
+			printf("post_file: unable to open '%s': %s\n",
+				filename, strerror(errno));
+			return -1;
+		}
+		state->post_fh= fh;
+	}
+	if (!state->post_buf)
+		state->post_buf= xmalloc(POST_BUF_SIZE);
+	r= fread(state->post_buf, 1, POST_BUF_SIZE, state->post_fh);
+	if (r == -1)
+	{
+		printf("post_file: error reading from '%s': %s\n",
+			filename, strerror(errno));
+		return -1;
+	}
+	if (r == 0)
+	{
+		fclose(state->post_fh);
+		state->post_fh= NULL;
+		return 1;
+	}
+	r= bufferevent_write(state->bev, state->post_buf, r);
+	if (r == -1)
+	{
+		printf("post_file: bufferevent_write failed\n");
+	}
+	return r;
+}
+
 static void writecb(struct bufferevent *bev, void *ptr)
 {
+	int r;
 	struct hgstate *state;
 	struct evbuffer *output;
 	off_t cLength;
+	struct stat sb;
 
 	state= ptr;
-	if (state->writestate == WRITE_HEADER)
+	for(;;)
 	{
-		output= bufferevent_get_output(bev);
-		evbuffer_add_printf(output, "%s %s HTTP/1.%c\r\n",
-			state->do_get ? "GET" :
-			state->do_head ? "HEAD" : "POST", state->path,
-			state->do_http10 ? '0' : '1');
-		evbuffer_add_printf(output, "Host: %s\r\n", state->host);
-		evbuffer_add_printf(output, "Connection: close\r\n");
-		evbuffer_add_printf(output, "User-Agent: %s\r\n",
-			state->user_agent);
-		if (state->do_post)
+		switch(state->writestate)
 		{
-			evbuffer_add_printf(output,
+		case WRITE_HEADER:
+			output= bufferevent_get_output(bev);
+			evbuffer_add_printf(output, "%s %s HTTP/1.%c\r\n",
+				state->do_get ? "GET" :
+				state->do_head ? "HEAD" : "POST", state->path,
+				state->do_http10 ? '0' : '1');
+			evbuffer_add_printf(output, "Host: %s\r\n",
+				state->host);
+			evbuffer_add_printf(output, "Connection: close\r\n");
+			evbuffer_add_printf(output, "User-Agent: %s\r\n",
+				state->user_agent);
+			if (state->do_post)
+			{
+				evbuffer_add_printf(output,
 			"Content-Type: application/x-www-form-urlencoded\r\n");
+			}
+
+			cLength= 0;
+			if (state->do_post)
+			{
+				if (state->post_header)
+				{
+					if (stat(state->post_header, &sb) == 0)
+						cLength  +=  sb.st_size;
+				}
+				if (state->post_file)
+				{
+					if (stat(state->post_file, &sb) == 0)
+						cLength  +=  sb.st_size;
+				}
+				if (state->post_footer)
+				{
+					if (stat(state->post_footer, &sb) == 0)
+						cLength  +=  sb.st_size;
+				}
+				evbuffer_add_printf(output,
+					"Content-Length: %lu\r\n",
+					(unsigned long)cLength);
+			}
+
+			evbuffer_add_printf(output, "\r\n");
+			if (state->do_post)
+				state->writestate = WRITE_POST_HEADER;
+			else
+				state->writestate = WRITE_DONE;
+			return;
+		case WRITE_POST_HEADER:
+			if (!state->post_header)
+			{
+				state->writestate= WRITE_POST_FILE;
+				continue;
+			}
+			r= post_file(state, state->post_header);
+			if (r != 1)
+				return;
+
+			/* Done */
+			state->writestate= WRITE_POST_FILE;
+			continue;
+
+		case WRITE_POST_FILE:
+			if (!state->post_file)
+			{
+				state->writestate= WRITE_POST_FOOTER;
+				continue;
+			}
+			r= post_file(state, state->post_file);
+			if (r != 1)
+				return;
+
+			/* Done */
+			state->writestate= WRITE_POST_FOOTER;
+			continue;
+		case WRITE_POST_FOOTER:
+			if (!state->post_footer)
+			{
+				state->writestate= WRITE_DONE;
+				continue;
+			}
+			r= post_file(state, state->post_footer);
+			if (r != 1)
+				return;
+
+			/* Done */
+			state->writestate= WRITE_DONE;
+			continue;
+		case WRITE_DONE:
+			return;
+		default:
+			printf("writecb: unknown write state: %d\n",
+				state->writestate);
+			return;
 		}
-
-		cLength= 0;
-#if 0
-		if( post_header != NULL )
-			cLength  +=  sbH.st_size;
-
-		if (post_file)
-			cLength  += sbS.st_size;
-
-		if (post_dir)
-			cLength += dir_length;
-
-		if( post_footer != NULL )
-			cLength  +=  sbF.st_size;
-#endif
-
-		if (state->do_post)
-		{
-			evbuffer_add_printf(output, "Content-Length: %lu\r\n",
-				(unsigned long)cLength);
-		}
-		evbuffer_add_printf(output, "\r\n");
-		state->writestate = WRITE_DONE;
 	}
 
 }
@@ -1344,6 +1533,19 @@ static void create_bev(struct hgstate *state)
 	bufferevent_setcb(bev, readcb, writecb, eventcb, state);
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
 	state->bev= bev;
+
+	/* Also set some variables */
+	state->connecting= 1;
+	state->readstate= READ_STATUS;
+	state->writestate= WRITE_HEADER;
+
+	state->linelen= 0;
+	state->lineoffset= 0;
+	state->headers_size= 0;
+	state->tot_headers= 0;
+
+	if (state->do_all && state->do_combine)
+		add_str(state, "{ ");
 }
 
 static void err_reading(struct hgstate *state)
@@ -1357,8 +1559,8 @@ static void err_reading(struct hgstate *state)
 		break;
 	case READ_HEADER:
 		if (state->max_headers)
-			add_str(state, " ]");
-		add_str(state, ", " DBQ(err) ":" DBQ(error reading headers));
+			add_str(state, " ], ");
+		add_str(state, DBQ(err) ":" DBQ(error reading headers) ", ");
 		report(state);
 		break;
 	case READ_SIMPLE:
@@ -1373,8 +1575,8 @@ static void err_reading(struct hgstate *state)
 		}
 		else
 		{
-			add_str(state, ", " DBQ(err) ":"
-				DBQ(error reading body));
+			add_str(state, DBQ(err) ":" DBQ(error reading body)
+				", ");
 		}
 		gettimeofday(&endtime, NULL);
 		state->resptime= (endtime.tv_sec-state->start.tv_sec)*1e3 +
@@ -1414,11 +1616,14 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 		if (errno != EINPROGRESS)
 		{
 			snprintf(line, sizeof(line),
-				", " DBQ(err) ":" DBQ(connect: %s),
+				DBQ(err) ":" DBQ(connect: %s) ", ",
 				strerror(errno));
 			add_str(hgstate, line);
 
-			restart_connect(hgstate);
+			if (hgstate->do_all)
+				report(hgstate);
+			else
+				restart_connect(hgstate);
 
 			return;
 		}
@@ -1440,15 +1645,28 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *state)
 	struct hgstate *hgstate;
 	struct hgbase *base;
 	struct bufferevent *bev;
+	struct evutil_addrinfo *cur;
 	struct timeval interval;
 	char line[80];
 
 	hgstate= state;
 	base= hgstate->base;
 
+	if (!hgstate->dnsip)
+	{
+		crondlog(LVL7
+	"dns_cb: for atlas '%s': in dns_cb but not doing dns at this time",
+			hgstate->atlas);
+		if (res)
+			evutil_freeaddrinfo(res);
+		return;
+	}
+
+	hgstate->dnsip= 0;
+
 	if (result != 0)
 	{
-		snprintf(line, sizeof(line), ", " DBQ(dnserr) ":" DBQ(%s),
+		snprintf(line, sizeof(line), DBQ(dnserr) ":" DBQ(%s),
 			evutil_gai_strerror(result));
 		add_str(state, line);
 		hgstate->dnserr= 1;
@@ -1458,6 +1676,17 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *state)
 
 	hgstate->dns_res= res;
 	hgstate->dns_curr= res;
+
+	if (hgstate->do_all)
+	{
+		hgstate->subid= 0;
+		hgstate->submax= 0;
+		for (cur= res; cur; cur= cur->ai_next)
+			hgstate->submax++;
+	}
+
+	if (hgstate->do_all && hgstate->do_combine)
+		add_str(state, DBQ(result) ":[ ");
 
 	create_bev(hgstate);
 	bev= hgstate->bev;
@@ -1488,10 +1717,11 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *state)
 
 	/* Something went wrong */
 	printf("Connect failed\n");
+	bufferevent_free(hgstate->bev);
 	hgstate->bev= NULL;
-	bufferevent_free(bev);
 	evutil_freeaddrinfo(hgstate->dns_res);
 	hgstate->dns_res= NULL;
+	hgstate->dns_curr= NULL;
 	report(state);
 }
 
@@ -1510,361 +1740,18 @@ static void httpget_start(void *state)
 	}
 	hgstate->busy= 1;
 
-	hgstate->connecting= 1;
-	hgstate->readstate= READ_STATUS;
-	hgstate->writestate= WRITE_HEADER;
-
-	hgstate->linelen= 0;
-	hgstate->lineoffset= 0;
-	hgstate->headers_size= 0;
-	hgstate->tot_headers= 0;
+	hgstate->dnsip= 1;
+	hgstate->dnserr= 0;
+	hgstate->connecting= 0;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
+	if (hgstate->only_v4)
+		hints.ai_family= AF_INET;
+	else if (hgstate->only_v6)
+		hints.ai_family= AF_INET6;
 	evdns_req= evdns_getaddrinfo(DnsBase, hgstate->host, hgstate->port,
 		&hints, dns_cb, state);
-
-#if 0
-	if (post_dir)
-	{
-		filelist= do_dir(post_dir, &dir_length);
-		if (!filelist)
-		{
-			/* Something went wrong. */
-			goto err;
-		}
-		if (debug)
-		{
-			fprintf(stderr, "total size in dir: %ld\n",
-				(long)dir_length);
-		}
-	}
-
-	if(post_header != NULL )
-	{	
-		fdH = open(post_header, O_RDONLY);
-		if(fdH == -1 )
-		{
-			report_err("unable to open header '%s'", post_header);
-			goto err;
-		}
-		if (fstat(fdH, &sbH) == -1)
-		{
-			report_err("fstat failed on header file '%s'",
-				post_header);
-			goto err;
-		}
-		if (!S_ISREG(sbH.st_mode))
-		{
-			report("'%s' header is not a regular file",
-				post_header);
-			goto err;
-		}
-	}
-
-	if(post_footer != NULL )
-	{	
-		fdF = open(post_footer, O_RDONLY);
-		if(fdF == -1 )
-		{
-			report_err("unable to open footer '%s'", post_footer);
-			goto err;
-		}
-		if (fstat(fdF, &sbF) == -1)
-		{
-			report_err("fstat failed on footer file '%s'",
-				post_footer);
-			goto err;
-		}
-		if (!S_ISREG(sbF.st_mode))
-		{
-			report("'%s' footer is not a regular file",
-				post_footer);
-			goto err;
-		}
-	}
-
-	/* Try to open the file before trying to connect */
-	if (post_file != NULL)
-	{
-		fdS= open(post_file, O_RDONLY);
-		if (fdS == -1)
-		{
-			report_err("unable to open '%s'", post_file);
-			goto err;
-		}
-		if (fstat(fdS, &sbS) == -1)
-		{
-			report_err("fstat failed");
-			goto err;
-		}
-		if (!S_ISREG(sbS.st_mode))
-		{
-			report("'%s' is not a regular file", post_file);
-			goto err;
-		}
-	}
-
-	sa.sa_flags= 0;
-	sa.sa_handler= got_alarm;
-	sigemptyset(&sa.sa_mask);
-	sigaction(SIGALRM, &sa, NULL);
-	if (debug) fprintf(stderr, "setting alarm\n");
-	alarm(10);
-	signal(SIGPIPE, SIG_IGN);
-
-	if (output_file)
-	{
-		out_file= fopen(output_file, do_append ? "a" : "w");
-		if (!out_file)
-		{
-			report_err("unable to create '%s'", output_file);
-			goto err;
-		}
-		out_file_needs_closing= 1;
-	}
-	else
-		out_file= stdout;
-
-
-	/* Stdio makes life easy */
-	tcp_file= fdopen(tcp_fd, "r+");
-	if (tcp_file == NULL)
-	{
-		report("fdopen failed");
-		goto err;
-	}
-	tcp_fd= -1;
-
-	if (debug) fprintf(stderr, "httpget: sending request\n");
-	fprintf(tcp_file, "%s %s HTTP/1.%c\r\n",
-		do_get ? "GET" : do_head ? "HEAD" : "POST", path,
-		do_http10 ? '0' : '1');
-	fprintf(tcp_file, "Host: %s\r\n", host);
-	fprintf(tcp_file, "Connection: close\r\n");
-	fprintf(tcp_file, "User-Agent: %s\r\n", user_agent);
-	if (do_post)
-	{
-		fprintf(tcp_file,
-			"Content-Type: application/x-www-form-urlencoded\r\n");
-	}
-
-	cLength= 0;
-	if( post_header != NULL )
-		cLength  +=  sbH.st_size;
-
-	if (post_file)
-		cLength  += sbS.st_size;
-
-	if (post_dir)
-		cLength += dir_length;
-
-	if( post_footer != NULL )
-		cLength  +=  sbF.st_size;
-
-	fprintf(tcp_file, "Content-Length: %lu\r\n", (unsigned long)cLength);
-	fprintf(tcp_file, "\r\n");
-
-	if( post_header != NULL )
-	{
-		 if (!write_to_tcp_fd(fdH, tcp_file))
-		 {
-		 	printf("write_to_tcp_fd failed\n");
-		 	goto fail;
-		}
-	}
-
-	if (post_file != NULL)
-	{
-		if (!write_to_tcp_fd(fdS, tcp_file))
-		{
-		 	printf("write_to_tcp_fd failed\n");
-		 	goto fail;
-		}
-	}
-
-	if (post_dir)
-	{
-		for (p= filelist; p[0] != 0; p += strlen(p)+1)
-		{
-			if (debug) fprintf(stderr, "posting file '%s'\n", p);
-			fd= open(p, O_RDONLY);
-			if (fd == -1)
-			{
-				report_err("unable to open '%s'", p);
-				goto err;
-			}
-			r= write_to_tcp_fd(fd, tcp_file);
-			close(fd);
-			fd= -1;
-			if (!r)
-			{
-				printf("write_to_tcp_fd failed\n");
-				goto fail;
-			}
-		}
-	}
-
-	if( post_footer != NULL)
-	{
-		if (!write_to_tcp_fd(fdF, tcp_file))
-		{
-			printf("write_to_tcp_fd failed\n");
-			goto fail;
-		}
-	}
-
-	if (debug) fprintf(stderr, "httpget: writing output\n");
-	do_multiline= (A_arg && (max_headers != 0 || max_body != 0));
-	if (do_multiline)
-	{
-		fd= open("/dev/urandom", O_RDONLY);
-		read(fd, rndbuf, sizeof(rndbuf));
-		close(fd);
-		fprintf(out_file, "BEGINRESULT ");
-		for (i= 0; i<sizeof(rndbuf); i++)
-			fprintf(out_file, "%02x", (unsigned char)rndbuf[i]);
-		fprintf(out_file, " %s %ld\n", A_arg, (long)time(NULL));
-	}
-
-	if (debug) fprintf(stderr, "httpget: getting result\n");
-	if (!check_result(tcp_file, &http_result))
-	{
-		printf("check_result failed\n");
-		goto fail;
-	}
-	if (debug) fprintf(stderr, "httpget: getting reply headers \n");
-	if (!eat_headers(tcp_file, &chunked, &content_length, &headers_size,
-		out_file, max_headers))
-	{
-		printf("eat_headers failed\n");
-		goto fail;
-	}
-	
-	no_body= (do_head || http_result == 204 || http_result == 304 ||
-		http_result/100 == 1);
-
-	if (max_headers != 0 && max_body != 0)
-		fprintf(out_file, "\n");	/* separate headers from body */
-
-	if (no_body)
-	{
-		/* This reply will not have a body even if there is a
-		 * content-length line.
-		 */
-	}
-	else if (chunked)
-	{
-		if (!copy_chunked(tcp_file, out_file, &content_length,
-			max_body))
-		{
-			printf("copy_chunked failed\n");
-			goto fail;
-		}
-	}
-	else
-	{
-		if (!copy_bytes(tcp_file, out_file, &content_length, max_body))
-		{
-			printf("copy_bytes failed\n");
-			goto fail;
-		}
-	}
-
-fail:
-	gettimeofday(&tv_end, NULL);
-
-	tv_end.tv_sec -= tv_start.tv_sec;
-	tv_end.tv_usec -= tv_start.tv_usec;
-	if (tv_end.tv_usec < 0)
-	{
-		tv_end.tv_usec += 1000000;
-		tv_end.tv_sec--;
-	}
-
-	if (do_multiline)
-	{
-		fprintf(out_file, "ENDRESULT ");
-		for (i= 0; i<sizeof(rndbuf); i++)
-			fprintf(out_file, "%02x", (unsigned char)rndbuf[i]);
-		fprintf(out_file, "\n");
-	}
-
-	if (A_arg && do_summary)
-	{
-		fprintf(out_file, "%s %ld ",
-			A_arg, (long)time(NULL));
-	}
-	if (do_summary)
-	{
-		const char *v, *cmd;
-
-		if (do_get)
-			cmd= "GET";
-		else if (do_head)
-			cmd= "HEAD";
-		else
-			cmd= "POST";
-		if (family == AF_INET)
-			v= "4";
-		else if (family == AF_INET6)
-			v= "6";
-		else
-			v= "?";
-
-		fprintf(out_file, "%s%s %s %d.%06d %03u %d %d\n",
-			cmd, v, 
-			host_addr, (int)tv_end.tv_sec, (int)tv_end.tv_usec,
-			http_result, headers_size, content_length);
-	}
-
-	if (debug) fprintf(stderr, "httpget: deleting files\n");
-	if ( opt_delete_file == 1 )
-	{
-		if (post_file)
-			unlink (post_file);
-		if (post_dir)
-		{
-			for (p= filelist; p[0] != 0; p += strlen(p)+1)
-			{
-				if (debug)
-				{
-					fprintf(stderr,
-						"unlinking file '%s'\n", p);
-				}
-				if (unlink(p) != 0)
-					report_err("unable to unlink '%s'", p);
-			}
-		}
-	}
-	if (debug) fprintf(stderr, "httpget: done\n");
-
-	result= 0;
-
-leave:
-	if (fdH != -1) close(fdH);
-	if (fdF != -1) close(fdF);
-	if (fdS != -1) close(fdS);
-	if (fd != -1) close(fd);
-	if (tcp_file) fclose(tcp_file);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (out_file && out_file_needs_closing) fclose(out_file);
-	if (host) free(host);
-	if (port) free(port);
-	if (hostport) free(hostport);
-	if (path) free(path);
-	if (filelist) free(filelist);
-
-	printf("clearing alarm\n");
-	alarm(0);
-	signal(SIGPIPE, SIG_DFL);
-
-	return result; 
-
-err:
-	result= 1;
-	goto leave;
-#endif
 }
 
 static int httpget_delete(void *state)
@@ -1892,10 +1779,24 @@ static int httpget_delete(void *state)
 
 	free(hgstate->atlas);
 	hgstate->atlas= NULL;
+	free(hgstate->output_file);
+	hgstate->output_file= NULL;
+	free(hgstate->host);
+	hgstate->host= NULL;
 	free(hgstate->hostport);
 	hgstate->hostport= NULL;
+	free(hgstate->port);
+	hgstate->port= NULL;
 	free(hgstate->path);
 	hgstate->path= NULL;
+	free(hgstate->user_agent);
+	hgstate->user_agent= NULL;
+	free(hgstate->post_header);
+	hgstate->post_header= NULL;
+	free(hgstate->post_file);
+	hgstate->post_file= NULL;
+	free(hgstate->post_footer);
+	hgstate->post_footer= NULL;
 
 	free(hgstate);
 
