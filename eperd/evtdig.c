@@ -1264,6 +1264,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	//char buf[INET6_ADDRSTRLEN];
 	u_int32_t serial;
 	struct buf tmpbuf;
+	char str[4]; 
 
 	if (qry->out_filename)
 	{
@@ -1328,6 +1329,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		
 		buf_init(&tmpbuf, -1);
 		buf_add_b64(&tmpbuf, result, wire_size,0);
+		str[0]  = '\0';
+		buf_add(&tmpbuf, str, 1);
 		JS(wbuf, tmpbuf.buf );
 		buf_cleanup(&tmpbuf); 
 		
