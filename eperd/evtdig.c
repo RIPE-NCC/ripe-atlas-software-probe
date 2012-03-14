@@ -45,6 +45,7 @@
 #define DQ(str) "\"" #str "\""
 #define DQC(str) "\"" #str "\" : "
 #define JS(key, val) fprintf(fh, "\"" #key"\" : \"%s\" , ",  val); 
+#define JS_NC(key, val) fprintf(fh, "\"" #key"\" : \"%s\" ",  val); 
 #define JSDOT(key, val) fprintf(fh, "\"" #key"\" : \"%s.\" , ",  val); 
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
 #define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
@@ -1331,12 +1332,12 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		buf_add_b64(&tmpbuf, result, wire_size,0);
 		str[0]  = '\0';
 		buf_add(&tmpbuf, str, 1);
-		JS(wbuf, tmpbuf.buf );
+		JS_NC(wbuf, tmpbuf.buf );
 		buf_cleanup(&tmpbuf); 
 		
 		if (dnsR->ans_count > 0)
 		{
-			fprintf (fh, "\"answers\" : [ ");
+			fprintf (fh, ", \"answers\" : [ ");
 			for(i=0;i<ntohs(dnsR->ans_count);i++)
 			{
 				answers[i].name=ReadName(reader,result,&stop);
@@ -1360,7 +1361,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					reader = reader + stop;
 
 					answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-					fprintf(fh, " , \"RDATA\" : \"%s\" }", answers[i].rdata);
+					fprintf(fh, " , \"RDATA\" : \"%s\" ", answers[i].rdata);
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
