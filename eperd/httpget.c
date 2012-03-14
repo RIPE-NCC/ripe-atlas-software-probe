@@ -102,6 +102,7 @@ struct hgstate
 	int content_offset;
 	int subid;
 	int submax;
+	time_t gstart;
 	struct timeval start;
 	double resptime;
 	FILE *post_fh;
@@ -636,8 +637,10 @@ static void report(struct hgstate *state)
 		if (state->atlas)
 		{
 			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
+				DBQ(fw) ":%d, "
 				DBQ(time) ":%ld, ",
-				state->atlas, (long)time(NULL));
+				state->atlas, get_atlas_fw_version(),
+				state->gstart);
 		}
 	}
 
@@ -646,7 +649,7 @@ static void report(struct hgstate *state)
 		if (state->do_combine)
 		{
 			snprintf(line, sizeof(line), DBQ(time) ":%ld, ",
-				(long)time(NULL));
+				state->start.tv_sec);
 		}
 		else
 		{
@@ -1743,6 +1746,7 @@ static void httpget_start(void *state)
 	hgstate->dnsip= 1;
 	hgstate->dnserr= 0;
 	hgstate->connecting= 0;
+	hgstate->gstart= time(NULL);
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;

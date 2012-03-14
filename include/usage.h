@@ -1019,9 +1019,25 @@
      "\n	-p pass		Append four or six byte password PW to the packet" \
 
 #define evhttpget_trivial_usage \
-       "todo"
+       "[-ac0146] [--all [--combine]] [--get|--head|--post] [--post-file <file>] [--post-header <file>] [--post-footer <file>] [--store-headers <bytes>] [--user-agent <string>] [-A <atlas id>] [-O <file>]"
 #define evhttpget_full_usage "\n\n" \
-     "todo"
+     "\nOptions:" \
+     "\n	-a --all		Report on all addresses" \
+     "\n	-c --combine 		Combine the reports for all address in one JSON" \
+     "\n	--get			GET method" \
+     "\n	--head			HEAD method" \
+     "\n	--post			POST mehod" \
+     "\n	--post-file <filename>	File to post" \
+     "\n	--post-header <fn>	File to post (comes first)" \
+     "\n	--post-footer <fn>	File to post (comes last)" \
+     "\n	--store-headers	<bytes>	Number of bytes of the header to store"\
+     "\n	--user-agent <string>	User agent header" \
+     "\n	-0			HTTP/1.0" \
+     "\n	-1			HTTP/1.1" \
+     "\n	-A <atlas id>		Atlas ID" \
+     "\n	-O <filename>		Output file" \
+     "\n	-4			Only IPv4 addresses" \
+     "\n	-6			Only IPv6 addresses" \
 
 #define evping_trivial_usage \
        "todo"
