@@ -58,7 +58,8 @@ int httppost_main(int argc, char *argv[])
 	int c,  r, fd, fdF, fdH, fdS, chunked, content_length, result;
 	int opt_delete_file, found_ok;
 	char *url, *host, *port, *hostport, *path, *filelist, *p;
-	char *post_dir, *post_file, *atlas_id, *output_file, *post_footer, *post_header;
+	char *post_dir, *post_file, *atlas_id, *output_file,
+		*post_footer, *post_header;
 	char *time_tolerance;
 	FILE *tcp_file, *out_file;
 	time_t server_time;
@@ -311,7 +312,7 @@ int httppost_main(int argc, char *argv[])
 	if (time_tolerance && server_time > 0)
 	{
 		/* Try to set time from server */
-		time_t now, tolerance;
+		time_t now, tolerance, rtt;
 
 		tolerance= strtoul(time_tolerance, &p, 10);
 		if (p[0] != '\0')
@@ -320,31 +321,21 @@ int httppost_main(int argc, char *argv[])
 				time_tolerance);
 		}
 		now= time(NULL);
-		if (now < server_time-tolerance || now > server_time+tolerance)
+		rtt= now-start_time;
+		if (rtt < 0) rtt= 0;
+		rtt++;
+		if (now < server_time-tolerance-rtt ||
+			now > server_time+tolerance+rtt)
 		{
-			if (now-start_time > 5)
+			fprintf(stderr,
+				"setting time, time difference is %ld\n",
+				(long)server_time-now);
+			stime(&server_time);
+			if (atlas_id)
 			{
-				fprintf(stderr,
-					"not setting time, server took too long to reply (%d)\n",
-					now-start_time);
-				if (atlas_id)
-				{
-					printf(
-		"RESULT %s ongoing %d httppost not setting time, start %d, local %d, remote %d\n",
-						atlas_id, time(NULL), start_time, now, server_time);
-				}
-			}
-			else
-			{
-				fprintf(stderr, "setting time, time difference is %ld\n",
-					(long)server_time-now);
-				stime(&server_time);
-				if (atlas_id)
-				{
-					printf(
-			"RESULT %s ongoing %d httppost setting time, local %d, remote %d\n",
-						atlas_id, time(NULL), now, server_time);
-				}
+				printf(
+	"RESULT %s ongoing %d httppost setting time, local %d, remote %d\n",
+					atlas_id, time(NULL), now, server_time);
 			}
 		}
 	}
