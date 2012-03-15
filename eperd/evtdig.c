@@ -50,6 +50,7 @@
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
 #define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
 #define JLD(key, val) fprintf(fh, "\"" #key"\" : %ld , ",  val); 
+#define JLD_NC(key, val) fprintf(fh, "\"" #key"\" : %ld ",  val); 
 #define JU(key, val) fprintf(fh, "\"" #key"\" : %u , ",  val); 
 #define JU_NC(key, val) fprintf(fh, "\"" #key"\" : %u",  val); 
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
@@ -1131,7 +1132,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	else
 		fh = stdout;
 	
-	BLURT(LVL9 "tdig_stats called");
+	BLURT(LVL9 "tdig_stats called sendfail %d sendok %d recvok %d", base->sendfail, base->sentok, base->recvok);
 	fprintf(fh, "RESULT { ");
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
@@ -1142,7 +1143,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JLD(sentbytes , base->sentbytes);
 	JLD(recvbytes , base->recvbytes);
 	JLD(timedout , base->timedout);
-	JLD(queries , base->activeqry);
+	JLD_NC(queries , base->activeqry);
 
 	fprintf(fh, " }\n");
 	if (qry->out_filename) 
@@ -1303,7 +1304,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				break;
 		}
 		inet_ntop (qry->ressent->ai_family, ptr, addrstr, 100);
-		JS(address , addrstr);
+		JS_NC(address , addrstr);
 	}
 
 	if(result)
@@ -1316,7 +1317,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		//move ahead of the dns header and the query field
 		reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
-		fprintf (fh, " \"result\" : { ");
+		fprintf (fh, ", \"result\" : { ");
 		fprintf (fh, " \"rt\" : %.3f", qry->triptime);
 		fprintf (fh, " , \"ID\" : %d", ntohs(dnsR->id));
 		// results from reply received 
@@ -1414,5 +1415,3 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 }
 
 struct testops tdig_ops = { tdig_init, tdig_start, tdig_delete }; 
-
-
