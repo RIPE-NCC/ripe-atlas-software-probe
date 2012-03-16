@@ -14,6 +14,12 @@ Created:	Jan 2012 by Philip Homburg for RIPE NCC
 #include <event2/event_struct.h>
 
 #include "eperd.h"
+#include "tcputil.h"
+
+#define CONN_TO		   5	/* Should get connection CONN_TO seconds */
+
+#define ENV2STATE(env) \
+	((struct hgstate *)((char *)env - offsetof(struct hgstate, tu_env)))
 
 #define DBQ(str) "\"" #str "\""
 
@@ -80,17 +86,14 @@ struct hgstate
 
 	/* State */
 	char busy;
-	char dnsip;
+	struct tu_env tu_env;
 	char dnserr;
 	char connecting;
 	char *host;
 	char *port;
 	char *hostport;
 	char *path;
-	struct evutil_addrinfo *dns_res;
-	struct evutil_addrinfo *dns_curr;
 	struct bufferevent *bev;
-	struct event timer;
 	enum readstate readstate;
 	enum writestate writestate;
 	int http_result;
@@ -130,8 +133,6 @@ struct hgstate
 static struct hgbase *hg_base;
 
 static void report(struct hgstate *state);
-static void eventcb(struct bufferevent *bev, short events, void *ptr);
-static void create_bev(struct hgstate *state);
 static void add_str(struct hgstate *state, const char *str);
 
 static struct hgbase *httpget_base_new(struct event_base *event_base)
@@ -281,74 +282,12 @@ fail:
 	return 0;
 }
 
-static void restart_connect(struct hgstate *state)
-{
-	struct bufferevent *bev;
-	struct timeval interval;
-
-	/* Delete old bev */
-	if (state->bev)
-	{
-		bufferevent_free(state->bev);
-		state->bev= NULL;
-	}
-
-	/* And create a new one */
-	create_bev(state);
-	bev= state->bev;
-
-	/* Connect failed, try next address */
-	if (state->dns_curr)
-			/* Just to be on the safe side */
-	{
-		state->dns_curr= state->dns_curr->ai_next;
-	}
-	while (state->dns_curr)
-	{
-		state->socklen= state->dns_curr->ai_addrlen;
-		memcpy(&state->sin6, state->dns_curr->ai_addr,
-			state->socklen);
-
-		/* Clear result */
-		if (!state->do_all || !state->do_combine)
-			state->reslen= 0;
-
-		interval.tv_sec= CONN_TO;
-		interval.tv_usec= 0;
-		evtimer_add(&state->timer, &interval);
-
-		gettimeofday(&state->start, NULL);
-		if (bufferevent_socket_connect(bev,
-			state->dns_curr->ai_addr,
-			state->dns_curr->ai_addrlen) == 0)
-		{
-			/* Connecting, wait for callback */
-			return;
-		}
-
-		/* Immediate error? */
-		printf("connect error\n");
-		state->dns_curr= state->dns_curr->ai_next;
-	}
-
-	/* Something went wrong */
-	bufferevent_free(state->bev);
-	state->bev= NULL;
-	if (state->dns_res)
-	{
-		evutil_freeaddrinfo(state->dns_res);
-		state->dns_res= NULL;
-		state->dns_curr= NULL;
-	}
-	report(state);
-}
-
 static void timeout_callback(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	struct hgstate *state;
 
-	state= s;
+	state= ENV2STATE(s);
 
 	if (state->connecting)
 	{
@@ -356,7 +295,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 		if (state->do_all)
 			report(state);
 		else
-			restart_connect(state);
+			tu_restart_connect(&state->tu_env);
 		return;
 	}
 	switch(state->readstate)
@@ -573,8 +512,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->only_v4= !!only_v4;	/* Gcc bug? */
 	state->only_v6= !!only_v6;
 
-	evtimer_assign(&state->timer, state->base->event_base,
-		timeout_callback, state);
+	//evtimer_assign(&state->timer, state->base->event_base,
+	//	timeout_callback, state);
 
 	state->line= NULL;
 	state->linemax= 0;
@@ -610,7 +549,7 @@ static void report(struct hgstate *state)
 	char namebuf[NI_MAXHOST];
 	char line[160];
 
-	event_del(&state->timer);
+	//event_del(&state->timer);
 
 	state->subid++;
 
@@ -729,21 +668,13 @@ static void report(struct hgstate *state)
 
 	if (state->do_all && state->subid < state->submax)
 	{
-		restart_connect(state);
+		tu_restart_connect(&state->tu_env);
 		return;
 	}
 
-	if (state->dns_res)
-	{
-		evutil_freeaddrinfo(state->dns_res);
-		state->dns_res= NULL;
-		state->dns_curr= NULL;
-	}
-	if (state->bev)
-	{
-		bufferevent_free(state->bev);
-		state->bev= NULL;
-	}
+	state->bev= NULL;
+
+	tu_cleanup(&state->tu_env);
 
 	if (state->base->done)
 		state->base->done(state);
@@ -853,7 +784,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	struct hgstate *state;
 	struct timeval endtime;
 
-	state= ptr;
+	state= ENV2STATE(ptr);
 
 	for (;;)
 	{
@@ -1351,9 +1282,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		case READ_DONE:
 			if (state->bev)
 			{
-				bufferevent_free(state->bev);
 				state->bev= NULL;
-
 				gettimeofday(&endtime, NULL);
 				state->resptime=
 					(endtime.tv_sec-
@@ -1417,7 +1346,8 @@ static void writecb(struct bufferevent *bev, void *ptr)
 	off_t cLength;
 	struct stat sb;
 
-	state= ptr;
+	state= ENV2STATE(ptr);
+
 	for(;;)
 	{
 		switch(state->writestate)
@@ -1519,41 +1449,10 @@ static void writecb(struct bufferevent *bev, void *ptr)
 
 }
 
-
-static void create_bev(struct hgstate *state)
-{
-	struct bufferevent *bev;
-	struct hgbase *base;
-
-	base= state->base;
-
-	bev= bufferevent_socket_new(base->event_base, -1,
-		BEV_OPT_CLOSE_ON_FREE);
-	if (!bev)
-	{
-		crondlog(DIE9 "bufferevent_socket_new failed");
-	}
-	bufferevent_setcb(bev, readcb, writecb, eventcb, state);
-	bufferevent_enable(bev, EV_READ|EV_WRITE);
-	state->bev= bev;
-
-	/* Also set some variables */
-	state->connecting= 1;
-	state->readstate= READ_STATUS;
-	state->writestate= WRITE_HEADER;
-
-	state->linelen= 0;
-	state->lineoffset= 0;
-	state->headers_size= 0;
-	state->tot_headers= 0;
-
-	if (state->do_all && state->do_combine)
-		add_str(state, "{ ");
-}
-
 static void err_reading(struct hgstate *state)
 {
 	struct timeval endtime;
+
 	switch(state->readstate)
 	{
 	case READ_STATUS:
@@ -1591,148 +1490,112 @@ static void err_reading(struct hgstate *state)
 	}
 }
 
-static void eventcb(struct bufferevent *bev, short events, void *ptr)
+static void dnscount(struct tu_env *env, int count)
 {
-	struct hgstate *hgstate;
-	char line[80];
+	struct hgstate *state;
 
-	hgstate= ptr;
-	if (hgstate->connecting)
-	{
-		/* Clear some events we don't want to see */
-		events &= ~(BEV_EVENT_READING|BEV_EVENT_ERROR);
-	}
+	state= ENV2STATE(env);
+	state->subid= 0;
+	state->submax= count;
 
-	if (events & BEV_EVENT_READING)
-	{
-		err_reading(hgstate);
-		events &= ~BEV_EVENT_READING;
-		return;
-	}
-	if (events & BEV_EVENT_ERROR)
-	{
-		printf("eventcb: unrecoverable error encountered\n");
-		events &= ~BEV_EVENT_ERROR;
-	}
-	if (events & BEV_EVENT_CONNECTED)
-	{
-		if (errno != EINPROGRESS)
-		{
-			snprintf(line, sizeof(line),
-				DBQ(err) ":" DBQ(connect: %s) ", ",
-				strerror(errno));
-			add_str(hgstate, line);
-
-			if (hgstate->do_all)
-				report(hgstate);
-			else
-				restart_connect(hgstate);
-
-			return;
-		}
-		events &= ~BEV_EVENT_CONNECTED;
-		hgstate->connecting= 0;
-
-		hgstate->loc_socklen= sizeof(hgstate->loc_sin6);
-		getsockname(bufferevent_getfd(bev),	
-			&hgstate->loc_sin6, &hgstate->loc_socklen);
-
-		writecb(bev, ptr);
-	}
-	if (events)
-		printf("events = 0x%x\n", events);
+	if (state->do_all && state->do_combine)
+		add_str(state, DBQ(result) ":[ ");
 }
 
-static void dns_cb(int result, struct evutil_addrinfo *res, void *state)
+static void beforeconnect(struct tu_env *env,
+	struct sockaddr *addr, socklen_t addrlen)
 {
-	struct hgstate *hgstate;
-	struct hgbase *base;
-	struct bufferevent *bev;
-	struct evutil_addrinfo *cur;
-	struct timeval interval;
+	struct hgstate *state;
+
+	state= ENV2STATE(env);
+
+	state->socklen= addrlen;
+	memcpy(&state->sin6, addr, state->socklen);
+
+	state->connecting= 1;
+	state->readstate= READ_STATUS;
+	state->writestate= WRITE_HEADER;
+
+	state->linelen= 0;
+	state->lineoffset= 0;
+	state->headers_size= 0;
+	state->tot_headers= 0;
+
+	/* Clear result */
+	if (!state->do_all || !state->do_combine)
+		state->reslen= 0;
+
+	if (state->do_all && state->do_combine)
+		add_str(state, "{ ");
+
+	gettimeofday(&state->start, NULL);
+}
+
+
+static void reporterr(struct tu_env *env, enum tu_err cause,
+		const char *str)
+{
+	struct hgstate *state;
 	char line[80];
 
-	hgstate= state;
-	base= hgstate->base;
+	state= ENV2STATE(env);
 
-	if (!hgstate->dnsip)
+	if (env != &state->tu_env) abort();
+
+	switch(cause)
 	{
-		crondlog(LVL7
-	"dns_cb: for atlas '%s': in dns_cb but not doing dns at this time",
-			hgstate->atlas);
-		if (res)
-			evutil_freeaddrinfo(res);
-		return;
-	}
-
-	hgstate->dnsip= 0;
-
-	if (result != 0)
-	{
-		snprintf(line, sizeof(line), DBQ(dnserr) ":" DBQ(%s),
-			evutil_gai_strerror(result));
+	case TU_DNS_ERR:
+		snprintf(line, sizeof(line), DBQ(dnserr) ":" DBQ(%s), str);
 		add_str(state, line);
-		hgstate->dnserr= 1;
+		state->dnserr= 1;
 		report(state);
-		return;
+		break;
+
+	case TU_READ_ERR:
+		err_reading(state);
+		break;
+
+	case TU_CONNECT_ERR:
+		snprintf(line, sizeof(line),
+			DBQ(err) ":" DBQ(connect: %s) ", ", str);
+		add_str(state, line);
+
+		if (state->do_all)
+			report(state);
+		else
+			tu_restart_connect(&state->tu_env);
+		break;
+
+	case TU_OUT_OF_ADDRS:
+		report(state);
+		break;
+
+	default:
+		crondlog(DIE9 "reporterr: bad cause %d", cause);
 	}
+}
 
-	hgstate->dns_res= res;
-	hgstate->dns_curr= res;
+static void connected(struct tu_env *env, struct bufferevent *bev)
+{
+	struct hgstate *state;
 
-	if (hgstate->do_all)
-	{
-		hgstate->subid= 0;
-		hgstate->submax= 0;
-		for (cur= res; cur; cur= cur->ai_next)
-			hgstate->submax++;
-	}
+	state= ENV2STATE(env);
 
-	if (hgstate->do_all && hgstate->do_combine)
-		add_str(state, DBQ(result) ":[ ");
+	if (env != &state->tu_env) abort();
 
-	create_bev(hgstate);
-	bev= hgstate->bev;
+	state->connecting= 0;
+	state->bev= bev;
 
-	while (hgstate->dns_curr)
-	{
-		hgstate->socklen= hgstate->dns_curr->ai_addrlen;
-		memcpy(&hgstate->sin6, hgstate->dns_curr->ai_addr,
-			hgstate->socklen);
-
-		interval.tv_sec= CONN_TO;
-		interval.tv_usec= 0;
-		evtimer_add(&hgstate->timer, &interval);
-
-		gettimeofday(&hgstate->start, NULL);
-		if (bufferevent_socket_connect(bev,
-			hgstate->dns_curr->ai_addr,
-			hgstate->dns_curr->ai_addrlen) == 0)
-		{
-			/* Connecting, wait for callback */
-			return;
-		}
-
-		/* Immediate error? */
-		printf("connect error\n");
-		hgstate->dns_curr= hgstate->dns_curr->ai_next;
-	}
-
-	/* Something went wrong */
-	printf("Connect failed\n");
-	bufferevent_free(hgstate->bev);
-	hgstate->bev= NULL;
-	evutil_freeaddrinfo(hgstate->dns_res);
-	hgstate->dns_res= NULL;
-	hgstate->dns_curr= NULL;
-	report(state);
+	state->loc_socklen= sizeof(state->loc_sin6);
+	getsockname(bufferevent_getfd(bev),	
+		&state->loc_sin6, &state->loc_socklen);
 }
 
 static void httpget_start(void *state)
 {
 	struct hgstate *hgstate;
-	struct evdns_getaddrinfo_request *evdns_req;
 	struct evutil_addrinfo hints;
+	struct timeval interval;
 
 	hgstate= state;
 
@@ -1743,7 +1606,6 @@ static void httpget_start(void *state)
 	}
 	hgstate->busy= 1;
 
-	hgstate->dnsip= 1;
 	hgstate->dnserr= 0;
 	hgstate->connecting= 0;
 	hgstate->gstart= time(NULL);
@@ -1754,8 +1616,12 @@ static void httpget_start(void *state)
 		hints.ai_family= AF_INET;
 	else if (hgstate->only_v6)
 		hints.ai_family= AF_INET6;
-	evdns_req= evdns_getaddrinfo(DnsBase, hgstate->host, hgstate->port,
-		&hints, dns_cb, state);
+	interval.tv_sec= CONN_TO;
+	interval.tv_usec= 0;
+	tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->port,
+		&interval, &hints, timeout_callback,
+		reporterr, dnscount, beforeconnect,
+		connected, readcb, writecb);
 }
 
 static int httpget_delete(void *state)
@@ -1779,7 +1645,7 @@ static int httpget_delete(void *state)
 		crondlog(DIE9 "strange, state not in table");
 	base->table[ind]= NULL;
 
-	event_del(&hgstate->timer);
+	//event_del(&hgstate->timer);
 
 	free(hgstate->atlas);
 	hgstate->atlas= NULL;
