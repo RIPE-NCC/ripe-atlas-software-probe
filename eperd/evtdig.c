@@ -61,7 +61,8 @@
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
-#define MAX_DNS_BUF_SIZE   3192
+#define MAX_DNS_BUF_SIZE   5120
+#define MAX_DNS_OUT_BUF_SIZE   512
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
 #define DEFAULT_NOREPLY_TIMEOUT 1000           /* 1000 msec - 0 is illegal      */
@@ -87,7 +88,7 @@
 #endif
 
 /* Definition for various types of counters */
-typedef uint64_t counter_t;
+typedef uint32_t counter_t;
 
 
 struct buf
@@ -300,8 +301,7 @@ unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
 /* from tdig.c */
 
 /* sslcert */
-void buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl);
-void buf_add(struct buf *buf, const void *data, size_t len);
+int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl);
 void buf_cleanup(struct buf *buf);
 
 
@@ -420,12 +420,14 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 /* Lookup for a query by its index */
 static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, int af, void * remote)
 { 
+	int i = 0;
 	struct query_state *qry;
 
 	qry = base->qry_head;
 	if (!qry)
 		return NULL;
 	do {
+		i++;
 		if (qry->qryid == idx)
 		{
 			//AA chnage to LVL5
@@ -439,6 +441,11 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, 
 			} 
 		}
 		qry = qry->next;
+		if (i > (2*base->activeqry) ) {
+			crondlog(LVL9 "i am looping %d AAAA", idx);
+			return NULL;
+		}
+		
 	} while (qry != base->qry_head);
 
 	return NULL;
@@ -518,17 +525,14 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
 
-	if(qry->opt_proto == 17)  //UDP 
-	{	
-		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
-		bzero(outbuff, MAX_DNS_BUF_SIZE);
+	if(qry->opt_proto == 17) {  //UDP 
+		outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
+		bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 		qry->outbuff = outbuff;
 		mk_dns_buff(qry, outbuff);
-		do
-		{
+		do {
 			gettimeofday(&qry->xmit_time, NULL);
-			switch (qry->res->ai_family)
-			{
+			switch (qry->res->ai_family) {
 				case AF_INET:
 					nsent = sendto(base->rawfd_v4, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 					break;
@@ -538,21 +542,20 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			}
 
 			qry->ressent = qry->res;
-			if (nsent == qry->pktsize)
-			{
-				crondlog(LVL9 "send qry  %d bytes", qry->pktsize);
+			if (nsent == qry->pktsize) {
 				/* One more DNS Query is sent */
 				base->sentok++;
-				base->sentbytes+=nsent;
+				base->sentbytes += nsent;
 				err  = 0;
+				crondlog(LVL9 "send qry  %d bytes. sentok %d send bytes %d", qry->pktsize, base->sentok, base->sentbytes+=nsent);
 				/* Add the timer to handle no reply condition in the given timeout */
 				evtimer_add(&qry->noreply_timer, &base->tv_noreply);
 			}
-			else 
-			{
+			else {
 				err  = 1;
 				base->sendfail++;
 				serrno= errno; 
+				bzero(line, DEFAULT_LINE_LENGTH);
 				if(qry->errlen > 0) 
 					sprintf(line, ", "); 
 				sprintf(line, "\"senderror\" : \"%s\"", strerror(serrno)); 
@@ -562,8 +565,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		} while ((qry->res = qry->res->ai_next) != NULL);
 		free (outbuff);
 		outbuff = NULL;
-		if(err) 
-		{
+		if(err) {
 			printReply (qry, 0, NULL);
 			return;
 		}
@@ -606,6 +608,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 				printReply (qry, n, qry->base->packet);
 			}
 			else {
+				bzero(line, DEFAULT_LINE_LENGTH);
 				if(qry->errlen > 0) 
 					sprintf(line, ", "); 
 				sprintf(line, "\"idmismatch\" : \"mismatch id from tcp fd %d\" ,", n);
@@ -632,7 +635,7 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		crondlog(LVL9 "Connect okay %s", qry->server_name);
 		printf ("Connect okay %s\n", qry->server_name);
 		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
-		bzero(outbuff, MAX_DNS_BUF_SIZE);
+		bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 		qry->outbuff = outbuff;
 		mk_dns_buff(qry, outbuff);
 		payload_len = (uint16_t) qry->pktsize;
@@ -644,10 +647,11 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 		qry->base->sentbytes+= (qry->pktsize +2);
 		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
 	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
+		bzero(line, DEFAULT_LINE_LENGTH);
 		if (events & BEV_EVENT_ERROR) {
 			serrno = bufferevent_socket_get_dns_error(bev);
 			if (serrno) {
-
+				bzero(line, DEFAULT_LINE_LENGTH);
 				if(qry->errlen > 0) 
 					sprintf(line, ", "); 
 				snprintf(line, DEFAULT_LINE_LENGTH, "\"dnserror\" : \" %s\n", evutil_gai_strerror(serrno));
@@ -680,6 +684,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 {
 	struct query_state *qry = h;
 	qry->base->timedout++;
+	bzero(line, DEFAULT_LINE_LENGTH);
 	sprintf(line, "\"timedout\" : 1");
 	add_str(qry, line);
 	printReply (qry, 0, NULL);
@@ -718,9 +723,6 @@ ntohs(dnsR->id));
 		return;
 	}
 
-	/* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
-
-	qry->base->recvok++;
 	qry->base->recvbytes += nrecv;
 	gettimeofday(&now, NULL);  // lave this till fix now from ready_callback6 corruption; ghoost
 	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 + (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
@@ -749,8 +751,7 @@ static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_P
 	gettimeofday(&rectime, NULL);
 	/* Receive data from the network */
 	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, &remote4, &slen);
-	if (nrecv < 0)
-	{
+	if (nrecv < 0) {
 		/* One more failure */
 		base->recvfail++;
 		return ;
@@ -789,8 +790,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	msg.msg_flags= 0;                       /* Not really needed */
 
 	nrecv= recvmsg(base->rawfd_v6, &msg, MSG_DONTWAIT);
-	if (nrecv == -1)
-	{
+	if (nrecv == -1) {
 		/* Strange, read error */
 		printf("ready_callback6: read error '%s'\n", strerror(errno));
 		return;
@@ -840,10 +840,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_edns0 = 1280;
 
 	optind = 0;
-	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1)
-	{
-		switch(c)
-		{
+	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1) {
+		switch(c) {
 			case '4':
 				qry->opt_v4_only = 1;
 				qry->opt_AF = AF_INET;
@@ -1082,6 +1080,7 @@ void tdig_start (struct query_state *qry)
 		tdig_base->qry_head->next = qry;
 		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
 			tdig_base->qry_head->prev = qry;
+			crondlog(LVL9 "head->prev == head quereis %d AAA", tdig_base->activeqry);
 		}
 	}
 	/* initialize callbacks: no reply timeout and sendpacket */
@@ -1122,7 +1121,10 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	if(!base->qry_head )
 		return;
 
-	qry = base->qry_head;
+	qry = base->qry_head; 
+
+	if(! base->sentok )
+		return;
 
 	if (qry->out_filename) {
 		fh= fopen(qry->out_filename, "a");
@@ -1130,9 +1132,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 			crondlog(DIE9 "unable to append to '%s'", qry->out_filename);
 	}
 	else
-		fh = stdout;
+		fh = stdout; 
 	
-	BLURT(LVL9 "tdig_stats called sendfail %d sendok %d recvok %d", base->sendfail, base->sentok, base->recvok);
+	BLURT(LVL9 "tdig_stats called sendfail %d sentok %d recvok %d", base->sendfail, base->sentok, base->recvok);
 	fprintf(fh, "RESULT { ");
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
@@ -1328,14 +1330,14 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fprintf (fh, " , \"QDCOUNT\" : %u ",ntohs(dnsR->q_count));
 		fprintf (fh, " , \"AA\" : %d" , ntohs(dnsR->auth_count));
 		fprintf (fh, " , \"ARCOUNT\" : %d , ",ntohs(dnsR->add_count));
-		
+
 		buf_init(&tmpbuf, -1);
 		buf_add_b64(&tmpbuf, result, wire_size,0);
 		str[0]  = '\0';
 		buf_add(&tmpbuf, str, 1);
 		JS_NC(wbuf, tmpbuf.buf );
 		buf_cleanup(&tmpbuf); 
-		
+
 		if (dnsR->ans_count > 0)
 		{
 			fprintf (fh, ", \"answers\" : [ ");
