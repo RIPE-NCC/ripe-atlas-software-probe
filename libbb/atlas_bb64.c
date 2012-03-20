@@ -6,7 +6,7 @@ struct buf
 	size_t offset;
 	size_t size;
 	size_t maxsize;
-	char *buf;
+	unsigned char *buf;
 	int fd;
 };
 
@@ -19,7 +19,7 @@ void buf_init(struct buf *buf, int fd)
 	buf->fd= fd;
 }
 
-void buf_add(struct buf *buf, const void *data, size_t len )
+int buf_add(struct buf *buf, const void *data, size_t len )
 {
 	size_t maxsize;
 	void *newbuf;
@@ -29,16 +29,17 @@ void buf_add(struct buf *buf, const void *data, size_t len )
 		/* Easy case, just add data */
 		memcpy(buf->buf+buf->size, data, len);
 		buf->size += len;
-		return;
+		return 0;
 	}
 
 	/* Just get a new buffer */
 	maxsize= buf->size-buf->offset + len + BUF_CHUNK;
+
 	newbuf= malloc(maxsize);
 	if (!newbuf)
 	{
 		fprintf(stderr, "unable to allocate %ld bytes\n", maxsize);
-		exit(1);
+		return (1);
 	}
 
 	if (buf->offset < buf->size)
@@ -58,9 +59,10 @@ void buf_add(struct buf *buf, const void *data, size_t len )
 
 	memcpy(buf->buf+buf->size, data, len);
 	buf->size += len;
+	return 0;
 }
 
-void buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
+int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 {
 	char b64[]=
 		"ABCDEFGHIJKLMNOP"
@@ -112,6 +114,8 @@ void buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 
 void buf_cleanup(struct buf *buf)
 {
-	free(buf->buf);
+	if(buf->maxsize)
+		 free(buf->buf);
+	buf->buf = NULL;
 	buf->offset= buf->size= buf->maxsize= 0;
 }

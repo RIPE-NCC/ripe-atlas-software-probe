@@ -49,8 +49,6 @@
 #define JSDOT(key, val) fprintf(fh, "\"" #key"\" : \"%s.\" , ",  val); 
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
 #define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
-#define JLD(key, val) fprintf(fh, "\"" #key"\" : %ld , ",  val); 
-#define JLD_NC(key, val) fprintf(fh, "\"" #key"\" : %ld ",  val); 
 #define JU(key, val) fprintf(fh, "\"" #key"\" : %u , ",  val); 
 #define JU_NC(key, val) fprintf(fh, "\"" #key"\" : %u",  val); 
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
@@ -121,8 +119,8 @@ struct tdig_base {
 	counter_t sentok;              /* # of successful sendto()                   */
 	counter_t recvfail;            /* # of failed recvfrom()                     */
 	counter_t recvok;              /* # of successful recvfrom()                 */
-	counter_t foreign;             /* # of DNS replies we are not looking for   */
-	counter_t illegal;             /* # of DNS packets with an illegal payload  */
+	counter_t martian;             /* # of DNS replies we are not looking for   */
+	counter_t shortpkt;            /* # of DNS payload with size < sizeof(struct DNS_HEADER) == 12 bytes */
 	counter_t sentbytes; 
 	counter_t recvbytes; 	
 	counter_t timedout;
@@ -183,10 +181,7 @@ struct query_state {
 	/* these objects are kept in a circular list */
 	struct query_state *next, *prev;
 
-	char *err; 
-	
-	size_t errlen;
-	size_t errmax; 
+	struct buf err; 
 	int qst ; 
 
 	u_char *outbuff;
@@ -347,24 +342,9 @@ static void done(void *state UNUSED_PARAM)
 }
 
 
-static void add_str(struct query_state *qry, const char *str)
-{
-	size_t len;
-	len= strlen(str);
-	if (qry->errlen + len+1 > qry->errmax)
-	{
-		qry->errmax= qry->err + len+1 + 80;
-		qry->err= xrealloc(qry->err, qry->errmax);
-	}
-	memcpy(qry->err+qry->errlen, str, len+1);
-	qry->errlen += len;
-	//printf("add_str: result = '%s'\n", state->result);
-}
-
-
 /* Initialize a struct timeval by converting milliseconds */
-	static void
-msecstotv(time_t msecs, struct timeval *tv)
+
+static void msecstotv(time_t msecs, struct timeval *tv)
 {
 	tv->tv_sec  = msecs / 1000;
 	tv->tv_usec = msecs % 1000 * 1000;
@@ -415,7 +395,6 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 	}
 	return 1;
 }
-
 
 /* Lookup for a query by its index */
 static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, int af, void * remote)
@@ -555,11 +534,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				err  = 1;
 				base->sendfail++;
 				serrno= errno; 
-				bzero(line, DEFAULT_LINE_LENGTH);
-				if(qry->errlen > 0) 
-					sprintf(line, ", "); 
-				sprintf(line, "\"senderror\" : \"%s\"", strerror(serrno)); 
-				add_str(qry, line);
+				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"senderror\" : \"%s\"", qry->err.size ? ", " : "", strerror(serrno)); 
+				buf_add(&qry->err, line, strlen(line));
 				//perror("send"); 
 			}
 		} while ((qry->res = qry->res->ai_next) != NULL);
@@ -609,11 +585,9 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 			}
 			else {
 				bzero(line, DEFAULT_LINE_LENGTH);
-				if(qry->errlen > 0) 
-					sprintf(line, ", "); 
-				sprintf(line, "\"idmismatch\" : \"mismatch id from tcp fd %d\" ,", n);
+				snprintf(line, DEFAULT_LINE_LENGTH, " %s \"idmismatch\" : \"mismatch id from tcp fd %d\"", qry->err.size ? ", " : "", n);
 				printf( "tcperror : id mismatch error %s\n", qry->server_name);
-				add_str(qry, line);
+				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
 			}
 			/* Clean the noreply timer */
@@ -652,25 +626,25 @@ void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
 			serrno = bufferevent_socket_get_dns_error(bev);
 			if (serrno) {
 				bzero(line, DEFAULT_LINE_LENGTH);
-				if(qry->errlen > 0) 
+				if(qry->err.size > 0) 
 					sprintf(line, ", "); 
 				snprintf(line, DEFAULT_LINE_LENGTH, "\"dnserror\" : \" %s\n", evutil_gai_strerror(serrno));
 			}
 		} 
 		else if (events & BEV_EVENT_TIMEOUT) {
 
-			if(qry->errlen > 0) 
+			if(qry->err.size > 0) 
 				sprintf(line, ", "); 
 			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"TIMEOUT could be read/write or connect\"");
 		}	
 		else if (events & BEV_EVENT_EOF) {
 			serrno = errno; 
 
-			if(qry->errlen > 0) 
+///			if(qry->errlen > 0) 
 				sprintf(line, ", "); 
 			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"Unexpectd EOF %s", strerror(serrno));
 		}
-		add_str(qry, line);
+		buf_add(&qry->err, line, strlen(line));
 		bufferevent_free(bev);
 		printReply (qry, 0, NULL);
 		//event_base_loopexit(base, NULL);
@@ -684,9 +658,8 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 {
 	struct query_state *qry = h;
 	qry->base->timedout++;
-	bzero(line, DEFAULT_LINE_LENGTH);
-	sprintf(line, "\"timedout\" : 1");
-	add_str(qry, line);
+	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", DEFAULT_NOREPLY_TIMEOUT);
+	buf_add(&qry->err, line, strlen(line));
 	printReply (qry, 0, NULL);
 	return;
 }
@@ -709,6 +682,11 @@ static void process_reply(void * arg, int nrecv, struct timeval now, int af, voi
 
 	struct query_state * qry;
 
+	if (nrecv < sizeof (struct DNS_HEADER)) {
+		base->shortpkt++;
+		return;
+	}
+
 	dnsR = (struct DNS_HEADER*) base->packet;
 	base->recvok++; 
 
@@ -718,6 +696,7 @@ static void process_reply(void * arg, int nrecv, struct timeval now, int af, voi
 	qry = tdig_lookup_query(base, ntohs(dnsR->id), af, remote);
 	
 	if ( ! qry) {
+		base->martian++;
 		crondlog(LVL9 "DBG: no match found for qry id i %d",\
 ntohs(dnsR->id));
 		return;
@@ -832,7 +811,6 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
-	qry->err= NULL; 
 	tdig_base->activeqry++;
 	qry->qst = 0;
 	qry->wire_size = 0;
@@ -840,6 +818,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_edns0 = 1280; 
 	qry->ressave = NULL;
 	qry->ressent = NULL;
+	buf_init(&qry->err, -1);
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1) {
@@ -986,8 +965,8 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	tdig_base->sentok  = 0;
 	tdig_base->recvfail  = 0;
 	tdig_base->recvok  = 0;
-	tdig_base->foreign  = 0;
-	tdig_base->illegal  = 0;
+	tdig_base->martian  = 0;
+	tdig_base->shortpkt  = 0;
 	tdig_base->sentbytes  = 0;
 	tdig_base->recvbytes = 0;
 	tdig_base->timedout = 0;
@@ -1141,13 +1120,17 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
 	JS1(time, %ld,  now.tv_sec);
-	JLD(sendfail , base->sendfail);
-	JLD(sentok , base->sentok);
-	JLD(recvok , base->recvok);
-	JLD(sentbytes , base->sentbytes);
-	JLD(recvbytes , base->recvbytes);
-	JLD(timedout , base->timedout);
-	JLD_NC(queries , base->activeqry);
+	JU(sentok , base->sentok);
+	JU(recvok , base->recvok);
+	JU(sentbytes , base->sentbytes);
+	JU(recvbytes , base->recvbytes);
+	JU(sendfail , base->sendfail);
+	JU(timedout , base->timedout);
+	if(base->shortpkt)
+		JU(shortpacket , base->shortpkt);
+	if(base->martian)
+		JU(martian , base->martian);
+	JU_NC(queries , base->activeqry);
 
 	fprintf(fh, " }\n");
 	if (qry->out_filename) 
@@ -1188,11 +1171,9 @@ static void free_qry_inst(struct query_state *qry)
 	struct event_base *event_base;
 	struct tdig_base *tbase;
 
-	if(qry->err) 
+	if(qry->err.size) 
 	{
-		free(qry->err);
-		qry->err= NULL;
-		qry->errmax = 0;
+		buf_cleanup(&qry->err);
 	}
 	if(qry->ressave )
 	{
@@ -1335,7 +1316,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fprintf (fh, " , \"ARCOUNT\" : %d , ",ntohs(dnsR->add_count));
 
 		buf_init(&tmpbuf, -1);
-		buf_add_b64(&tmpbuf, result, wire_size,0);
+		buf_add_b64(&tmpbuf, result, wire_size, 0);
 		str[0]  = '\0';
 		buf_add(&tmpbuf, str, 1);
 		JS_NC(wbuf, tmpbuf.buf );
@@ -1410,8 +1391,12 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 		fprintf (fh , " }"); //result
 	} 
-	if(qry->err) 
-		fprintf(fh, ", \"error\" : { %s }" , qry->err);
+	if(qry->err.size) 
+	{
+		line[0]  = '\0';
+		buf_add(&qry->err, line, 1 );
+		fprintf(fh, ", \"error\" : { %s }" , qry->err.buf);
+	}
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
