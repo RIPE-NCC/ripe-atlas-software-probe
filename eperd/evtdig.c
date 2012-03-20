@@ -276,7 +276,7 @@ static struct option longopts[]=
 	{ "dnskey", required_argument, NULL, 'D' },
 	{ NULL, }
 };
-static	char line[DEFAULT_LINE_LENGTH];
+static char line[DEFAULT_LINE_LENGTH];
 
 
 //static uint32_t fmt_dns_query(u_char *buf, struct query_state *qry);
@@ -432,7 +432,7 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, 
 		{
 			//AA chnage to LVL5
 			crondlog(LVL9 "found matching query id %d", idx);
-			if( ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
+			if( qry->ressent && ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
 				crondlog(LVL9 "matching id and address id %d", idx);
 				return qry;
 			}
@@ -837,7 +837,9 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->qst = 0;
 	qry->wire_size = 0;
 	qry->triptime = 0;
-	qry->opt_edns0 = 1280;
+	qry->opt_edns0 = 1280; 
+	qry->ressave = NULL;
+	qry->ressent = NULL;
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46dD:e:tbhiO:rs:A:?", longopts, NULL), c != -1) {
@@ -1196,6 +1198,7 @@ static void free_qry_inst(struct query_state *qry)
 	{
 		freeaddrinfo(qry->ressave);
 		qry->ressave  = NULL;
+		qry->ressent = NULL;
 	}
 	qry->qst = STATUS_FREE;
 
