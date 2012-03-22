@@ -989,10 +989,11 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 			if (!state->busy)
 			{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
+#if 0
 				printf(
 			"ready_callback4: index (%d) is not busy\n",
 					ind);
+#endif
 				return;
 			}
 
@@ -1013,10 +1014,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			{
 				if (seq > state->seq)
 				{
+#if 0
 					printf(
 	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x (for %s)\n",
 						seq, state->seq,
 						state->hostname);
+#endif
 					return;
 				}
 				late= 1;
@@ -1176,9 +1179,11 @@ printf("curpacksize: %d\n", state->curpacksize);
 			if (ind >= base->tabsiz)
 			{
 				/* Out of range */
+#if 0
 				printf(
 				"ready_callback4: index out of range (%d)\n",
 					ind);
+#endif
 				return;
 			}
 
@@ -1229,10 +1234,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			{
 				if (seq > state->seq)
 				{
+#if 0
 					printf(
 	"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x (for %s)\n",
 						seq, state->seq,
 						state->hostname);
+#endif
 					return;
 				}
 				late= 1;
@@ -1441,9 +1448,11 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		if (ind >= base->tabsiz)
 		{
 			/* Out of range */
+#if 0
 			printf(
 			"ready_callback4: index out of range (%d)\n",
 				ind);
+#endif
 			return;
 		}
 
@@ -1478,9 +1487,11 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		{
 			if (seq > state->seq)
 			{
+#if 0
 				printf(
 "ready_callback4: mismatch for seq, got 0x%x, expected 0x%x, for %s\n",
 					seq, state->seq, state->hostname);
+#endif
 				return;
 			}
 			late= 1;
@@ -1632,7 +1643,9 @@ static void ready_callback6(int __attribute((unused)) unused,
 	if (nrecv < sizeof(*icmp))
 	{
 		/* Short packet */
+#if 0
 		printf("ready_callback6: too short %d (icmp)\n", (int)nrecv);
+#endif
 		return;
 	}
 
@@ -1647,8 +1660,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 		/* Make sure the packet we have is big enough */
 		if (nrecv < sizeof(*icmp) + sizeof(*eip))
 		{
+#if 0
 			printf("ready_callback6: too short %d (icmp_ip)\n",
 				(int)nrecv);
+#endif
 			return;
 		}
 
@@ -1668,9 +1683,11 @@ static void ready_callback6(int __attribute((unused)) unused,
 				if (nrecv < sizeof(*icmp) + sizeof(*eip)
 					+ sizeof(*frag))
 				{
+#if 0
 					printf(
 			"ready_callback6: too short %d (icmp+ip+frag)\n",
 						(int)nrecv);
+#endif
 					return;
 				}
 				frag= (struct ip6_frag *)&eip[1];
@@ -1696,10 +1713,12 @@ static void ready_callback6(int __attribute((unused)) unused,
 			if (nrecv < sizeof(*icmp) + sizeof(*eip)
 				+ ehdrsiz + sizeof(*v6info))
 			{
+#if 0
 				printf(
 			"ready_callback6: too short %d (all) from %s\n",
 					(int)nrecv, inet_ntop(AF_INET6,
 					&remote.sin6_addr, buf, sizeof(buf)));
+#endif
 				return;
 			}
 
@@ -1947,9 +1966,11 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 			else
 			{
+#if 0
 				printf(
 			"ready_callback6: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
+#endif
 				return;
 			}
 		}
@@ -1995,8 +2016,10 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		/* Now check if there is also a header in the packet */
 		if (nrecv < sizeof(*icmp) + sizeof(*v6info))
 		{
+#if 0
 			printf("ready_callback6: too short %d (echo reply)\n",
 				(int)nrecv);
+#endif
 			return;
 		}
 

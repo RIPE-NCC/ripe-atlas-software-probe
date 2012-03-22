@@ -16,7 +16,7 @@ Created:	Jan 2012 by Philip Homburg for RIPE NCC
 #include "eperd.h"
 #include "tcputil.h"
 
-#define CONN_TO		   5	/* Should get connection CONN_TO seconds */
+#define CONN_TO		   5
 
 #define ENV2STATE(env) \
 	((struct hgstate *)((char *)env - offsetof(struct hgstate, tu_env)))
@@ -25,8 +25,6 @@ Created:	Jan 2012 by Philip Homburg for RIPE NCC
 
 #define MAX_LINE_LEN	2048	/* We don't deal with lines longer than this */
 #define POST_BUF_SIZE	2048	/* Big enough to be efficient? */
-
-#define CONN_TO		   5	/* Should get connection CONN_TO seconds */
 
 static struct option longopts[]=
 {
@@ -97,6 +95,8 @@ struct hgstate
 	enum readstate readstate;
 	enum writestate writestate;
 	int http_result;
+	char res_major;
+	char res_minor;
 	int headers_size;
 	int tot_headers;
 	int chunked;
@@ -602,10 +602,9 @@ static void report(struct hgstate *state)
 	if (!state->dnserr)
 	{
 		snprintf(line, sizeof(line), 
-			DBQ(mode) ":" DBQ(%s%c/%c),
+			DBQ(mode) ":" DBQ(%s%c),
 			state->do_get ? "GET" : state->do_head ? "HEAD" : "POST", 
-			state->sin6.sin6_family == AF_INET6 ? '6' : '4',
-			state->do_http10 ? '0' : '1');
+			state->sin6.sin6_family == AF_INET6 ? '6' : '4');
 		add_str(state, line);
 
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
@@ -634,10 +633,13 @@ static void report(struct hgstate *state)
 		snprintf(line, sizeof(line),
 			", " DBQ(rt) ":%f"
 			", " DBQ(res) ":%d"
+			", " DBQ(ver) ":" DBQ(%d.%d)
 			", " DBQ(hsize) ":%d"
 			", " DBQ(bsize) ":%d",
 			state->resptime,
-			state->http_result, state->headers_size,
+			state->http_result,
+			state->res_major, state->res_minor,
+			state->headers_size,
 			state->content_offset);
 		add_str(state, line);
 	}
@@ -888,6 +890,8 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 				return;
 			}
 			state->http_result= strtoul(cp, NULL, 10);
+			state->res_major= major;
+			state->res_minor= minor;
 
 			state->readstate= READ_HEADER;
 			state->content_length= -1;

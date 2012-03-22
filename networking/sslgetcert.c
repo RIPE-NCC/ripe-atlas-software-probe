@@ -615,6 +615,8 @@ static int Xeat_certificate(struct msgbuf *msgbuf)
 	return 0;
 }
 
+extern int get_atlas_fw_version(void);	/* In eperd */
+
 int sslgetcert_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -654,7 +656,11 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 
 	printf("RESULT { ");
 	if (str_Atlas)
-		printf(DBQ(id) ":" DBQ(%s), str_Atlas);
+	{
+		printf(DBQ(id) ":" DBQ(%s)
+			", " DBQ(fw) ":%d",
+			str_Atlas, get_atlas_fw_version());
+	}
 
 	printf("%s" DBQ(time) ":%ld", str_Atlas ? ", " : "", time(NULL));
 	printf(", " DBQ(name) ":" DBQ(%s) ", " DBQ(port) ":" DBQ(%s),
