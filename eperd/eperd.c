@@ -150,7 +150,7 @@ void crondlog(const char *ctl, ...)
 
 int get_atlas_fw_version(void)
 {
-	static fw_version= -1;
+	static int fw_version= -1;
 
 	int r, fw;
 	FILE *file;
@@ -684,14 +684,14 @@ static void Start(CronLine *line)
 
 	line->testops= NULL;
 
-	now= time(NULL);
-	if (now > line->end_time)
-		return;			/* This job has expired */
-
 	/* Parse command line and init test */
 	atlas_init(line);
 	if (!line->testops)
 		return;			/* Test failed to initialize */
+
+	now= time(NULL);
+	if (now > line->end_time)
+		return;			/* This job has expired */
 
 	line->nextcycle= (now-line->start_time)/line->interval + 1;
 	do_distr(line);

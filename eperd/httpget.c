@@ -581,6 +581,7 @@ static void report(struct hgstate *state)
 				state->atlas, get_atlas_fw_version(),
 				state->gstart);
 		}
+		fprintf(fh, DBQ(result) ":[ ");
 	}
 
 	if (state->do_all && !state->dnserr)
@@ -644,7 +645,7 @@ static void report(struct hgstate *state)
 		add_str(state, line);
 	}
 
-	if (state->do_all && state->do_combine && !state->dnserr)
+	if (!state->dnserr)
 	{
 		add_str(state, " }");
 		if (!do_output)
@@ -1501,9 +1502,6 @@ static void dnscount(struct tu_env *env, int count)
 	state= ENV2STATE(env);
 	state->subid= 0;
 	state->submax= count;
-
-	if (state->do_all && state->do_combine)
-		add_str(state, DBQ(result) ":[ ");
 }
 
 static void beforeconnect(struct tu_env *env,
@@ -1529,8 +1527,7 @@ static void beforeconnect(struct tu_env *env,
 	if (!state->do_all || !state->do_combine)
 		state->reslen= 0;
 
-	if (state->do_all && state->do_combine)
-		add_str(state, "{ ");
+	add_str(state, "{ ");
 
 	gettimeofday(&state->start, NULL);
 }
