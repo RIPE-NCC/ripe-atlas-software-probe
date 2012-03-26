@@ -1148,9 +1148,6 @@ printf("curpacksize: %d\n", state->curpacksize);
 					break;
 				}
 			}
-
-			if (late)
-				add_str(state, " }, { ");
 		}
 		else if (eip->ip_p == IPPROTO_ICMP)
 		{
@@ -1371,9 +1368,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			{
 				printf("imcp type %d\n", icmp->icmp_type);
 			}
-
-			if (late)
-				add_str(state, " }, { ");
 		}
 		else
 		{
@@ -1421,6 +1415,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				return;
 			}
 		}
+
+		if (late)
+			add_str(state, " }, { ");
 
 		if (!late && !isDup)
 		{
