@@ -1448,6 +1448,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 		str[0]  = '\0'; 
 		if(qry->opt_abuf) {
+			JC;
 			buf_init(&tmpbuf, -1);
 			buf_add_b64(&tmpbuf, result, wire_size, 0);
 			buf_add(&tmpbuf, str, 1);
