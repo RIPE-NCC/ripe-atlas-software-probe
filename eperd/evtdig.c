@@ -248,7 +248,7 @@ struct EDNS0_HEADER
 	u_int8_t _edns_x; // combined rcode and edns version both zeros.
 	u_int8_t _edns_y; // combined rcode and edns version both zeros.
 	//u_int16_t _edns_z;
-	u_int16_t DO ;
+	u_int16_t D0 ;
 }; 
 
 struct EDNS_NSID 
@@ -507,8 +507,6 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->ns_count = 0;
 
 	dns->add_count = htons(0);
-	if( qry->opt_nsid )
-		dns->add_count = htons(1);
 
 	//point to the query portion
 	qname =(u_char *)&packet[sizeof(struct DNS_HEADER)];
@@ -520,29 +518,28 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	qinfo->qclass = htons(qry->qclass);
 
 	qry->pktsize  = (strlen((const char*)qname) + 1) + sizeof(struct DNS_HEADER) + sizeof(struct QUESTION) ;
-	e=(struct EDNS0_HEADER*)&packet[ qry->pktsize + 1 ];
-
-	e->otype = htons(ns_t_opt);
-	e->_edns_udp_size = htons(qry->opt_edns0);
-	//e->_edns_z = htons(128);
-	e->DO = 0x80;
-	if(!qry->opt_dnssec)
-	{
-	 e->DO = 0x0;
-	}
-
-	if(qry->opt_nsid)
-	{ 
+	if(qry->opt_nsid || qry->opt_dnssec || (qry->opt_edns0 > 512)) { 
+		e=(struct EDNS0_HEADER*)&packet[ qry->pktsize + 1 ];
+		e->otype = htons(ns_t_opt);
+		e->_edns_udp_size = htons(qry->opt_edns0);
+		//e->_edns_z = htons(128);
+		if(qry->opt_dnssec)
+			e->D0 = 0x80;
+		else 
+			e->D0 = 0x0;
 		qry->pktsize  += sizeof(struct EDNS0_HEADER) ;
-		n=(struct EDNS_NSID*)&packet[ qry->pktsize + 1 ];
-		n->len =  htons(4);
-		n->otype = htons(3);
-		qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
+
+		if(qry->opt_nsid ) {
+			dns->add_count = htons(1);
+			n=(struct EDNS_NSID*)&packet[ qry->pktsize + 1 ];
+			n->len =  htons(4);
+			n->otype = htons(3); 
+			qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
+		}
+		/* Transmit the request over the network */
 	}
 
-	/* Transmit the request over the network */
 }
-
 /* Attempt to transmit an DNS Request a given qry to a server*/
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
@@ -872,8 +869,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->wire_size = 0;
 	qry->triptime = 0;
 	qry->opt_edns0 = 1280; 
-	qry->opt_dnssec = 1;
-	qry->opt_nsid = 1; 
+	qry->opt_dnssec = 0;
+	qry->opt_nsid = 0; 
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->ressave = NULL;
@@ -900,7 +897,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 		
 			case 'd':
-				qry->opt_dnssec = 0;
+				qry->opt_dnssec = 1;
 				break;
 
 			case 'e':
@@ -916,7 +913,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 
 			case 'n':
-				qry->opt_nsid = 0;
+				qry->opt_nsid = 1;
 				break;
 
 			case 'O':
@@ -1002,28 +999,24 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case (100000 + T_DS):
 				qry->qtype = T_DS;
 				qry->qclass = C_IN;
-				qry->opt_dnssec = 1;
 				qry->lookupname  = (u_char *) strdup(optarg);
 				break;
 
 			case (100000 + T_NSEC):
 				qry->qtype = T_NSEC;
 				qry->qclass = C_IN;
-				qry->opt_dnssec = 1;
 				qry->lookupname  = (u_char *) strdup(optarg);
 				break;
 
 			case (100000 + T_DNSKEY):
 				qry->qtype = T_DNSKEY;
 				qry->qclass = C_IN;
-				qry->opt_dnssec = 1;
 				qry->lookupname  = (u_char *) strdup(optarg);
 				break;
 
 			case (100000 + T_RRSIG):
 				qry->qtype = T_RRSIG;
 				qry->qclass = C_IN;
-				qry->opt_dnssec = 1;
 				qry->lookupname  = (u_char *) strdup(optarg);
 				break;break;
 

@@ -1,5 +1,5 @@
 #include "libbb.h"
-#define BUF_CHUNK       4096
+#define BUF_CHUNK       256
 
 struct buf
 {
