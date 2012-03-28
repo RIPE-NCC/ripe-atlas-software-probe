@@ -1035,6 +1035,27 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	}
 	qry->server_name = strdup(argv[optind]);
 	qry->base = tdig_base;
+
+	/* insert this qry into the list of queries */
+	if (!tdig_base->qry_head) {
+		qry->next = qry->prev = qry;
+		tdig_base->qry_head = qry;
+		tdig_stats( 0, 0, tdig_base); // call this first time to initial values.
+		crondlog(LVL9 "new head qry %s qry->prev %s qry->next %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
+	} 
+	else {	
+		crondlog(LVL9 "old head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
+		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
+			tdig_base->qry_head->prev = qry;
+			crondlog(LVL9 "head->prev == head quereis %d AAA", tdig_base->activeqry);
+		}
+		qry->next = tdig_base->qry_head->next;
+		qry->prev = tdig_base->qry_head;
+		tdig_base->qry_head->next->prev = qry;
+		tdig_base->qry_head->next = qry;
+		crondlog(LVL9 "QRYAA qry %s qry->prev %s qry->next  %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
+		crondlog(LVL9 "new head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
+	}
 	return qry;
 }
 
@@ -1164,20 +1185,6 @@ void tdig_start (struct query_state *qry)
 	qry->res = res;
 	qry->ressave = res;
 
-	/* insert this nameserver into the list of them */
-	if (!tdig_base->qry_head) {
-		qry->next = qry->prev = qry;
-		tdig_base->qry_head = qry;
-		tdig_stats( 0, 0, tdig_base); // call this first time to initial values.
-	} else {
-		qry->next = tdig_base->qry_head->next;
-		qry->prev = tdig_base->qry_head;
-		tdig_base->qry_head->next = qry;
-		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
-			tdig_base->qry_head->prev = qry;
-			crondlog(LVL9 "head->prev == head quereis %d AAA", tdig_base->activeqry);
-		}
-	}
 	/* initialize callbacks: no reply timeout and sendpacket */
 	evtimer_assign(&qry->nsm_timer, tdig_base->event_base, tdig_send_query_callback, qry);
 	evtimer_assign(&qry->noreply_timer, tdig_base->event_base, noreply_callback, qry); 
@@ -1336,6 +1343,20 @@ static int tdig_delete(void *state)
 		free(qry->lookupname);
 		qry->lookupname = NULL;
 	}
+
+	if((qry->next == qry->prev) && (qry->next == qry)) {
+		qry->base->qry_head =  NULL;
+		crondlog(LVL9 "deleted last query qry %s", qry->str_Atlas);
+	}
+	else {
+		crondlog(LVL9 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
+		crondlog(LVL9 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
+		qry->next->prev = qry->prev; 
+		qry->prev->next = qry->next;
+		if(qry->base->qry_head == qry) 
+			qry->base->qry_head = qry->next;
+		crondlog(LVL9 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
+	}
 	if( qry->str_Atlas) 
 	{
 		free( qry->str_Atlas);
@@ -1345,14 +1366,10 @@ static int tdig_delete(void *state)
 	{
 		free(qry->server_name);
 		qry->server_name = NULL;
-	}
-	qry->next->prev = qry->prev; 
-	qry->prev->next = qry->next;
-	if(qry->base->qry_head == qry) 
-		qry->base->qry_head = qry->next;
+	} 
 	qry->base->activeqry--;
-
 	free(qry);
+	qry  = NULL;
 	return 1;
 } 
 
