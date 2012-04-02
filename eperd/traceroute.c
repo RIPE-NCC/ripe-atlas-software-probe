@@ -482,7 +482,7 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"%s\"error\":\"sendto failed: %s\" ] }",
+				"%s\"error\":\"sendto failed: %s\" } ] }",
 						state->sent ? ", " : "",
 						strerror(serrno));
 					add_str(state, line);

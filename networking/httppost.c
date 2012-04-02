@@ -27,7 +27,6 @@ struct option longopts[]=
 	{ NULL, }
 };
 
-static char buffer[1024];
 static int tcp_fd;
 static time_t start_time;
 
@@ -416,6 +415,7 @@ err:
 static int write_to_tcp_fd (int fd, FILE *tcp_file)
 {
 	int r;
+	char buffer[1024];
 
 	/* Copy file */
 	while(r= read(fd, buffer, sizeof(buffer)), r > 0)
@@ -535,6 +535,7 @@ static int check_result(FILE *tcp_file)
 	size_t len;
 	char *cp, *check, *line;
 	const char *prefix;
+	char buffer[1024];
 	
 	while (fgets(buffer, sizeof(buffer), tcp_file) == NULL)
 	{
@@ -596,6 +597,7 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 	char *line, *cp, *ncp, *check;
 	size_t len;
 	const char *kw;
+	char buffer[1024];
 
 	*chunked= 0;
 	*content_length= 0;
@@ -832,6 +834,7 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 	size_t len, offset, size;
 	char *cp, *line, *check;
 	const char *okp;
+	char buffer[1024];
 
 	okp= OK_STR;
 
@@ -936,6 +939,7 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 	int i;
 	size_t offset, size;
 	const char *okp;
+	char buffer[1024];
 
 	okp= OK_STR;
 
@@ -983,7 +987,7 @@ static void skip_spaces(const char *cp, char **ncp)
 
 static void got_alarm(int sig __attribute__((unused)) )
 {
-	if (tcp_fd != -1 && time(NULL) > start_time+60)
+	if (tcp_fd != -1 && time(NULL) > start_time+300)
 	{
 		report("setting tcp_fd to nonblock");
 		fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);

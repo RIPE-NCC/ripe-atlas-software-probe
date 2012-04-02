@@ -648,11 +648,11 @@ static void report(struct hgstate *state)
 	if (!state->dnserr)
 	{
 		add_str(state, " }");
-		if (!do_output)
-			add_str(state, ", ");
-		else
-			add_str(state, " ]");
 	}
+	if (!do_output)
+		add_str(state, ", ");
+	else
+		add_str(state, " ]");
 
 	if (do_output)
 	{
@@ -1546,7 +1546,8 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 	switch(cause)
 	{
 	case TU_DNS_ERR:
-		snprintf(line, sizeof(line), DBQ(dnserr) ":" DBQ(%s), str);
+		snprintf(line, sizeof(line),
+			"{ " DBQ(dnserr) ":" DBQ(%s) " }", str);
 		add_str(state, line);
 		state->dnserr= 1;
 		report(state);

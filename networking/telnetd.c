@@ -486,6 +486,16 @@ static void handle_sigchld(int sig UNUSED_PARAM)
 	}
 }
 
+static void kick_watchdog(void)
+{
+	int fdwatchdog = open("/dev/watchdog", O_RDWR);
+	if (fdwatchdog != -1)
+	{
+		write(fdwatchdog, "1", 1);
+		close(fdwatchdog);
+	}
+}
+
 int telnetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int telnetd_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -509,6 +519,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		portnbr = 23,
 	};
 #endif
+	struct timeval tv;
+
 	/* Even if !STANDALONE, we accept (and ignore) -i, thus people
 	 * don't need to guess whether it's ok to pass -i to us */
 	opt = getopt32(argv, "f:l:Ki" USE_FEATURE_TELNETD_STANDALONE("p:b:F"),
@@ -582,6 +594,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	FD_ZERO(&rdfdset);
 	FD_ZERO(&wrfdset);
 
+	kick_watchdog();
+
 	/* Select on the master socket, all telnet sockets and their
 	 * ptys if there is room in their session buffers.
 	 * NB: scalability problem: we recalculate entire bitmap
@@ -624,7 +638,9 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			maxfd = master_fd;
 	}
 
-	count = select(maxfd + 1, &rdfdset, &wrfdset, NULL, NULL);
+	tv.tv_sec= 10;
+	tv.tv_usec= 0;
+	count = select(maxfd + 1, &rdfdset, &wrfdset, NULL, &tv);
 	if (count < 0)
 		goto again; /* EINTR or ENOMEM */
 
