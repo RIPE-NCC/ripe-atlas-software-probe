@@ -403,7 +403,7 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 	char buf[INET6_ADDRSTRLEN];
 
 	if(af_a != af_b) {
-		crondlog(LVL9 "address family mismatch in  %d ", __LINE__);
+		crondlog(LVL5 "address family mismatch in  %d ", __LINE__);
 		return -1;
 	}
  
@@ -421,17 +421,17 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 		b6 = (struct sockaddr_in6 *) b;
 		if( memcmp ( &(a6->sin6_addr),  &(b6->sin6_addr), sizeof(struct in6_addr)) == 0) {
 			inet_ntop(AF_INET6, &(a6->sin6_addr), buf, sizeof(buf));
-			crondlog(LVL9 "address6 match  A %s", buf);
+			crondlog(LVL5 "address6 match  A %s", buf);
 			inet_ntop(AF_INET6, &(b6->sin6_addr), buf, sizeof(buf));
-			crondlog(LVL9 "address6 match  B %s", buf);
+			crondlog(LVL5 "address6 match  B %s", buf);
 
 			return 0;
 		}
 		else {
 			inet_ntop(AF_INET6, &(a6->sin6_addr), buf, sizeof(buf));
-			crondlog(LVL9 "address6 mismatch  A %s", buf);
+			crondlog(LVL5 "address6 mismatch  A %s", buf);
 			inet_ntop(AF_INET6, &(b6->sin6_addr), buf, sizeof(buf));
-			crondlog(LVL9 "address mismatch  B %s", buf);
+			crondlog(LVL5 "address mismatch  B %s", buf);
 
 
 			return 1;
@@ -454,18 +454,18 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, 
 		if (qry->qryid == idx)
 		{
 			//AA chnage to LVL5
-			crondlog(LVL9 "found matching query id %d", idx);
+			crondlog(LVL7 "found matching query id %d", idx);
 			if( qry->ressent && ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
-				crondlog(LVL9 "matching id and address id %d", idx);
+				crondlog(LVL7 "matching id and address id %d", idx);
 				return qry;
 			}
 			else {
-				crondlog(LVL9 "matching id and address mismatch id %d", idx);
+				crondlog(LVL7 "matching id and address mismatch id %d", idx);
 			} 
 		}
 		qry = qry->next;
 		if (i > (2*base->activeqry) ) {
-			crondlog(LVL9 "i am looping %d AAAA", idx);
+			crondlog(LVL7 "i am looping %d AAAA", idx);
 			return NULL;
 		}
 		
@@ -488,9 +488,8 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	r =  rand();
 	r %= 65535;
 	qry->qryid = (uint16_t) r; // host is storing int host byte order
-	//crondlog(LVL9 "%s() : %d dns qry id %d",__FILE__, __LINE__, qry->qryid);
-	crondlog(LVL9 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
-	BLURT(LVL9 "dns qyery id %d", qry->qryid);
+	crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
+	BLURT(LVL5 "dns qyery id %d", qry->qryid);
 	dns->id = (uint16_t) htons(r); 
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
@@ -574,7 +573,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				base->sentok++;
 				base->sentbytes += nsent;
 				err  = 0;
-				crondlog(LVL9 "send qry  %d bytes. sentok %d send bytes %d", qry->pktsize, base->sentok, base->sentbytes+=nsent);
 				/* Add the timer to handle no reply condition in the given timeout */
 				evtimer_add(&qry->noreply_timer, &base->tv_noreply);
 				qry->ressent = qry->res;
@@ -628,9 +626,9 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
  	while ((n = evbuffer_remove(input, qry->base->packet, qry->wire_size )) > 0) {
 		if(n) {
 			evtimer_del(&qry->noreply_timer);
-			crondlog(LVL9 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  qry->wire_size, n);
-			crondlog(LVL9 "qry pointer address readcb %p qry.id, %d", qry->qryid);
-			crondlog(LVL9 "DBG: base pointer address readcb %p",  qry->base );
+			crondlog(LVL5 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  qry->wire_size, n);
+			crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
+			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
 			dnsR = (struct DNS_HEADER*) qry->base->packet;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
 				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;	
@@ -744,13 +742,13 @@ static void process_reply(void * arg, int nrecv, struct timeval now, int af, voi
 	base->recvok++; 
 
 
-	crondlog(LVL9 "DBG: base address process reply %p, nrec %d", base, nrecv);
+	crondlog(LVL7 "DBG: base address process reply %p, nrec %d", base, nrecv);
 	/* Get the pointer to the qry descriptor in our internal table */
 	qry = tdig_lookup_query(base, ntohs(dnsR->id), af, remote);
 	
 	if ( ! qry) {
 		base->martian++;
-		crondlog(LVL9 "DBG: no match found for qry id i %d",\
+		crondlog(LVL7 "DBG: no match found for qry id i %d",\
 ntohs(dnsR->id));
 		return;
 	}
@@ -1041,20 +1039,20 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		qry->next = qry->prev = qry;
 		tdig_base->qry_head = qry;
 		tdig_stats( 0, 0, tdig_base); // call this first time to initial values.
-		crondlog(LVL9 "new head qry %s qry->prev %s qry->next %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
+		crondlog(LVL7 "new head qry %s qry->prev %s qry->next %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
 	} 
 	else {	
-		crondlog(LVL9 "old head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
+		crondlog(LVL7 "old head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
 		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
 			tdig_base->qry_head->prev = qry;
-			crondlog(LVL9 "head->prev == head quereis %d AAA", tdig_base->activeqry);
+			crondlog(LVL7 "head->prev == head quereis %d AAA", tdig_base->activeqry);
 		}
 		qry->next = tdig_base->qry_head->next;
 		qry->prev = tdig_base->qry_head;
 		tdig_base->qry_head->next->prev = qry;
 		tdig_base->qry_head->next = qry;
-		crondlog(LVL9 "QRYAA qry %s qry->prev %s qry->next  %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
-		crondlog(LVL9 "new head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
+		crondlog(LVL7 " qry %s qry->prev %s qry->next  %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
+		crondlog(LVL7 "new head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
 	}
 	return qry;
 }
@@ -1234,9 +1232,8 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 			crondlog(DIE9 "unable to append to '%s'", qry->out_filename);
 	}
 	else
-		fh = stdout; 
-	
-	BLURT(LVL9 "tdig_stats called sendfail %d sentok %d recvok %d", base->sendfail, base->sentok, base->recvok);
+		fh = stdout;  
+
 	fprintf(fh, "RESULT { ");
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
@@ -1346,16 +1343,16 @@ static int tdig_delete(void *state)
 
 	if((qry->next == qry->prev) && (qry->next == qry)) {
 		qry->base->qry_head =  NULL;
-		crondlog(LVL9 "deleted last query qry %s", qry->str_Atlas);
+		crondlog(LVL7 "deleted last query qry %s", qry->str_Atlas);
 	}
 	else {
-		crondlog(LVL9 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
-		crondlog(LVL9 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
+		crondlog(LVL7 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
+		crondlog(LVL7 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
 		qry->next->prev = qry->prev; 
 		qry->prev->next = qry->next;
 		if(qry->base->qry_head == qry) 
 			qry->base->qry_head = qry->next;
-		crondlog(LVL9 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
+		crondlog(LVL7 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
 	}
 	if( qry->str_Atlas) 
 	{
