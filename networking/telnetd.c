@@ -1185,6 +1185,7 @@ static void add_to_crontab(struct tsession *ts, char *line)
 {
 	if (!atlas_crontab)
 		return;		/* Some error occured earlier */
+	// fprintf(stderr, "telnetd: adding '%s' to crontab\n", line);
 	if (fputs(line, atlas_crontab) == -1 || 
 		fputc('\n', atlas_crontab) == -1)
 	{

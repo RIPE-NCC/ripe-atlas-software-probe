@@ -475,6 +475,12 @@ static void send_pkt(struct trtstate *state)
 			r= sendto(base->v6icmp_snd, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
+
+#if 0
+ { static int doit=1; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+
 			if (r == -1)
 			{
 				if (errno != EMSGSIZE)
@@ -482,8 +488,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"%s\"error\":\"sendto failed: %s\" } ] }",
-						state->sent ? ", " : "",
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
+						state->sent ? " }, " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -538,6 +544,12 @@ static void send_pkt(struct trtstate *state)
 			r= sendto(base->v6udp_snd, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
+
+#if 0
+ { static int doit=1; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+
 			if (r == -1)
 			{
 				if (errno != EACCES &&
@@ -547,8 +559,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"%s\"error\":\"sendto failed: %s\" ] }",
-						state->sent ? ", " : "",
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
+						state->sent ? " }, " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -625,6 +637,12 @@ static void send_pkt(struct trtstate *state)
 			r= sendto(base->v4icmp_snd, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
+
+#if 0
+ { static int doit=1; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+
 			if (r == -1)
 			{
 				if (errno != EMSGSIZE)
@@ -632,8 +650,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"%s\"error\":\"sendto failed: %s\" ] }",
-						state->sent ? ", " : "",
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
+						state->sent ? " }, " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -652,14 +670,20 @@ static void send_pkt(struct trtstate *state)
 				}
 
 				/* Bind to source addr/port */
-				if (bind(sock,
+				r= bind(sock,
 					(struct sockaddr *)&state->loc_sin6,
-					state->loc_socklen) == -1)
+					state->loc_socklen);
+#if 0
+ { static int doit=1; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+				if (r == -1)
 				{
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"\"error\":\"bind failed: %s\" ] }",
+			"%s{ " DBQ(error) ":" DBQ(bind failed: %s) " } ] }",
+						state->sent ? " }, " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -752,6 +776,12 @@ static void send_pkt(struct trtstate *state)
 			r= sendto(sock, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
+
+#if 0
+ { static int doit=0; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+
 			serrno= errno;
 			if (state->parismod)
 				close(sock);
@@ -762,8 +792,8 @@ static void send_pkt(struct trtstate *state)
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				"%s\"error\":\"sendto failed: %s\" ] }",
-						state->sent ? ", " : "",
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
+						state->sent ? " }, " : "",
 						strerror(serrno));
 					add_str(state, line);
 					report(state);
@@ -2351,7 +2381,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 
 static void traceroute_start(void *state)
 {
-	int serrno;
+	int r, serrno;
 	struct trtstate *trtstate;
 	struct trtbase *trtbase;
 	struct sockaddr_in loc_sa4;
@@ -2400,14 +2430,18 @@ static void traceroute_start(void *state)
 			memset(&loc_sa6, '\0', sizeof(loc_sa6));
 			loc_sa6.sin6_family= AF_INET;
 
-			if (connect(trtbase->v6icmp_snd,
+			r= connect(trtbase->v6icmp_snd,
 				(struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen) == -1)
+				trtstate->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+			if (r == -1)
 			{
 				serrno= errno;
 
 				snprintf(line, sizeof(line),
-			", \"error\":\"connect failed: %s\" }",
+			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
 					strerror(serrno));
 				add_str(trtstate, line);
 				report(trtstate);
@@ -2434,14 +2468,18 @@ static void traceroute_start(void *state)
 			((struct sockaddr_in *)&trtstate->sin6)->sin_port=
 				htons(0x8000);
 
-			if (connect(trtbase->v4icmp_snd,
+			r= connect(trtbase->v4icmp_snd,
 				(struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen) == -1)
+				trtstate->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+			if (r == -1)
 			{
 				serrno= errno;
 
 				snprintf(line, sizeof(line),
-			", \"error\":\"connect failed: %s\" }",
+			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
 					strerror(serrno));
 				add_str(trtstate, line);
 				report(trtstate);
@@ -2471,14 +2509,17 @@ static void traceroute_start(void *state)
 			loc_sa6.sin6_family= AF_INET6;
 			sock= trtbase->v6udp_snd;
 
-			if (connect(sock, (struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen) == -1)
+			r= connect(sock, (struct sockaddr *)&trtstate->sin6,
+				trtstate->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+			if (r == -1)
 			{
 				serrno= errno;
-printf("%s, %d\n", __FILE__, __LINE__);
 
 				snprintf(line, sizeof(line),
-			", \"error\":\"connect failed: %s\" }",
+			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
 					strerror(serrno));
 				add_str(trtstate, line);
 				report(trtstate);
@@ -2522,13 +2563,17 @@ printf("%s, %d\n", __FILE__, __LINE__);
 				{
 					crondlog(DIE9 "socket failed");
 				}
-				if (bind(sock, (struct sockaddr *)&loc_sa4,
-					sizeof(loc_sa4)) == -1)
+				r= bind(sock, (struct sockaddr *)&loc_sa4,
+					sizeof(loc_sa4));
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+				if (r == -1)
 				{
 					serrno= errno;
 
 					snprintf(line, sizeof(line),
-				", \"error\":\"bind failed: %s\" }",
+				", " DBQ(error) ":" DBQ(bind failed: %s) " }",
 						strerror(serrno));
 					add_str(trtstate, line);
 					report(trtstate);
@@ -2542,13 +2587,17 @@ printf("%s, %d\n", __FILE__, __LINE__);
 			}
 
 
-			if (connect(sock, (struct sockaddr *) &trtstate->sin6,
-				trtstate->socklen) == -1)
+			r= connect(sock, (struct sockaddr *) &trtstate->sin6,
+				trtstate->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+			if (r == -1)
 			{
 				serrno= errno;
 
 				snprintf(line, sizeof(line),
-			", \"error\":\"connect failed: %s\" }",
+			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
 					strerror(serrno));
 				add_str(trtstate, line);
 				report(trtstate);

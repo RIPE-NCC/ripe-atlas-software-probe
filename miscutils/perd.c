@@ -922,7 +922,7 @@ static void CopyFromOld(CronLine *line)
 			oldLine->start_time == line->start_time &&
 			strcmp(oldLine->cl_Shell, line->cl_Shell) == 0)
 		{
-			crondlog(LVL9 "next line matches");
+			crondlog(LVL7 "next line matches");
 			; /* okay */
 		}
 		else
@@ -939,7 +939,7 @@ static void CopyFromOld(CronLine *line)
 				oldLine->start_time == line->start_time &&
 				strcmp(oldLine->cl_Shell, line->cl_Shell) == 0)
 			{
-				crondlog(LVL9 "found matching line");
+				crondlog(LVL7 "found matching line");
 				break;
 			}
 		}
@@ -947,12 +947,12 @@ static void CopyFromOld(CronLine *line)
 
 	if (!oldLine)
 	{
-		crondlog(LVL9, "found no match for line '%s'", 
-			line);
+		crondlog(LVL7 "found no match for line '%s'", 
+			line->cl_Shell);
 		return;
 	}
 
-	crondlog(LVL9 "found old line for '%s'", oldLine->cl_Shell);
+	crondlog(LVL7 "found old line for '%s'", oldLine->cl_Shell);
 	if (line->nextcycle != oldLine->nextcycle)
 	{
 		crondlog(LVL9 "nextcycle %d -> %d for '%s'",

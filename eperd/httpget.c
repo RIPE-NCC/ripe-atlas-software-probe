@@ -1610,6 +1610,8 @@ static void httpget_start(void *state)
 
 	hgstate->dnserr= 0;
 	hgstate->connecting= 0;
+	hgstate->readstate= READ_STATUS;
+	hgstate->writestate= WRITE_HEADER;
 	hgstate->gstart= time(NULL);
 
 	memset(&hints, '\0', sizeof(hints));
