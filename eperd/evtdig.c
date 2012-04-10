@@ -1514,7 +1514,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				else  
 				{
 
-					fprintf(fh, " \"TYPE\" : %u ", ntohs(answers[i].resource->type));
+					JU(TYPE, ntohs(answers[i].resource->type));
 					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
 					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
