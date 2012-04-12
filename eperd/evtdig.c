@@ -535,6 +535,8 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 			n->otype = htons(3); 
 			qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
 		}
+		qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
+		dns->add_count = htons(1);
 		/* Transmit the request over the network */
 	}
 
