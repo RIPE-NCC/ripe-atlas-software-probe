@@ -476,7 +476,7 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, 
 		}
 		qry = qry->next;
 		if (i > (2*base->activeqry) ) {
-			crondlog(LVL7 "i am looping %d AAAA", idx);
+			crondlog(LVL7 "i am looping %d AA", idx);
 			return NULL;
 		}
 		
@@ -746,7 +746,10 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 	qry->base->timeout++;
 	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", DEFAULT_NOREPLY_TIMEOUT);
 	buf_add(&qry->err, line, strlen(line));
+
+	BLURT(LVL5 "AAA timeout for %s ", qry->server_name);
 	printReply (qry, 0, NULL);
+	sleep(10);
 	return;
 } 
 
@@ -857,6 +860,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct DNS_HEADER *dnsR = NULL;
 
         qry = ENV2QRY(ptr);
+	BLURT(LVL5 "TCP readcb %s", qry->server_name );
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 			bufferevent_free(bev);
@@ -1273,7 +1277,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		crondlog(LVL7 "old head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
 		if (tdig_base->qry_head->prev == tdig_base->qry_head) {
 			tdig_base->qry_head->prev = qry;
-			crondlog(LVL7 "head->prev == head quereis %d AAA", tdig_base->activeqry);
+			crondlog(LVL7 "head->prev == head quereis %d AA", tdig_base->activeqry);
 		}
 		qry->next = tdig_base->qry_head->next;
 		qry->prev = tdig_base->qry_head;
@@ -1536,6 +1540,8 @@ static void free_qry_inst(struct query_state *qry)
 	struct event_base *event_base;
 	struct tdig_base *tbase;
 
+	BLURT(LVL5 "AAA tu_cleanup %s ", qry->server_name);
+
 	if(qry->err.size) 
 	{
 		buf_cleanup(&qry->err);
@@ -1554,9 +1560,9 @@ static void free_qry_inst(struct query_state *qry)
 
 	if(qry->packet.size)
 	{
-		buf_cleanup(&qry->err);
+		buf_cleanup(&qry->packet);
 	}
-	
+
 	tu_cleanup(&qry->tu_env);
 
 	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
