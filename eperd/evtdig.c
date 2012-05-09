@@ -337,8 +337,6 @@ static void tdig_stats(int unused UNUSED_PARAM, const short event UNUSED_PARAM, 
 static int tdig_delete(void *state);
 static void ChangetoDnsNameFormat(u_char * dns,unsigned char* qry) ;
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
-void readcb_tcp(struct bufferevent *bev, void *ptr);
-void eventcb_tcp(struct bufferevent *bev, short events, void *ptr);
 void tdig_start (struct query_state *qry);
 void printReply(struct query_state *qry, int wire_size, unsigned char *result );
 static void done(void *state);
@@ -627,118 +625,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		printReply (qry, 0, NULL);
 		return;
 	}
-	/*
-	   qry->bev_tcp =  bufferevent_socket_new(qry->base->event_base, -1, BEV_OPT_CLOSE_ON_FREE);
-	   bufferevent_setcb(qry->bev_tcp, readcb_tcp, NULL, eventcb_tcp, qry);
-	   bufferevent_enable(qry->bev_tcp, EV_READ|EV_WRITE);
-	   bufferevent_settimeout(qry->bev_tcp, DEFAULT_TCP_CONNECT_TIMEOUT, DEFAULT_TCP_CONNECT_TIMEOUT );
-	   bufferevent_socket_connect_hostname(qry->bev_tcp, DnsBase, qry->opt_AF , qry->server_name, 53);
-	   crondlog(LVL9 "dispatched tcp callback %s", qry->server_name);
-	 */
 }
-
-
-/*
-void readcb_tcp(struct bufferevent *bev, void *ptr)
-{
-	struct query_state *qry = ptr;
-	int n;
-	u_char b2[2];
-	struct timeval rectime;	
-	struct evbuffer *input ;
-	struct DNS_HEADER *dnsR = NULL;
-	gettimeofday(&rectime, NULL);
-	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
-
-	input = bufferevent_get_input(bev);
-	if(qry->wire_size == 0) {
-		evbuffer_remove(input, b2, 2 );
-		qry->wire_size = ldns_read_uint16(b2);
-	}
- 	while ((n = evbuffer_remove(input, qry->base->packet, qry->wire_size )) > 0) {
-		if(n) {
-			evtimer_del(&qry->noreply_timer);
-			crondlog(LVL5 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  qry->wire_size, n);
-			crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
-			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
-			dnsR = (struct DNS_HEADER*) qry->base->packet;
-			if ( ntohs(dnsR->id)  == qry->qryid ) {
-				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;	
-				printReply (qry, n, qry->base->packet);
-			}
-			else {
-				bzero(line, DEFAULT_LINE_LENGTH);
-				snprintf(line, DEFAULT_LINE_LENGTH, " %s \"idmismatch\" : \"mismatch id from tcp fd %d\"", qry->err.size ? ", " : "", n);
-				printf( "tcperror : id mismatch error %s\n", qry->server_name);
-				buf_add(&qry->err, line, strlen(line));
-				printReply (qry, 0, NULL);
-			}
-			// Clean the noreply timer 
-			bufferevent_free(bev);
-			bev =  NULL;
-			qry->wire_size = 0;
-		}
-	}
-}
-
-void eventcb_tcp(struct bufferevent *bev, short events, void *ptr)
-{
-	struct query_state *qry = ptr;
-	u_char *outbuff;
-	uint16_t payload_len ;
-	u_char wire[1300];
-	int serrno;
-
-	if (events & BEV_EVENT_CONNECTED) {
-		crondlog(LVL9 "Connect okay %s", qry->server_name);
-		printf ("Connect okay %s\n", qry->server_name);
-		outbuff = xzalloc(MAX_DNS_BUF_SIZE);
-		bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
-		qry->outbuff = outbuff;
-		mk_dns_buff(qry, outbuff);
-		payload_len = (uint16_t) qry->pktsize;
-		ldns_write_uint16(wire, qry->pktsize);
-		memcpy(wire + 2, outbuff, qry->pktsize);
-		gettimeofday(&qry->xmit_time, NULL);
-		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
-		qry->base->sentok++;
-		qry->base->sentbytes+= (qry->pktsize +2);
-		evtimer_add(&qry->noreply_timer, &qry->base->tv_noreply);
-	} else if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF|BEV_EVENT_TIMEOUT)) {
-		bzero(line, DEFAULT_LINE_LENGTH);
-		if (events & BEV_EVENT_ERROR) {
-			serrno = bufferevent_socket_get_dns_error(bev);
-			if (serrno) {
-				bzero(line, DEFAULT_LINE_LENGTH);
-				if(qry->err.size > 0) 
-					sprintf(line, ", "); 
-				snprintf(line, DEFAULT_LINE_LENGTH, "\"dnserror\" : \" %s\n", evutil_gai_strerror(serrno));
-			}
-		} 
-		else if (events & BEV_EVENT_TIMEOUT) {
-
-			if(qry->err.size > 0) 
-				sprintf(line, ", "); 
-			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"TIMEOUT could be read/write or connect\"");
-		}	
-		else if (events & BEV_EVENT_EOF) {
-			serrno = errno; 
-
-///			if(qry->errlen > 0) 
-				sprintf(line, ", "); 
-			snprintf(line, DEFAULT_LINE_LENGTH, "\"tcperror\" : \"Unexpectd EOF %s", strerror(serrno));
-		}
-		buf_add(&qry->err, line, strlen(line));
-		bufferevent_free(bev);
-		printReply (qry, 0, NULL);
-		//event_base_loopexit(base, NULL);
-		qry->base->sendfail++;
-	}
-}
-
-*/
-
-
 /* The callback to handle timeouts due to destination host unreachable condition */
 static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
@@ -1540,7 +1427,7 @@ static void free_qry_inst(struct query_state *qry)
 	struct event_base *event_base;
 	struct tdig_base *tbase;
 
-	BLURT(LVL5 "AAA tu_cleanup %s ", qry->server_name);
+	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
 
 	if(qry->err.size) 
 	{
@@ -1563,7 +1450,8 @@ static void free_qry_inst(struct query_state *qry)
 		buf_cleanup(&qry->packet);
 	}
 
-	tu_cleanup(&qry->tu_env);
+	if(qry->opt_proto == 6)
+		tu_cleanup(&qry->tu_env);
 
 	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
 		// this loop goes over servers in /etc/resolv.conf
