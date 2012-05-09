@@ -76,11 +76,11 @@
 #define MAX_DNS_OUT_BUF_SIZE   512
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
-#define DEFAULT_NOREPLY_TIMEOUT 1000           /* 1000 msec - 0 is illegal      */
+#define DEFAULT_NOREPLY_TIMEOUT 5000           /* 1000 msec - 0 is illegal      */
 #define DEFAULT_RETRY_INTERVAL  1000           /* 1 sec - 0 means flood mode   */
 #define DEFAULT_TCP_CONNECT_TIMEOUT  5         /* in seconds */
 #define DEFAULT_LINE_LENGTH 80 
-#define DEFAULT_STATS_REPORT_INTERVEL 60 		/* in seconds */
+#define DEFAULT_STATS_REPORT_INTERVEL 180 		/* in seconds */
 
 #define CONN_TO            1  /* TCP connection time out in seconds */
 
@@ -230,6 +230,7 @@ struct query_state {
 
 	struct buf err; 
 	struct buf qbuf; 
+	struct buf packet;
 	int qst ; 
 
 	u_char *outbuff;
@@ -262,8 +263,7 @@ struct EDNS0_HEADER
 	uint16_t _edns_udp_size;
 	u_int8_t _edns_x; // combined rcode and edns version both zeros.
 	u_int8_t _edns_y; // combined rcode and edns version both zeros.
-	//u_int16_t _edns_z;
-	u_int16_t D0 ;
+	u_int16_t Z ;     // first bit is the D0 bit.
 }; 
 
 // EDNS OPT pseudo-RR : eg NSID RFC 5001 
@@ -534,11 +534,24 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 		e=(struct EDNS0_HEADER*)&packet[ qry->pktsize + 1 ];
 		e->otype = htons(ns_t_opt);
 		e->_edns_udp_size = htons(qry->opt_edns0);
-		//e->_edns_z = htons(128);
-		if(qry->opt_dnssec)
-			e->D0 = 0x80;
-		else 
-			e->D0 = 0x0;
+		if(qry->opt_dnssec) {
+			e->Z = htons(0x8000);
+		}
+		else  {
+			e->Z = 0x0;
+		}
+		crondlog(LVL5 "opt header in hex | %X  %X %X %X %X %X %X %X %X | %X",
+				packet[qry->pktsize],
+				packet[qry->pktsize + 1],
+				packet[qry->pktsize + 2],
+				packet[qry->pktsize + 3],
+				packet[qry->pktsize + 4],
+				packet[qry->pktsize + 5],
+				packet[qry->pktsize + 6],
+				packet[qry->pktsize + 7],
+				packet[qry->pktsize + 8],
+				packet[qry->pktsize + 9]);
+
 		qry->pktsize  += sizeof(struct EDNS0_HEADER) ;
 
 		if(qry->opt_nsid ) {
@@ -662,6 +675,7 @@ void readcb_tcp(struct bufferevent *bev, void *ptr)
 			}
 			// Clean the noreply timer 
 			bufferevent_free(bev);
+			bev =  NULL;
 			qry->wire_size = 0;
 		}
 	}
@@ -801,14 +815,15 @@ static void tcp_beforeconnect(struct tu_env *env,
 	BLURT(LVL5 "time : %d",  qry->xmit_time.tv_sec);
 }
 
-static void tcp_writecb(struct bufferevent *bev, void *ptr) 
+static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 {
 
 	uint16_t payload_len ;
 	u_char *outbuff;	
 	u_char *wire;
 	struct query_state * qry; 
-	qry = ENV2QRY(ptr); 
+	qry = ENV2QRY(env); 
+	BLURT(LVL5 "send %u bytes", payload_len );
 
 	qry->bev_tcp =  bev;
 	outbuff = xzalloc(MAX_DNS_BUF_SIZE);
@@ -828,7 +843,6 @@ static void tcp_writecb(struct bufferevent *bev, void *ptr)
 	}
 	free(outbuff);
 	free(wire);
-	BLURT(LVL5 "send %u bytes", payload_len );
 }
 
 static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr) 
@@ -836,51 +850,62 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
         struct query_state *qry = ptr;
         int n;
+	int to_read;
         u_char b2[2];
         struct timeval rectime;
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
         qry = ENV2QRY(ptr);
+
+	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
+			bufferevent_free(bev);
+			return;
+	}
+
         gettimeofday(&rectime, NULL);
         bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
         input = bufferevent_get_input(bev);
         if(qry->wire_size == 0) {
-                evbuffer_remove(input, b2, 2 );
-                qry->wire_size = ldns_read_uint16(b2);
-        }
-	while ((n = evbuffer_remove(input, qry->base->packet, qry->wire_size )) > 0) {
-		if(n) {
-			// evtimer_del(&qry->noreply_timer);  //AA  How to kill the timer?  ask PH?
+                n = evbuffer_remove(input, b2, 2 );
+		if(n == 2){
+			qry->wire_size = ldns_read_uint16(b2);
+			buf_init(&qry->packet, -1);
+		}
+		else {
 
-			crondlog(LVL5 "in readcb %s %s %d bytes, red %d ", qry->str_Atlas, qry->server_name,  qry->wire_size, n);
+			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREAD\" : \"expected 2 bytes and got %d\"", qry->err.size ? ", " : "", n );
+			buf_add(&qry->err, line, strlen(line));	
+		}
+	} 
+	while ((n = evbuffer_remove(input,line , DEFAULT_LINE_LENGTH )) > 0) {
+		buf_add(&qry->packet, line, n);
+		if(qry->wire_size == qry->packet.size) {
+			crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
 			crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
 			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
-			dnsR = (struct DNS_HEADER*) qry->base->packet;
+			dnsR = (struct DNS_HEADER*) qry->packet.buf;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
 				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;
-				printReply (qry, n, qry->base->packet);
+				printReply (qry, qry->packet.size, qry->packet.buf);
 			}
 			else {
 				bzero(line, DEFAULT_LINE_LENGTH);
 				snprintf(line, DEFAULT_LINE_LENGTH, " %s \"idmismatch\" : \"mismatch id from tcp fd %d\"", qry->err.size ? ", " : "", n);
-				printf( "tcperror : id mismatch error %s\n", qry->server_name);
 				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
 			}
-			// Clean the noreply timer
-			bufferevent_free(bev);
-			qry->wire_size = 0;
-		}
+			return;
+		} 
 	}
 }
 
-static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
+static void tcp_writecb(struct bufferevent *bev, void *ptr) 
 {
 	struct query_state * qry; 
-	qry = ENV2QRY(env); 
-	BLURT(LVL5 "TCP connected");
+	qry = ENV2QRY(ptr); 
+	BLURT(LVL5 "TCP writecb");
 }
 
 
@@ -1036,7 +1061,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->qst = 0;
 	qry->wire_size = 0;
 	qry->triptime = 0;
-	qry->opt_edns0 = 1280; 
+	qry->opt_edns0 = 512; 
 	qry->opt_dnssec = 0;
 	qry->opt_nsid = 0; 
 	qry->opt_qbuf = 0; 
@@ -1044,6 +1069,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->ressave = NULL;
 	qry->ressent = NULL;
 	buf_init(&qry->err, -1);
+	buf_init(&qry->packet, -1);
 	qry->opt_resolv_conf = (Q_RESOLV_CONF - 1);
 	qry->lookupname = NULL;
 
@@ -1399,11 +1425,11 @@ void tdig_start (struct query_state *qry)
 	}
 	else {
 
-		crondlog(LVL8 "TCP QUERY %s", qry->server_name);
+		qry->wire_size =  0;
+		crondlog(LVL5 "TCP QUERY %s", qry->server_name);
 		struct timeval interval;
 		interval.tv_sec = CONN_TO;
 		interval.tv_usec= 0;
-		printf ("node %s , port %s\n" ,  qry->server_name, port);
 		tu_connect_to_name (&qry->tu_env,   qry->server_name, port_as_char,
 				&interval, &hints, tcp_timeout_callback, tcp_reporterr,
 				tcp_dnscount, tcp_beforeconnect,
@@ -1524,11 +1550,19 @@ static void free_qry_inst(struct query_state *qry)
 		qry->ressent = NULL;
 	}
 	qry->qst = STATUS_FREE;
+	qry->wire_size == 0;
+
+	if(qry->packet.size)
+	{
+		buf_cleanup(&qry->err);
+	}
+	
+	tu_cleanup(&qry->tu_env);
 
 	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
-		if(qry->opt_resolv_conf < MAXNS) {
+		if(qry->opt_resolv_conf < tdig_base->resolv_max) {
 			free (qry->server_name);
 			qry->server_name = strdup(tdig_base->nslist[qry->opt_resolv_conf]);
 			qry->opt_resolv_conf++;
@@ -1618,6 +1652,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	u_int32_t serial;
 	struct buf tmpbuf;
 	char str[4]; 
+	int iMax ;
 
 	if (qry->out_filename)
 	{
@@ -1636,6 +1671,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 	}
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
+	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
+		JD (subid, qry->opt_resolv_conf);
+		JD (submax, qry->base->resolv_max);
+	}
 	if( qry->ressent)
 	{  // started to send query
 		switch (qry->ressent->ai_family)
@@ -1699,12 +1738,16 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		}
 
 		stop=0;  
+		iMax = 0;
 		
 		if (dnsR->ans_count > 0)
 		{
 			fprintf (fh, ", \"answers\" : [ ");
-			for(i=0;i<ntohs(dnsR->ans_count);i++)
+			iMax = MIN(2, ntohs(dnsR->ans_count));
+
+			for(i=0;i<iMax;i++)
 			{
+			//	printf("Answer %d\n", i);
 				answers[i].name=ReadName(reader,result,&stop);
 				reader = reader + stop;
 
@@ -1762,7 +1805,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 			fprintf (fh, " ]");
 		}
 
-		for(i=0;i<ntohs(dnsR->ans_count);i++)
+		for(i=0;i<iMax;i++)
 		{
 			free(answers[i].name);
 		}
