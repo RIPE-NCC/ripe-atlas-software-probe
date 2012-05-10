@@ -66,6 +66,8 @@
 #define Q_RESOLV_CONF -1
 #define O_RESOLV_CONF  1003
 
+#define DNS_FLAG_RD 0x0100
+
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
@@ -235,6 +237,9 @@ struct query_state {
 struct DNS_HEADER
 {
 	u_int16_t id;        // identification number
+
+	u_int16_t flags;
+/* 
 	u_int16_t rd :1,     // recursion desired
 		  tc :1,     // truncated message
 		  aa :1,     // authoritive answer
@@ -245,6 +250,8 @@ struct DNS_HEADER
 		  ad :1,     // authenticated data
 		  z :1,      // its z! reserved
 		  ra :1;     // recursion available
+
+*/
 	u_int16_t q_count; // number of question entries
 	u_int16_t ans_count; // number of answer entries
 	u_int16_t ns_count; // number of authority entries
@@ -496,23 +503,27 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
 	BLURT(LVL5 "dns qyery id %d", qry->qryid);
 	dns->id = (uint16_t) htons(r); 
+ /*
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
 	dns->aa = 0; //Not Authoritative
 	dns->tc = 0; //This message is not truncated
 	dns->rd = 0; //Recursion  not Desired
-	dns->ra = 0; //Recursion not available! hey we dont have it (lol)
+	dns->ra = 1; //Recursion not available! hey we dont have it (lol)
 	dns->z = 0;
 	dns->ad = 0;
 	dns->cd = 0;
 	dns->rcode = 0;
+*/
 	dns->q_count = htons(1); //we have only 1 question
 	dns->ans_count = 0;
 	dns->ns_count = 0;
 	dns->add_count = htons(0);
 
-	if( qry->opt_resolv_conf > Q_RESOLV_CONF ) 
-		dns->rd = 1;
+	if( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
+		// if you need more falgs do a bitwise and here.
+		dns->flags = htons(DNS_FLAG_RD);
+	}
 
 	//point to the query portion
 	qname =(u_char *)&packet[sizeof(struct DNS_HEADER)];
@@ -1617,9 +1628,11 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fprintf (fh, " \"rt\" : %.3f", qry->triptime);
 		fprintf (fh, " , \"size\" : %d", wire_size);
 		fprintf (fh, " , \"ID\" : %d", ntohs(dnsR->id));
+		/*
 		fprintf (fh, " , \"RCODE\" : %d",  dnsR->rcode);
 		fprintf (fh, " , \"AA\" : %d",  dnsR->aa);
 		fprintf (fh, " , \"TC\" : %d",  dnsR->tc);
+		*/
 		fprintf (fh, " , \"ANCOUNT\" : %d ", ntohs(dnsR->ans_count ));
 		fprintf (fh, " , \"QDCOUNT\" : %u ",ntohs(dnsR->q_count));
 		fprintf (fh, " , \"NSCOUNT\" : %d" , ntohs(dnsR->ns_count));
