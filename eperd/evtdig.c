@@ -572,14 +572,21 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	struct buf pbuf;
 	buf_init(&pbuf, -1);
 
-	for(int x = 0; x < qry->pktsize; x++) {
-		snprintf(line, DEFAULT_LINE_LENGTH, "%02X ", packet[x]);
-		buf_add(&pbuf, line, 3);
-	}
-	line[0]  = '\0';
-        buf_add(&qry->err, line, 1 );
-	crondlog(LVL5 "payload : %s", pbuf.buf);
+	if(qry->pktsize) {
+		snprintf(line, DEFAULT_LINE_LENGTH, "%0d bytes ", qry->pktsize);
+		buf_add(&pbuf, line, strlen(line));
 
+		line[0]  = '"'; 
+		buf_add(&pbuf, line, 1);
+		for(int x = 0; x < qry->pktsize; x++) {
+			snprintf(line, DEFAULT_LINE_LENGTH, "%02X ", packet[x]);
+			buf_add(&pbuf, line, 3);
+		}
+		line[0]  = '"'; 
+		line[1]  = '\0';
+		buf_add(&pbuf, line, 2 );
+		crondlog(LVL5 "payload : %s", pbuf.buf);
+	}
 } 
 
 
