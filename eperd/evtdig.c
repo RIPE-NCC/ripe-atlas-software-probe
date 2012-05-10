@@ -77,12 +77,9 @@
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
 #define DEFAULT_NOREPLY_TIMEOUT 5000           /* 1000 msec - 0 is illegal      */
-#define DEFAULT_RETRY_INTERVAL  1000           /* 1 sec - 0 means flood mode   */
-#define DEFAULT_TCP_CONNECT_TIMEOUT  5         /* in seconds */
 #define DEFAULT_LINE_LENGTH 80 
 #define DEFAULT_STATS_REPORT_INTERVEL 180 		/* in seconds */
-
-#define CONN_TO            1  /* TCP connection time out in seconds */
+#define CONN_TO            5  /* TCP connection time out in seconds */
 
 /* state of the dns query */
 #define STATUS_DNS_RESOLV 		1001
@@ -146,7 +143,6 @@ struct tdig_base {
 	evutil_socket_t rawfd_v6;       /* Raw socket used to nsm hosts              */
 
 	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
-	struct timeval tv_interval;    /* between two subsequent queries */
 
 	/* A circular list of user queries */
 	struct query_state *qry_head;
@@ -538,7 +534,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 		else  {
 			e->Z = 0x0;
 		}
-		crondlog(LVL5 "opt header in hex | %X  %X %X %X %X %X %X %X %X | %X",
+		crondlog(LVL5 "opt header in hex | %02X  %02X %02X %02X %02X %02X %02X %02X %02X | %02X",
 				packet[qry->pktsize],
 				packet[qry->pktsize + 1],
 				packet[qry->pktsize + 2],
@@ -557,12 +553,21 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 			n=(struct EDNS_NSID*)&packet[ qry->pktsize + 1 ];
 			n->len =  htons(4);
 			n->otype = htons(3); 
-			qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
 		}
 		qry->pktsize  += sizeof(struct EDNS_NSID) + 1;
 		dns->add_count = htons(1);
 		/* Transmit the request over the network */
 	}
+	struct buf pbuf;
+	buf_init(&pbuf, -1);
+
+	for(int x = 0; x < qry->pktsize; x++) {
+		snprintf(line, DEFAULT_LINE_LENGTH, "%02X ", packet[x]);
+		buf_add(&pbuf, line, 3);
+	}
+	line[0]  = '\0';
+        buf_add(&qry->err, line, 1 );
+	crondlog(LVL5 "payload : %s", pbuf.buf);
 
 } 
 
@@ -1242,7 +1247,6 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
 
 	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
-	msecstotv(DEFAULT_RETRY_INTERVAL, &tdig_base->tv_interval);
 
 	// Define the callback to handle UDP Reply 
 	// add the raw file descriptor to those monitored for read events 
