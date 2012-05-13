@@ -111,6 +111,8 @@ static void report(struct pingstate *state)
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
 	state->result= NULL;
+	crondlog(LVL8 "report: clearing busy for state %p, '%s'",
+			state, state->hostname);
 	state->busy= 0;
 
 	if (state->out_filename)
@@ -139,6 +141,13 @@ static void ping_cb(int result, int bytes,
 	crondlog(LVL7 "in ping_cb: result %d, bytes %d, seq %d, ttl %d",
 		result, bytes, seq, ttl);
 #endif
+	
+	if (!pingstate->busy)
+	{
+		crondlog(LVL8 "ping_cb: not busy for state %p, '%s'",
+			pingstate, pingstate->hostname);
+		return;
+	}
 
 	if (pingstate->first)
 	{
@@ -300,6 +309,9 @@ static void ping_start(void *state)
 
 	pingstate->first= 1;
 	pingstate->got_reply= 0;
+	crondlog(LVL8 "ping_start: setting busy for state %p, '%s'",
+			pingstate, pingstate->hostname);
+	pingstate->busy= 1;
 
 	evping_start(pingstate->pingevent, pingstate->pingcount);
 }
@@ -309,6 +321,14 @@ static int ping_delete(void *state)
 	struct pingstate *pingstate;
 
 	pingstate= state;
+
+	if (pingstate->busy)
+	{
+		crondlog(LVL8
+			"ping_delete: not deleting, busy for state %p, '%s'",
+			pingstate, pingstate->hostname);
+		return 0;
+	}
 
 	evping_delete(pingstate->pingevent);
 	pingstate->pingevent= NULL;

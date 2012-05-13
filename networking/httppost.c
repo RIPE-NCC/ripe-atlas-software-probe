@@ -587,7 +587,10 @@ static int check_result(FILE *tcp_file)
 		fatal("bad status code in response '%s'", line);
 
 	if (cp[0] != '2')
-		fatal("POST command failed: '%s'", cp);
+	{
+		report("POST command failed: '%s'", cp);
+		return 0;
+	}
 
 	return 1;
 }
