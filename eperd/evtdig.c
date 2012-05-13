@@ -586,6 +586,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 		line[1]  = '\0';
 		buf_add(&pbuf, line, 2 );
 		crondlog(LVL5 "payload : %s", pbuf.buf);
+		buf_cleanup(&pbuf);
 	}
 } 
 
