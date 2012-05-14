@@ -725,7 +725,12 @@ static void DeleteFile(void)
 			continue;
 		}
 		kick_watchdog();
-		if (line->testops)
+		if (!line->teststate)
+		{
+			crondlog(LVL8 "DeleteFile: no state to delete for '%s'",
+				line->cl_Shell);
+		}
+		if (line->testops && line->teststate)
 		{
 			r= line->testops->delete(line->teststate);
 			if (r != 1)
@@ -890,8 +895,7 @@ static void atlas_init(CronLine *line)
 		crondlog(LVL7 "atlas_run: argv[%d] = '%s'", i, argv[i]);
 
 	state= bp->testops->init(argc, argv, 0);
-	if (!state)
-		return;
+	crondlog(LVL8 "init returned %p for '%s'", state, line->cl_Shell);
 	line->teststate= state;
 	line->testops= bp->testops;
 }
@@ -1077,7 +1081,18 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 		return;			/* Line is to be deleted */
 	}
 
+	if (!line->teststate)
+	{
+		crondlog(LVL8 "not starting cmd '%s' (not init)\n",
+			line->cl_Shell);
+		return;
+	}
+
+	crondlog(LVL8 "starting cmd '%s'\n", line->cl_Shell);
+
 	line->testops->start(line->teststate);
+
+	crondlog(LVL8 "after cmd '%s'\n", line->cl_Shell);
 
 	line->nextcycle++;
 	if (line->start_time + line->nextcycle*line->interval < now)

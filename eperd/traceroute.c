@@ -31,6 +31,7 @@ traceroute.c
 #define OPT_F	(1 << 4)
 
 #define BASE_PORT	(0x8000 + 666)
+#define SRC_BASE_PORT	(20480)
 #define MAX_DATA_SIZE   (4096)
 
 #define DBQ(str) "\"" #str "\""
@@ -120,6 +121,7 @@ struct trtstate
 					 * we sent. For dup detection.
 					 */
 
+	time_t starttime;
 	struct timeval xmit_time;
 
 	struct event timer;
@@ -299,8 +301,10 @@ static void report(struct trtstate *state)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", " DBQ(fw) ":%d"
-			", " DBQ(time) ":%ld, ",
+			", " DBQ(time) ":%ld"
+			", " DBQ(endtime) ":%ld, ",
 			state->atlas, get_atlas_fw_version(),
+			state->starttime,
 			(long)time(NULL));
 	}
 
@@ -350,6 +354,7 @@ static void send_pkt(struct trtstate *state)
 	struct v6_ph v6_ph;
 	struct udphdr udp;
 	struct timeval interval;
+	struct sockaddr_in6 sin6;
 	char line[80];
 	char id[]= "http://atlas.ripe.net Randy Bush, Atlas says Hi!";
 
@@ -568,6 +573,19 @@ static void send_pkt(struct trtstate *state)
 				}
 			}
 		}
+
+		memset(&sin6, '\0', sizeof(sin6));
+
+		r= connect(base->v6udp_snd,
+			(struct sockaddr *)&sin6, sizeof(sin6));
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+		if (r == -1)
+		{
+			fprintf(stderr, "send_pkt: connect failed: %s\n",
+				strerror(errno));
+		}
 	}
 	else
 	{
@@ -661,45 +679,48 @@ static void send_pkt(struct trtstate *state)
 		}
 		else
 		{
-			if (state->parismod)
+			sock= socket(AF_INET, SOCK_DGRAM, 0);
+			if (sock == -1)
 			{
-				sock= socket(AF_INET, SOCK_DGRAM, 0);
-				if (sock == -1)
-				{
-					crondlog(DIE9 "socket failed");
-				}
+				crondlog(DIE9 "socket failed");
+			}
 
-				/* Bind to source addr/port */
-				r= bind(sock,
-					(struct sockaddr *)&state->loc_sin6,
-					state->loc_socklen);
+			on= 1;
+			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
+				sizeof(on));
+
+			/* Bind to source addr/port */
+			r= bind(sock,
+				(struct sockaddr *)&state->loc_sin6,
+				state->loc_socklen);
 #if 0
  { static int doit=1; if (doit && r != -1)
- 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+ { errno= ENOSYS; r= -1; } doit= !doit; }
 #endif
-				if (r == -1)
-				{
-					serrno= errno;
-
-					snprintf(line, sizeof(line),
-			"%s{ " DBQ(error) ":" DBQ(bind failed: %s) " } ] }",
-						state->sent ? " }, " : "",
-						strerror(serrno));
-					add_str(state, line);
-					report(state);
-					close(sock);
-					return;
-				}
-			}
-			else
+			if (r == -1)
 			{
-				sock= base->v4udp_snd;
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+		"%s{ " DBQ(error) ":" DBQ(bind failed: %s) " } ] }",
+					state->sent ? " }, " : "",
+					strerror(serrno));
+				add_str(state, line);
+				report(state);
+				close(sock);
+				return;
 			}
 
 			hop= state->hop;
 
 			/* Set port */
-			if (!state->parismod)
+			if (state->parismod)
+			{
+				((struct sockaddr_in *)&state->sin6)->sin_port=
+					htons(BASE_PORT +
+					(state->paris % state->parismod));
+			}
+			else
 			{
 				((struct sockaddr_in *)&state->sin6)->sin_port=
 					htons(BASE_PORT + state->seq);
@@ -741,7 +762,7 @@ static void send_pkt(struct trtstate *state)
 			{
 				/* Make sure that the sequence number ends
 				 * up in the checksum field. We can't store
-				 * 0.
+				 * 0. So we add 1.
 				 */
 				if (state->seq == 0)
 					state->seq++;
@@ -783,8 +804,7 @@ static void send_pkt(struct trtstate *state)
 #endif
 
 			serrno= errno;
-			if (state->parismod)
-				close(sock);
+			close(sock);
 			if (r == -1)
 			{
 				if (serrno != EMSGSIZE)
@@ -932,6 +952,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 		printf("ready_callback4: read error '%s'\n", strerror(errno));
 		return;
 	}
+	// printf("ready_callback4: got packet\n");
 
 	ip= (struct ip *)base->packet;
 	hlen= ip->ip_hl*4;
@@ -972,10 +993,9 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 			eudp= (struct udphdr *)((char *)eip+ehlen);
 
-			/* If we are doing paris, we store the id in the
-			 * destination port.
+			/* We store the id in the source port.
 			 */
-			ind= ntohs(eudp->uh_dport) - BASE_PORT;
+			ind= ntohs(eudp->uh_sport) - SRC_BASE_PORT;
 
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
@@ -984,29 +1004,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 				state= NULL;
 			if (state && state->do_icmp)
 				state= NULL;	
-			if (state && !state->parismod)
-				state= NULL;	
 
 			if (!state)
 			{
-				/* Try again for non-paris. Get the id from
-				 * the checksum field.
-				 */
-				ind= ntohs(eudp->uh_sum)-1;
-				state= NULL;
-				if (ind >= 0 && ind < base->tabsiz)
-					state= base->table[ind];
-				if (state && state->sin6.sin6_family != AF_INET)
-					state= NULL;
-				if (state && state->do_icmp)
-					state= NULL;	
-				if (state && state->parismod)
-					state= NULL;	
-				if (!state)
-				{
-					/* Nothing here */
-					return;
-				}
+				/* Nothing here */
+				// printf("ready_callback4: no state\n");
+				return;
 			}
 
 #if 0
@@ -1033,6 +1036,14 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 				/* Sequence number is in checksum field */
 				seq= ntohs(eudp->uh_sum);
+
+				/* Unfortunately, cheap home routers may 
+				 * forget to restore the checksum field
+				 * when they are doing NAT. Ignore the 
+				 * sequence number if it seems wrong.
+				 */
+				if (seq > state->seq)
+					seq= state->seq;
 			}
 			else
 			{
@@ -1226,6 +1237,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 
 			if (state->sin6.sin6_family != AF_INET)
 			{
+				// printf("ready_callback4: bad family\n");
 				return;
 			}
 
@@ -1424,7 +1436,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				printf(
 			"ready_callback4: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
-				return;
 			}
 		}
 		else if (nrecv > hlen + ICMP_MINLEN + 128)
@@ -1442,7 +1453,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				printf(
 			"ready_callback4: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
-				return;
 			}
 		}
 
@@ -1495,6 +1505,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 		if (state->sin6.sin6_family != AF_INET)
 		{
+			// printf("ready_callback4: bad family\n");
 			return;
 		}
 
@@ -1998,7 +2009,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			"ready_callback6: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
 #endif
-				return;
 			}
 		}
 		else if (nrecv > 128)
@@ -2014,9 +2024,8 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			else
 			{
 				printf(
-			"ready_callback4: too short %d (Multi-Part ICMP)\n",
+			"ready_callback6: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
-				return;
 			}
 		}
 
@@ -2525,6 +2534,7 @@ static void traceroute_start(void *state)
 				report(trtstate);
 				return;
 			}
+
 			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
 			if (getsockname(sock,
 				&trtstate->loc_sin6,
@@ -2548,44 +2558,36 @@ static void traceroute_start(void *state)
 
 			memset(&loc_sa4, '\0', sizeof(loc_sa4));
 			loc_sa4.sin_family= AF_INET;
-			if (trtstate->parismod)
+
+			loc_sa4.sin_port= htons(SRC_BASE_PORT +
+				trtstate->index);;
+
+			/* Also set destination port */
+			((struct sockaddr_in *)&trtstate->sin6)->
+				sin_port= htons(BASE_PORT);
+
+			sock= socket(AF_INET, SOCK_DGRAM, 0);
+			if (sock == -1)
 			{
-				loc_sa4.sin_port= htons(BASE_PORT +
-					trtstate->paris % trtstate->parismod);
-
-				/* Also set destination port */
-				((struct sockaddr_in *)&trtstate->sin6)->
-					sin_port= htons(BASE_PORT +
-					trtstate->index);
-
-				sock= socket(AF_INET, SOCK_DGRAM, 0);
-				if (sock == -1)
-				{
-					crondlog(DIE9 "socket failed");
-				}
-				r= bind(sock, (struct sockaddr *)&loc_sa4,
-					sizeof(loc_sa4));
+				crondlog(DIE9 "socket failed");
+			}
+			r= bind(sock, (struct sockaddr *)&loc_sa4,
+				sizeof(loc_sa4));
 #if 0
  { errno= ENOSYS; r= -1; }
 #endif
-				if (r == -1)
-				{
-					serrno= errno;
-
-					snprintf(line, sizeof(line),
-				", " DBQ(error) ":" DBQ(bind failed: %s) " }",
-						strerror(serrno));
-					add_str(trtstate, line);
-					report(trtstate);
-					close(sock);
-					return;
-				}
-			}
-			else
+			if (r == -1)
 			{
-				sock= trtbase->v4udp_snd;
-			}
+				serrno= errno;
 
+				snprintf(line, sizeof(line),
+			", " DBQ(error) ":" DBQ(bind failed: %s) " }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				close(sock);
+				return;
+			}
 
 			r= connect(sock, (struct sockaddr *) &trtstate->sin6,
 				trtstate->socklen);
@@ -2611,8 +2613,7 @@ static void traceroute_start(void *state)
 			{
 				crondlog(DIE9 "getsockname failed");
 			}
-			if (trtstate->parismod)
-				close(sock);
+			close(sock);
 #if 0
 			printf("Got localname: %s:%d\n",
 				inet_ntoa(((struct sockaddr_in *)
@@ -2625,6 +2626,7 @@ static void traceroute_start(void *state)
 
 	add_str(trtstate, ", \"result\": [ ");
 
+	trtstate->starttime= time(NULL);
 	send_pkt(trtstate);
 }
 
