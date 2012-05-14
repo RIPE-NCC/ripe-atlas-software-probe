@@ -113,7 +113,16 @@
 
 #ifndef T_NSEC
 #define T_NSEC ns_t_nsec
-#endif 
+#endif  
+
+#ifndef T_NSEC3
+#define T_NSEC3 ns_t_nsec3
+#endif  
+
+#ifndef ns_t_nsec3
+#define ns_t_nsec3   50
+#endif
+
 
 #ifndef ns_t_ds
 #define ns_t_ds   43
@@ -317,6 +326,7 @@ static struct option longopts[]=
 	{ "any", required_argument, NULL, (100000 + T_ANY) },
 	{ "dnskey", required_argument, NULL, (100000 + T_DNSKEY) },
 	{ "nsec", required_argument, NULL, (100000 + T_NSEC) },
+	{ "nsec3", required_argument, NULL, (100000 + T_NSEC3) },
 	{ "ds", required_argument, NULL, (100000 + T_DS) },
 	{ "rrsig", required_argument, NULL, (100000 + T_RRSIG) },
 	{ "soa", required_argument, NULL, 's' },
@@ -989,7 +999,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->lookupname = NULL;
 
 	optind = 0;
-	while (c= getopt_long(argc, argv, "46dD:e:tbhinqO:rs:A:?", longopts, NULL), c != -1) {
+	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:rs:A:?", longopts, NULL), c != -1) {
 		switch(c) {
 			case '4':
 				qry->opt_v4_only = 1;
@@ -998,6 +1008,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case '6':
 				qry->opt_v6_only = 1;
 				qry->opt_AF = AF_INET6;
+				break;
+
+			case 'a':
+				qry->opt_v6_only = 1;
+				qry->opt_v4_only = 1;
 				break;
 
 			case 'A':
@@ -1055,6 +1070,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			case O_RESOLV_CONF :
 				qry->opt_resolv_conf = Q_RESOLV_CONF ;
+				qry->opt_v6_only = 1;
+				qry->opt_v4_only = 1;
 				break;
 
 			case (100000 + T_A):
