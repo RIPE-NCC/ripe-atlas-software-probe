@@ -558,7 +558,8 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 
 	printf("\n");
 }
-unsigned char* ReadName(unsigned char *base, size_t size, size_t offset, 
+
+unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 	int* count)
 {
 	unsigned char *name;
@@ -573,7 +574,6 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 	//read the names in 3www6google3com format
 	while(len= base[offset], len !=0)
 	{
-		printf("ReadName2: offset %d, len %d\n", offset, len);
 		if (len & 0xc0)
 		{
 			if ((len & 0xc0) != 0xc0)
@@ -604,9 +604,6 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			jumped= 1;
 			continue;
 		}
-
-		printf("ReadName2: string: '%.*s'\n", len, base+offset+1);
-
 		if (offset+len+1 > size)
 		{
 			strcpy(name, "buf-bounds-error");
@@ -643,7 +640,6 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 
 	if(p >  0)
 		name[p-1]= '\0'; //remove the last dot
-	printf("ReadName2: returning '%s', *count = %d \n", name, *count);
 	return name;
 }
 

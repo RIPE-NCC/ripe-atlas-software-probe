@@ -26,6 +26,7 @@
  */
 
 #include "libbb.h"
+#include "atlas_bb64.h"
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
@@ -135,16 +136,6 @@
 
 /* Definition for various types of counters */
 typedef uint32_t counter_t;
-
-
-struct buf
-{
-        size_t offset;
-        size_t size;
-        size_t maxsize;
-        char *buf;
-        int fd;
-};
 
 /* How to keep track of a DNS query session */
 struct tdig_base {
@@ -363,10 +354,8 @@ void ldns_write_uint16(void *dst, uint16_t data);
 uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
         int* count);
+void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh);
 /* from tdig.c */
-
-int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl);
-void buf_cleanup(struct buf *buf);
 
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
@@ -401,6 +390,28 @@ int evtdig_main(int argc, char **argv)
 	if(EventBase)
 	event_base_free(EventBase);
 	return 0;
+}
+
+void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh)
+{
+        int i;
+
+        fprintf(fh, ", \"RDATA\" : \"");
+        for(i = 0; i < txt_len; i++) {
+                if( (*rdata == 34  ) || (*rdata == 92  ))  {
+                        fprintf(fh, "\\%c", *(char *)rdata  );
+                }
+                // Space - DEL
+                else if ((*rdata > 31  ) && (*rdata < 128)) {
+                        fprintf(fh, "%c", *(char *)rdata );
+                }
+                else {
+                        fprintf(fh, "\\u00%02X", *rdata   );
+                }
+                rdata++;
+        }
+
+        fprintf(fh, "\"");
 }
 
 static void done(void *state UNUSED_PARAM)
@@ -1689,7 +1700,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 			for(i=0;i<iMax;i++)
 			{
-				printf("Answer %d\n", i);
 				answers[i].name=ReadName(result,wire_size,
 					reader-result,&stop);
 				reader = reader + stop;
@@ -1705,21 +1715,17 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
-printf("TXT\n");
+					answers[i].rdata =  NULL;
+					int data_len = ntohs(answers[i].resource->data_len) - 1;
 
 					fprintf(fh, " \"TYPE\" : \"TXT\"");
 					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
-					answers[i].rdata = ReadName(
-						result,wire_size,
-						reader-result,&stop);
-					reader = reader + stop;
+					print_txt_json(&result[reader-result+1], data_len, fh);
+					reader = reader + ntohs(answers[i].resource->data_len);
 
-					answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-					fprintf(fh, " , \"RDATA\" : \"%s\" ", answers[i].rdata);
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
-printf("SOA\n");
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
 					JU(TTL, ntohl(answers[i].resource->ttl));
@@ -1742,8 +1748,6 @@ printf("SOA\n");
 				}
 				else  
 				{
-printf("other\n");
-
 					JU(TYPE, ntohs(answers[i].resource->type));
 					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
 					reader =  reader + ntohs(answers[i].resource->data_len);
