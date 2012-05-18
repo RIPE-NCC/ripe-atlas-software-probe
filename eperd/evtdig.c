@@ -361,7 +361,8 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 u_int32_t get32b (char *p);
 void ldns_write_uint16(void *dst, uint16_t data);
 uint16_t ldns_read_uint16(const void *src);
-unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
+unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
+        int* count);
 /* from tdig.c */
 
 int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl);
@@ -670,7 +671,6 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 
 	BLURT(LVL5 "AAA timeout for %s ", qry->server_name);
 	printReply (qry, 0, NULL);
-	sleep(10);
 	return;
 } 
 
@@ -998,6 +998,12 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_resolv_conf = (Q_RESOLV_CONF - 1);
 	qry->lookupname = NULL;
 
+	/* initialize callbacks: no reply timeout and sendpacket */
+	evtimer_assign(&qry->nsm_timer, tdig_base->event_base,
+		tdig_send_query_callback, qry);
+	evtimer_assign(&qry->noreply_timer, tdig_base->event_base,
+		noreply_callback, qry); 
+
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:rs:A:?", longopts, NULL), c != -1) {
 		switch(c) {
@@ -1225,7 +1231,7 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	struct addrinfo hints;
 	int on = 1;
 	struct timeval tv;
-	
+
 	bzero(&hints,sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_flags = 0;
@@ -1347,10 +1353,6 @@ void tdig_start (struct query_state *qry)
 
 		qry->res = res;
 		qry->ressave = res;
-
-		/* initialize callbacks: no reply timeout and sendpacket */
-		evtimer_assign(&qry->nsm_timer, tdig_base->event_base, tdig_send_query_callback, qry);
-		evtimer_assign(&qry->noreply_timer, tdig_base->event_base, noreply_callback, qry); 
 
 		evtimer_add(&qry->nsm_timer, &asap);
 	}
@@ -1544,6 +1546,10 @@ static int tdig_delete(void *state)
 		qry->lookupname = NULL;
 	}
 
+	/* Delete timers */
+	evtimer_del(&qry->noreply_timer);
+	evtimer_del(&qry->nsm_timer);
+
 	if((qry->next == qry->prev) && (qry->next == qry)) {
 		qry->base->qry_head =  NULL;
 		crondlog(LVL7 "deleted last query qry %s", qry->str_Atlas);
@@ -1683,8 +1689,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 			for(i=0;i<iMax;i++)
 			{
-			//	printf("Answer %d\n", i);
-				answers[i].name=ReadName(reader,result,&stop);
+				printf("Answer %d\n", i);
+				answers[i].name=ReadName(result,wire_size,
+					reader-result,&stop);
 				reader = reader + stop;
 
 				answers[i].resource = (struct R_DATA*)(reader);
@@ -1698,10 +1705,13 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
+printf("TXT\n");
 
 					fprintf(fh, " \"TYPE\" : \"TXT\"");
 					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
-					answers[i].rdata = ReadName(reader,result,&stop);
+					answers[i].rdata = ReadName(
+						result,wire_size,
+						reader-result,&stop);
 					reader = reader + stop;
 
 					answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
@@ -1709,14 +1719,19 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
+printf("SOA\n");
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
 					JU(TTL, ntohl(answers[i].resource->ttl));
-					answers[i].rdata = ReadName(reader,result,&stop);
+					answers[i].rdata = ReadName(
+						result,wire_size,
+						reader-result,&stop);
 					JSDOT( MNAME, answers[i].rdata);
 					reader =  reader + stop;
 					free(answers[i].rdata);
-					answers[i].rdata = ReadName(reader,result,&stop);
+					answers[i].rdata = ReadName(
+						result,wire_size,
+						reader-result,&stop);
 					JSDOT( RNAME, answers[i].rdata);
 					reader =  reader + stop;
 					serial = get32b(reader);
@@ -1727,6 +1742,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				}
 				else  
 				{
+printf("other\n");
 
 					JU(TYPE, ntohs(answers[i].resource->type));
 					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))

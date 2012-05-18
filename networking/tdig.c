@@ -123,7 +123,7 @@ static void fatal(const char *fmt, ...);
 static void fatal_err(const char *fmt, ...);
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
-unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count);
+unsigned char* ReadName(unsigned char* base,size_t size,size_t offset,int* count);
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) ; 
 unsigned int makequery( struct DNS_HEADER *dns, struct EDNS0_HEADER *edns0, unsigned char *buf, unsigned char *lookupname, u_int16_t qtype, u_int16_t qclass);
 
@@ -494,7 +494,7 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 
 	for(i=0;i<ntohs(dnsR->ans_count);i++)
 	{
-		answers[i].name=ReadName(reader,result,&stop);
+		answers[i].name=ReadName(result,wire_size,reader-result,&stop);
 		reader = reader + stop;
 
 		answers[i].resource = (struct R_DATA*)(reader);
@@ -510,7 +510,7 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 		{
 			printf(" TXT ", ntohs(answers[i].resource->data_len));
 			printf(" %s ",answers[i].name);
-			answers[i].rdata = ReadName(reader,result,&stop);
+			//answers[i].rdata = ReadName(reader,result,&stop);
 			reader = reader + stop;
 
 			answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
@@ -520,11 +520,13 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 		{
 			printf("SOA ");
 			printf(" %s ",answers[i].name);
-			answers[i].rdata = ReadName(reader,result,&stop);
+			answers[i].rdata = ReadName(result,wire_size,
+				reader-result,&stop);
 			//printf(" %s", answers[i].rdata);
 			reader =  reader + stop;
 			free(answers[i].rdata);
-			answers[i].rdata = ReadName(reader,result,&stop);
+			answers[i].rdata = ReadName(result,wire_size,
+				reader-result,&stop);
 			//printf(" %s", answers[i].rdata);
 		        reader =  reader + stop;
 			u_int32_t serial;
@@ -556,50 +558,92 @@ void printAnswer(unsigned char *result, int wire_size, unsigned long long tTrip_
 
 	printf("\n");
 }
-unsigned char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
+unsigned char* ReadName(unsigned char *base, size_t size, size_t offset, 
+	int* count)
 {
 	unsigned char *name;
-	unsigned int p=0,jumped=0,offset;
+	unsigned int p=0,jumped=0, len;
 	int i , j;
 
-	*count = 1;
+	*count = 0;
 	name = (unsigned char*)malloc(256);
 
-	name[0]=NULL;
+	name[0]= '\0';
 
 	//read the names in 3www6google3com format
-	while(*reader!=0)
+	while(len= base[offset], len !=0)
 	{
-		if(*reader>=192)
+		printf("ReadName2: offset %d, len %d\n", offset, len);
+		if (len & 0xc0)
 		{
-			offset = (*reader)*256 + *(reader+1) - 49152; //49152 = 11000000 00000000 <img src="http://www.binarytides.com/blog/wp-includes/images/smilies/icon_wink.gif" alt=";)" class="wp-smiley">
-			reader = buffer + offset - 1;
-			jumped = 1; //we have jumped to another location so counting wont go up!
+			if ((len & 0xc0) != 0xc0)
+			{
+				/* Bad format */
+				strcpy(name, "format-error");
+				printf("format-error: len = %d\n",
+					len);
+				abort();
+				return name;
+			}
+
+			offset= ((len & ~0xc0) << 8) | base[offset+1];
+			if (offset >= size)
+			{
+				strcpy(name, "offset-error");
+				printf("offset-error\n");
+				abort();
+				return name;
+			}
+			if(jumped==0)
+			{
+				/* if we havent jumped to another location
+				 * then we can count up
+				 */
+				*count += 2;
+			}
+			jumped= 1;
+			continue;
 		}
-		else
-			name[p++]=*reader;
 
-		reader=reader+1;
+		printf("ReadName2: string: '%.*s'\n", len, base+offset+1);
 
+		if (offset+len+1 > size)
+		{
+			strcpy(name, "buf-bounds-error");
+			printf("buf-bounds-error\n");
+			abort();
+			return name;
+		}
+
+		if (p+len+1 > 255)
+		{
+			strcpy(name, "name-length-error");
+			printf("name-length-error\n");
+			abort();
+			return name;
+		}
+		memcpy(name+p, base+offset+1, len);
+		name[p+len]= '.';
+		p += len+1;
+		offset += len+1;
+		
 		if(jumped==0)
-			*count = *count + 1; //if we havent jumped to another location then we can count up
-	}
-
-	name[p]=NULL; //string complete
-	if(jumped==1)
-		*count = *count + 1; //number of steps we actually moved forward in the packet
-
-	//now convert 3www6google3com0 to www.google.com
-	for(i=0;i<(int)strlen((const char*)name);i++) {
-		p=name[i];
-		for(j=0;j<(int)p;j++) {
-			name[i]=name[i+1];
-			i=i+1;
+		{
+			/* if we havent jumped to another location then we
+			 * can count up 
+			 */
+			*count += len+1;
 		}
-		name[i]='.';
 	}
-	if(i >  0)
-		name[i-1]=NULL; //remove the last dot
+
+	if (!jumped)
+		(*count)++;	/* Terminating zero length */
+
+	name[p]= '\0'; //string complete
+
+	if(p >  0)
+		name[p-1]= '\0'; //remove the last dot
+	printf("ReadName2: returning '%s', *count = %d \n", name, *count);
 	return name;
 }
 
