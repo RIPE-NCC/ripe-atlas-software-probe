@@ -111,8 +111,6 @@ static void report(struct pingstate *state)
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
 	state->result= NULL;
-	crondlog(LVL8 "report: clearing busy for state %p, '%s'",
-			state, state->hostname);
 	state->busy= 0;
 
 	if (state->out_filename)
@@ -309,8 +307,6 @@ static void ping_start(void *state)
 
 	pingstate->first= 1;
 	pingstate->got_reply= 0;
-	crondlog(LVL8 "ping_start: setting busy for state %p, '%s'",
-			pingstate, pingstate->hostname);
 	pingstate->busy= 1;
 
 	evping_start(pingstate->pingevent, pingstate->pingcount);

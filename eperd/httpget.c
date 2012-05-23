@@ -674,6 +674,12 @@ static void report(struct hgstate *state)
 		tu_restart_connect(&state->tu_env);
 		return;
 	}
+	if (state->linemax)
+	{
+		state->linemax= 0;
+		free(state->line);
+		state->line= NULL;
+	}
 
 	state->bev= NULL;
 
@@ -691,6 +697,9 @@ static int get_input(struct hgstate *state)
 	/* Assume that we always end up with a full buffer anyway */
 	if (state->linemax == 0)
 	{
+		if (state->line)
+			crondlog(DIE9 "line is not empty");
+
 		state->linemax= MAX_LINE_LEN;
 		state->line= xmalloc(state->linemax);
 	}
@@ -1641,6 +1650,9 @@ static int httpget_delete(void *state)
 
 	if (hgstate->busy)
 		return 0;
+
+	if (hgstate->line)
+		crondlog(DIE9 "line is not empty");
 
 	base= hgstate->base;
 	ind= hgstate->index;
