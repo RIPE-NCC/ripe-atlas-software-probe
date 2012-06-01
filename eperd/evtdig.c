@@ -1157,6 +1157,12 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->lookupname  = (u_char *) strdup(optarg);
 				break;
 
+			case (100000 + T_NSEC3):
+				qry->qtype = T_NSEC3;
+				qry->qclass = C_IN;
+				qry->lookupname  = (u_char *) strdup(optarg);
+				break;
+
 			case (100000 + T_DNSKEY):
 				qry->qtype = T_DNSKEY;
 				qry->qclass = C_IN;
@@ -1171,6 +1177,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			default:
 				fprintf(stderr, "ERROR unknown option %d ??\n", c); 
+				 tdig_delete(qry);
 				return (0);
 				break;
 		}
@@ -1188,12 +1195,15 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_resolv_conf = 1;
 				qry->server_name = strdup(tdig_base->nslist[0]);
 			}
-			else 
+			else {
+				tdig_delete(qry);
 				return NULL;
+			}
 		}
 	}
 	else if (optind != argc-1)  {
 		crondlog(LVL9 "ERROR no server IP address in input");
+		tdig_delete(qry);
 		return NULL;
 	}
 	else 
@@ -1201,6 +1211,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 	 if(qry->lookupname == NULL) {
 		crondlog(LVL9 "ERROR no query in command line");
+		tdig_delete(qry);
 		return NULL;
 	}
 
