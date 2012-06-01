@@ -1021,6 +1021,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->lookupname = NULL;
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
+	qry->loc_sin6.sin6_family = 0;
 
 	/* initialize callbacks: no reply timeout and sendpacket */
 	evtimer_assign(&qry->nsm_timer, tdig_base->event_base,
@@ -1680,15 +1681,14 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	else {
 		JS(name,  qry->server_name);
 	}
-
-	line[0]  = '\0';
-	getnameinfo((struct sockaddr *)&qry->loc_sin6,
-			qry->loc_socklen, line, sizeof(line),
-			NULL, 0, NI_NUMERICHOST);
-	if(strlen(line)) 
-		JS(src, line);
-
-
+	if(qry->loc_sin6.sin6_family) {
+		line[0]  = '\0';
+		getnameinfo((struct sockaddr *)&qry->loc_sin6,
+				qry->loc_socklen, line, sizeof(line),
+				NULL, 0, NI_NUMERICHOST);
+		if(strlen(line)) 
+			JS(src, line); 
+	}
 
 	JS_NC(proto, qry->opt_proto == 6 ? "TCP" : "UDP" );
 	if(qry->opt_qbuf && qry->qbuf.size) {
