@@ -199,6 +199,7 @@ struct query_state {
 	int opt_qbuf;
 	int opt_abuf;
 	int opt_resolv_conf;
+	int opt_rd;
 
 	char * str_Atlas; 
 	u_int16_t qtype;
@@ -549,7 +550,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->ns_count = 0;
 	dns->add_count = htons(0);
 
-	if( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
+	if (( qry->opt_resolv_conf > Q_RESOLV_CONF ) ||  (qry->opt_rd )){
 		// if you need more falgs do a bitwise and here.
 		dns->flags = htons(DNS_FLAG_RD);
 	}
@@ -1013,6 +1014,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_nsid = 0; 
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
+	qry->opt_rd = 0;
 	qry->ressave = NULL;
 	qry->ressent = NULL;
 	buf_init(&qry->err, -1);
@@ -1030,7 +1032,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		noreply_callback, qry); 
 
 	optind = 0;
-	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:rs:A:?", longopts, NULL), c != -1) {
+	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:?", longopts, NULL), c != -1) {
 		switch(c) {
 			case '4':
 				qry->opt_v4_only = 1;
@@ -1079,6 +1081,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			case 'r':
 				qry->lookupname = (u_char *) strdup("version.server.");
+				break;
+
+			case 'R':
+				qry->opt_rd = 1;
 				break;
 
 			case 's':
