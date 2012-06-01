@@ -234,6 +234,8 @@ struct query_state {
 	char loc_addr_str[(INET6_ADDRSTRLEN+1)]; 
 	unsigned short dst_ai_family ;
 	unsigned short loc_ai_family ;
+	struct sockaddr_in6 loc_sin6;
+        socklen_t loc_socklen;
 	
 
 	u_char *outbuff;
@@ -759,13 +761,15 @@ static void tcp_beforeconnect(struct tu_env *env,
 
 static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 {
-
 	uint16_t payload_len ;
 	u_char *outbuff;	
 	u_char *wire;
 	struct query_state * qry; 
 	qry = ENV2QRY(env); 
 	BLURT(LVL5 "send %u bytes", payload_len );
+
+	qry->loc_socklen= sizeof(qry->loc_sin6);
+        getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
 
 	qry->bev_tcp =  bev;
 	outbuff = xzalloc(MAX_DNS_BUF_SIZE);
@@ -1677,6 +1681,15 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JS(name,  qry->server_name);
 	}
 
+	line[0]  = '\0';
+	getnameinfo((struct sockaddr *)&qry->loc_sin6,
+			qry->loc_socklen, line, sizeof(line),
+			NULL, 0, NI_NUMERICHOST);
+	if(strlen(line)) 
+		JS(src, line);
+
+
+
 	JS_NC(proto, qry->opt_proto == 6 ? "TCP" : "UDP" );
 	if(qry->opt_qbuf && qry->qbuf.size) {
 		str[0]  = '\0';
@@ -1685,6 +1698,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JS_NC(qbuf, qry->qbuf.buf );
 	} 
 
+      
 	if(result)
 	{
 		dnsR = (struct DNS_HEADER*) result;
