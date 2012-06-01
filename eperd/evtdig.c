@@ -230,6 +230,11 @@ struct query_state {
 	struct buf qbuf; 
 	struct buf packet;
 	int qst ; 
+	char dst_addr_str[(INET6_ADDRSTRLEN+1)]; 
+	char loc_addr_str[(INET6_ADDRSTRLEN+1)]; 
+	unsigned short dst_ai_family ;
+	unsigned short loc_ai_family ;
+	
 
 	u_char *outbuff;
 };
@@ -747,7 +752,9 @@ static void tcp_beforeconnect(struct tu_env *env,
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
 	gettimeofday(&qry->xmit_time, NULL); 
+	qry->dst_ai_family = addr->sa_family;
 	BLURT(LVL5 "time : %d",  qry->xmit_time.tv_sec);
+	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
 }
 
 static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
@@ -1639,6 +1646,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	}
 	if( qry->ressent)
 	{  // started to send query
+	   // historic resaons only works with UDP 
 		switch (qry->ressent->ai_family)
 		{
 			case AF_INET:
@@ -1654,6 +1662,14 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		}
 		JS(address , addrstr);
 		JD(pf, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
+	}
+	else if(qry->dst_ai_family)
+	{
+		if(strcmp(qry->dst_addr_str, qry->server_name)) {
+			JS(name,  qry->server_name);
+		}
+		JS(address , qry->dst_addr_str);
+		JD(pf, qry->dst_ai_family == PF_INET6 ? 6 : 4);
 	}
 	else {
 		JS(name,  qry->server_name);
