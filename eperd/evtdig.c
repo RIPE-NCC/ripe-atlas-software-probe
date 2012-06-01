@@ -1015,6 +1015,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	buf_init(&qry->packet, -1);
 	qry->opt_resolv_conf = (Q_RESOLV_CONF - 1);
 	qry->lookupname = NULL;
+	qry->dst_ai_family = 0;
+	qry->loc_ai_family = 0;
 
 	/* initialize callbacks: no reply timeout and sendpacket */
 	evtimer_assign(&qry->nsm_timer, tdig_base->event_base,
