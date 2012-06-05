@@ -628,10 +628,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 {
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
-	int serrno;
 	uint32_t nsent;
 	u_char *outbuff;
 	int err = 0; 
+	int sockfd;
 
 		/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
@@ -650,8 +650,27 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				nsent = sendto(base->rawfd_v6, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 				break;
 		}
+		
 
 		if (nsent == qry->pktsize) {
+			// the packet is send. Now lets try to the source address we would have used.
+			// create another sock with same dest, connect and get the source address 
+    			// delete that socket and hope the the source address is the right one.
+			if ((sockfd = socket(qry->res->ai_family, SOCK_DGRAM, 0 ) ) < 0 ) { 
+                                        snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"temp socket to get src address failed %s\"", qry->err.size ? ", " : "", strerror(errno));
+                                        buf_add(&qry->err, line, strlen(line));
+				return NULL;
+        		}
+			else  {
+				qry->loc_socklen = sizeof(qry->loc_sin6);
+				connect(sockfd, qry->res->ai_addr, qry->res->ai_addrlen);
+				if (getsockname(sockfd,(struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
+					snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getscokname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
+					buf_add(&qry->err, line, strlen(line));
+				}
+				close(sockfd);
+			}
+
 			/* One more DNS Query is sent */
 			base->sentok++;
 			base->sentbytes += nsent;
@@ -668,8 +687,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		else {
 			err  = 1;
 			base->sendfail++;
-			serrno= errno; 
-			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"senderror\" : \"%s\"", qry->err.size ? ", " : "", strerror(serrno)); 
+			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"senderror\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno)); 
 			buf_add(&qry->err, line, strlen(line));
 		}
 	} while ((qry->res = qry->res->ai_next) != NULL);
@@ -1635,6 +1653,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	struct buf tmpbuf;
 	char str[4]; 
 	int iMax ;
+	int flagAnswer = 1;
 
 	if (qry->out_filename)
 	{
@@ -1744,7 +1763,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		
 		if (dnsR->ans_count > 0)
 		{
-			fprintf (fh, ", \"answers\" : [ ");
 			iMax = MIN(2, ntohs(dnsR->ans_count));
 
 			for(i=0;i<iMax;i++)
@@ -1758,23 +1776,42 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 
 				answers[i].rdata  = NULL;
 
-				if(i > 0) 
-					fprintf(fh, ", ");
-				fprintf(fh, " { ");
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
 					answers[i].rdata =  NULL;
 					int data_len = ntohs(answers[i].resource->data_len) - 1;
 
+					if(flagAnswer) {
+						fprintf (fh, ", \"answers\" : [ ");
+						flagAnswer = 0;
+					}
+					if (flagAnswer == 0) {
+						if(i > 0) 
+							fprintf(fh, ", ");
+						fprintf(fh, " { ");
+					}
 					fprintf(fh, " \"TYPE\" : \"TXT\"");
 					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
 					print_txt_json(&result[reader-result+1], data_len, fh);
 					reader = reader + ntohs(answers[i].resource->data_len);
+					if(flagAnswer == 0) 
+						fprintf(fh, " } ");
 
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
+					if(flagAnswer) {
+						fprintf (fh, ", \"answers\" : [ ");
+						flagAnswer = 0;
+					}
+					if (flagAnswer == 0) {
+					if(i > 0) 
+						fprintf(fh, ", ");
+					fprintf(fh, " { ");
+					}
+
+	
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
 					JU(TTL, ntohl(answers[i].resource->ttl));
@@ -1790,24 +1827,26 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 					JSDOT( RNAME, answers[i].rdata);
 					reader =  reader + stop;
 					serial = get32b(reader);
-					JU(SERIAL, serial);
-					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len));
+					JU_NC(SERIAL, serial);
 					reader =  reader + 4;
 					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
+					if(flagAnswer == 0) 
+						fprintf(fh, " } ");
 				}
 				else  
 				{
-					JU(TYPE, ntohs(answers[i].resource->type));
-					JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
+					// JU(TYPE, ntohs(answers[i].resource->type));
+					// JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
 					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
-				fprintf(fh, " } ");
+	
 				fflush(fh);
 				// free mem 
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
-			} 
-			fprintf (fh, " ]");
+			}
+			if(flagAnswer == 0) 
+				fprintf (fh, " ]");
 		}
 
 		for(i=0;i<iMax;i++)
