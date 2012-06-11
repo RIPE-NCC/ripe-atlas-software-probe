@@ -1669,6 +1669,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	if(qry->str_Atlas) 
 	{
 		JS(id,  qry->str_Atlas);
+		JS(type, "dns");
 
 	}
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
@@ -1692,19 +1693,19 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		if(strcmp(addrstr, qry->server_name)) {
 			JS(name,  qry->server_name);
 		}
-		JS(address , addrstr);
-		JD(pf, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
+		JS(dst_addr, addrstr);
+		JD(af, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
 	}
 	else if(qry->dst_ai_family)
 	{
 		if(strcmp(qry->dst_addr_str, qry->server_name)) {
-			JS(name,  qry->server_name);
+			JS(dst_name,  qry->server_name);
 		}
-		JS(address , qry->dst_addr_str);
-		JD(pf, qry->dst_ai_family == PF_INET6 ? 6 : 4);
+		JS(dst_addr , qry->dst_addr_str);
+		JD(af, qry->dst_ai_family == PF_INET6 ? 6 : 4);
 	}
 	else {
-		JS(name,  qry->server_name);
+		JS(dst_name,  qry->server_name);
 	}
 	if(qry->loc_sin6.sin6_family) {
 		line[0]  = '\0';
@@ -1712,7 +1713,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 				qry->loc_socklen, line, sizeof(line),
 				NULL, 0, NI_NUMERICHOST);
 		if(strlen(line)) 
-			JS(src, line); 
+			JS(src_addr, line); 
 	}
 
 	JS_NC(proto, qry->opt_proto == 6 ? "TCP" : "UDP" );
