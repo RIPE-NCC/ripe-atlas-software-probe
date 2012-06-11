@@ -1669,8 +1669,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	if(qry->str_Atlas) 
 	{
 		JS(id,  qry->str_Atlas);
-		JS(type, "dns");
-
 	}
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
 	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
