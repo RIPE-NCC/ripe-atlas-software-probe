@@ -603,15 +603,16 @@ static void report(struct hgstate *state)
 	if (!state->dnserr)
 	{
 		snprintf(line, sizeof(line), 
-			DBQ(mode) ":" DBQ(%s%c),
-			state->do_get ? "GET" : state->do_head ? "HEAD" : "POST", 
-			state->sin6.sin6_family == AF_INET6 ? '6' : '4');
+			DBQ(method) ":" DBQ(%s) ", " DBQ(af) ": %d",
+			state->do_get ? "GET" : state->do_head ? "HEAD" :
+			"POST", 
+			state->sin6.sin6_family == AF_INET6 ? 6 : 4);
 		add_str(state, line);
 
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line), ", " DBQ(addr) ":" DBQ(%s),
+		snprintf(line, sizeof(line), ", " DBQ(dst_addr) ":" DBQ(%s),
 			namebuf);
 		add_str(state, line);
 	}
@@ -623,7 +624,7 @@ static void report(struct hgstate *state)
 			state->loc_socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line), ", " DBQ(srcaddr) ":" DBQ(%s),
+		snprintf(line, sizeof(line), ", " DBQ(src_addr) ":" DBQ(%s),
 			namebuf);
 		add_str(state, line);
 	}

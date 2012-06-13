@@ -87,7 +87,7 @@ static void report(struct pingstate *state)
 	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-	fprintf(fh, "\"name\":\"%s\", \"addr\":\"%s\"",
+	fprintf(fh, "\"dst_name\":\"%s\", \"dst_addr\":\"%s\"",
 		state->hostname, namebuf);
 
 	if (state->got_reply)
@@ -97,11 +97,11 @@ static void report(struct pingstate *state)
 			state->loc_socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
+		fprintf(fh, ", \"src_addr\":\"%s\"", namebuf);
 	}
 
-	fprintf(fh, ", \"mode\":\"ICMP%c\"",
-		state->sin6.sin6_family == AF_INET6 ? '6' : '4');
+	fprintf(fh, ", " DBQ(proto) ":" DBQ(ICMP) ", " DBQ(af) ":%d",
+		state->sin6.sin6_family == AF_INET6 ? 6 : 4);
 
 	if (state->got_reply)
 		fprintf(fh, ", " DBQ(ttl) ":%d", state->ttl);

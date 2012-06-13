@@ -787,7 +787,7 @@ static struct builtin
 };
 
 
-#define ATLAS_NARGS	20	/* Max arguments to a built-in command */
+#define ATLAS_NARGS	64	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */
 
 static void atlas_init(CronLine *line)

@@ -311,22 +311,23 @@ static void report(struct trtstate *state)
 	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-	fprintf(fh, "\"name\":\"%s\", \"addr\":\"%s\"",
+	fprintf(fh, "\"dst_name\":\"%s\", \"dst_addr\":\"%s\"",
 		state->hostname, namebuf);
 
 	namebuf[0]= '\0';
 	getnameinfo((struct sockaddr *)&state->loc_sin6, state->loc_socklen,
 		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-	fprintf(fh, ", \"srcaddr\":\"%s\"", namebuf);
+	fprintf(fh, ", \"src_addr\":\"%s\"", namebuf);
 
-	fprintf(fh, ", \"mode\":\"%s%c\"", state->do_icmp ? "ICMP" : "UDP",
-		state->sin6.sin6_family == AF_INET6 ? '6' : '4');
+	fprintf(fh, ", " DBQ(proto) ":" DBQ(%s) ", " DBQ(af) ": %d",
+		state->do_icmp ? "ICMP" : "UDP",
+		state->sin6.sin6_family == AF_INET6 ? 6 : 4);
 
 	fprintf(fh, ", \"size\":%d", state->maxpacksize);
 	if (state->parismod)
 	{
-		fprintf(fh, ", \"paris-id\":%d",
+		fprintf(fh, ", \"paris_id\":%d",
 			state->paris % state->parismod);
 	}
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);

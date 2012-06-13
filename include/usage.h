@@ -3945,7 +3945,6 @@
 	"\n	-p <port>	Port (default https)" \
 	"\n	-4		IPv4" \
 	"\n	-6		IPv6" \
-     "todo"
 
 #define start_stop_daemon_trivial_usage \
        "[OPTIONS] [-S|-K] ... [-- arguments...]"

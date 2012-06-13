@@ -663,8 +663,12 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	printf("%s" DBQ(time) ":%ld", str_Atlas ? ", " : "", time(NULL));
-	printf(", " DBQ(name) ":" DBQ(%s) ", " DBQ(port) ":" DBQ(%s),
+	printf(", " DBQ(dst_name) ":" DBQ(%s) ", " DBQ(dst_port) ":" DBQ(%s),
 		hostname, str_port);
+
+	printf(", " DBQ(method) ":" DBQ(SSL) ", " DBQ(ver) ":" DBQ(3.0));
+	if (af != AF_UNSPEC)
+		printf(", " DBQ(af) ": %d", af == AF_INET6 ? 6 : 4);
 
 	if (tcp_fd == -1)
 	{
@@ -678,7 +682,12 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 		getnameinfo((struct sockaddr *)&sa, salen,
 			hostbuf, sizeof(hostbuf), NULL, 0,
 			NI_NUMERICHOST);
-		printf(", " DBQ(addr) ":" DBQ(%s), hostbuf);
+		printf(", " DBQ(dst_addr) ":" DBQ(%s), hostbuf);
+		if (af == AF_UNSPEC)
+		{
+			printf(", " DBQ(af) ": %d",
+				sa.ss_family == AF_INET6 ? 6 : 4);
+		}
 	}
 	salen= sizeof(sa);
 	if (getsockname(tcp_fd, (struct sockaddr *)&sa, &salen) != -1)
@@ -686,7 +695,7 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 		getnameinfo((struct sockaddr *)&sa, salen,
 			hostbuf, sizeof(hostbuf), NULL, 0,
 			NI_NUMERICHOST);
-		printf(", " DBQ(srcaddr) ":" DBQ(%s), hostbuf);
+		printf(", " DBQ(src_addr) ":" DBQ(%s), hostbuf);
 	}
 
 	buf_init(&outbuf, tcp_fd);
