@@ -1384,6 +1384,7 @@ void tdig_start (struct query_state *qry)
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 
+	gettimeofday(&qry->xmit_time, NULL);
 	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
