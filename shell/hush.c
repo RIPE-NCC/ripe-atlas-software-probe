@@ -4684,8 +4684,10 @@ static int builtin_rxtxrpt(char **argv)
 static int builtin_rchoose(char **argv)
 {
 	int argc = 0;
-	int r = rand();
+	int r;
+
 	srand (time (0));
+	r = rand();
         while (*argv) {
                 argc++;
                 argv++;
