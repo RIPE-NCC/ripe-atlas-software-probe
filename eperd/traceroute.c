@@ -2429,6 +2429,7 @@ static void traceroute_start(void *state)
 	trtstate->resmax= 80;
 	trtstate->result= xmalloc(trtstate->resmax);
 	trtstate->reslen= 0;
+	trtstate->starttime= time(NULL);
 
 	snprintf(line, sizeof(line), "{ \"hop\":%d", trtstate->hop);
 	add_str(trtstate, line);
@@ -2627,7 +2628,6 @@ static void traceroute_start(void *state)
 
 	add_str(trtstate, ", \"result\": [ ");
 
-	trtstate->starttime= time(NULL);
 	send_pkt(trtstate);
 }
 
