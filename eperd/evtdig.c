@@ -526,8 +526,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	int r;
 
 	dns = (struct DNS_HEADER *)packet;
-	srand ( time(NULL) );
-	r =  rand();
+	r =  random();
 	r %= 65535;
 	qry->qryid = (uint16_t) r; // host is storing int host byte order
 	crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
