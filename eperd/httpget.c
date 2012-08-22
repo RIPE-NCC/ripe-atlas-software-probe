@@ -134,6 +134,7 @@ static struct hgbase *hg_base;
 
 static void report(struct hgstate *state);
 static void add_str(struct hgstate *state, const char *str);
+static void add_str_quoted(struct hgstate *state, char *str);
 
 static struct hgbase *httpget_base_new(struct event_base *event_base)
 {
@@ -758,6 +759,31 @@ static void add_str(struct hgstate *state, const char *str)
 	//printf("add_str: result = '%s'\n", state->result);
 }
 
+static void add_str_quoted(struct hgstate *state, char *str)
+{
+	char c;
+	char *p;
+	char buf[20];
+
+	for (p= str; *p; p++)
+	{
+		c= *p;
+		if (c == '"' || c == '\\')
+			snprintf(buf, sizeof(buf), "\\%c", c);
+		else if (isprint((unsigned char)c))
+		{
+			buf[0]= c;
+			buf[1]= '\0';
+		}
+		else
+		{
+			snprintf(buf, sizeof(buf), "\\u%04x",
+				(unsigned char)c);
+		}
+		add_str(state, buf);
+	}
+}
+
 static void err_status(struct hgstate *state, const char *reason)
 {
 	char line[80];
@@ -953,7 +979,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 				if (state->tot_headers != 0)
 					add_str(state, ",");
 				add_str(state, " \"");
-				add_str(state, line);
+				add_str_quoted(state, line);
 				add_str(state, "\"");
 				state->tot_headers += len;
 			} else if (state->tot_headers <= state->max_headers &&
@@ -968,7 +994,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 				{
 					line[state->max_headers-
 						state->tot_headers]= '\0';
-					add_str(state, line);
+					add_str_quoted(state, line);
 				}
 				add_str(state, "[...]\"");
 

@@ -1,5 +1,5 @@
 /*
-httpport.c -- Simple program that uses the HTTP POST command
+httppost.c -- Simple program that uses the HTTP POST command
 
 Created:	Jun 2011 by Philip Homburg for RIPE NCC
 */
@@ -19,16 +19,19 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 struct option longopts[]=
 {
 	{ "delete-file", no_argument, NULL, 'd' },
+	{ "maxpostsize", required_argument, NULL, 'm' },
 	{ "post-file", required_argument, NULL, 'p' },
 	{ "post-dir", required_argument, NULL, 'D' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
 	{ "set-time", required_argument, NULL, 's' },
+	{ "timeout", required_argument, NULL, 't' },
 	{ NULL, }
 };
 
 static int tcp_fd;
 static time_t start_time;
+static time_t timeout = 300;
 
 /* Result sent by controller when input is acceptable. */
 #define OK_STR	"OK\n"
@@ -38,7 +41,7 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 static int check_result(FILE *tcp_file);
 static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t *timep);
 static int connect_to_name(char *host, char *port);
-char *do_dir(char *dir_name, off_t *lenp);
+char *do_dir(char *dir_name, off_t curr_size, off_t max_size, off_t *lenp);
 static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp);
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len,
 	int *found_okp);
@@ -56,14 +59,14 @@ int httppost_main(int argc, char *argv[])
 {
 	int c,  r, fd, fdF, fdH, fdS, chunked, content_length, result;
 	int opt_delete_file, found_ok;
-	char *url, *host, *port, *hostport, *path, *filelist, *p;
+	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *atlas_id, *output_file,
-		*post_footer, *post_header;
+		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
 	char *time_tolerance;
 	FILE *tcp_file, *out_file;
 	time_t server_time;
 	struct stat sbF, sbH, sbS;
-	off_t     cLength, dir_length;
+	off_t cLength, dir_length, maxpostsize;
 	struct sigaction sa;
 
 	post_dir= NULL; 
@@ -74,6 +77,8 @@ int httppost_main(int argc, char *argv[])
 	output_file= NULL;
 	opt_delete_file = 0;
 	time_tolerance = NULL;
+	maxpostsizestr= NULL;
+	timeoutstr= NULL;
 
 	fd= -1;
 	fdH= -1;
@@ -87,6 +92,7 @@ int httppost_main(int argc, char *argv[])
 	hostport= NULL;
 	path= NULL;
 	filelist= NULL;
+	maxpostsize= 1000000;
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
@@ -112,12 +118,17 @@ int httppost_main(int argc, char *argv[])
 		case 'f':				/* --post-footer */
 			post_footer= optarg;
 			break;
-
+		case 'm':				/* --maxpostsize */
+			maxpostsizestr= optarg;
+			break;
 		case 'p':				/* --post-file */
 			post_file= optarg;
 			break;
 		case 's':				/* --set-time */
 			time_tolerance= optarg;
+			break;
+		case 't':				/* --timeout */
+			timeoutstr= optarg;
 			break;
 		case '?':
 			bb_show_usage();
@@ -131,6 +142,28 @@ int httppost_main(int argc, char *argv[])
 		fatal("exactly one url expected");
 	url= argv[optind];
 
+	if (maxpostsizestr)
+	{
+		maxpostsize= strtoul(maxpostsizestr, &check, 0);
+		if (check[0] != 0)
+		{
+			report("unable to parse maxpostsize '%s'",
+				maxpostsizestr);
+			goto err;
+		}
+	}
+
+	if (timeoutstr)
+	{
+		timeout= strtoul(timeoutstr, &check, 0);
+		if (check[0] != 0)
+		{
+			report("unable to parse timeout '%s'",
+				timeoutstr);
+			goto err;
+		}
+	}
+
 	parse_url(url, &host, &port, &hostport, &path);
 
 	//printf("host: %s\n", host);
@@ -138,16 +171,7 @@ int httppost_main(int argc, char *argv[])
 	//printf("hostport: %s\n", hostport);
 	//printf("path: %s\n", path);
 
-	if (post_dir)
-	{
-		filelist= do_dir(post_dir, &dir_length);
-		if (!filelist)
-		{
-			/* Something went wrong. */
-			goto err;
-		}
-		fprintf(stderr, "total size in dir: %ld\n", (long)dir_length);
-	}
+	cLength= 0;
 
 	if(post_header != NULL )
 	{	
@@ -169,6 +193,7 @@ int httppost_main(int argc, char *argv[])
 				post_header);
 			goto err;
 		}
+		cLength  +=  sbH.st_size;
 	}
 
 	if(post_footer != NULL )
@@ -191,6 +216,7 @@ int httppost_main(int argc, char *argv[])
 				post_footer);
 			goto err;
 		}
+		cLength  +=  sbF.st_size;
 	}
 
 	/* Try to open the file before trying to connect */
@@ -212,6 +238,19 @@ int httppost_main(int argc, char *argv[])
 			report("'%s' is not a regular file", post_file);
 			goto err;
 		}
+		cLength  += sbS.st_size;
+	}
+
+	if (post_dir)
+	{
+		filelist= do_dir(post_dir, cLength, maxpostsize, &dir_length);
+		if (!filelist)
+		{
+			/* Something went wrong. */
+			goto err;
+		}
+		fprintf(stderr, "total size in dir: %ld\n", (long)dir_length);
+		cLength += dir_length;
 	}
 
 	time(&start_time);
@@ -746,7 +785,7 @@ static int connect_to_name(char *host, char *port)
 	return s;
 }
 
-char *do_dir(char *dir_name, off_t *lenp)
+char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 {
 	size_t currsize, allocsize, dirlen, len;
 	char *list, *tmplist, *path;
@@ -805,7 +844,21 @@ char *do_dir(char *dir_name, off_t *lenp)
 		if (!S_ISREG(sb.st_mode))
 			continue;	/* Just skip entry */
 
+		if (curr_tot_size + sb.st_size > max_size)
+		{
+			/* File is too big to fit this time. */
+			if (sb.st_size > max_size/2)
+			{
+				/* File just too big in general */
+				report("deleting file '%s', size %d",
+					path, sb.st_size);
+				unlink(path);
+			}
+			continue;
+		}
+
 		currsize += len;
+		curr_tot_size += sb.st_size;
 		*lenp += sb.st_size;
 	}
 	closedir(dir);
@@ -990,7 +1043,7 @@ static void skip_spaces(const char *cp, char **ncp)
 
 static void got_alarm(int sig __attribute__((unused)) )
 {
-	if (tcp_fd != -1 && time(NULL) > start_time+300)
+	if (tcp_fd != -1 && time(NULL) > start_time+timeout)
 	{
 		report("setting tcp_fd to nonblock");
 		fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);

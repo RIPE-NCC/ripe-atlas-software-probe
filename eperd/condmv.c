@@ -45,15 +45,24 @@ static void *condmv_init(int argc, char *argv[],
 
 static void condmv_start(void *state)
 {
-	struct stat sb;
-	FILE *file;
+	size_t len;
 	time_t mytime;
+	char *to;
+	FILE *file;
 	struct condmvstate *condmvstate;
+	struct stat sb;
 
 	condmvstate= state;
 
-	if (stat(condmvstate->to, &sb) == 0 && !condmvstate->force)
+	len= strlen(condmvstate->to) + 20;
+	to= malloc(len);
+	snprintf(to, len, "%s.%ld", condmvstate->to, (long)time(NULL));
+
+	crondlog(LVL7 "condmv_start: destination '%s'\n", to);
+
+	if (stat(to, &sb) == 0 && !condmvstate->force)
 	{
+		free(to);
 		return;
 	}
 
@@ -68,6 +77,7 @@ static void condmv_start(void *state)
 		{
 			crondlog(LVL9 "condmv: unable to append to '%s': %s\n",
 				condmvstate->from, strerror(errno));
+			free(to);
 			return;
 		}
 		if (fprintf(file, "%s %lu %s\n", condmvstate->atlas, mytime,
@@ -76,21 +86,23 @@ static void condmv_start(void *state)
 			crondlog(LVL9 "condmv: unable to append to '%s': %s\n",
 				condmvstate->from, strerror(errno));
 			fclose(file);
+			free(to);
 			return;
 		}
 		if (fclose(file) != 0)
 		{
 			crondlog(LVL9 "condmv: unable to close '%s': %s\n",
 				condmvstate->from, strerror(errno));
+			free(to);
 			return;
 		}
 	}
-	if (rename(condmvstate->from, condmvstate->to) != 0)
+	if (rename(condmvstate->from, to) != 0)
 	{
 		crondlog(LVL9 "condmv: unable to rename '%s' to '%s': %s\n",
-			condmvstate->from, condmvstate->to, strerror(errno));
-		return;
-	}
+			condmvstate->from, to, strerror(errno));
+	}	
+	free(to);
 }
 
 static int condmv_delete(void *state)
