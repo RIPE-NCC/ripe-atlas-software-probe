@@ -1,4 +1,5 @@
 /*
+	if((qry->opt_prepend_probe_id ) && (qry->qclass == C_IN))
  * Copyright (c) 2011 RIPE NCC, Antony Antony <antony@ripe.net>, <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone <ro...@tecsiel.it>
  *
@@ -1265,11 +1266,15 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	if(qry->opt_prepend_probe_id ) 
 	{	
 	 	int probe_id;
-		probe_id= get_probe_id();
+		struct timeval c_time;
+		gettimeofday(&c_time, NULL);
+		probe_id = get_probe_id();
+		probe_id =  MAX(probe_id, 0);
 		unsigned char *tmp_l;
 		tmp_l = strdup(qry->lookupname);
 		qry->lookupname = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(tmp_l));
-		snprintf(qry->lookupname, (sizeof(tmp_l) + DEFAULT_LINE_LENGTH - 1),  "%d.%s", probe_id, tmp_l);
+		snprintf(qry->lookupname, (sizeof(tmp_l) + DEFAULT_LINE_LENGTH - 1),  "%d.%lu.%s", probe_id, c_time.tv_sec, tmp_l);
+		free(tmp_l);
 	}
 
 	if(qry->opt_v6_only  == 0)
