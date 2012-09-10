@@ -27,6 +27,7 @@
 
 #include "libbb.h"
 #include "atlas_bb64.h"
+#include "atlas_probe.h"
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
