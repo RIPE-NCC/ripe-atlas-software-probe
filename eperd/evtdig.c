@@ -27,6 +27,7 @@
 
 #include "libbb.h"
 #include "atlas_bb64.h"
+#include "atlas_probe.h"
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
@@ -66,6 +67,7 @@
 #undef MAX	/* also, just in case */
 #define Q_RESOLV_CONF -1
 #define O_RESOLV_CONF  1003
+#define O_PREPEND_PROBE_ID  1004
 
 #define DNS_FLAG_RD 0x0100
 
@@ -200,6 +202,7 @@ struct query_state {
 	int opt_abuf;
 	int opt_resolv_conf;
 	int opt_rd;
+	int opt_prepend_probe_id;
 
 	char * str_Atlas; 
 	u_int16_t qtype;
@@ -340,6 +343,7 @@ static struct option longopts[]=
 	{ "qbuf", no_argument, NULL, 1001 },
 	{ "noabuf", no_argument, NULL, 1002 },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
+	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "d0", no_argument, NULL, 'd' },
 	{ NULL, }
 };
@@ -1032,6 +1036,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
+	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
 	qry->ressent = NULL;
 	buf_init(&qry->err, -1);
@@ -1126,6 +1131,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_resolv_conf = Q_RESOLV_CONF ;
 				qry->opt_v6_only = 1;
 				qry->opt_v4_only = 1;
+				break;
+
+			case O_PREPEND_PROBE_ID:
+				qry->opt_prepend_probe_id = 1;
 				break;
 
 			case (100000 + T_A):
@@ -1250,6 +1259,17 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		crondlog(LVL9 "ERROR no query in command line");
 		tdig_delete(qry);
 		return NULL;
+	}
+
+	// should it be limited to clas C_IN ? 
+	if(qry->opt_prepend_probe_id ) 
+	{	
+	 	int probe_id;
+		probe_id= get_probe_id();
+		unsigned char *tmp_l;
+		tmp_l = strdup(qry->lookupname);
+		qry->lookupname = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(tmp_l));
+		snprintf(qry->lookupname, (sizeof(tmp_l) + DEFAULT_LINE_LENGTH - 1),  "%d.%s", probe_id, tmp_l);
 	}
 
 	if(qry->opt_v6_only  == 0)
