@@ -192,7 +192,7 @@ static int con_hello_main( int argc, char *argv[] )
                 	if( strncmp(line,"CONTROLLER_TIMESTAMP ", 21)==0 ) {
 				int timediff2 ;
 
-			 	sscanf( line+21, "%d", &tmp_long);
+			 	sscanf( line+21, "%ld", &tmp_long);
 				con_time= tim_long;
 				timediff2 = ( mytime - con_time )  *  ( mytime - con_time );
 				printf ("Mytime %d controller time %d\n",(int)mytime , (int)con_time);
