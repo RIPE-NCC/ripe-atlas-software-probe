@@ -62,7 +62,7 @@ const int max_lines = 16; /* maximum lines we'll process */
 const int min_rereg_time = 100; 
 const int max_rereg_time = 28*24*3600; /* 28d */
 const int default_rereg_time = 7*24*3600; /* 7d */
-int *str_reason;
+char *str_reason;
 
 /**********************************************************************/
 
@@ -169,6 +169,7 @@ static int con_hello_main( int argc, char *argv[] )
 	/* read response from P_TO_C_HELLO  */
 	FILE *read_from = stdin;
 	int ret = 0;
+	long tmp_long;
 
 	time_t mytime = time(0);
 	time_t con_time;
@@ -191,7 +192,8 @@ static int con_hello_main( int argc, char *argv[] )
                 	if( strncmp(line,"CONTROLLER_TIMESTAMP ", 21)==0 ) {
 				int timediff2 ;
 
-			 	sscanf( line+21, "%d", &con_time);
+			 	sscanf( line+21, "%d", &tmp_long);
+				con_time= tim_long;
 				timediff2 = ( mytime - con_time )  *  ( mytime - con_time );
 				printf ("Mytime %d controller time %d\n",(int)mytime , (int)con_time);
 				if( timediff2 > 4 ) {
@@ -426,14 +428,14 @@ static int reg_init_main( int argc, char *argv[] )
 				token = strtok (line+16, search);  // version
 				sscanf (token, "%f", &root_fs_ver);
 				root_fs_ver *= 1000.0;
-				printf("FIRMWARE_KERNEL_VERSION=%d\n", (int)root
+				printf("FIRMWARE_KERNEL_VERSION=%d\n", (int)root_fs_ver);
 				token = strtok(NULL, search);      // alg
 				printf("FIRMWARE_KERNEL_CS_ALG=%s\n", token);
 
 				token = strtok(NULL, search);      // comp hash 
 				printf("FIRMWARE_KERNEL_CS_COMP=%s\n", token);
 
-				token = strtok(NULL, search);      // uncomp has
+				token = strtok(NULL, search);      // uncomp hash
 
 				printf("FIRMWARE_KERNEL_CS_UNCOMP=%s\n", token);
 				token = strtok(NULL, search);      // url hash 
@@ -484,7 +486,7 @@ static int reg_init_main( int argc, char *argv[] )
 				// fprintf (f, "%s\n", line);
 				token = strtok(line+13, search); //IPV4ADDRESS 
 				token = strtok(NULL, search);      // <address>
-			 	fprintf (f, "/sbin/ifconfig eth0 0.0.0.0\n", token);
+			 	fprintf (f, "/sbin/ifconfig eth0 0.0.0.0\n");
 			 	fprintf (f, "/sbin/ifconfig eth0:1 %s ", token);
 				ipv4_address = token;
 				token = strtok(NULL, search);      // IPV4NETMASK
