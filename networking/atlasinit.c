@@ -420,6 +420,26 @@ static int reg_init_main( int argc, char *argv[] )
 				 	settimeofday( &tval, NULL);
 				}
 			} 
+			else if( strncmp(line,"FIRMWARE_KERNEL ", 16)==0 ) 
+			{ 
+				float root_fs_ver = 0;
+				token = strtok (line+16, search);  // version
+				sscanf (token, "%f", &root_fs_ver);
+				root_fs_ver *= 1000.0;
+				printf("FIRMWARE_KERNEL_VERSION=%d\n", (int)root
+				token = strtok(NULL, search);      // alg
+				printf("FIRMWARE_KERNEL_CS_ALG=%s\n", token);
+
+				token = strtok(NULL, search);      // comp hash 
+				printf("FIRMWARE_KERNEL_CS_COMP=%s\n", token);
+
+				token = strtok(NULL, search);      // uncomp has
+
+				printf("FIRMWARE_KERNEL_CS_UNCOMP=%s\n", token);
+				token = strtok(NULL, search);      // url hash 
+				printf( "FIRMWARE_KERNEL=%s\n", token) ;
+
+			} 
 			else if( strncmp(line,"FIRMWARE_APPS ", 14)==0 ) 
 			{ 
 				float root_fs_ver = 0;
