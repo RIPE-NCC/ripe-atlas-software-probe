@@ -3,6 +3,7 @@ traceroute.c
 */
 
 #include "libbb.h"
+#include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
 #include <netinet/ip.h>
@@ -22,13 +23,14 @@ traceroute.c
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("46IUFa:c:f:g:m:w:z:A:O:S:")
+#define TRACEROUTE_OPT_STRING ("46IUFra:c:f:g:m:w:z:A:O:S:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
 #define OPT_I	(1 << 2)
 #define OPT_U	(1 << 3)
 #define OPT_F	(1 << 4)
+#define OPT_r	(1 << 5)
 
 #define BASE_PORT	(0x8000 + 666)
 #define SRC_BASE_PORT	(20480)
@@ -84,6 +86,7 @@ struct trtstate
 	char do_icmp;
 	char do_v6;
 	char dont_fragment;
+	char delay_name_res;
 	char trtcount;
 	unsigned short maxpacksize;
 	unsigned char firsthop;
@@ -120,6 +123,9 @@ struct trtstate
 	unsigned gotresp:1;		/* Got a response to the last packet
 					 * we sent. For dup detection.
 					 */
+	unsigned dnsip:1;		/* Busy with dns name resolution */
+	struct evutil_addrinfo *dns_res;
+	struct evutil_addrinfo *dns_curr;
 
 	time_t starttime;
 	struct timeval xmit_time;
@@ -308,21 +314,28 @@ static void report(struct trtstate *state)
 			(long)time(NULL));
 	}
 
-	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
-		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
+		state->hostname);
 
-	fprintf(fh, "\"dst_name\":\"%s\", \"dst_addr\":\"%s\"",
-		state->hostname, namebuf);
+	if (!state->dnsip)
+	{
+		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
+			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-	namebuf[0]= '\0';
-	getnameinfo((struct sockaddr *)&state->loc_sin6, state->loc_socklen,
-		namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
 
-	fprintf(fh, ", \"src_addr\":\"%s\"", namebuf);
+		namebuf[0]= '\0';
+		getnameinfo((struct sockaddr *)&state->loc_sin6,
+			state->loc_socklen,
+			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+
+		fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), namebuf);
+	}
 
 	fprintf(fh, ", " DBQ(proto) ":" DBQ(%s) ", " DBQ(af) ": %d",
 		state->do_icmp ? "ICMP" : "UDP",
-		state->sin6.sin6_family == AF_INET6 ? 6 : 4);
+		state->dnsip ? (state->do_v6 ? 6 : 4) :
+		(state->sin6.sin6_family == AF_INET6 ? 6 : 4));
 
 	fprintf(fh, ", \"size\":%d", state->maxpacksize);
 	if (state->parismod)
@@ -910,6 +923,7 @@ static void do_icmp_multi(struct trtstate *state,
 
 		if (len < 4 || o+len > size)
 		{
+			add_str(state, " }");
 			printf("do_icmp_multi: bad len %d\n", len);
 			break;
 		}
@@ -2274,7 +2288,7 @@ static void noreply_callback(int __attribute((unused)) unused,
 static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state))
 {
-	int i, opt, do_icmp, do_v6, dont_fragment;
+	int i, opt, do_icmp, do_v6, dont_fragment, delay_name_res;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
 		parismod, timeout; /* must be int-sized */
 	size_t newsiz;
@@ -2301,6 +2315,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	duptimeout= 10;
 	timeout= 1000;
 	parismod= 16;
+	str_Atlas= NULL;
 	out_filename= NULL;
 	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+";
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
@@ -2311,19 +2326,29 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	do_icmp= !!(opt & OPT_I);
 	do_v6= !!(opt & OPT_6);
 	dont_fragment= !!(opt & OPT_F);
+	delay_name_res= !!(opt & OPT_r);
 	if (maxpacksize > sizeof(trt_base->packet))
 		maxpacksize= sizeof(trt_base->packet);
 
-	/* Attempt to resolve 'name' */
-	af= do_v6 ? AF_INET6 : AF_INET;
-	lsa= host_and_af2sockaddr(hostname, 0, af);
-	if (!lsa)
-		return NULL;
-
-	if (lsa->len > sizeof(state->sin6))
+	if (!delay_name_res)
 	{
-		free(lsa);
-		return NULL;
+		/* Attempt to resolve 'name' */
+		af= do_v6 ? AF_INET6 : AF_INET;
+		lsa= host_and_af2sockaddr(hostname, 0, af);
+		if (!lsa)
+			return NULL;
+
+		if (lsa->len > sizeof(state->sin6))
+		{
+			free(lsa);
+			return NULL;
+		}
+	}
+	else
+	{
+		/* lint */
+		lsa= NULL;
+		af= -1;
 	}
 
 	state= xzalloc(sizeof(*state));
@@ -2340,6 +2365,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	state->do_icmp= do_icmp;
 	state->do_v6= do_v6;
 	state->dont_fragment= dont_fragment;
+	state->delay_name_res= delay_name_res;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 	state->base= trt_base;
 	state->busy= 0;
@@ -2369,18 +2395,22 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	printf("traceroute_init: state %p, index %d\n",
 		state, state->index);
 
-	memcpy(&state->sin6, &lsa->u.sa, lsa->len);
-	state->socklen= lsa->len;
-	free(lsa); lsa= NULL;
 	memset(&state->loc_sin6, '\0', sizeof(state->loc_sin6));
 	state->loc_socklen= 0;
 
-	if (af == AF_INET6)
+	if (!delay_name_res)
 	{
-		char buf[INET6_ADDRSTRLEN];
-		printf("traceroute_init: %s, len %d for %s\n",
-			inet_ntop(AF_INET6, &state->sin6.sin6_addr,
-			buf, sizeof(buf)), state->socklen, state->hostname);
+		memcpy(&state->sin6, &lsa->u.sa, lsa->len);
+		state->socklen= lsa->len;
+		free(lsa); lsa= NULL;
+		if (af == AF_INET6)
+		{
+			char buf[INET6_ADDRSTRLEN];
+			printf("traceroute_init: %s, len %d for %s\n",
+				inet_ntop(AF_INET6, &state->sin6.sin6_addr,
+				buf, sizeof(buf)), state->socklen,
+				state->hostname);
+		}
 	}
 
 	evtimer_assign(&state->timer, state->base->event_base,
@@ -2389,7 +2419,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	return state;
 }
 
-static void traceroute_start(void *state)
+static void traceroute_start2(void *state)
 {
 	int r, serrno;
 	struct trtstate *trtstate;
@@ -2629,6 +2659,101 @@ static void traceroute_start(void *state)
 	add_str(trtstate, ", \"result\": [ ");
 
 	send_pkt(trtstate);
+}
+
+static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
+{
+	int count;
+	struct trtstate *env;
+	struct evutil_addrinfo *cur;
+	char line[160];
+
+	env= ctx;
+
+	if (!env->dnsip)
+	{
+		crondlog(LVL7
+			"dns_cb: in dns_cb but not doing dns at this time");
+		if (res)
+			evutil_freeaddrinfo(res);
+		return;
+	}
+
+	if (result != 0)
+	{
+		/* Hmm, great. Where do we put this init code */
+		if (env->result) free(env->result);
+		env->resmax= 80;
+		env->result= xmalloc(env->resmax);
+		env->reslen= 0;
+
+		env->starttime= time(NULL);
+		snprintf(line, sizeof(line),
+		"{ " DBQ(error) ":" DBQ(name resolution failed: %s) " }",
+			evutil_gai_strerror(result));
+		add_str(env, line);
+		report(env);
+		return;
+	}
+
+	env->dnsip= 0;
+
+	env->dns_res= res;
+	env->dns_curr= res;
+
+	count= 0;
+	for (cur= res; cur; cur= cur->ai_next)
+		count++;
+
+	// env->reportcount(env, count);
+
+	while (env->dns_curr)
+	{
+		env->socklen= env->dns_curr->ai_addrlen;
+		if (env->socklen > sizeof(env->sin6))
+			continue;	/* Weird */
+		memcpy(&env->sin6, env->dns_curr->ai_addr,
+			env->socklen);
+
+		traceroute_start2(env);
+
+		evutil_freeaddrinfo(env->dns_res);
+		env->dns_res= NULL;
+		env->dns_curr= NULL;
+		return;
+	}
+
+	/* Something went wrong */
+	evutil_freeaddrinfo(env->dns_res);
+	env->dns_res= NULL;
+	env->dns_curr= NULL;
+	snprintf(line, sizeof(line),
+"%s{ " DBQ(error) ":" DBQ(name resolution failed: out of addresses) " } ] }",
+		env->sent ? " }, " : "");
+	add_str(env, line);
+	report(env);
+}
+
+static void traceroute_start(void *state)
+{
+	struct trtstate *trtstate;
+	struct evdns_getaddrinfo_request *evdns_req;
+	struct evutil_addrinfo hints;
+
+	trtstate= state;
+
+	if (!trtstate->delay_name_res)
+	{
+		traceroute_start2(state);
+		return;
+	}
+
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_socktype= SOCK_DGRAM;
+	hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
+	trtstate->dnsip= 1;
+	evdns_req= evdns_getaddrinfo(DnsBase, trtstate->hostname, NULL,
+	                &hints, dns_cb, trtstate);
 }
 
 static int traceroute_delete(void *state)
