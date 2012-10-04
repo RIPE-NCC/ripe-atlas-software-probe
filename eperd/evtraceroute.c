@@ -26,6 +26,12 @@ int evtraceroute_main(int argc UNUSED_PARAM, char **argv)
 		fprintf(stderr, "evtraceroute: event_base_new failed\n");
 		exit(1);
 	}
+	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
+	if (!DnsBase)
+	{
+		fprintf(stderr, "evdns_base_new failed\n");
+		exit(1);
+	}
 
 	state= traceroute_ops.init(argc, argv, done);
 	if (!state)

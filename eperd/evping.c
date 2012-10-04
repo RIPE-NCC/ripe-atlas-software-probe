@@ -2,6 +2,7 @@
 
 #include "libbb.h"
 #include <syslog.h>
+#include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
 
@@ -26,6 +27,13 @@ int evping_main(int argc UNUSED_PARAM, char **argv)
 		fprintf(stderr, "evping_base_new failed\n");
 		exit(1);
 	}
+	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
+	if (!DnsBase)
+	{
+		fprintf(stderr, "evdns_base_new failed\n");
+		exit(1);
+	}
+
 
 	state= ping_ops.init(argc, argv, done);
 	if (!state)
