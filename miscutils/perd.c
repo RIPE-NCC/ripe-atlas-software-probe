@@ -698,7 +698,7 @@ static void SynchronizeFile(const char *fileName)
 	now= time(NULL);
 #endif
 
-	if (fstat(fileno(parser->fp), &sbuf) == 0 && sbuf.st_uid == DaemonUid) {
+	if (fstat(fileno(parser->fp), &sbuf) == 0 /* && sbuf.st_uid == DaemonUid */ ) {
 		CronFile *file = xzalloc(sizeof(CronFile));
 		CronLine **pline;
 		int n;
