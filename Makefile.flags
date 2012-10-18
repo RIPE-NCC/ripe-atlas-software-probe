@@ -103,7 +103,7 @@ endif
 
 LDLIBS += event
 
-LDFLAGS += -Llibevent-2.0.20-stable/.libs -Wl,-rpath,/home/atlas/lib
+LDFLAGS += -Llibevent-2.0.20-stable/.libs -Wl,-rpath,/usr/local/atlas/lib
 
 # If a flat binary should be built, CFLAGS_busybox="-Wl,-elf2flt"
 # env var should be set for make invocation.
