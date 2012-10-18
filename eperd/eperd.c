@@ -465,7 +465,7 @@ static void SynchronizeFile(const char *fileName)
 
 	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
 
-	if (fstat(fileno(parser->fp), &sbuf) == 0 && sbuf.st_uid == DaemonUid) {
+	if (fstat(fileno(parser->fp), &sbuf) == 0 /* && sbuf.st_uid == DaemonUid */) {
 		int n;
 
 		while (1) {
