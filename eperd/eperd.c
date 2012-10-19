@@ -326,6 +326,14 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	tv.tv_usec= 0;
 	event_add(updateEventHour, &tv);
 		
+	if(PidFileName)
+	{
+		write_pidfile(PidFileName);
+	}
+	else 
+	{
+		write_pidfile("/var/run/crond.pid");
+	}
 #if 0
 	/* main loop - synchronize to 1 second after the minute, minimum sleep
 	 * of 1 second. */
@@ -335,14 +343,6 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 		time_t last_minutely= 0;
 		time_t last_hourly= 0;
 		int sleep_time = 10; /* AA previously 60 */
-		if(PidFileName)
-		{
-			write_pidfile(PidFileName);
-		}
-		else 
-		{
-			write_pidfile("/var/run/crond.pid");
-		}
 		for (;;) {
 			kick_watchdog();
 			sleep(sleep_time);
