@@ -397,10 +397,14 @@ static int start_login(struct tsession *ts, char *user)
 
 /* Must match getopt32 string */
 enum {
+		/*	 (1 << 0)	-f */
+		/*	 (1 << 1)	-l */
 	OPT_WATCHCHILD = (1 << 2), /* -K */
 	OPT_INETD      = (1 << 3) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -i */
-	OPT_PORT       = (1 << 4) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p */
-	OPT_FOREGROUND = (1 << 6) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
+		/*	 (1 << 4)	-P */
+	OPT_PORT       = (1 << 5) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p */
+		/*	 (1 << 6)	-b */
+	OPT_FOREGROUND = (1 << 7) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
 };
 
 #if ENABLE_FEATURE_TELNETD_STANDALONE
