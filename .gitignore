@@ -32,11 +32,16 @@ include/config/autossh.h
 include/config/buddyinfo.h
 include/config/condmv.h
 include/config/dfrm.h
+include/config/evhttpget.h
+include/config/evping.h
+include/config/evtdig.h
+include/config/evtraceroute.h
 include/config/feature/traceroute/ipv6.h
 include/config/findpid.h
-include/config/httppost.h
 include/config/httpget.h
+include/config/httppost.h
 include/config/sleepkick.h
+include/config/sslgetcert.h
 include/config/tdig.h
 include/usage_compressed.h
 .indent.pro
