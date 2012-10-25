@@ -1,5 +1,4 @@
 /*
-	if((qry->opt_prepend_probe_id ) && (qry->qclass == C_IN))
  * Copyright (c) 2011 RIPE NCC, Antony Antony <antony@ripe.net>, <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone <ro...@tecsiel.it>
  *
@@ -1266,15 +1265,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	if(qry->opt_prepend_probe_id ) 
 	{	
 	 	int probe_id;
-		struct timeval c_time;
-		gettimeofday(&c_time, NULL);
-		probe_id = get_probe_id();
-		probe_id =  MAX(probe_id, 0);
+		probe_id= get_probe_id();
 		unsigned char *tmp_l;
 		tmp_l = strdup(qry->lookupname);
 		qry->lookupname = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(tmp_l));
-		snprintf(qry->lookupname, (sizeof(tmp_l) + DEFAULT_LINE_LENGTH - 1),  "%d.%lu.%s", probe_id, c_time.tv_sec, tmp_l);
-		free(tmp_l);
+		snprintf(qry->lookupname, (sizeof(tmp_l) + DEFAULT_LINE_LENGTH - 1),  "%d.%s", probe_id, tmp_l);
 	}
 
 	if(qry->opt_v6_only  == 0)
@@ -1400,7 +1395,14 @@ void tdig_start (struct query_state *qry)
 	int err_num;
 	struct addrinfo hints, *res;
 	char port[] = "domain";
-	char port_as_char[] = "53";
+	char port_as_char[] = "53";  
+
+	if(qry->opt_resolv_conf > tdig_base->resolv_max) {
+		qry->opt_resolv_conf = 0;
+		free (qry->server_name);
+		qry->server_name = strdup(tdig_base->nslist[qry->opt_resolv_conf]);
+		qry->opt_resolv_conf++;
+	}
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -1590,6 +1592,8 @@ static void free_qry_inst(struct query_state *qry)
 			tdig_start(qry);  
 			return;
 		}
+		else 
+			qry->opt_resolv_conf++;
 	}
 
 	if(qry->base->done)
