@@ -799,6 +799,7 @@ static void atlas_init(CronLine *line)
 	char *cp, *ncp;
 	struct builtin *bp;
 	char *cmdline, *p;
+	const char *reason;
 	void *state;
 	FILE *fn;
 	char *argv[ATLAS_NARGS];
@@ -807,6 +808,8 @@ static void atlas_init(CronLine *line)
 	cmdline= line->cl_Shell;
 	crondlog(LVL7 "atlas_run: looking for %p '%s'", cmdline, cmdline);
 
+	state= NULL;
+	reason= NULL;
 	for (bp= builtin_cmds; bp->cmd != NULL; bp++)
 	{
 		len= strlen(bp->cmd);
@@ -817,7 +820,10 @@ static void atlas_init(CronLine *line)
 		break;
 	}
 	if (bp->cmd == NULL)
-		return;			/* Nothing found */
+	{
+		reason="command not found";
+		goto error;
+	}
 	
 	crondlog(LVL7 "found cmd '%s' for '%s'", bp->cmd, cmdline);
 
@@ -825,7 +831,8 @@ static void atlas_init(CronLine *line)
 	if (len+1 > ATLAS_ARGSIZE)
 	{
 		crondlog(LVL8 "atlas_run: command line too big: '%s'", cmdline);
-		return;			/* Just skip it */
+		reason="command line too big";
+		goto error;
 	}
 	strcpy(args, cmdline);
 
@@ -855,9 +862,10 @@ static void atlas_init(CronLine *line)
 		if (argc >= ATLAS_NARGS-1)
 		{
 			crondlog(
-			LVL8 "atlas_run: command line '%s', too arguments",
+			LVL8 "atlas_run: command line '%s', too many arguments",
 				cmdline);
-			return;			/* Just skip it */
+			reason="too many arguments";
+			goto error;
 		}
 
 		cp= ncp;
@@ -871,7 +879,8 @@ static void atlas_init(CronLine *line)
 				crondlog(
 		LVL8 "atlas_run: command line '%s', end of string not found",
 					cmdline);
-				return;			/* Just skip it */
+				reason="end of string not found";
+				goto error;
 			}
 			argv[argc]= cp+1;
 			cp= ncp;
@@ -890,7 +899,8 @@ static void atlas_init(CronLine *line)
 		crondlog(	
 			LVL8 "atlas_run: command line '%s', too many arguments",
 			cmdline);
-		return;			/* Just skip it */
+		reason="too many arguments";
+		goto error;
 	}
 	argv[argc]= NULL;
 
@@ -902,6 +912,7 @@ static void atlas_init(CronLine *line)
 	line->teststate= state;
 	line->testops= bp->testops;
 
+error:
 	if (state == NULL && out_filename)
 	{
 		fn= fopen(out_filename, "a");
@@ -910,8 +921,10 @@ static void atlas_init(CronLine *line)
 		fprintf(fn, "RESULT { ");
 		if (atlas_id)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%d, ",
-			get_atlas_fw_version(), time(NULL));
+		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
+			get_atlas_fw_version(), (long)time(NULL));
+		if (reason)
+			fprintf(fn, DBQ(reason) ":" DBQ(%s) ", ", reason);
 		fprintf(fn, DBQ(cmd) ": \"");
 		for (p= line->cl_Shell; *p; p++)
 		{
