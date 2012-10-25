@@ -1,1 +1,1 @@
-#define CONFIG_INETD 1
+#undef CONFIG_INETD

@@ -1,1 +1,1 @@
-#define CONFIG_DIFF 1
+#undef CONFIG_DIFF

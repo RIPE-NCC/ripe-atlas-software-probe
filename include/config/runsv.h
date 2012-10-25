@@ -1,1 +1,1 @@
-#define CONFIG_RUNSV 1
+#undef CONFIG_RUNSV

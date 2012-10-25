@@ -1,1 +1,1 @@
-#define CONFIG_RUNSVDIR 1
+#undef CONFIG_RUNSVDIR

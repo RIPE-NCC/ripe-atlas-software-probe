@@ -1,1 +1,1 @@
-#define CONFIG_BLKID 1
+#undef CONFIG_BLKID

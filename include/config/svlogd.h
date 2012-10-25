@@ -1,1 +1,1 @@
-#define CONFIG_SVLOGD 1
+#undef CONFIG_SVLOGD

@@ -1,1 +1,1 @@
-#define CONFIG_TCPSVD 1
+#undef CONFIG_TCPSVD

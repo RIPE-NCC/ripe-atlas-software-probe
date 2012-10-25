@@ -1,1 +1,1 @@
-#define CONFIG_MAKEMIME 1
+#undef CONFIG_MAKEMIME

@@ -1,1 +1,1 @@
-#define CONFIG_ENVDIR 1
+#undef CONFIG_ENVDIR

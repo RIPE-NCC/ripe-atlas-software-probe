@@ -1,1 +1,1 @@
-#define CONFIG_LOGGER 1
+#undef CONFIG_LOGGER

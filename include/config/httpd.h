@@ -1,1 +1,1 @@
-#define CONFIG_HTTPD 1
+#undef CONFIG_HTTPD
