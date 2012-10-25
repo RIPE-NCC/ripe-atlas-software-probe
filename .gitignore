@@ -10,7 +10,7 @@
 *.swp
 applets/applet_tables
 applets/.applet_tables.cmd
-applets/usage 
+applets/usage
 applets/.usage.cmd
 busybox
 busybox.links
