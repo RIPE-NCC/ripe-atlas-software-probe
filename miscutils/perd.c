@@ -1182,11 +1182,13 @@ static int atlas_run(char *cmdline)
 	struct builtin *bp;
 	char *outfile;
 	FILE *fn;
+	char *reason;
 	char *argv[ATLAS_NARGS];
 	char args[ATLAS_ARGSIZE];
 
 	crondlog(LVL7 "atlas_run: looking for %p '%s'", cmdline, cmdline);
 
+	reason= NULL;
 	for (bp= builtin_cmds; bp->cmd != NULL; bp++)
 	{
 		len= strlen(bp->cmd);
@@ -1197,7 +1199,12 @@ static int atlas_run(char *cmdline)
 		break;
 	}
 	if (bp->cmd == NULL)
-		return 0;	/* Nothing found */
+	{
+		crondlog(LVL8 "cmd not found '%s'", cmdline);
+		r= -1;
+		reason="cmd not found";
+		goto error;
+	}
 	
 	crondlog(LVL7 "found cmd '%s' for '%s'", bp->cmd, cmdline);
 
@@ -1208,7 +1215,9 @@ static int atlas_run(char *cmdline)
 	if (len+1 > ATLAS_ARGSIZE)
 	{
 		crondlog(LVL8 "atlas_run: command line too big: '%s'", cmdline);
-		return 1;	/* Just skip it */
+		r= -1;
+		reason="command line too big";
+		goto error;
 	}
 	strcpy(args, cmdline);
 
@@ -1275,9 +1284,11 @@ static int atlas_run(char *cmdline)
 		if (argc >= ATLAS_NARGS-1)
 		{
 			crondlog(
-			LVL8 "atlas_run: command line '%s', too arguments",
+			LVL8 "atlas_run: command line '%s', too many arguments",
 				cmdline);
-			return 1;	/* Just skip it */
+			r= -1;
+			reason="too many arguments";
+			goto error;
 		}
 
 		cp= ncp;
@@ -1291,7 +1302,9 @@ static int atlas_run(char *cmdline)
 				crondlog(
 		LVL8 "atlas_run: command line '%s', end of string not found",
 					cmdline);
-				return 1;	/* Just skip it */
+				r= -1;
+				reason="end of string not found";
+				goto error;
 			}
 			argv[argc]= cp+1;
 			cp= ncp;
@@ -1310,7 +1323,9 @@ static int atlas_run(char *cmdline)
 		crondlog(	
 			LVL8 "atlas_run: command line '%s', too many arguments",
 			cmdline);
-		return 1;	/* Just skip it */
+		r= -1;
+		reason="too many arguments";
+		goto error;
 	}
 	argv[argc]= NULL;
 
@@ -1327,7 +1342,9 @@ static int atlas_run(char *cmdline)
 			crondlog(
 			LVL8 "atlas_run: insecure output file '%s'",
 				outfile);
-			return 1;
+			r= -1;
+			reason="insecure output file";
+			goto error;
 		}
 		flags= O_CREAT | O_WRONLY;
 		if (do_append)
@@ -1338,7 +1355,9 @@ static int atlas_run(char *cmdline)
 			crondlog(
 			LVL8 "atlas_run: unable to create output file '%s'",
 				outfile);
-			return 1;
+			r= -1;
+			reason="unable to create output file";
+			goto error;
 		}
 		fflush(stdout);
 		saved_fd= dup(1);
@@ -1346,7 +1365,9 @@ static int atlas_run(char *cmdline)
 		{
 			crondlog(LVL8 "atlas_run: unable to dub stdout");
 			close(atlas_fd);
-			return 1;
+			r= -1;
+			reason="unable to dub stdout";
+			goto error;
 		}
 		dup2(atlas_fd, 1);
 		close(atlas_fd);
@@ -1363,6 +1384,7 @@ static int atlas_run(char *cmdline)
 		close(saved_fd);
 	}
 
+error:
 	if (r != 0 && out_filename)
 	{
 		fn= fopen(out_filename, "a");
@@ -1373,6 +1395,8 @@ static int atlas_run(char *cmdline)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
 		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%d, ",
 			get_atlas_fw_version(), time(NULL));
+		if (reason != NULL)
+			fprintf(fn, DBQ(reason) ":" DBQ(%s) ", ", reason);
 		fprintf(fn, DBQ(err) ":%d, " DBQ(cmd) ": \"", r);
 		for (cp= cmdline; *cp; cp++)
 		{
@@ -1420,6 +1444,9 @@ static void RunJob(const char *user, CronLine *line)
 		return;
 	}
 
+	/* Don't run external commands */
+	line->cl_Pid = 0;
+#if 0
 	/* prepare things before vfork */
 	pas = getpwnam(user);
 	if (!pas) {
@@ -1452,4 +1479,5 @@ static void RunJob(const char *user, CronLine *line)
 		pid = 0;
 	}
 	line->cl_Pid = pid;
+#endif
 }
