@@ -678,7 +678,11 @@ printf("ready_callback4: too short\n");
 	host= base->table[data->index];
 
 	/* Check for Destination Host Unreachable */
-	if (icmp->type == ICMP_ECHOREPLY)
+	if (icmp->type == ICMP_ECHO)
+	{
+		/* Completely ignore ECHO requests */
+	}
+	else if (icmp->type == ICMP_ECHOREPLY)
 	  {
 	    /* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
 	    struct timeval elapsed;             /* response time */

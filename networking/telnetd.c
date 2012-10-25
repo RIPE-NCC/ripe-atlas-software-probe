@@ -397,10 +397,14 @@ static int start_login(struct tsession *ts, char *user)
 
 /* Must match getopt32 string */
 enum {
+		/*	 (1 << 0)	-f */
+		/*	 (1 << 1)	-l */
 	OPT_WATCHCHILD = (1 << 2), /* -K */
 	OPT_INETD      = (1 << 3) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -i */
-	OPT_PORT       = (1 << 4) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p */
-	OPT_FOREGROUND = (1 << 6) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
+		/*	 (1 << 4)	-P */
+	OPT_PORT       = (1 << 5) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p */
+		/*	 (1 << 6)	-b */
+	OPT_FOREGROUND = (1 << 7) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
 };
 
 #if ENABLE_FEATURE_TELNETD_STANDALONE
@@ -511,6 +515,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned portnbr = 23;
 	char *opt_bindaddr = NULL;
 	char *opt_portnbr;
+	const char *PidFileName = NULL;
 	char buf[80];
 #else
 	enum {
@@ -523,8 +528,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 	/* Even if !STANDALONE, we accept (and ignore) -i, thus people
 	 * don't need to guess whether it's ok to pass -i to us */
-	opt = getopt32(argv, "f:l:Ki" USE_FEATURE_TELNETD_STANDALONE("p:b:F"),
-			&issuefile, &loginpath
+	opt = getopt32(argv, "f:l:KiP:" USE_FEATURE_TELNETD_STANDALONE("p:b:F"),
+			&issuefile, &loginpath, &PidFileName
 			USE_FEATURE_TELNETD_STANDALONE(, &opt_portnbr, &opt_bindaddr));
 	if (!IS_INETD /*&& !re_execed*/) {
 		/* inform that we start in standalone mode?
@@ -545,6 +550,11 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		if (opt & OPT_PORT)
 			portnbr = xatou16(opt_portnbr);
 	);
+
+	if(PidFileName)
+	{
+		write_pidfile(PidFileName);
+	}
 
 	/* Used to check access(loginpath, X_OK) here. Pointless.
 	 * exec will do this for us for free later. */
@@ -1108,8 +1118,8 @@ static char *getline_2pty(struct tsession *ts)
 	cp= strchr(line, '\r');
 	if (cp == NULL || cp-line != strlen(line)-1)
 	{
-		bb_error_msg("bad line '%s', cp %p, cp-line %d, |line| %ld",
-			line, cp, cp-line, (long)strlen(line));
+		bb_error_msg("bad line '%s', cp %p, cp-line %ld, |line| %ld",
+			line, cp, (long)(cp-line), (long)strlen(line));
 
 		/* Bad line, just ignore it */
 		free(line); line= NULL;
