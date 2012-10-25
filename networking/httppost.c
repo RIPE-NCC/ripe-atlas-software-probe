@@ -16,6 +16,10 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 #include <sys/stat.h>
 #include "libbb.h"
 
+#define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
+#define SAFE_PREFIX_DATA_NEW ATLAS_DATA_NEW
+#define SAFE_PREFIX_STATUS ATLAS_STATUS
+
 struct option longopts[]=
 {
 	{ "delete-file", no_argument, NULL, 'd' },
@@ -175,6 +179,12 @@ int httppost_main(int argc, char *argv[])
 
 	if(post_header != NULL )
 	{	
+		if (!validate_filename(post_header, SAFE_PREFIX_DATA_OUT) &&
+			!validate_filename(post_header, SAFE_PREFIX_STATUS))
+		{
+			report("protected file (for header) '%s'", post_header);
+			goto err;
+		}
 		fdH = open(post_header, O_RDONLY);
 		if(fdH == -1 )
 		{
@@ -198,6 +208,12 @@ int httppost_main(int argc, char *argv[])
 
 	if(post_footer != NULL )
 	{	
+		if (!validate_filename(post_footer, SAFE_PREFIX_DATA_OUT) &&
+			!validate_filename(post_footer, SAFE_PREFIX_STATUS))
+		{
+			report("pretected file (for footer) '%s'", post_footer);
+			goto err;
+		}
 		fdF = open(post_footer, O_RDONLY);
 		if(fdF == -1 )
 		{
@@ -222,6 +238,12 @@ int httppost_main(int argc, char *argv[])
 	/* Try to open the file before trying to connect */
 	if (post_file != NULL)
 	{
+		if (!validate_filename(post_file, SAFE_PREFIX_DATA_OUT) &&
+			!validate_filename(post_file, SAFE_PREFIX_STATUS))
+		{
+			report("protected file (post) '%s'", post_file);
+			goto err;
+		}
 		fdS= open(post_file, O_RDONLY);
 		if (fdS == -1)
 		{
@@ -319,6 +341,11 @@ int httppost_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			fprintf(stderr, "posting file '%s'\n", p);
+			if (!validate_filename(p, SAFE_PREFIX_DATA_OUT))
+			{
+				report("protected file (post dir) '%s'", p);
+				goto err;
+			}
 			fd= open(p, O_RDONLY);
 			if (fd == -1)
 			{
@@ -381,6 +408,11 @@ int httppost_main(int argc, char *argv[])
 	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
 	{
+		if (!validate_filename(output_file, SAFE_PREFIX_DATA_NEW))
+		{
+			report("protected file (output) '%s'", output_file);
+			goto err;
+		}
 		out_file= fopen(output_file, "w");
 		if (!out_file)
 		{
@@ -407,7 +439,15 @@ int httppost_main(int argc, char *argv[])
 	{
 		fprintf(stderr, "httppost: deleting files\n");
 		if (post_file)
+		{
+			if (!validate_filename(post_file, SAFE_PREFIX_DATA_OUT))
+			{
+				report("trying to delete protected file '%s'",
+					post_file);
+				goto err;
+			}
 			unlink (post_file);
+		}
 		if (post_dir)
 		{
 			for (p= filelist; p[0] != 0; p += strlen(p)+1)

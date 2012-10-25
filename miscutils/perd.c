@@ -19,6 +19,8 @@
 #define ATLAS 1
 #define ATLAS_NEW_FORMAT 1
 
+#define DBQ(str) "\"" #str "\""
+
 /* glibc frees previous setenv'ed value when we do next setenv()
  * of the same variable. uclibc does not do this! */
 #if (defined(__GLIBC__) && !defined(__UCLIBC__)) /* || OTHER_SAFE_LIBC... */
@@ -34,12 +36,6 @@
 #ifndef TMPDIR
 #define TMPDIR          "/var/spool/cron"
 #endif
-#ifndef SENDMAIL
-#define SENDMAIL        "sendmail"
-#endif
-#ifndef SENDMAIL_ARGS
-#define SENDMAIL_ARGS   "-ti", "oem"
-#endif
 #ifndef CRONUPDATE
 #define CRONUPDATE      "cron.update"
 #endif
@@ -49,6 +45,8 @@
 
 #ifdef ATLAS
 #include <cmdtable.h>
+
+#define SAFE_PREFIX ATLAS_DATA_NEW
 #endif
 
 #if ATLAS_NEW_FORMAT
@@ -72,11 +70,6 @@ typedef struct CronLine {
 	struct CronLine *cl_Next;
 	char *cl_Shell;         /* shell command                        */
 	pid_t cl_Pid;           /* running pid, 0, or armed (-1)        */
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-	int cl_MailPos;         /* 'empty file' size                    */
-	smallint cl_MailFlag;   /* running pid is for mail              */
-	char *cl_MailTo;	/* whom to mail results			*/
-#endif
 #if ATLAS_NEW_FORMAT
 	unsigned interval;
 	time_t nextcycle;
@@ -151,8 +144,9 @@ static struct globals G;
 } while (0)
 
 #ifdef ATLAS
-static int do_atlas;
 static int do_kick_watchdog;
+static char *atlas_id= NULL;
+static char *out_filename= NULL;
 
 static int atlas_run(char *cmdline);
 #endif
@@ -167,11 +161,7 @@ static int TestJobs(time_t t1, time_t t2);
 static void RunJobs(void);
 static int CheckJobs(void);
 static void RunJob(const char *user, CronLine *line);
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-static void EndJob(const char *user, CronLine *line);
-#else
 #define EndJob(user, line)  ((line)->cl_Pid = 0)
-#endif
 static void DeleteFile(CronFile *tfile);
 static void SetOld(const char *userName);
 static void CopyFromOld(CronLine *line);
@@ -225,49 +215,6 @@ static void kick_watchdog(void)
 	}
 }
 
-#if 0
-static void FAST_FUNC Xbb_daemonize_or_rexec(int flags, char **argv)
-{
-	int fd;
-
-	if (flags & DAEMON_CHDIR_ROOT)
-		xchdir("/");
-
-	if (flags & DAEMON_DEVNULL_STDIO) {
-		close(0);
-		close(1);
-		close(2);
-	}
-
-	fd = open(bb_dev_null, O_RDWR);
-	if (fd < 0) {
-		/* NB: we can be called as bb_sanitize_stdio() from init
-		 * or mdev, and there /dev/null may legitimately not (yet) exist!
-		 * Do not use xopen above, but obtain _ANY_ open descriptor,
-		 * even bogus one as below. */
-		fd = xopen("/", O_RDONLY); /* don't believe this can fail */
-	}
-
-	while ((unsigned)fd < 2)
-		fd = dup(fd); /* have 0,1,2 open at least to /dev/null */
-
-	if (!(flags & DAEMON_ONLY_SANITIZE)) {
-		//forkexit_or_rexec(argv);
-		/* if daemonizing, make sure we detach from stdio & ctty */
-		setsid();
-		dup2(fd, 0);
-		dup2(fd, 1);
-		dup2(fd, 2);
-	}
-	while (fd > 2) {
-		close(fd--);
-		if (!(flags & DAEMON_CLOSE_EXTRA_FDS))
-			return;
-		/* else close everything after fd#2 */
-	}
-}
-#endif
-
 int perd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int perd_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -285,9 +232,9 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:ADP:" USE_FEATURE_PERD_D("d:"),
-			&LogLevel, &LogFile, &CDir, &PidFileName
-			USE_FEATURE_PERD_D(,&LogLevel));
+	opt = getopt32(argv, "l:L:fbSc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
+			&LogLevel, &LogFile, &CDir, &atlas_id, &PidFileName
+			USE_FEATURE_PERD_D(,&LogLevel), &out_filename);
 	/* both -d N and -l N set the same variable: LogLevel */
 
 	if (!(opt & OPT_f)) {
@@ -302,7 +249,6 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 		logmode = LOGMODE_SYSLOG;
 	}
 
-	do_atlas= !!(opt & OPT_A);
 	do_kick_watchdog= !!(opt & OPT_D);
 
 	xchdir(CDir);
@@ -668,9 +614,6 @@ static void SynchronizeFile(const char *fileName)
 	struct stat sbuf;
 	int maxLines;
 	char *tokens[6];
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-	char *mailTo = NULL;
-#endif
 #if ATLAS_NEW_FORMAT
 	char *check0, *check1, *check2;
 	time_t now;
@@ -720,10 +663,6 @@ static void SynchronizeFile(const char *fileName)
 
 			/* check if line is setting MAILTO= */
 			if (0 == strncmp(tokens[0], "MAILTO=", 7)) {
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-				free(mailTo);
-				mailTo = (tokens[0][7]) ? xstrdup(&tokens[0][7]) : NULL;
-#endif /* otherwise just ignore such lines */
 				continue;
 			}
 			/* check if a minimum of tokens is specified */
@@ -784,10 +723,6 @@ static void SynchronizeFile(const char *fileName)
 			 */
 			FixDayDow(line);
 #endif /* ATLAS_NEW_FORMAT */
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-			/* copy mailto (can be NULL) */
-			line->cl_MailTo = xstrdup(mailTo);
-#endif
 			/* copy command */
 			line->cl_Shell = xstrdup(tokens[5]);
 			if (DebugOpt) {
@@ -1064,7 +999,6 @@ static int TestJobs(time_t t1, time_t t2)
 #if ATLAS_NEW_FORMAT
 				if (line->lasttime != 0)
 				{
-					time_t now= time(NULL);
 					if (now > line->lasttime+
 						line->interval+
 						line->distr_param)
@@ -1241,11 +1175,13 @@ static void find_eos(char *cp, char **ncpp)
 
 static int atlas_run(char *cmdline)
 {
-	int i, argc, atlas_fd, saved_fd, do_append, flags;
+	char c;
+	int i, r, argc, atlas_fd, saved_fd, do_append, flags;
 	size_t len;
 	char *cp, *ncp;
 	struct builtin *bp;
 	char *outfile;
+	FILE *fn;
 	char *argv[ATLAS_NARGS];
 	char args[ATLAS_ARGSIZE];
 
@@ -1386,6 +1322,13 @@ static int atlas_run(char *cmdline)
 	{
 		/* Redirect I/O */
 		crondlog(LVL7 "sending output to '%s'", outfile);
+		if (!validate_filename(outfile, SAFE_PREFIX))
+		{
+			crondlog(
+			LVL8 "atlas_run: insecure output file '%s'",
+				outfile);
+			return 1;
+		}
 		flags= O_CREAT | O_WRONLY;
 		if (do_append)
 			flags |= O_APPEND;
@@ -1409,7 +1352,7 @@ static int atlas_run(char *cmdline)
 		close(atlas_fd);
 	}
 
-	bp->func(argc, argv);
+	r= bp->func(argc, argv);
 
 	alarm(0);
 
@@ -1420,162 +1363,34 @@ static int atlas_run(char *cmdline)
 		close(saved_fd);
 	}
 
+	if (r != 0 && out_filename)
+	{
+		fn= fopen(out_filename, "a");
+		if (!fn)
+			crondlog(DIE9 "unable to append to '%s'", out_filename);
+		fprintf(fn, "RESULT { ");
+		if (atlas_id)
+			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
+		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%d, ",
+			get_atlas_fw_version(), time(NULL));
+		fprintf(fn, DBQ(err) ":%d, " DBQ(cmd) ": \"", r);
+		for (cp= cmdline; *cp; cp++)
+		{
+			c= *cp;
+			if (c == '"' || c == '\\')
+				fprintf(fn, "\\%c", c);
+			else if (isprint((unsigned char)c))
+				fputc(c, fn);
+			else
+				fprintf(fn, "\\u%04x", (unsigned char)c);
+		}
+		fprintf(fn, "\"");
+		fprintf(fn, " }\n");
+		fclose(fn);
+	}
+
 	return 1;
 }
-
-#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
-
-// TODO: sendmail should be _run-time_ option, not compile-time!
-
-static void
-ForkJob(const char *user, CronLine *line, int mailFd,
-		const char *prog, const char *cmd, const char *arg,
-		const char *mail_filename)
-{
-	struct passwd *pas;
-	pid_t pid;
-
-	/* prepare things before vfork */
-	pas = getpwnam(user);
-	if (!pas) {
-		crondlog(LVL9 "can't get uid for %s", user);
-		goto err;
-	}
-	SetEnv(pas);
-
-	pid = vfork();
-	if (pid == 0) {
-		/* CHILD */
-		/* change running state to the user in question */
-		ChangeUser(pas);
-		if (DebugOpt) {
-			crondlog(LVL5 "child running %s", prog);
-		}
-		if (mailFd >= 0) {
-			xmove_fd(mailFd, mail_filename ? 1 : 0);
-			dup2(1, 2);
-		}
-		/* crond 3.0pl1-100 puts tasks in separate process groups */
-		bb_setpgrp();
-		execlp(prog, prog, cmd, arg, NULL);
-		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user, prog, cmd, arg);
-		if (mail_filename) {
-			fdprintf(1, "Exec failed: %s -c %s\n", prog, arg);
-		}
-		_exit(EXIT_SUCCESS);
-	}
-
-	line->cl_Pid = pid;
-	if (pid < 0) {
-		/* FORK FAILED */
-		crondlog(ERR20 "can't vfork");
- err:
-		line->cl_Pid = 0;
-		if (mail_filename) {
-			unlink(mail_filename);
-		}
-	} else if (mail_filename) {
-		/* PARENT, FORK SUCCESS
-		 * rename mail-file based on pid of process
-		 */
-		char mailFile2[128];
-
-		snprintf(mailFile2, sizeof(mailFile2), "%s/cron.%s.%d", TMPDIR, user, pid);
-		rename(mail_filename, mailFile2); // TODO: xrename?
-	}
-
-	/*
-	 * Close the mail file descriptor.. we can't just leave it open in
-	 * a structure, closing it later, because we might run out of descriptors
-	 */
-	if (mailFd >= 0) {
-		close(mailFd);
-	}
-}
-
-static void RunJob(const char *user, CronLine *line)
-{
-	char mailFile[128];
-	int mailFd = -1;
-
-	line->cl_Pid = 0;
-	line->cl_MailFlag = 0;
-
-	if (line->cl_MailTo) {
-		/* open mail file - owner root so nobody can screw with it. */
-		snprintf(mailFile, sizeof(mailFile), "%s/cron.%s.%d", TMPDIR, user, getpid());
-		mailFd = open(mailFile, O_CREAT | O_TRUNC | O_WRONLY | O_EXCL | O_APPEND, 0600);
-
-		if (mailFd >= 0) {
-			line->cl_MailFlag = 1;
-			fdprintf(mailFd, "To: %s\nSubject: cron: %s\n\n", line->cl_MailTo,
-				line->cl_Shell);
-			line->cl_MailPos = lseek(mailFd, 0, SEEK_CUR);
-		} else {
-			crondlog(ERR20 "cannot create mail file %s for user %s, "
-					"discarding output", mailFile, user);
-		}
-	}
-
-
-	if (atlas_outfile && atlas_run(line->cl_Shell))
-	{
-		/* Internal command */
-		return;
-	}
-
-	ForkJob(user, line, mailFd, DEFAULT_SHELL, "-c", line->cl_Shell, mailFile);
-}
-
-/*
- * EndJob - called when job terminates and when mail terminates
- */
-static void EndJob(const char *user, CronLine *line)
-{
-	int mailFd;
-	char mailFile[128];
-	struct stat sbuf;
-
-	/* No job */
-	if (line->cl_Pid <= 0) {
-		line->cl_Pid = 0;
-		return;
-	}
-
-	/*
-	 * End of job and no mail file
-	 * End of sendmail job
-	 */
-	snprintf(mailFile, sizeof(mailFile), "%s/cron.%s.%d", TMPDIR, user, line->cl_Pid);
-	line->cl_Pid = 0;
-
-	if (line->cl_MailFlag == 0) {
-		return;
-	}
-	line->cl_MailFlag = 0;
-
-	/*
-	 * End of primary job - check for mail file.  If size has increased and
-	 * the file is still valid, we sendmail it.
-	 */
-	mailFd = open(mailFile, O_RDONLY);
-	unlink(mailFile);
-	if (mailFd < 0) {
-		return;
-	}
-
-	if (fstat(mailFd, &sbuf) < 0 || sbuf.st_uid != DaemonUid
-	 || sbuf.st_nlink != 0 || sbuf.st_size == line->cl_MailPos
-	 || !S_ISREG(sbuf.st_mode)
-	) {
-		close(mailFd);
-		return;
-	}
-	if (line->cl_MailTo)
-		ForkJob(user, line, mailFd, SENDMAIL, SENDMAIL_ARGS, NULL);
-}
-
-#else /* crond without sendmail */
 
 static void RunJob(const char *user, CronLine *line)
 {
@@ -1598,7 +1413,7 @@ static void RunJob(const char *user, CronLine *line)
 	}
 	line->lasttime= time(NULL);
 
-	if (do_atlas && atlas_run(line->cl_Shell))
+	if (atlas_run(line->cl_Shell))
 	{
 		/* Internal command */
 		line->cl_Pid = 0;
@@ -1624,7 +1439,8 @@ static void RunJob(const char *user, CronLine *line)
 		}
 		/* crond 3.0pl1-100 puts tasks in separate process groups */
 		bb_setpgrp();
-		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
+		/* Disable execl for securty reasons */
+		//execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
 				 DEFAULT_SHELL, "-c", line->cl_Shell);
 		_exit(EXIT_SUCCESS);
@@ -1637,5 +1453,3 @@ static void RunJob(const char *user, CronLine *line)
 	}
 	line->cl_Pid = pid;
 }
-
-#endif /* ENABLE_FEATURE_CROND_CALL_SENDMAIL */

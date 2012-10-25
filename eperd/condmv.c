@@ -6,6 +6,9 @@ condmv.c -- move a file only if the destination doesn't exist
 #include "libbb.h"
 #include "eperd.h"
 
+#define SAFE_PREFIX_FROM ATLAS_DATA_NEW
+#define SAFE_PREFIX_TO ATLAS_DATA_OUT
+
 #define A_FLAG	(1 << 0)
 #define F_FLAG	(1 << 1)
 
@@ -29,10 +32,24 @@ static void *condmv_init(int argc, char *argv[],
 	opt= getopt32(argv, "A:f", &opt_add);
 
 	if (argc != optind + 2)
-		bb_show_usage();
+	{
+		crondlog(LVL8 "too many or too few arguments (required 2)"); 
+		return NULL;
+	}
 
 	from= argv[optind];
 	to= argv[optind+1];
+
+	if (!validate_filename(from, SAFE_PREFIX_FROM))
+	{
+		fprintf(stderr, "insecure from file '%s'\n", from);
+		return NULL;
+	}
+	if (!validate_filename(to, SAFE_PREFIX_TO))
+	{
+		fprintf(stderr, "insecure to file '%s'\n", to);
+		return NULL;
+	}
 
 	state= malloc(sizeof(*state));
 	state->from= strdup(from);

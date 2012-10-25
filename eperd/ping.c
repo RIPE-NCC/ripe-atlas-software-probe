@@ -19,9 +19,11 @@ ping.c
 
 #include "eperd.h"
 
+#define SAFE_PREFIX ATLAS_DATA_NEW
+
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("46rc:s:A:O:")
+#define PING_OPT_STRING ("!46rc:s:A:O:")
 
 enum 
 {
@@ -868,8 +870,8 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 {
 	static struct pingbase *ping_base;
 
-	int opt;
 	int i, newsiz, delay_name_res;
+	uint32_t opt;
 	unsigned pingcount; /* must be int-sized */
 	unsigned size;
 	sa_family_t af;
@@ -878,6 +880,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	char *out_filename;
 	struct pingstate *state;
 	len_and_sockaddr *lsa;
+	FILE *fh;
 
 	if (!ping_base)
 	{
@@ -962,6 +965,29 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
 		&str_Atlas, &out_filename);
 	hostname = argv[optind];
+
+	if (opt == 0xffffffff)
+	{
+		crondlog(LVL8 "bad options");
+		return NULL;
+	}
+
+	if (out_filename)
+	{
+		if (!validate_filename(out_filename, SAFE_PREFIX))
+		{
+			crondlog(LVL8 "insecure file '%s'", out_filename);
+			return NULL;
+		}
+		fh= fopen(out_filename, "a");
+		if (!fh)
+		{
+			crondlog(LVL8 "unable to append to '%s'",
+				out_filename);
+			return NULL;
+		}
+		fclose(fh);
+	}
 
 	af= AF_UNSPEC;
 	if (opt & opt_4)

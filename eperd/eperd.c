@@ -29,6 +29,7 @@
 #define SETENV_LEAKS 1
 #endif
 
+#define DBQ(str) "\"" #str "\""
 
 #ifndef CRONTABS
 #define CRONTABS        "/var/spool/cron/crontabs"
@@ -107,9 +108,9 @@ struct globals G;
 	CDir = CRONTABS; \
 } while (0)
 
-static int do_atlas;
 static int do_kick_watchdog;
-
+static char *out_filename= NULL;
+static char *atlas_id= NULL;
 
 static void CheckUpdates(evutil_socket_t fd, short what, void *arg);
 static void CheckUpdatesHour(evutil_socket_t fd, short what, void *arg);
@@ -247,6 +248,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	struct timeval tv;
 
 	const char *PidFileName = NULL;
+
 	atexit(my_exit);
 
 	INIT_G();
@@ -254,9 +256,9 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			":l+:d+"; /* -l and -d have numeric param */
-	opt = getopt32(argv, "l:L:fbSc:ADP:" USE_FEATURE_PERD_D("d:"),
-			&LogLevel, &LogFile, &CDir, &PidFileName
-			USE_FEATURE_PERD_D(,&LogLevel));
+	opt = getopt32(argv, "l:L:fbSc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
+			&LogLevel, &LogFile, &CDir, &atlas_id, &PidFileName
+			USE_FEATURE_PERD_D(,&LogLevel), &out_filename);
 	/* both -d N and -l N set the same variable: LogLevel */
 
 	if (!(opt & OPT_f)) {
@@ -271,7 +273,6 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 		logmode = LOGMODE_SYSLOG;
 	}
 
-	do_atlas= !!(opt & OPT_A);
 	do_kick_watchdog= !!(opt & OPT_D);
 
 	xchdir(CDir);
@@ -792,12 +793,14 @@ static struct builtin
 
 static void atlas_init(CronLine *line)
 {
+	char c;
 	int i, argc;
 	size_t len;
 	char *cp, *ncp;
 	struct builtin *bp;
-	char *cmdline;
+	char *cmdline, *p;
 	void *state;
+	FILE *fn;
 	char *argv[ATLAS_NARGS];
 	char args[ATLAS_ARGSIZE];
 
@@ -898,6 +901,32 @@ static void atlas_init(CronLine *line)
 	crondlog(LVL7 "init returned %p for '%s'", state, line->cl_Shell);
 	line->teststate= state;
 	line->testops= bp->testops;
+
+	if (state == NULL && out_filename)
+	{
+		fn= fopen(out_filename, "a");
+		if (!fn)
+			crondlog(DIE9 "unable to append to '%s'", out_filename);
+		fprintf(fn, "RESULT { ");
+		if (atlas_id)
+			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
+		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%d, ",
+			get_atlas_fw_version(), time(NULL));
+		fprintf(fn, DBQ(cmd) ": \"");
+		for (p= line->cl_Shell; *p; p++)
+		{
+			c= *p;
+			if (c == '"' || c == '\\')
+				fprintf(fn, "\\%c", c);
+			else if (isprint((unsigned char)c))
+				fputc(c, fn);
+			else
+				fprintf(fn, "\\u%04x", (unsigned char)c);
+		}
+		fprintf(fn, "\"");
+		fprintf(fn, " }\n");
+		fclose(fn);
+	}
 }
 
 #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
@@ -1054,7 +1083,6 @@ static void EndJob(const char *user, CronLine *line)
 
 #else /* crond without sendmail */
 
-#if 1
 static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	short __attribute__ ((unused)) what, void *arg)
 {
@@ -1109,67 +1137,5 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	tv.tv_usec= 0;
 	event_add(&line->event, &tv);
 }
-#else
-static void RunJob(const char *user, CronLine *line)
-{
-	struct passwd *pas;
-	pid_t pid;
-
-	if (line->lasttime != 0)
-	{
-		time_t now= time(NULL);
-		if (now > line->lasttime+line->interval+line->distr_param)
-		{
-			crondlog(LVL7 "job is late. Now %d, lasttime %d, max %d, should %d: %s",
-				now, line->lasttime,
-				line->lasttime+line->interval+line->distr_param,
-				line->start_time +
-				line->nextcycle*line->interval+
-				line->distr_offset,
-				line->cl_Shell);
-		}
-	}
-	line->lasttime= time(NULL);
-
-	if (do_atlas && atlas_run(line->cl_Shell))
-	{
-		/* Internal command */
-		line->cl_Pid = 0;
-		return;
-	}
-
-	/* prepare things before vfork */
-	pas = getpwnam(user);
-	if (!pas) {
-		crondlog(LVL9 "can't get uid for %s", user);
-		goto err;
-	}
-	SetEnv(pas);
-
-	/* fork as the user in question and run program */
-	pid = vfork();
-	if (pid == 0) {
-		/* CHILD */
-		/* change running state to the user in question */
-		ChangeUser(pas);
-		if (DebugOpt) {
-			crondlog(LVL5 "child running %s", DEFAULT_SHELL);
-		}
-		/* crond 3.0pl1-100 puts tasks in separate process groups */
-		bb_setpgrp();
-		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
-		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
-				 DEFAULT_SHELL, "-c", line->cl_Shell);
-		_exit(EXIT_SUCCESS);
-	}
-	if (pid < 0) {
-		/* FORK FAILED */
-		crondlog(ERR20 "can't vfork");
- err:
-		pid = 0;
-	}
-	line->cl_Pid = pid;
-}
-#endif
 
 #endif /* ENABLE_FEATURE_CROND_CALL_SENDMAIL */

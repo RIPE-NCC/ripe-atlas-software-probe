@@ -60,6 +60,7 @@
 #define CRONTAB_BUSY	"CRONTAB_BUSY" CRLF CRLF
 #define CREATE_FAILED	"UNABLE_TO_CREATE_NEW_CRONTAB" CRLF CRLF
 #define IO_ERROR	"IO_ERROR" CRLF CRLF
+#define BAD_PATH	"BAD_PATH" CRLF CRLF
 
 #define CRONUSER	"root"
 #define CRONTAB_NEW_SUF	"/" CRONUSER ".new"
@@ -67,6 +68,7 @@
 #define CRONUPDATE	"/cron.update"
 #define UPDATELINE	CRONUSER "\n"
 #define ONEOFF_SUFFIX	".new"
+#define SAFE_PREFIX	ATLAS_CRONS
 
 enum state
 {
@@ -114,6 +116,7 @@ static void add_to_crontab(struct tsession *ts, char *line);
 static void end_crontab(struct tsession *ts);
 static void do_oneoff(struct tsession *ts, char *line);
 static int get_probe_id(void);
+int validate_filename(const char *path, const char *prefix);
 #endif
 
 /* Globals */
@@ -1181,6 +1184,12 @@ static int start_crontab(struct tsession *ts, char *line)
 	strlcpy(filename, atlas_dirname, sizeof(filename));
 	strlcat(filename, CRONTAB_NEW_SUF, sizeof(filename));
 
+	if (!validate_filename(filename, SAFE_PREFIX))
+	{
+		add_2sock(ts, BAD_PATH);
+		return -1;
+	}
+
 	atlas_crontab= fopen(filename, "w");
 	if (!atlas_crontab)
 	{
@@ -1318,6 +1327,12 @@ static void do_oneoff(struct tsession *ts, char *line)
 	}
 	strlcpy(filename_new, filename, sizeof(filename_new));
 	strlcat(filename_new, ONEOFF_SUFFIX, sizeof(filename_new));
+
+	if (!validate_filename(filename, SAFE_PREFIX))
+	{
+		add_2sock(ts, BAD_PATH);
+		return;
+	}
 
 	/* Try to grab 'filename', if there is any. It doesn't matter if this
 	 * fails.

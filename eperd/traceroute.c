@@ -14,6 +14,8 @@ traceroute.c
 
 #include "eperd.h"
 
+#define SAFE_PREFIX ATLAS_DATA_NEW
+
 #define DBQ(str) "\"" #str "\""
 
 #ifndef STANDALONE_BUSYBOX
@@ -23,7 +25,7 @@ traceroute.c
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("46IUFra:c:f:g:m:w:z:A:O:S:")
+#define TRACEROUTE_OPT_STRING ("!46IUFra:c:f:g:m:w:z:A:O:S:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -2288,7 +2290,8 @@ static void noreply_callback(int __attribute((unused)) unused,
 static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state))
 {
-	int i, opt, do_icmp, do_v6, dont_fragment, delay_name_res;
+	uint32_t opt;
+	int i, do_icmp, do_v6, dont_fragment, delay_name_res;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
 		parismod, timeout; /* must be int-sized */
 	size_t newsiz;
@@ -2298,6 +2301,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	struct trtstate *state;
 	sa_family_t af;
 	len_and_sockaddr *lsa;
+	FILE *fh;
 
 	if (!trt_base)
 	{
@@ -2323,12 +2327,35 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 		&str_Atlas, &out_filename, &maxpacksize);
 	hostname = argv[optind];
 
+	if (opt == 0xffffffff)
+	{
+		crondlog(LVL8 "bad options");
+		return NULL;
+	}
+
 	do_icmp= !!(opt & OPT_I);
 	do_v6= !!(opt & OPT_6);
 	dont_fragment= !!(opt & OPT_F);
 	delay_name_res= !!(opt & OPT_r);
 	if (maxpacksize > sizeof(trt_base->packet))
 		maxpacksize= sizeof(trt_base->packet);
+
+	if (out_filename)
+	{
+		if (!validate_filename(out_filename, SAFE_PREFIX))
+		{
+			crondlog(LVL8 "insecure file '%s'", out_filename);
+			return NULL;
+		}
+		fh= fopen(out_filename, "a");
+		if (!fh)
+		{
+			crondlog(LVL8 "unable to append to '%s'",
+				out_filename);
+			return NULL;
+		}
+		fclose(fh);
+	}
 
 	if (!delay_name_res)
 	{

@@ -16,12 +16,14 @@ Created:	Aug 2011 by Philip Homburg for RIPE NCC
 #include <sys/stat.h>
 #include "libbb.h"
 
+#define SAFE_PREFIX_OUT ATLAS_DATA_OUT
+#define SAFE_PREFIX_NEW ATLAS_DATA_NEW
+
 #define debug 0
 
 static struct option longopts[]=
 {
 	{ "append",	no_argument, NULL, 'a' },
-	{ "delete-file", no_argument, NULL, 'd' },
 	{ "get",	no_argument, NULL, 'g' },
 	{ "head",	no_argument, NULL, 'E' },
 	{ "post",	no_argument, NULL, 'P' },
@@ -68,7 +70,7 @@ int httpget_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int httpget_main(int argc, char *argv[])
 {
 	int c,  i, r, fd, fdF, fdH, fdS, chunked, content_length,
-		result, http_result, opt_delete_file, do_get, do_head, do_post,
+		result, http_result, do_get, do_head, do_post,
 		max_headers, max_body, do_multiline, only_v4, only_v6,
 		do_summary, headers_size, no_body, do_append, do_http10, gerr,
 		out_file_needs_closing;
@@ -93,7 +95,6 @@ int httpget_main(int argc, char *argv[])
 	post_footer=NULL;
 	post_header=NULL;
 	output_file= NULL;
-	opt_delete_file = 0;
 	time_tolerance= NULL;
 	store_headers= NULL;
 	store_body= NULL;
@@ -143,9 +144,6 @@ int httpget_main(int argc, char *argv[])
 			break;
 		case 'O':
 			output_file= optarg;
-			break;
-		case 'd':
-			opt_delete_file = 1;
 			break;
 		case 'g':				/* --get */
 			do_get = 1;
@@ -262,6 +260,11 @@ int httpget_main(int argc, char *argv[])
 
 	if(post_header != NULL )
 	{	
+		if (!validate_filename(post_header, SAFE_PREFIX_OUT))
+		{
+			report("insecure file '%s'", post_header);
+			goto err;
+		}
 		fdH = open(post_header, O_RDONLY);
 		if(fdH == -1 )
 		{
@@ -284,6 +287,11 @@ int httpget_main(int argc, char *argv[])
 
 	if(post_footer != NULL )
 	{	
+		if (!validate_filename(post_footer, SAFE_PREFIX_OUT))
+		{
+			report("insecure file '%s'", post_footer);
+			goto err;
+		}
 		fdF = open(post_footer, O_RDONLY);
 		if(fdF == -1 )
 		{
@@ -307,6 +315,11 @@ int httpget_main(int argc, char *argv[])
 	/* Try to open the file before trying to connect */
 	if (post_file != NULL)
 	{
+		if (!validate_filename(post_file, SAFE_PREFIX_OUT))
+		{
+			report("insecure file '%s'", post_file);
+			goto err;
+		}
 		fdS= open(post_file, O_RDONLY);
 		if (fdS == -1)
 		{
@@ -335,6 +348,11 @@ int httpget_main(int argc, char *argv[])
 
 	if (output_file)
 	{
+		if (!validate_filename(output_file, SAFE_PREFIX_NEW))
+		{
+			report("insecure output file '%s'", output_file);
+			goto err;
+		}
 		out_file= fopen(output_file, do_append ? "a" : "w");
 		if (!out_file)
 		{
@@ -433,6 +451,11 @@ int httpget_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			if (debug) fprintf(stderr, "posting file '%s'\n", p);
+			if (!validate_filename(p, SAFE_PREFIX_OUT))
+			{
+				report("insecure file '%s'", p);
+				goto err;
+			}
 			fd= open(p, O_RDONLY);
 			if (fd == -1)
 			{
@@ -563,25 +586,6 @@ fail:
 			http_result, headers_size, content_length);
 	}
 
-	if (debug) fprintf(stderr, "httpget: deleting files\n");
-	if ( opt_delete_file == 1 )
-	{
-		if (post_file)
-			unlink (post_file);
-		if (post_dir)
-		{
-			for (p= filelist; p[0] != 0; p += strlen(p)+1)
-			{
-				if (debug)
-				{
-					fprintf(stderr,
-						"unlinking file '%s'\n", p);
-				}
-				if (unlink(p) != 0)
-					report_err("unable to unlink '%s'", p);
-			}
-		}
-	}
 	if (debug) fprintf(stderr, "httpget: done\n");
 
 	result= 0;
@@ -1385,9 +1389,6 @@ static void usage(void)
 "         [--post-header <file-to-post>] [--post-file <file-to-post>]\n");
 	fprintf(stderr, 
 "        [--post-footer  <file-to-post>] \n");
-
-	fprintf(stderr, 
-"        [--delete-file 'delete the upon success, not header and footer'\n");
 
 	fprintf(stderr, 
 "        [--post-footer  <file-to-post>] [-O <output-file>] <url>\n");

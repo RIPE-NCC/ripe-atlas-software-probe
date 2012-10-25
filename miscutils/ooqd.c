@@ -14,6 +14,8 @@ One-off queue daemon
 #define WAIT_TIME	60	/* in seconds */
 #define NARGS		20	/* Max arguments to a built-in command */
 
+#define SAFE_PREFIX ATLAS_DATA_NEW
+
 static void process(FILE *file);
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
@@ -257,6 +259,11 @@ printf("got cp %p, line %p, '%s'\n", cp, line, cp);
 		{
 			/* Redirect I/O */
 			report("sending output to '%s'", outfile);
+			if (!validate_filename(outfile, SAFE_PREFIX))
+			{
+				report("insecure output file '%s'", outfile);
+				return;
+			}
 			flags= O_CREAT | O_WRONLY;
 			if (do_append)
 				flags |= O_APPEND;

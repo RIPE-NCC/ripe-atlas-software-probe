@@ -302,6 +302,15 @@ extern char *bb_get_last_path_component_strip(char *path) FAST_FUNC;
 /* "abc/def/" -> "" and it never modifies 'path' */
 extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 
+/* What's the best place for this? */
+#define ATLAS_HOME	"/home/atlas"
+#define ATLAS_CRONS	ATLAS_HOME "/crons"
+#define ATLAS_STATUS	ATLAS_HOME "/status"
+#define ATLAS_DATA_OUT	ATLAS_HOME "/data/out"
+#define ATLAS_DATA_NEW	ATLAS_HOME "/data/new"
+
+extern int validate_filename(const char *path, const char *prefix);
+
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;
 int close_on_exec_on(int fd) FAST_FUNC;
@@ -318,12 +327,11 @@ char *xmalloc_readlink_or_warn(const char *path) FAST_FUNC;
 char *xrealloc_getcwd_or_warn(char *cwd) FAST_FUNC;
 
 char *xmalloc_follow_symlinks(const char *path) FAST_FUNC;
-
+  
 extern size_t strlcat(char *__restrict dst, const char *__restrict src,
-                      size_t n) __THROW __nonnull ((1, 2));
+	size_t n) __THROW __nonnull ((1, 2));
 extern size_t strlcpy(char *__restrict dst, const char *__restrict src,
-                      size_t n) __THROW __nonnull ((1, 2));
-
+	size_t n) __THROW __nonnull ((1, 2));
 
 enum {
 	/* bb_signals(BB_FATAL_SIGS, handler) catches all signals which

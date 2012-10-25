@@ -16,6 +16,9 @@ Created:	Jan 2012 by Philip Homburg for RIPE NCC
 #include "eperd.h"
 #include "tcputil.h"
 
+#define SAFE_PREFIX_IN ATLAS_DATA_OUT
+#define SAFE_PREFIX_OUT ATLAS_DATA_NEW
+
 #define CONN_TO		   5
 
 #define ENV2STATE(env) \
@@ -347,6 +350,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
+	FILE *fh;
 
 	/* Arguments */
 	do_http10= 0;
@@ -376,7 +380,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "01aA:cO:46?", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "01aA:cO:46", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -439,17 +443,50 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		case 'u':				/* --user-agent */
 			user_agent= optarg;
 			break;
-		case '?':
-			bb_show_usage();
-			return NULL;
 		default:
-			crondlog(DIE9 "bad option '%c'", c);
+			crondlog(LVL8 "bad option '%c'", c);
+			return NULL;
 		}
 	}
 
 	if (optind != argc-1)
-		crondlog(DIE9 "exactly one url expected");
+	{
+		crondlog(LVL8 "exactly one url expected");
+		return NULL;
+	}
 	url= argv[optind];
+
+	if (output_file)
+	{
+		if (!validate_filename(output_file, SAFE_PREFIX_OUT))
+		{
+			crondlog(LVL8 "insecure file '%s'", output_file);
+			return NULL;
+		}
+		fh= fopen(output_file, "a");
+		if (!fh)
+		{
+			crondlog(LVL8 "unable to append to '%s'",
+				output_file);
+			return NULL;
+		}
+		fclose(fh);
+	}
+	if (post_header && !validate_filename(post_header, SAFE_PREFIX_IN))
+	{
+		crondlog(LVL8 "insecure file '%s'", post_header);
+		return NULL;
+	}
+	if (post_file && !validate_filename(post_file, SAFE_PREFIX_IN))
+	{
+		crondlog(LVL8 "insecure file '%s'", post_file);
+		return NULL;
+	}
+	if (post_footer && !validate_filename(post_footer, SAFE_PREFIX_IN))
+	{
+		crondlog(LVL8 "insecure file '%s'", post_footer);
+		return NULL;
+	}
 
 	max_headers= 0;
 	max_body= UINT_MAX;	/* default is to write out the entire body */
@@ -459,7 +496,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		max_headers= strtoul(store_headers, &check, 10);
 		if (check[0] != '\0')
 		{
-			crondlog(DIE9 "unable to parse argument '%s'",
+			crondlog(LVL8
+			"unable to parse argument (--store-headers) '%s'",
 				store_headers);
 			return NULL;
 		}
@@ -470,7 +508,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		max_body= strtoul(store_body, &check, 10);
 		if (check[0] != '\0')
 		{
-			crondlog(DIE9 "unable to parse argument '%s'",
+			crondlog(LVL8
+				"unable to parse argument (--store-body) '%s'",
 				store_body);
 			return NULL;
 		}

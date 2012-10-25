@@ -5,7 +5,6 @@ Commands for perd and ooqd
 */
 
 int condmv_main(int argc, char *argv[]);
-int dfrm_main(int argc, char *argv[]);
 int httpget_main(int argc, char *argv[]);
 int httppost_main(int argc, char *argv[]);
 int nslookup_main(int argc, char *argv[]);
@@ -22,14 +21,10 @@ static struct builtin
 } builtin_cmds[]=
 {
 	{ "condmv", condmv_main },
-	{ "dfrm", dfrm_main },
-	{ "httpget", httpget_main },
 	{ "httppost", httppost_main },
-	{ "nslookup", nslookup_main },
 	{ "ping6", ping6_main },
 	{ "ping", ping_main },
 	{ "sslgetcert", sslgetcert_main },
-	{ "tdig", tdig_main },
 	{ "traceroute", traceroute_main },
 	{ NULL, 0 }
 };
