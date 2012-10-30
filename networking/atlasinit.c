@@ -444,11 +444,11 @@ static int reg_init_main( int argc, char *argv[] )
 			} 
 			else if( strncmp(line,"FIRMWARE_APPS ", 14)==0 ) 
 			{ 
-				float root_fs_ver = 0;
+				unsigned root_fs_ver = 0;
 				token = strtok (line+14, search);  // version
-				sscanf (token, "%f", &root_fs_ver);
-				root_fs_ver *= 1000.0;
-				printf("FIRMWARE_APPS_VERSION=%d\n", (int)root_fs_ver); 
+				sscanf (token, "%u", &root_fs_ver);
+				printf("FIRMWARE_APPS_VERSION=%u\n",
+					root_fs_ver); 
 				token = strtok(NULL, search);      // alg
 				printf("FIRMWARE_APPS_CS_ALG=%s\n", token);
 
