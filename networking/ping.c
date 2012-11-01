@@ -253,7 +253,7 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 
 /* full(er) version */
 
-#define OPT_STRING ("qvc:s:w:W:I:A:4D" USE_PING6("6"))
+#define OPT_STRING ("!qvc:s:w:W:I:A:4D" USE_PING6("6"))
 enum {
 	OPT_QUIET = 1 << 0,
 	OPT_VERBOSE = 1 << 1,
@@ -839,13 +839,17 @@ int ping_main(int argc UNUSED_PARAM, char **argv)
 {
 	len_and_sockaddr *lsa;
 	char *str_s;
-	int opt;
+	uint32_t opt;
 
 	INIT_G();
 
 	/* exactly one argument needed; -v and -q don't mix; -c NUM, -w NUM, -W NUM */
 	opt_complementary = "=1:q--v:v--q:c+:w+:W+";
 	opt = getopt32(argv, OPT_STRING, &pingcount, &str_s, &deadline, &timeout, &str_I, &str_Atlas);
+	if (opt == (uint32_t)-1)
+	{
+		return EXIT_FAILURE;
+	}
 	if (opt & OPT_s)
 		datalen = xatou16(str_s); // -s
 	if(opt & OPT_D_WATCHDOG )

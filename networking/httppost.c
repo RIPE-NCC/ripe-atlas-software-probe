@@ -40,7 +40,7 @@ static time_t timeout = 300;
 /* Result sent by controller when input is acceptable. */
 #define OK_STR	"OK\n"
 
-static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
+static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
 static int check_result(FILE *tcp_file);
 static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t *timep);
@@ -50,7 +50,7 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp);
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len,
 	int *found_okp);
 static void fatal(const char *fmt, ...);
-static void fatal_err(const char *fmt, ...);
+// static void fatal_err(const char *fmt, ...);
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
 static int write_to_tcp_fd (int fd, FILE *tcp_file);
@@ -68,7 +68,7 @@ int httppost_main(int argc, char *argv[])
 		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
 	char *time_tolerance;
 	FILE *tcp_file, *out_file;
-	time_t server_time;
+	time_t server_time, tolerance;
 	struct stat sbF, sbH, sbS;
 	off_t cLength, dir_length, maxpostsize;
 	struct sigaction sa;
@@ -135,7 +135,7 @@ int httppost_main(int argc, char *argv[])
 			timeoutstr= optarg;
 			break;
 		case '?':
-			bb_show_usage();
+			fprintf(stderr, "bad option\n");
 			return 1;
 		default:
 			fatal("bad option '%c'", c);
@@ -143,7 +143,10 @@ int httppost_main(int argc, char *argv[])
 	}
 
 	if (optind != argc-1)
-		fatal("exactly one url expected");
+	{
+		fprintf(stderr, "exactly one url expected\n");
+		return 1;
+	}
 	url= argv[optind];
 
 	if (maxpostsizestr)
@@ -168,7 +171,20 @@ int httppost_main(int argc, char *argv[])
 		}
 	}
 
-	parse_url(url, &host, &port, &hostport, &path);
+	tolerance= 0;
+	if (time_tolerance)
+	{
+		tolerance= strtoul(time_tolerance, &p, 10);
+		if (p[0] != '\0')
+		{
+			fprintf(stderr, "unable to parse tolerance '%s'\n",
+				time_tolerance);
+			return 1;
+		}
+	}
+
+	if (parse_url(url, &host, &port, &hostport, &path) == -1)
+		return 1;
 
 	//printf("host: %s\n", host);
 	//printf("port: %s\n", port);
@@ -374,17 +390,11 @@ int httppost_main(int argc, char *argv[])
 	if (!eat_headers(tcp_file, &chunked, &content_length, &server_time))
 		goto err;
 
-	if (time_tolerance && server_time > 0)
+	if (tolerance && server_time > 0)
 	{
 		/* Try to set time from server */
-		time_t now, tolerance, rtt;
+		time_t now, rtt;
 
-		tolerance= strtoul(time_tolerance, &p, 10);
-		if (p[0] != '\0')
-		{
-			fatal("unable to parse tolerance '%s'",
-				time_tolerance);
-		}
 		now= time(NULL);
 		rtt= now-start_time;
 		if (rtt < 0) rtt= 0;
@@ -399,8 +409,9 @@ int httppost_main(int argc, char *argv[])
 			if (atlas_id)
 			{
 				printf(
-	"RESULT %s ongoing %d httppost setting time, local %d, remote %d\n",
-					atlas_id, time(NULL), now, server_time);
+	"RESULT %s ongoing %ld httppost setting time, local %ld, remote %ld\n",
+					atlas_id, (long)time(NULL), (long)now,
+					(long)server_time);
 			}
 		}
 	}
@@ -507,23 +518,34 @@ static int write_to_tcp_fd (int fd, FILE *tcp_file)
 		alarm(10);
 	}
 	if (r == -1)
-		fatal_err("error reading from file");
+	{
+		report_err("error reading from file");
+		return 0;
+	}
 	return 1;
 }
 
 
-static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
+static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp)
 {
 	char *item;
 	const char *cp, *np, *prefix;
 	size_t len;
 
+	*hostportp= NULL;
+	*pathp= NULL;
+	*hostp= NULL;
+	*portp= NULL;
+
 	/* the url must start with 'http://' */
 	prefix= "http://";
 	len= strlen(prefix);
 	if (strncasecmp(prefix, url, len) != 0)
-		fatal("bad prefix in url '%s'", url);
+	{
+		fprintf(stderr, "bad prefix in url '%s'\n", url);
+		return -1;
+	}
 
 	cp= url+len;
 
@@ -537,7 +559,11 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= cp+len;
 	}
 	if (len == 0)
-		fatal("missing host part in url '%s'", url);
+	{
+		fprintf(stderr, "missing host part in url '%s'\n", url);
+		return -1;
+	}
+
 	item= malloc(len+1);
 	if (!item) fatal("out of memory");
 	memcpy(item, cp, len);
@@ -564,11 +590,12 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= strchr(cp, ']');
 		if (np == NULL || np == cp+1)
 		{
-			fatal("malformed IPv6 address literal in url '%s'",
+			fprintf(stderr,
+				"malformed IPv6 address literal in url '%s'\n",
 				url);
+			goto error;
 		}
 	}
-	/* Should handle IPv6 address literals */
 	np= strchr(np, ':');
 	if (np != NULL)
 		len= np-cp;
@@ -578,7 +605,10 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 		np= cp+len;
 	}
 	if (len == 0)
-		fatal("missing host part in url '%s'", url);
+	{
+		fprintf(stderr, "missing host part in url '%s'\n", url);
+		goto error;
+	}
 	item= malloc(len+1);
 	if (!item) fatal("out of memory");
 	if (cp[0] == '[')
@@ -606,6 +636,15 @@ static void parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	memcpy(item, cp, len);
 	item[len]= '\0';
 	*portp= item;
+
+	return 0;
+error:
+	free(*hostportp); *hostportp= NULL;
+	free(*pathp); *pathp= NULL;
+	free(*hostp); *hostp= NULL;
+	free(*portp); *portp= NULL;
+
+	return -1;
 }
 
 static int check_result(FILE *tcp_file)
@@ -638,7 +677,10 @@ static int check_result(FILE *tcp_file)
 	line= buffer;
 	cp= strchr(line, '\n');
 	if (cp == NULL)
-		fatal("line too long");
+	{
+		fprintf(stderr, "line too long\n");
+		return 0;
+	}
 	cp[0]= '\0';
 	if (cp > line && cp[-1] == '\r')
 		cp[-1]= '\0';
@@ -647,23 +689,33 @@ static int check_result(FILE *tcp_file)
 	prefix= "http/";
 	len= strlen(prefix);
 	if (strncasecmp(prefix, line, len) != 0)
-		fatal("bad prefix in response '%s'", line);
+	{
+		fprintf(stderr, "bad prefix in response '%s'\n", line);
+		return 0;
+	}
 	cp= line+len;
 	major= strtoul(cp, &check, 10);
 	if (check == cp || check[0] != '.')
-		fatal("bad major version in response '%s'", line);
+	{
+		fprintf(stderr, "bad major version in response '%s'\n", line);
+		return 0;
+	}
 	cp= check+1;
 	minor= strtoul(cp, &check, 10);
 	if (check == cp || check[0] == '\0' ||
 		!isspace(*(unsigned char *)check))
 	{
-		fatal("bad major version in response '%s'", line);
+		fprintf(stderr, "bad major version in response '%s'\n", line);
+		return 0;
 	}
 
 	skip_spaces(check, &cp);
 
 	if (!isdigit(*(unsigned char *)cp))
-		fatal("bad status code in response '%s'", line);
+	{
+		fprintf(stderr, "bad status code in response '%s'\n", line);
+		return 0;
+	}
 
 	if (cp[0] != '2')
 	{
@@ -688,7 +740,10 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 		line= buffer;
 		cp= strchr(line, '\n');
 		if (cp == NULL)
-			fatal("line too long");
+		{
+			fprintf(stderr, "line too long\n");
+			return 0;
+		}
 		cp[0]= '\0';
 		if (cp > line && cp[-1] == '\r')
 			cp[-1]= '\0';
@@ -733,7 +788,11 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 			skip_spaces(cp, &cp);
 
 			if (cp[0] != ':')
-				fatal("malformed content-length header", line);
+			{
+				fprintf(stderr,
+					"malformed transfer-encoding header");
+				return 0;
+			}
 			cp++;
 
 			/* Skip more white space */
@@ -761,7 +820,10 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 		skip_spaces(cp, &cp);
 
 		if (cp[0] != ':')
-			fatal("malformed content-length header", line);
+		{
+			fprintf(stderr, "malformed content-length header");
+			return 0;
+		}
 		cp++;
 
 		/* Skip more white space */
@@ -770,14 +832,20 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 		/* Should have the value by now */
 		*content_length= strtoul(cp, &check, 10);
 		if (check == cp)
-			fatal("malformed content-length header", line);
+		{
+			fprintf(stderr, "malformed content-length header\n");
+			return 0;
+		}
 
 		/* And after that we should have just white space */
 		cp= check;
 		skip_spaces(cp, &cp);
 
 		if (cp[0] != '\0')
-			fatal("malformed content-length header", line);
+		{
+			fprintf(stderr, "malformed content-length header\n");
+			return 0;
+		}
 	}
 	if (feof(tcp_file))
 		report("got unexpected EOF from server");
@@ -797,7 +865,12 @@ static int connect_to_name(char *host, char *port)
 	hints.ai_socktype= SOCK_STREAM;
 	r= getaddrinfo(host, port, &hints, &res);
 	if (r != 0)
-		fatal("unable to resolve '%s': %s", host, gai_strerror(r));
+	{
+		fprintf(stderr, "unable to resolve '%s': %s\n",
+			host, gai_strerror(r));
+		errno= ENOENT;	/* Need something */
+		return -1;
+	}
 
 	s_errno= 0;
 	s= -1;
@@ -946,7 +1019,10 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 		line= buffer;
 		cp= strchr(line, '\n');
 		if (cp == NULL)
-			fatal("line too long");
+		{
+			fprintf(stderr, "line too long");
+			return 0;
+		}
 		cp[0]= '\0';
 		if (cp > line && cp[-1] == '\r')
 			cp[-1]= '\0';
@@ -954,7 +1030,10 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 		fprintf(stderr, "httppost: got chunk line '%s'\n", line);
 		len= strtoul(line, &check, 16);
 		if (check[0] != '\0' && !isspace(*(unsigned char *)check))
-			fatal("bad chunk line '%s'", line);
+		{
+			fprintf(stderr, "bad chunk line '%s'", line);
+			return 0;
+		}
 		if (!len)
 			break;
 
@@ -971,7 +1050,10 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 				return 0;
 			}
 			if (fwrite(buffer, size, 1, out_file) != 1)
-				fatal_err("error writing output");
+			{
+				fprintf(stderr, "error writing output");
+				return 0;
+			}
 			offset += size;
 
 			for (i= 0; i<size; i++)
@@ -997,12 +1079,18 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 		line= buffer;
 		cp= strchr(line, '\n');
 		if (cp == NULL)
-			fatal("line too long");
+		{
+			fprintf(stderr, "line too long");
+			return 0;
+		}
 		cp[0]= '\0';
 		if (cp > line && cp[-1] == '\r')
 			cp[-1]= '\0';
 		if (line[0] != '\0')
-			fatal("Garbage after chunk data");
+		{
+			fprintf(stderr, "Garbage after chunk data");
+			return 0;
+		}
 	}
 
 	for (;;)
@@ -1017,7 +1105,10 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 		line= buffer;
 		cp= strchr(line, '\n');
 		if (cp == NULL)
-			fatal("line too long");
+		{
+			fprintf(stderr, "line too long");
+			return 0;
+		}
 		cp[0]= '\0';
 		if (cp > line && cp[-1] == '\r')
 			cp[-1]= '\0';
@@ -1052,7 +1143,10 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 			return 0;
 		}
 		if (fwrite(buffer, size, 1, out_file) != 1)
-			fatal_err("error writing output");
+		{
+			report_err("error writing output");
+			return 0;
+		}
 		offset += size;
 
 		for (i= 0; i<size; i++)
@@ -1118,6 +1212,7 @@ static void fatal(const char *fmt, ...)
 	exit(1);
 }
 
+#if 0
 static void fatal_err(const char *fmt, ...)
 {
 	int s_errno;
@@ -1135,6 +1230,7 @@ static void fatal_err(const char *fmt, ...)
 
 	exit(1);
 }
+#endif
 
 static void report(const char *fmt, ...)
 {

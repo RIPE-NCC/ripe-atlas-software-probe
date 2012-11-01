@@ -262,7 +262,7 @@
 # define IPPROTO_IP 0
 #endif
 
-#define OPT_STRING "FIlnrdvxt:i:m:p:q:s:w:z:f:A:D" \
+#define OPT_STRING "!FIlnrdvxt:i:m:p:q:s:w:z:f:A:D" \
                     USE_FEATURE_TRACEROUTE_SOURCE_ROUTE("g:") \
                     "4" USE_FEATURE_TRACEROUTE_IPV6("6")
 enum {
@@ -372,7 +372,6 @@ struct globals {
 #define xconnect(fd, addr, addrlen) \
 	xrconnect(fd, addr, addrlen, traceroute_report_err)
 
-static void traceroute_report_err(int err);
 static void resolver_timeout(int __attribute((unused)) sig);
 #endif /* ATLAS */
 
@@ -810,7 +809,7 @@ print_delta_ms(unsigned t1p, unsigned t2p)
  * [-w waittime] [-z pausemsecs] host [packetlen]"
  */
 static int
-common_traceroute_main(int op, char **argv)
+common_traceroute_main(uint32_t op, char **argv)
 {
 	int i;
 	int minpacket;
@@ -858,6 +857,9 @@ common_traceroute_main(int op, char **argv)
 //#endif
 	);
 	argv += optind;
+
+	if (op == (uint32_t)-1)
+		return 1;
 
 #if 0 /* IGNORED */
 	if (op & OPT_IP_CHKSUM)
@@ -1167,6 +1169,10 @@ common_traceroute_main(int op, char **argv)
 
 		printf("%2d", ttl);
 		for (probe = 0; probe < nprobes; ++probe) {
+			int read_len;
+			unsigned t1;
+			unsigned t2;
+			struct ip *ip;
 	
 			if (option_mask32 & OPT_D_WATCHDOG) {
 				fd = open(WATCHDOGDEV, O_RDWR);
@@ -1174,11 +1180,6 @@ common_traceroute_main(int op, char **argv)
                 		close(fd);
 
 			}
-			int read_len;
-			unsigned t1;
-			unsigned t2;
-			struct ip *ip;
-
 			if (!first && pausemsecs > 0)
 				usleep(pausemsecs * 1000);
 			//fflush_all();
@@ -1343,11 +1344,6 @@ int traceroute6_main(int argc UNUSED_PARAM, char **argv)
 #endif
 
 #ifdef ATLAS
-static void traceroute_report_err(int err)
-{
-	printf(" errno %d\n", err);
-}
-
 static void resolver_timeout(int __attribute((unused)) sig)
 {
 	got_timeout= 1;

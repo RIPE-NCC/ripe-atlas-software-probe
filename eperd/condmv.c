@@ -24,12 +24,14 @@ static void *condmv_init(int argc, char *argv[],
 	void (*done)(void *state) UNUSED_PARAM)
 {
 	char *opt_add, *from, *to;
-	unsigned opt;
+	uint32_t opt;
 	struct condmvstate *state;
 
 	opt_add= NULL;
 	opt_complementary= NULL;	/* For when we are called by crond */
-	opt= getopt32(argv, "A:f", &opt_add);
+	opt= getopt32(argv, "!A:f", &opt_add);
+	if (opt == (uint32_t)-1)
+		return NULL;
 
 	if (argc != optind + 2)
 	{

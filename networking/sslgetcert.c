@@ -172,7 +172,7 @@ static void buf_add_b64(struct buf *buf, void *data, size_t len)
 	}
 }
 
-static int Xbuf_read(struct buf *buf)
+static int buf_read(struct buf *buf)
 {
 	int r;
 	size_t maxsize;
@@ -224,7 +224,7 @@ static int Xbuf_read(struct buf *buf)
 	return 0;
 }
 
-static void buf_write(struct buf *buf)
+static int buf_write(struct buf *buf)
 {
 	int r;
 	size_t len;
@@ -240,8 +240,9 @@ static void buf_write(struct buf *buf)
 		}
 		fprintf(stderr, "write to %d failed: %s\n",
 			buf->fd, r == 0 ? "eof" : strerror(errno));
-		exit(1);
+		return -1;
 	}
+	return 0;
 }
 
 static void buf_cleanup(struct buf *buf)
@@ -273,7 +274,7 @@ static int Xmsgbuf_read(struct msgbuf *msgbuf, int type)
 	{
 		while (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5)
 		{
-			r= Xbuf_read(msgbuf->inbuf);
+			r= buf_read(msgbuf->inbuf);
 			if (r < 0)
 			{
 				fprintf(stderr,
@@ -299,7 +300,7 @@ static int Xmsgbuf_read(struct msgbuf *msgbuf, int type)
 		len= (p[3] << 8) + p[4];
 		if (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5 + len)
 		{
-			r= Xbuf_read(msgbuf->inbuf);
+			r= buf_read(msgbuf->inbuf);
 			if (r < 0)
 			{
 				fprintf(stderr,
@@ -522,7 +523,11 @@ static int Xeat_server_hello(struct msgbuf *msgbuf)
 		}
 		p= (uint8_t *)msgbuf->buffer.buf+msgbuf->buffer.offset;
 		if (p[0] != HS_SERVER_HELLO)
-			fatal("eat_server_hello: got type %d\n", p[0]);
+		{
+			fprintf(stderr, "eat_server_hello: got type %d\n",
+				p[0]);
+			return -1;
+		}
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
@@ -563,7 +568,10 @@ static int Xeat_certificate(struct msgbuf *msgbuf)
 		}
 		p= (uint8_t *)msgbuf->buffer.buf+msgbuf->buffer.offset;
 		if (p[0] != HS_CERTIFICATE)
-			fatal("eat_certificate: got type %d\n", p[0]);
+		{
+			fprintf(stderr, "eat_certificate: got type %d\n", p[0]);
+			return -1;
+		}
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
@@ -604,10 +612,17 @@ static int Xeat_certificate(struct msgbuf *msgbuf)
 		buf_cleanup(&tmpbuf);
 		printf(" ]");
 		if (o != 3+n)
-			fatal("do_certificate: bad amount of cert data");
+		{
+			fprintf(stderr,
+				"do_certificate: bad amount of cert data\n");
+			return -1;
+		}
 		if (o != len)
-			fatal("do_certificate: bad amount of cert data");
-
+		{
+			fprintf(stderr,
+				"do_certificate: bad amount of cert data\n");
+			return -1;
+		}
 		msgbuf->buffer.offset += 4+len;
 		break;
 	}
@@ -620,7 +635,8 @@ extern int get_atlas_fw_version(void);	/* In eperd */
 int sslgetcert_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 {
-	int af, opt;
+	int r, af;
+	uint32_t opt;
 	socklen_t salen;
 	char *str_Atlas;
 	const char *str_port;
@@ -636,7 +652,9 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 	str_port= "https";
 
 	opt_complementary = "=1";
-	opt = getopt32(argv, "46A:p:", &str_Atlas, &str_port);
+	opt = getopt32(argv, "!46A:p:", &str_Atlas, &str_port);
+	if (opt == (uint32_t)-1)
+		return 1;
 	hostname = argv[optind];
 
 	af= AF_UNSPEC;
@@ -712,7 +730,9 @@ int sslgetcert_main(int argc UNUSED_PARAM, char **argv)
 
 	hsbuf_final(&hsbuf, HS_CLIENT_HELLO, &msgoutbuf);
 	msgbuf_final(&msgoutbuf, MSG_HANDSHAKE);
-	buf_write(&outbuf);
+	r= buf_write(&outbuf);
+	if (r == -1)
+		goto fail;
 
 	buf_init(&inbuf, tcp_fd);
 	msgbuf_init(&msginbuf, &inbuf, NULL);

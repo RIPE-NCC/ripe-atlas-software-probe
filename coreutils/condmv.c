@@ -14,17 +14,26 @@ condmv.c -- move a file only if the destination doesn't exist
 int condmv_main(int argc, char *argv[])
 {
 	char *opt_add, *from, *to;
-	unsigned opt;
+	uint32_t opt;
 	struct stat sb;
 	FILE *file;
 	time_t mytime;
 
 	opt_add= NULL;
 	opt_complementary= NULL;	/* For when we are called by crond */
-	opt= getopt32(argv, "A:f", &opt_add);
+	opt= getopt32(argv, "!A:f", &opt_add);
+
+	if (opt == (uint32_t)-1)
+	{
+		fprintf(stderr, "condmv: bad options\n");
+		return 1;
+	}
 
 	if (argc != optind + 2)
-		bb_show_usage();
+	{
+		fprintf(stderr, "condmv: two arguments expected\n");
+		return 1;
+	}
 
 	from= argv[optind];
 	to= argv[optind+1];
