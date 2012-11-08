@@ -245,7 +245,7 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 
 	if (!DebugOpt && LogFile == NULL) {
 		/* logging to syslog */
-		openlog(applet_name, LOG_CONS | LOG_PID, LOG_CRON);
+		openlog(applet_name, LOG_CONS | LOG_PID, LOG_LOCAL6);
 		logmode = LOGMODE_SYSLOG;
 	}
 
