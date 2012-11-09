@@ -17,6 +17,7 @@ Created:	Jun 2011 by Philip Homburg for RIPE NCC
 #include "libbb.h"
 
 #define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
+#define SAFE_PREFIX_DATA_OOQ_OUT ATLAS_DATA_OOQ_OUT
 #define SAFE_PREFIX_DATA_NEW ATLAS_DATA_NEW
 #define SAFE_PREFIX_STATUS ATLAS_STATUS
 
@@ -357,7 +358,8 @@ int httppost_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			fprintf(stderr, "posting file '%s'\n", p);
-			if (!validate_filename(p, SAFE_PREFIX_DATA_OUT))
+			if (!validate_filename(p, SAFE_PREFIX_DATA_OUT) &&
+				!validate_filename(p, SAFE_PREFIX_DATA_OOQ_OUT))
 			{
 				report("protected file (post dir) '%s'", p);
 				goto err;

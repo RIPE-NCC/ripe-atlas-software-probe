@@ -304,10 +304,11 @@ extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 
 /* What's the best place for this? */
 #define ATLAS_HOME	"/home/atlas"
-#define ATLAS_CRONS	ATLAS_HOME "/crons"
-#define ATLAS_STATUS	ATLAS_HOME "/status"
-#define ATLAS_DATA_OUT	ATLAS_HOME "/data/out"
-#define ATLAS_DATA_NEW	ATLAS_HOME "/data/new"
+#define ATLAS_CRONS		ATLAS_HOME "/crons"
+#define ATLAS_STATUS		ATLAS_HOME "/status"
+#define ATLAS_DATA_OUT		ATLAS_HOME "/data/out"
+#define ATLAS_DATA_OOQ_OUT	ATLAS_HOME "/data/ooq.out"
+#define ATLAS_DATA_NEW		ATLAS_HOME "/data/new"
 
 extern int validate_filename(const char *path, const char *prefix);
 

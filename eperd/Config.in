@@ -5,6 +5,14 @@
 
 menu "Eperd"
 
+config EOOQD
+	bool "Eooqd"
+	default n
+	select FEATURE_SUID
+	select FEATURE_SYSLOG
+	help
+	    Eooqd runs Atlas measurements just once.
+
 config EPERD
 	bool "Eperd"
 	default n

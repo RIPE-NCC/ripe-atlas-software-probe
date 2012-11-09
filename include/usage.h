@@ -980,6 +980,10 @@
      "\n	-, -i	Start with an empty environment" \
      "\n	-u	Remove variable from the environment" \
 
+#define eooqd_trivial_usage \
+       "<queue-file>"
+#define eooqd_full_usage \
+
 #define eperd_trivial_usage \
        "-fbSAD -P pidfile -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
 #define eperd_full_usage "\n\n" \

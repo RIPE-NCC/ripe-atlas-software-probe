@@ -32,6 +32,7 @@ include/config/autossh.h
 include/config/buddyinfo.h
 include/config/condmv.h
 include/config/dfrm.h
+include/config/eooqd.h
 include/config/evhttpget.h
 include/config/evping.h
 include/config/evtdig.h
