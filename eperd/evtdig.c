@@ -1602,6 +1602,8 @@ static void free_qry_inst(struct query_state *qry)
 
 	if(qry->base->done)
 	{
+		qry->base->done(qry);
+	/*
 		terminator = qry->base->done;
 		event_base = qry->base->event_base;
 		if(DnsBase) {
@@ -1614,6 +1616,7 @@ static void free_qry_inst(struct query_state *qry)
 		event_base_loopbreak(event_base);
 		event_base_free(event_base);
 		terminator(qry);
+	*/
 	}
 	
 }
