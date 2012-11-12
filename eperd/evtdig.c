@@ -60,6 +60,8 @@
 #define JU_NC(key, val) fprintf(fh, "\"" #key"\" : %u",  val); 
 #define JC fprintf(fh, ","); 
 
+#define SAFE_PREFIX ATLAS_DATA_NEW
+
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
 #define IAMHERE crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);
 
@@ -1257,6 +1259,14 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 	 if(qry->lookupname == NULL) {
 		crondlog(LVL9 "ERROR no query in command line");
+		tdig_delete(qry);
+		return NULL;
+	}
+
+	if (qry->out_filename &&
+		!validate_filename(qry->out_filename, SAFE_PREFIX))
+	{
+		crondlog(LVL8 "insecure file '%s'", qry->out_filename);
 		tdig_delete(qry);
 		return NULL;
 	}
