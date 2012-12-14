@@ -4686,8 +4686,8 @@ static int builtin_rchoose(char **argv)
 	int argc = 0;
 	int r;
 
-	srand (time (0));
-	r = rand();
+	srandom (time (0));
+	r = random();
         while (*argv) {
                 argc++;
                 argv++;
