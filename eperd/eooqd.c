@@ -69,22 +69,29 @@ static void skip_space(char *cp, char **ncpp);
 static void skip_nonspace(char *cp, char **ncpp);
 static void find_eos(char *cp, char **ncpp);
 
+int eooqd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int eooqd_main(int argc, char *argv[])
 {
 	int r;
 	uint32_t opt;
-	char *atlas_id;
+	char *atlas_id, *pid_file_name;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
 
 	atlas_id= NULL;
+	pid_file_name= NULL;
 
-	opt = getopt32(argv, "A:", &atlas_id);
+	opt = getopt32(argv, "A:P:", &atlas_id, &pid_file_name);
 
 	if (argc != optind+1)
 	{
 		bb_show_usage();
 		return 1;
+	}
+
+	if(pid_file_name)
+	{
+		write_pidfile(pid_file_name);
 	}
 
 	state = xzalloc(sizeof(*state));
