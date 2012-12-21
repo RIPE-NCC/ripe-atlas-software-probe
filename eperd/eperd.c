@@ -664,6 +664,10 @@ static int Insert(CronLine *line)
 		if (tv.tv_sec < 0)
 			tv.tv_sec= 0;
 		tv.tv_usec= 0;
+		crondlog(LVL7 "Insert: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
+			oldLine->nextcycle, oldLine->interval,
+			oldLine->start_time, oldLine->distr_offset, now,
+			tv.tv_sec);
 		event_add(&oldLine->event, &tv);
 
 		return 0;
@@ -694,7 +698,10 @@ static void Start(CronLine *line)
 	if (now > line->end_time)
 		return;			/* This job has expired */
 
-	line->nextcycle= (now-line->start_time)/line->interval + 1;
+	if (now < line->start_time)
+		line->nextcycle= 0;
+	else
+		line->nextcycle= (now-line->start_time)/line->interval + 1;
 	do_distr(line);
 
 	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
@@ -702,6 +709,10 @@ static void Start(CronLine *line)
 	if (tv.tv_sec < 0)
 		tv.tv_sec= 0;
 	tv.tv_usec= 0;
+	crondlog(LVL7 "Start: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
+		line->nextcycle, line->interval,
+		line->start_time, line->distr_offset, now,
+		tv.tv_sec);
 	event_add(&line->event, &tv);
 }
 
@@ -1148,6 +1159,10 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	if (tv.tv_sec < 0)
 		tv.tv_sec= 0;
 	tv.tv_usec= 0;
+	crondlog(LVL7 "RunJob: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
+		line->nextcycle, line->interval,
+		line->start_time, line->distr_offset, now,
+		tv.tv_sec);
 	event_add(&line->event, &tv);
 }
 
