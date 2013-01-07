@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 RIPE NCC, Antony Antony <antony@ripe.net>, <atlas@ripe.net>
+ * Copyright (c) 2011-2013 RIPE NCC, Antony Antony <antony@ripe.net>, <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone <ro...@tecsiel.it>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -377,8 +377,9 @@ void ldns_write_uint16(void *dst, uint16_t data);
 uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
         int* count);
-void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh);
 /* from tdig.c */
+
+void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh);
 
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
@@ -1023,7 +1024,6 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry=xzalloc(sizeof(*qry));
 	opt_v4_only =  opt_v6_only = 0;
 
-	bzero(qry, sizeof(*qry));
 	// initialize per query state variables;
 	qry->qtype = T_TXT; /* TEXT */
 	qry->qclass = C_CHAOS;
@@ -1723,7 +1723,7 @@ static int tdig_delete(void *state)
 		free(qry->server_name);
 		qry->server_name = NULL;
 	} 
-	if(qry->base)
+	if(qry->base) 
 		qry->base->activeqry--;
 	free(qry);
 	qry  = NULL;
@@ -1958,5 +1958,132 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		fclose(fh);
 	free_qry_inst(qry);
 }
+
+unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
+	int* count)
+{
+	unsigned char *name;
+	unsigned int p=0,jumped=0, len;
+	int i , j;
+
+	*count = 0;
+	name = (unsigned char*)malloc(256);
+
+	name[0]= '\0';
+
+	//read the names in 3www6google3com format
+	while(len= base[offset], len !=0)
+	{
+		if (len & 0xc0)
+		{
+			if ((len & 0xc0) != 0xc0)
+			{
+				/* Bad format */
+				strcpy(name, "format-error");
+				printf("format-error: len = %d\n",
+					len);
+				abort();
+				return name;
+			}
+
+			offset= ((len & ~0xc0) << 8) | base[offset+1];
+			if (offset >= size)
+			{
+				strcpy(name, "offset-error");
+				printf("offset-error\n");
+				abort();
+				return name;
+			}
+			if(jumped==0)
+			{
+				/* if we havent jumped to another location
+				 * then we can count up
+				 */
+				*count += 2;
+			}
+			jumped= 1;
+			continue;
+		}
+		if (offset+len+1 > size)
+		{
+			strcpy(name, "buf-bounds-error");
+			printf("buf-bounds-error\n");
+			abort();
+			return name;
+		}
+
+		if (p+len+1 > 255)
+		{
+			strcpy(name, "name-length-error");
+			printf("name-length-error\n");
+			abort();
+			return name;
+		}
+		memcpy(name+p, base+offset+1, len);
+		name[p+len]= '.';
+		p += len+1;
+		offset += len+1;
+		
+		if(jumped==0)
+		{
+			/* if we havent jumped to another location then we
+			 * can count up 
+			 */
+			*count += len+1;
+		}
+	}
+
+	if (!jumped)
+		(*count)++;	/* Terminating zero length */
+
+	name[p]= '\0'; //string complete
+
+	if(p >  0)
+		name[p-1]= '\0'; //remove the last dot
+	return name;
+}
+
+/* get 4 bytes from memory
+ * eg.  used to extract serial number from soa packet
+ */
+	u_int32_t
+get32b (char *p)
+{
+	u_int32_t var;
+
+	var = (0x000000ff & *(p)) << 24;
+	var |= (0x000000ff & *(p+1)) << 16;
+	var |= (0x000000ff & *(p+2)) << 8;
+	var |= (0x000000ff & *(p+3));
+
+	return (var);
+}
+
+/*
+ * Copy data allowing for unaligned accesses in network byte order
+ * (big endian).
+ */
+void ldns_write_uint16(void *dst, uint16_t data)
+{
+#ifdef ALLOW_UNALIGNED_ACCESSES
+        * (uint16_t *) dst = htons(data);
+#else
+        uint8_t *p = (uint8_t *) dst;
+        p[0] = (uint8_t) ((data >> 8) & 0xff);
+        p[1] = (uint8_t) (data & 0xff);
+#endif
+}
+
+uint16_t
+ldns_read_uint16(const void *src)
+{
+#ifdef ALLOW_UNALIGNED_ACCESSES
+        return ntohs(*(uint16_t *) src);
+#else
+        uint8_t *p = (uint8_t *) src;
+        return ((uint16_t) p[0] << 8) | (uint16_t) p[1];
+#endif
+}
+
 
 struct testops tdig_ops = { tdig_init, tdig_start, tdig_delete }; 
