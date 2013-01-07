@@ -70,6 +70,7 @@
 #define Q_RESOLV_CONF -1
 #define O_RESOLV_CONF  1003
 #define O_PREPEND_PROBE_ID  1004
+#define O_EVDNS 1005
 
 #define DNS_FLAG_RD 0x0100
 
@@ -205,6 +206,7 @@ struct query_state {
 	int opt_resolv_conf;
 	int opt_rd;
 	int opt_prepend_probe_id;
+	int opt_evdns;
 
 	char * str_Atlas; 
 	u_int16_t qtype;
@@ -319,6 +321,7 @@ struct RES_RECORD
 
 static struct option longopts[]=
 {
+	// class IN
 	{ "a", required_argument, NULL, (100000 + T_A) },
 	{ "ns", required_argument, NULL, (100000 + T_NS) },
 	{ "cname", required_argument, NULL, (100000 + T_CNAME) },
@@ -335,18 +338,24 @@ static struct option longopts[]=
 	{ "rrsig", required_argument, NULL, (100000 + T_RRSIG) },
 	{ "soa", required_argument, NULL, 's' },
 
+	// clas CHAOS
 	{ "hostname.bind", no_argument, NULL, 'h' },
 	{ "id.server", no_argument, NULL, 'i' },
 	{ "version.bind", no_argument, NULL, 'b' },
 	{ "version.server", no_argument, NULL, 'r' },
-	{ "out-file", required_argument, NULL, 'O' },
+
+	// flags
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
+	{ "d0", no_argument, NULL, 'd' },
+ 	
+	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
 	{ "qbuf", no_argument, NULL, 1001 },
 	{ "noabuf", no_argument, NULL, 1002 },
-	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
+
+	{ "evdns", no_argument, NULL, O_EVDNS },
+	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
-	{ "d0", no_argument, NULL, 'd' },
 	{ NULL, }
 };
 static char line[DEFAULT_LINE_LENGTH];
@@ -627,8 +636,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 
 
 
-/* Attempt to transmit a DNS Request, in qry to a server*/
-/* handles UDP queries */
+/* Attempt to transmit a UDP DNS Request to a serveri. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
 	struct query_state *qry = h;
@@ -655,7 +663,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				nsent = sendto(base->rawfd_v6, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
 				break;
 		}
-		
+		qry->ressent = qry->res;
 
 		if (nsent == qry->pktsize) {
 			// the packet is send. Now lets try to the source address we would have used.
@@ -682,7 +690,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			err  = 0;
 			/* Add the timer to handle no reply condition in the given timeout */
 			evtimer_add(&qry->noreply_timer, &base->tv_noreply);
-			qry->ressent = qry->res;
 			if(qry->opt_qbuf) {
 				buf_init(&qry->qbuf, -1);
 				buf_add_b64(&qry->qbuf, outbuff, qry->pktsize, 0);
@@ -692,7 +699,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		else {
 			err  = 1;
 			base->sendfail++;
-			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"senderror\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno)); 
+			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"senderror\" : \"AF %s, %s\"", qry->err.size ? ", " : ""
+					, strerror(errno) ,  qry->res->ai_family == AF_INET ? "AF_INET" :"NOT AF_INET"); 
 			buf_add(&qry->err, line, strlen(line));
 		}
 	} while ((qry->res = qry->res->ai_next) != NULL);
@@ -1038,6 +1046,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
+	qry->opt_evdns = 0;
 	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
 	qry->ressent = NULL;
@@ -1137,6 +1146,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			case O_PREPEND_PROBE_ID:
 				qry->opt_prepend_probe_id = 1;
+				break;
+
+			case O_EVDNS:
+				qry->opt_evdns = 1;
 				break;
 
 			case (100000 + T_A):
@@ -1402,6 +1415,23 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	return tdig_base;
 }
 
+static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_state *qry) {
+	
+	if (err)  {
+		qry->qst = STATUS_FREE;
+		snprintf(line, DEFAULT_LINE_LENGTH, "\"evdns_getaddrinfo\": \"%s\"", evutil_gai_strerror(err));
+		buf_add(&qry->err, line, strlen(line));
+		printReply (qry, 0, NULL);
+		return ;
+
+	}
+	else {
+		qry->res = ev_res;
+		qry->ressave = ev_res;
+		tdig_send_query_callback(NULL, NULL, qry);
+	}
+}
+
 void tdig_start (struct query_state *qry)
 {
 	struct timeval asap = { 0, 0 };
@@ -1441,23 +1471,30 @@ void tdig_start (struct query_state *qry)
 		hints.ai_family = AF_UNSPEC;
 	}
 
-	if(qry->opt_proto == 17) {  //UDP
-		if ( ( err_num  = getaddrinfo(qry->server_name, port , &hints, &res)))
-		{
-			qry->qst = STATUS_FREE;
-			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getaddrinfo\": \"port %s, AF %d %s\"", qry->err.size ? ", " : "",  port,  hints.ai_family, gai_strerror(err_num));
-			buf_add(&qry->err, line, strlen(line));
-
-			printReply (qry, 0, NULL);
-			return ;
+	if(qry->opt_proto == 17) {  //UDP 
+		if(qry->opt_evdns ) {
+			// use EVDNS asynchronous call 
+			evdns_getaddrinfo(DnsBase, qry->server_name, port_as_char , &hints, udp_dns_cb, qry);
 		}
+		else {
+			// using getaddrinfo; blocking call
+			if ( ( err_num  = getaddrinfo(qry->server_name, port , &hints, &res)))
+			{
+				qry->qst = STATUS_FREE;
+				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getaddrinfo\": \"port %s, AF %d %s\"", qry->err.size ? ", " : "",  port,  hints.ai_family, gai_strerror(err_num));
+				buf_add(&qry->err, line, strlen(line));
 
-		qry->res = res;
-		qry->ressave = res;
+				printReply (qry, 0, NULL);
+				return ;
+			}
 
-		evtimer_add(&qry->nsm_timer, &asap);
+			qry->res = res;
+			qry->ressave = res;
+
+			evtimer_add(&qry->nsm_timer, &asap);
+		}
 	}
-	else {
+	else { // TCP Query
 
 		qry->wire_size =  0;
 		crondlog(LVL5 "TCP QUERY %s", qry->server_name);
@@ -1579,7 +1616,12 @@ static void free_qry_inst(struct query_state *qry)
 	if(qry->qbuf.size)  
 		buf_cleanup(&qry->qbuf);
 
-	if(qry->ressave )
+	if(qry->ressave  && qry->opt_evdns) {
+		evutil_freeaddrinfo(qry->ressave);
+		qry->ressave  = NULL;
+		qry->ressent = NULL;
+	}
+	else if (qry->ressave )
 	{
 		freeaddrinfo(qry->ressave);
 		qry->ressave  = NULL;
@@ -1661,6 +1703,7 @@ static int tdig_delete(void *state)
 		crondlog(LVL7 "deleted last query qry %s", qry->str_Atlas);
 	}
 	else {
+#if  ENABLE_FEATURE_EVTDIG_DEBUG
 		crondlog(LVL7 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
 		crondlog(LVL7 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
 		qry->next->prev = qry->prev; 
@@ -1668,6 +1711,7 @@ static int tdig_delete(void *state)
 		if(qry->base->qry_head == qry) 
 			qry->base->qry_head = qry->next;
 		crondlog(LVL7 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
+#endif
 	}
 	if( qry->str_Atlas) 
 	{
@@ -1679,7 +1723,8 @@ static int tdig_delete(void *state)
 		free(qry->server_name);
 		qry->server_name = NULL;
 	} 
-	qry->base->activeqry--;
+	if(qry->base)
+		qry->base->activeqry--;
 	free(qry);
 	qry  = NULL;
 	return 1;
