@@ -277,9 +277,6 @@ static void ping_cb(int result, int bytes,
 
 	if (pingstate->first)
 	{
-		memcpy(&pingstate->sin6, sa, socklen);
-		pingstate->socklen= socklen;
-
 		pingstate->size= bytes;
 		pingstate->ttl= ttl;
 	}
@@ -616,6 +613,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	struct sockaddr_in remote;                  /* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
 	struct sockaddr_in *sin4p;
+	struct sockaddr_in loc_sin4;
 
 	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
 	struct ip * ip = (struct ip *) base->packet;
@@ -697,11 +695,10 @@ printf("ready_callback4: too short\n");
 	    usecs = tvtousecs(&elapsed);
 
 	    /* Set destination address of packet as local address */
-	    memset(&host->loc_sin6, '\0', sizeof(host->loc_sin6));
-	    sin4p= (struct sockaddr_in *)&host->loc_sin6;
+	    sin4p= &loc_sin4;
+	    memset(sin4p, '\0', sizeof(*sin4p));
 	    sin4p->sin_family= AF_INET;
 	    sin4p->sin_addr= ip->ip_dst;
-	    host->loc_socklen= sizeof(*sin4p);
 	    host->rcvd_ttl= ip->ip_ttl;
 
 	    /* Report everything with the wrong sequence number as a dup. 
@@ -712,7 +709,7 @@ printf("ready_callback4: too short\n");
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,
 		    (struct sockaddr *)&host->sin6, host->socklen,
-		    (struct sockaddr *)&host->loc_sin6, host->loc_socklen,
+		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
 		    host);
 
@@ -762,6 +759,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
 	struct msghdr msg;
+	struct sockaddr_in6 loc_sin6;
 	struct iovec iov[1];
 	char cmsgbuf[256];
 
@@ -816,8 +814,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    usecs = tvtousecs(&elapsed);
 
 	    /* Set destination address of packet as local address */
-	    memset(&host->loc_sin6, '\0', sizeof(host->loc_sin6));
-	    host->loc_socklen= sizeof(*sin6p);
+	    memset(&loc_sin6, '\0', sizeof(loc_sin6));
 	    for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
 		    cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
 	    {
@@ -826,7 +823,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 			    cmsgptr->cmsg_type == IPV6_PKTINFO)
 		    {
-			    sin6p= &host->loc_sin6;
+			    sin6p= &loc_sin6;
 			    sin6p->sin6_family= AF_INET6;
 			    sin6p->sin6_addr= ((struct in6_pktinfo *)
 				    CMSG_DATA(cmsgptr))->ipi6_addr;
@@ -846,7 +843,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR,\
 		    (struct sockaddr *)&host->sin6, host->socklen,
-		    (struct sockaddr *)&host->loc_sin6, host->loc_socklen,
+		    (struct sockaddr *)&loc_sin6, sizeof(loc_sin6),
 		    ntohs(icmp->icmp6_seq), host->rcvd_ttl, &elapsed,
 		    host);
 
@@ -1023,7 +1020,6 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 	state->base = ping_base;
 	state->af= af;
-	state->hostname= strdup(hostname);
 	state->delay_name_res= delay_name_res;
 
 	state->seq = 1;
