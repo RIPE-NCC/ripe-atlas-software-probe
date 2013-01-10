@@ -4304,17 +4304,6 @@
        "$ taskset -p 1\n" \
        "pid 1's current affinity mask: 3\n"
 
-#define tdig_trivial_usage \
-             "[-h|-i|-b|-s] ... <server IP address>"
-#define tdig_full_usage "\n\n" \
-    "tdig:  a tiny implemention dns queries which supports 4 queries\n" \
-     "\n     not implemented:  recursion, IPv6 yet, SOA" \
-     "\n     -h | --hostname-bind hostname.bind txt chaos " \
-     "\n     -i | id-server id.server txt chaos " \
-     "\n     -b | version-bind version-bind txt chaos " \
-     "\n     -s | soa <zone> to be implmented " \
-     "\n      RIPE NCC 2011 " \
-
 #define tee_trivial_usage \
        "[OPTION]... [FILE]..."
 #define tee_full_usage "\n\n" \
