@@ -195,7 +195,7 @@ static void create_bev(struct tu_env *env)
 		crondlog(DIE9 "bufferevent_socket_new failed");
 	}
 	bufferevent_setcb(bev, env->readcb, env->writecb, eventcb, env);
-	bufferevent_enable(bev, EV_READ|EV_WRITE);
+	bufferevent_enable(bev, EV_WRITE);
 	env->bev= bev;
 	env->connecting= 1;
 
@@ -206,11 +206,6 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	struct tu_env *env;
 
 	env= ptr;
-	if (env->connecting)
-	{
-		/* Clear some events we don't want to see */
-		events &= ~(BEV_EVENT_READING|BEV_EVENT_ERROR);
-	}
 
 	if (events & BEV_EVENT_READING)
 	{
@@ -220,19 +215,19 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	}
 	if (events & BEV_EVENT_ERROR)
 	{
-		printf("eventcb: unrecoverable error encountered\n");
-		events &= ~BEV_EVENT_ERROR;
-	}
-	if (events & BEV_EVENT_CONNECTED)
-	{
-		if (errno != EINPROGRESS)
+		if (env->connecting)
 		{
 			env->reporterr(env, TU_CONNECT_ERR,
 				strerror(errno));
 			return;
 		}
+		events &= ~BEV_EVENT_ERROR;
+	}
+	if (events & BEV_EVENT_CONNECTED)
+	{
 		events &= ~BEV_EVENT_CONNECTED;
 		env->connecting= 0;
+		bufferevent_enable(bev, EV_READ);
 
 		env->connected(env, bev);
 		env->writecb(bev, ptr);
