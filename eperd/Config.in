@@ -37,10 +37,16 @@ config EVTDIG
 	bool "evtdig"
 	default n
 	depends on EPERD
-	select TDIG
 	help
 	   tiny dig event driven version. support only limited queries id.sever 
             txt chaos.  RIPE NCC 2011
+
+config FEATURE_EVTDIG_DEBUG
+	bool "Enable debug support in evtdig"
+	default n
+	depends on EVTDIG	
+	help
+ 	 extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
 
 config EVTRACEROUTE
 	bool "evtraceroute"

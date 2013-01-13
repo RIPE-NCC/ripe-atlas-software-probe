@@ -743,13 +743,6 @@ config SSLGETCERT
 #	def_bool n
 #	depends on TC
 
-config TDIG
-        bool "tdig"
-        default n
-        help
-	 tiny dig. support only limited queries id.sever txt chaos.
-	 RIPE NCC 2011
-
 config TELNET
 	bool "telnet"
 	default n
