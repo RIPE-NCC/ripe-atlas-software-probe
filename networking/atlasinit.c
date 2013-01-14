@@ -20,7 +20,7 @@
 #define ERROR 1
 #define INFO  2
 #define ATLAS_DEFAULT_WAIT 100
-#define OPT_STRING "rcdsi:"
+#define OPT_STRING "rcdsi:I:"
 #define ATLAS_WAIT 0
 
 enum 
@@ -63,6 +63,7 @@ const int min_rereg_time = 100;
 const int max_rereg_time = 28*24*3600; /* 28d */
 const int default_rereg_time = 7*24*3600; /* 7d */
 char *str_reason;
+char *str_device;
 
 /**********************************************************************/
 
@@ -79,7 +80,8 @@ int atlasinit_main( int argc, char *argv[] )
 
 	if(argc > 1) 
 	{
-		opt = getopt32(argv, OPT_STRING, &str_reason);
+		str_device= NULL;
+		opt = getopt32(argv, OPT_STRING, &str_reason, &str_device);
 		argv += optind;
 		argc -= optind;
 		argc++; // AA Hack
@@ -338,7 +340,10 @@ static int reg_init_main( int argc, char *argv[] )
 	int reregister_time = default_rereg_time;
 	mytime = time(NULL);
 
-	if( argc > 1 ) {
+	if (!str_device)
+		str_device= "eth0";
+
+	if( argc >1 ) {
 		read_from = fopen( argv[0], "rt" );
 		if( read_from==NULL ) {
 			atlas_log( ERROR, "Cannot read from file %s\n", argv[1] );
@@ -486,8 +491,10 @@ static int reg_init_main( int argc, char *argv[] )
 				// fprintf (f, "%s\n", line);
 				token = strtok(line+13, search); //IPV4ADDRESS 
 				token = strtok(NULL, search);      // <address>
-			 	fprintf (f, "/sbin/ifconfig eth0 0.0.0.0\n");
-			 	fprintf (f, "/sbin/ifconfig eth0:1 %s ", token);
+			 	fprintf (f, "/sbin/ifconfig %s 0.0.0.0\n",
+					str_device);
+			 	fprintf (f, "/sbin/ifconfig %s:1 %s ",
+					str_device, token);
 				ipv4_address = token;
 				token = strtok(NULL, search);      // IPV4NETMASK
 				token = strtok(NULL, search);      // 
@@ -554,15 +561,19 @@ static int reg_init_main( int argc, char *argv[] )
 				token = strtok(NULL, search);      // IPV6PREFIXLEN
 				token = strtok(NULL, search);      // 
 				prefixlen = token;	
-			 	fprintf  (f, "/sbin/ifconfig eth0 0.0.0.0\n");
-			 	fprintf  (f, "/sbin/ifconfig eth0 %s/%s\n", ipv6_address, prefixlen);
+			 	fprintf  (f, "/sbin/ifconfig %s 0.0.0.0\n",
+					str_device);
+			 	fprintf  (f, "/sbin/ifconfig %s %s/%s\n",
+					str_device, ipv6_address, prefixlen);
 
 				token = strtok(NULL, search);      // IPV6GATEWAY
 				token = strtok(NULL, search);      // 
 				ipv6_gw = token;
 				ipv6_gw[(strlen(ipv6_gw) - 1)] = '\0';
 				///sbin/route -A inet6 add default gw fe80::13:0:0:1 dev eth0
-			 	fprintf (f, "/sbin/route -A inet6 add default gw %s dev eth0\n", ipv6_gw); 
+			 	fprintf (f,
+			"/sbin/route -A inet6 add default gw %s dev %s\n",
+					ipv6_gw, str_device); 
 				// second file for static  network info
 				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s/%s\" >    %s \n", ipv6_address, prefixlen, atlas_network_v6_static_info );
 				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw , atlas_network_v6_static_info );
