@@ -488,7 +488,7 @@ static void SynchronizeFile(const char *fileName)
 			line->start_time= strtoul(tokens[1], &check1, 10);
 			line->end_time= strtoul(tokens[2], &check2, 10);
 
-			if (check0[0] != '\0' ||
+			if (line->interval <= 0 || check0[0] != '\0' ||
 				check1[0] != '\0' ||
 				check2[0] != '\0')
 			{
