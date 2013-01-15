@@ -41,6 +41,8 @@ static time_t timeout = 300;
 /* Result sent by controller when input is acceptable. */
 #define OK_STR	"OK\n"
 
+#define TIMESYNC_FILE	"/home/atlas/status/timesync.vol.txt"
+
 static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
 static int check_result(FILE *tcp_file);
@@ -68,7 +70,7 @@ int httppost_main(int argc, char *argv[])
 	char *post_dir, *post_file, *atlas_id, *output_file,
 		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
 	char *time_tolerance;
-	FILE *tcp_file, *out_file;
+	FILE *tcp_file, *out_file, *fh;
 	time_t server_time, tolerance;
 	struct stat sbF, sbH, sbS;
 	off_t cLength, dir_length, maxpostsize;
@@ -392,6 +394,7 @@ int httppost_main(int argc, char *argv[])
 	if (!eat_headers(tcp_file, &chunked, &content_length, &server_time))
 		goto err;
 
+printf("tolerance %d, server_time %d\n", tolerance, server_time);
 	if (tolerance && server_time > 0)
 	{
 		/* Try to set time from server */
@@ -401,6 +404,7 @@ int httppost_main(int argc, char *argv[])
 		rtt= now-start_time;
 		if (rtt < 0) rtt= 0;
 		rtt++;
+printf("now %d, server_time %d, rtt %d\n", now, server_time, rtt);
 		if (now < server_time-tolerance-rtt ||
 			now > server_time+tolerance+rtt)
 		{
@@ -414,6 +418,17 @@ int httppost_main(int argc, char *argv[])
 	"RESULT %s ongoing %ld httppost setting time, local %ld, remote %ld\n",
 					atlas_id, (long)time(NULL), (long)now,
 					(long)server_time);
+			}
+		}
+		else if (rtt <= 1)
+		{
+			/* Time and network are fine. Record this fact */
+			fh= fopen(TIMESYNC_FILE ".new", "wt");
+			if (fh)
+			{
+				fprintf(fh, "%ld\n", (long)now);
+				fclose(fh);
+				rename(TIMESYNC_FILE ".new", TIMESYNC_FILE);
 			}
 		}
 	}

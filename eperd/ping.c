@@ -187,6 +187,20 @@ static void add_str(struct pingstate *state, const char *str)
 	//printf("add_str: result = '%s'\n", state->result);
 }
 
+#define TIMESYNC_FILE "/home/atlas/status/timesync.vol.txt"
+static int get_timesync(void)
+{
+	FILE *fh;
+	int lastsync;
+
+	fh= fopen(TIMESYNC_FILE, "r");
+	if (!fh)
+		return -1;
+	fscanf(fh, "%d", &lastsync);
+	fclose(fh);
+	return time(NULL)-lastsync;
+}
+
 static void report(struct pingstate *state)
 {
 	FILE *fh;
@@ -207,8 +221,9 @@ static void report(struct pingstate *state)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", " DBQ(fw) ":%d"
+			", " DBQ(lts) ":%d"
 			", " DBQ(time) ":%ld, ",
-			state->atlas, get_atlas_fw_version(),
+			state->atlas, get_atlas_fw_version(), get_timesync(),
 			(long)time(NULL));
 	}
 
