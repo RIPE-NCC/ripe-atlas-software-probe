@@ -341,20 +341,35 @@ static void ping_cb(int result, int bytes,
 		/* No ping reply */
 
 		snprintf(line, sizeof(line),
-			"%s{ " DBQ(x) ":" DBQ(*) " }",
+			"%s{ " DBQ(x) ":" DBQ(*),
 			pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
-		pingstate->first= 0;
 		pingstate->no_dst= 0;
 	}
 	if (result == PING_ERR_SENDTO)
 	{
 		snprintf(line, sizeof(line),
-			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " }",
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s),
 			pingstate->first ? "" : ", ", strerror(seq));
 		add_str(pingstate, line);
-		pingstate->first= 0;
 		pingstate->no_dst= 0;
+	}
+	if (result == PING_ERR_TIMEOUT || result == PING_ERR_SENDTO)
+	{
+		if (pingstate->first && pingstate->loc_socklen != 0)
+		{
+			namebuf[0]= '\0';
+			getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
+				pingstate->loc_socklen,
+				namebuf, sizeof(namebuf),
+				NULL, 0, NI_NUMERICHOST);
+
+			snprintf(line, sizeof(line),
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+			add_str(pingstate, line);
+		}
+		add_str(pingstate, " }");
+		pingstate->first= 0;
 	}
 	if (result == PING_ERR_DNS)
 	{
@@ -505,7 +520,7 @@ static void ping_xmit(struct pingstate *host)
 {
 	struct pingbase *base = host->base;
 
-	int nsent;
+	int nsent, fd4, fd6, t_errno, r;
 
 	host->send_error= 0;
 	if (host->sentpkts >= host->maxpkts)
@@ -532,9 +547,27 @@ static void ping_xmit(struct pingstate *host)
 		fmticmp6(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-		nsent = sendto(base->rawfd6, base->packet, host->cursize,
+		fd6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+		if (fd6 != -1)
+		{
+			r= connect(fd6, (struct sockaddr *)&host->sin6,
+	                        host->socklen);
+			if (r == 0)
+			{
+				host->loc_socklen= 
+					sizeof(host->loc_sin6);
+				getsockname(fd6, &host->loc_sin6,
+					&host->loc_socklen);
+			}
+		}
+
+		nsent = sendto(fd6, base->packet, host->cursize,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
+
+		t_errno= errno;
+		close(fd6);
+		errno= t_errno;
 	}
 	else
 	{
@@ -542,9 +575,28 @@ static void ping_xmit(struct pingstate *host)
 		fmticmp4(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-		nsent = sendto(base->rawfd4, base->packet, host->cursize,
+		fd4 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+		if (fd4 != -1)
+		{
+			r= connect(fd4, (struct sockaddr *)&host->sin6,
+	                        host->socklen);
+			if (r == 0)
+			{
+				host->loc_socklen= 
+					sizeof(host->loc_sin6);
+				getsockname(fd4, &host->loc_sin6,
+					&host->loc_socklen);
+			}
+		}
+
+
+		nsent = sendto(fd4, base->packet, host->cursize,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
+
+		t_errno= errno;
+		close(fd4);
+		errno= t_errno;
 	}
 
 	if (nsent > 0)
