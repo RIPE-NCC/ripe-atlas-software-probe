@@ -153,7 +153,6 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->reportcount(env, count);
 
 	create_bev(env);
-	bev= env->bev;
 
 	while (env->dns_curr)
 	{
@@ -161,6 +160,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 		env->beforeconnect(env,
 			env->dns_curr->ai_addr, env->dns_curr->ai_addrlen);
+		bev= env->bev;
 		if (bufferevent_socket_connect(bev,
 			env->dns_curr->ai_addr,
 			env->dns_curr->ai_addrlen) == 0)
