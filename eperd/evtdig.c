@@ -799,7 +799,6 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	u_char *wire;
 	struct query_state * qry; 
 	qry = ENV2QRY(env); 
-	BLURT(LVL5 "send %u bytes", payload_len );
 
 	qry->loc_socklen= sizeof(qry->loc_sin6);
         getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
@@ -815,6 +814,7 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
 	qry->base->sentok++;
 	qry->base->sentbytes+= (qry->pktsize +2);
+	BLURT(LVL5 "send %u bytes", payload_len );
 
 	if(qry->opt_qbuf) {
 		buf_init(&qry->qbuf, -1);
@@ -1706,10 +1706,13 @@ static int tdig_delete(void *state)
 #if  ENABLE_FEATURE_EVTDIG_DEBUG
 		crondlog(LVL7 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
 		crondlog(LVL7 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
+#endif
 		qry->next->prev = qry->prev; 
 		qry->prev->next = qry->next;
 		if(qry->base->qry_head == qry) 
 			qry->base->qry_head = qry->next;
+
+#if  ENABLE_FEATURE_EVTDIG_DEBUG
 		crondlog(LVL7 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
 #endif
 	}
