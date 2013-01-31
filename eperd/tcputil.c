@@ -170,12 +170,21 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		}
 
 		/* Immediate error? */
-		printf("connect error\n");
+		printf("dns_cb: connect error\n");
+		
+		/* It is possible that the callback already freed dns_curr. */
+		if (!env->dns_curr)
+		{
+			printf("dns_cb: callback ate dns_curr\n");
+			if (env->dns_res)
+				crondlog(DIE9 "dns_cb: dns_res not null");
+			return;
+		}
 		env->dns_curr= env->dns_curr->ai_next;
 	}
 
 	/* Something went wrong */
-	printf("Connect failed\n");
+	printf("dns_cb: Connect failed\n");
 	bufferevent_free(env->bev);
 	env->bev= NULL;
 	evutil_freeaddrinfo(env->dns_res);
