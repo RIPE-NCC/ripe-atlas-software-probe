@@ -529,7 +529,7 @@ static int reg_init_main( int argc, char *argv[] )
 				fprintf (f, "echo \"STATIC_IPV4_GW %s\" >>    %s \n",ipv4_gw , atlas_network_v4_static_info );
 				// ping the gateway 
 				fprintf (f, "ping -c 2 -q %s \n", ipv4_gw);
-				fprintf (f, "IPV4_GW=%s; export $IPV4_GW\n", ipv4_gw);
+				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
 
 				fclose(f);
 			}
