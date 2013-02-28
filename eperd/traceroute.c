@@ -60,7 +60,7 @@ struct trtbase
 	int v4icmp_snd;
 	int v6icmp_snd;
 	int v4udp_snd;
-	int v6udp_snd;
+	// int v6udp_snd;
 
 	int my_pid;
 
@@ -370,7 +370,7 @@ static void send_pkt(struct trtstate *state)
 	struct v6_ph v6_ph;
 	struct udphdr udp;
 	struct timeval interval;
-	struct sockaddr_in6 sin6;
+	//struct sockaddr_in6 sin6;
 	char line[80];
 	char id[]= "http://atlas.ripe.net Randy Bush, Atlas says Hi!";
 
@@ -520,19 +520,54 @@ static void send_pkt(struct trtstate *state)
 		}
 		else
 		{
+			sock= socket(AF_INET6, SOCK_DGRAM, 0);
+			if (sock == -1)
+			{
+				crondlog(DIE9 "socket failed");
+			}
+
+			on= 1;
+			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
+				sizeof(on));
+
+			/* Bind to source addr/port */
+			r= bind(sock,
+				(struct sockaddr *)&state->loc_sin6,
+				state->loc_socklen);
+			if (r == -1)
+			{
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+		"%s{ " DBQ(error) ":" DBQ(bind failed: %s) " } ] }",
+					state->sent ? " }, " : "",
+					strerror(serrno));
+				add_str(state, line);
+				report(state);
+				close(sock);
+				return;
+			}
+
 			/* Set port */
-			state->sin6.sin6_port= htons(BASE_PORT + 
-				(state->parismod ? (state->paris % state->parismod) :
-				0));
+			if (state->parismod)
+			{
+				state->sin6.sin6_port= htons(BASE_PORT +
+					(state->paris % state->parismod));
+			}
+			else
+			{
+				state->sin6.sin6_port= htons(BASE_PORT +
+					state->seq);
+			}
 
 			/* Set hop count */
-			setsockopt(base->v6udp_snd, SOL_IPV6, IPV6_UNICAST_HOPS,
+			setsockopt(sock, SOL_IPV6, IPV6_UNICAST_HOPS,
 				&hop, sizeof(hop));
 
 			/* Set/clear don't fragment */
 			on= (state->dont_fragment ? IPV6_PMTUDISC_DO :
 				IPV6_PMTUDISC_DONT);
-			setsockopt(base->v6udp_snd, IPPROTO_IPV6,
+			setsockopt(sock, IPPROTO_IPV6,
 					IPV6_MTU_DISCOVER, &on, sizeof(on));
 
 			v6info= (struct v6info *)base->packet;
@@ -562,7 +597,7 @@ static void send_pkt(struct trtstate *state)
 				len= state->curpacksize;
 			}
 
-			r= sendto(base->v6udp_snd, base->packet, len, 0,
+			r= sendto(sock, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
 
@@ -590,6 +625,7 @@ static void send_pkt(struct trtstate *state)
 			}
 		}
 
+#if 0
 		memset(&sin6, '\0', sizeof(sin6));
 
 		r= connect(base->v6udp_snd,
@@ -602,6 +638,7 @@ static void send_pkt(struct trtstate *state)
 			fprintf(stderr, "send_pkt: connect failed: %s\n",
 				strerror(errno));
 		}
+#endif
 	}
 	else
 	{
@@ -2247,7 +2284,7 @@ static struct trtbase *traceroute_base_new(struct event_base
 	base->v4icmp_snd= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	base->v6icmp_snd= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	base->v4udp_snd= xsocket(AF_INET, SOCK_DGRAM, 0);
-	base->v6udp_snd= xsocket(AF_INET6, SOCK_DGRAM, 0);
+	//base->v6udp_snd= xsocket(AF_INET6, SOCK_DGRAM, 0);
 
 	base->my_pid= getpid();
 
@@ -2575,7 +2612,29 @@ static void traceroute_start2(void *state)
 
 			memset(&loc_sa6, '\0', sizeof(loc_sa6));
 			loc_sa6.sin6_family= AF_INET6;
-			sock= trtbase->v6udp_snd;
+			loc_sa6.sin6_port= htons(SRC_BASE_PORT +
+				trtstate->index);;
+
+			sock= socket(AF_INET6, SOCK_DGRAM, 0);
+                        if (sock == -1)
+                        {
+                                crondlog(DIE9 "socket failed");
+                        }
+printf("traceroute_start2: before bind\n");
+			r= bind(sock, (struct sockaddr *)&loc_sa6,
+				sizeof(loc_sa6));
+			if (r == -1)
+			{
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+			", " DBQ(error) ":" DBQ(bind failed: %s) " }",
+					strerror(serrno));
+				add_str(trtstate, line);
+				report(trtstate);
+				close(sock);
+				return;
+			}
 
 			r= connect(sock, (struct sockaddr *)&trtstate->sin6,
 				trtstate->socklen);
@@ -2602,13 +2661,17 @@ static void traceroute_start2(void *state)
 				crondlog(DIE9 "getsockname failed");
 			}
 
-#if 0
+			close(sock);
+#if 1
+			{
+			char buf[80];
 			printf("Got localname: %s:%d\n",
 				inet_ntop(AF_INET6,
 				&trtstate->loc_sin6.sin6_addr,
 				buf, sizeof(buf)),
 				ntohs(((struct sockaddr_in *)&trtstate->
 					loc_sin6)->sin_port));
+			}
 #endif
 		}
 		else
@@ -2764,7 +2827,6 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 static void traceroute_start(void *state)
 {
 	struct trtstate *trtstate;
-	struct evdns_getaddrinfo_request *evdns_req;
 	struct evutil_addrinfo hints;
 
 	trtstate= state;
@@ -2779,7 +2841,7 @@ static void traceroute_start(void *state)
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
 	trtstate->dnsip= 1;
-	evdns_req= evdns_getaddrinfo(DnsBase, trtstate->hostname, NULL,
+	(void) evdns_getaddrinfo(DnsBase, trtstate->hostname, NULL,
 	                &hints, dns_cb, trtstate);
 }
 
