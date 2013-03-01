@@ -12,24 +12,29 @@ condmv.c -- move a file only if the destination doesn't exist
 #define A_FLAG	(1 << 0)
 #define F_FLAG	(1 << 1)
 
+#define DEFAULT_INTERVAL	60
+
 struct condmvstate
 {
 	char *from;
 	char *to;
 	char *atlas;
 	int force;
+	int interval;
 };
 
 static void *condmv_init(int argc, char *argv[],
 	void (*done)(void *state) UNUSED_PARAM)
 {
-	char *opt_add, *from, *to;
+	char *opt_add, *opt_interval, *from, *to, *check;
+	int interval;
 	uint32_t opt;
 	struct condmvstate *state;
 
 	opt_add= NULL;
+	opt_interval= NULL;
 	opt_complementary= NULL;	/* For when we are called by crond */
-	opt= getopt32(argv, "!A:f", &opt_add);
+	opt= getopt32(argv, "!A:fi:", &opt_add, &opt_interval);
 	if (opt == (uint32_t)-1)
 		return NULL;
 
@@ -38,6 +43,19 @@ static void *condmv_init(int argc, char *argv[],
 		crondlog(LVL8 "too many or too few arguments (required 2)"); 
 		return NULL;
 	}
+
+	if (opt_interval)
+	{
+		interval= strtoul(opt_interval, &check, 0);
+		if (interval <= 0)
+		{
+			crondlog(LVL8 "unable to parse interval '%s'",
+				opt_interval); 
+			return NULL;
+		}
+	}
+	else
+		interval= DEFAULT_INTERVAL;
 
 	from= argv[optind];
 	to= argv[optind+1];
@@ -58,6 +76,7 @@ static void *condmv_init(int argc, char *argv[],
 	state->to= strdup(to);
 	state->atlas= opt_add ? strdup(opt_add) : NULL;
 	state->force= !!(opt & F_FLAG);
+	state->interval= interval;
 
 	return state;
 }
@@ -75,7 +94,8 @@ static void condmv_start(void *state)
 
 	len= strlen(condmvstate->to) + 20;
 	to= malloc(len);
-	snprintf(to, len, "%s.%ld", condmvstate->to, (long)time(NULL));
+	snprintf(to, len, "%s.%ld", condmvstate->to,
+		(long)time(NULL)/condmvstate->interval);
 
 	crondlog(LVL7 "condmv_start: destination '%s'\n", to);
 
