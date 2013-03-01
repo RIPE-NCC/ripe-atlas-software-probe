@@ -13,23 +13,31 @@ Remove the contents of directories if the amount of free space gets too low
 
 #include "libbb.h"
 
+#define DBQ(str) "\"" #str "\""
+
 int dfrm_main(int argc, char *argv[])
 {
 	int i;
 	size_t len;
+	uint32_t opt;
 	unsigned long limit, avail;
+	char *opt_atlas;
 	char *dev, *limit_str, *dir_str, *check, *path;
 	DIR *dir;
 	struct dirent *de;
 	struct statfs sb;
 
-	if (argc < 3)
+	opt_atlas= NULL;
+	opt_complementary= NULL;        /* Just in case */
+	opt= getopt32(argv, "A:", &opt_atlas);
+
+	if (argc < optind+3)
 	{
 		printf("not enough arguments\n");
 		return 1;
 	}
-	dev= argv[1];
-	limit_str= argv[2];
+	dev= argv[optind];
+	limit_str= argv[optind+1];
 
 	if (statfs(dev, &sb) != 0)
 	{
@@ -38,13 +46,18 @@ int dfrm_main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("bsize: %d\n", sb.f_bsize);
-	printf("blocks: %d\n", sb.f_blocks);
-	printf("bfree: %d\n", sb.f_bfree);
-	printf("bavail: %d\n", sb.f_bavail);
-	printf("free: %dKByte, free (non-root): %dKByte\n",
-		sb.f_bfree*(sb.f_bsize/1024),
-		sb.f_bavail*(sb.f_bsize/1024));
+	printf("RESULT { ");
+	if (opt_atlas)
+	{
+		printf(
+		DBQ(id) ":" DBQ(%s) ", " DBQ(fw) ": %d, " DBQ(time) ": %ld, ",
+			opt_atlas, get_atlas_fw_version(), (long)time(NULL));
+	}
+	printf(DBQ(bsize) ": %ld, " DBQ(blocks) ": %ld, "
+		DBQ(bfree) ": %ld, " DBQ(free) ": %ld",
+		(long)sb.f_bsize, (long)sb.f_blocks, (long)sb.f_bfree,
+		(long)sb.f_bfree*(sb.f_bsize/1024));
+	printf(" }\n");
 
 	avail= sb.f_bavail*(sb.f_bsize/1024);
 
@@ -56,11 +69,11 @@ int dfrm_main(int argc, char *argv[])
 	}
 	if (avail > limit)
 	{
-		printf("enough space free, no need to do anything\n");
+		fprintf(stderr, "enough space free, no need to do anything\n");
 		return 1;
 	}
 
-	for (i= 3; i < argc; i++)
+	for (i= optind+2; i < argc; i++)
 	{
 		dir_str= argv[i];
 
@@ -83,8 +96,9 @@ int dfrm_main(int argc, char *argv[])
 			path= realloc(path, len);	/* Avoid leaks */
 			if (path == NULL)
 			{
-				fprintf(stderr, "unable to allocate %d bytes\n",
-					len);
+				fprintf(stderr,
+					"unable to allocate %ld bytes\n",
+					(long)len);
 				continue;
 			}
 			strlcpy(path, dir_str, len);
@@ -97,7 +111,7 @@ int dfrm_main(int argc, char *argv[])
 					path, strerror(errno));
 				continue;
 			}
-			printf("rm %s\n", path);
+			fprintf(stderr, "rm %s\n", path);
 		}
 		closedir(dir);
 		free(path); path= NULL;
