@@ -60,7 +60,6 @@ struct trtbase
 	int v4icmp_snd;
 	int v6icmp_snd;
 	int v4udp_snd;
-	// int v6udp_snd;
 
 	int my_pid;
 
@@ -370,7 +369,6 @@ static void send_pkt(struct trtstate *state)
 	struct v6_ph v6_ph;
 	struct udphdr udp;
 	struct timeval interval;
-	//struct sockaddr_in6 sin6;
 	char line[80];
 	char id[]= "http://atlas.ripe.net Randy Bush, Atlas says Hi!";
 
@@ -624,21 +622,6 @@ static void send_pkt(struct trtstate *state)
 				}
 			}
 		}
-
-#if 0
-		memset(&sin6, '\0', sizeof(sin6));
-
-		r= connect(base->v6udp_snd,
-			(struct sockaddr *)&sin6, sizeof(sin6));
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-		if (r == -1)
-		{
-			fprintf(stderr, "send_pkt: connect failed: %s\n",
-				strerror(errno));
-		}
-#endif
 	}
 	else
 	{
@@ -2284,7 +2267,6 @@ static struct trtbase *traceroute_base_new(struct event_base
 	base->v4icmp_snd= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	base->v6icmp_snd= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	base->v4udp_snd= xsocket(AF_INET, SOCK_DGRAM, 0);
-	//base->v6udp_snd= xsocket(AF_INET6, SOCK_DGRAM, 0);
 
 	base->my_pid= getpid();
 
@@ -2662,16 +2644,13 @@ printf("traceroute_start2: before bind\n");
 			}
 
 			close(sock);
-#if 1
-			{
-			char buf[80];
+#if 0
 			printf("Got localname: %s:%d\n",
 				inet_ntop(AF_INET6,
 				&trtstate->loc_sin6.sin6_addr,
 				buf, sizeof(buf)),
 				ntohs(((struct sockaddr_in *)&trtstate->
 					loc_sin6)->sin_port));
-			}
 #endif
 		}
 		else
