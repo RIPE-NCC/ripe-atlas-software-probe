@@ -35,13 +35,11 @@ struct option longopts[]=
 };
 
 static int tcp_fd;
-static time_t start_time;
+static struct timeval start_time;
 static time_t timeout = 300;
 
 /* Result sent by controller when input is acceptable. */
 #define OK_STR	"OK\n"
-
-#define TIMESYNC_FILE	"/home/atlas/status/timesync.vol.txt"
 
 static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	char **pathp);
@@ -294,7 +292,7 @@ int httppost_main(int argc, char *argv[])
 		cLength += dir_length;
 	}
 
-	time(&start_time);
+	gettimeofday(&start_time, NULL);
 
 	sa.sa_flags= 0;
 	sa.sa_handler= got_alarm;
@@ -394,42 +392,48 @@ int httppost_main(int argc, char *argv[])
 	if (!eat_headers(tcp_file, &chunked, &content_length, &server_time))
 		goto err;
 
-printf("tolerance %d, server_time %d\n", tolerance, server_time);
 	if (tolerance && server_time > 0)
 	{
 		/* Try to set time from server */
-		time_t now, rtt;
+		struct timeval now;
+		double rtt;
 
-		now= time(NULL);
-		rtt= now-start_time;
+		gettimeofday(&now, NULL);
+		rtt= now.tv_sec-start_time.tv_sec;
+		rtt += (now.tv_usec-start_time.tv_usec)/1e6;
 		if (rtt < 0) rtt= 0;
-		rtt++;
-printf("now %d, server_time %d, rtt %d\n", now, server_time, rtt);
-		if (now < server_time-tolerance-rtt ||
-			now > server_time+tolerance+rtt)
+		if (now.tv_sec < server_time-tolerance-rtt ||
+			now.tv_sec > server_time+tolerance+rtt)
 		{
 			fprintf(stderr,
 				"setting time, time difference is %ld\n",
-				(long)server_time-now);
+				(long)server_time-now.tv_sec);
 			stime(&server_time);
 			if (atlas_id)
 			{
 				printf(
 	"RESULT %s ongoing %ld httppost setting time, local %ld, remote %ld\n",
-					atlas_id, (long)time(NULL), (long)now,
+					atlas_id, (long)time(NULL),
+					(long)now.tv_sec,
 					(long)server_time);
 			}
 		}
 		else if (rtt <= 1)
 		{
 			/* Time and network are fine. Record this fact */
-			fh= fopen(TIMESYNC_FILE ".new", "wt");
+			fh= fopen(ATLAS_TIMESYNC_FILE ".new", "wt");
 			if (fh)
 			{
-				fprintf(fh, "%ld\n", (long)now);
+				fprintf(fh, "%ld\n", (long)now.tv_sec);
 				fclose(fh);
-				rename(TIMESYNC_FILE ".new", TIMESYNC_FILE);
+				rename(ATLAS_TIMESYNC_FILE ".new",
+					ATLAS_TIMESYNC_FILE);
 			}
+		}
+		else if (atlas_id)
+		{
+			printf("RESULT %s ongoing %ld httppost rtt %g ms\n",
+				atlas_id, (long)time(NULL), rtt*1000);
 		}
 	}
 
@@ -1194,7 +1198,7 @@ static void skip_spaces(const char *cp, char **ncp)
 
 static void got_alarm(int sig __attribute__((unused)) )
 {
-	if (tcp_fd != -1 && time(NULL) > start_time+timeout)
+	if (tcp_fd != -1 && time(NULL) > start_time.tv_sec+timeout)
 	{
 		report("setting tcp_fd to nonblock");
 		fcntl(tcp_fd, F_SETFL, fcntl(tcp_fd, F_GETFL) | O_NONBLOCK);

@@ -309,6 +309,7 @@ extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 #define ATLAS_DATA_OUT		ATLAS_HOME "/data/out"
 #define ATLAS_DATA_OOQ_OUT	ATLAS_HOME "/data/ooq.out"
 #define ATLAS_DATA_NEW		ATLAS_HOME "/data/new"
+#define ATLAS_TIMESYNC_FILE	ATLAS_STATUS "/timesync.vol"
 
 extern int validate_filename(const char *path, const char *prefix);
 
@@ -328,7 +329,7 @@ char *xmalloc_readlink_or_warn(const char *path) FAST_FUNC;
 char *xrealloc_getcwd_or_warn(char *cwd) FAST_FUNC;
 
 char *xmalloc_follow_symlinks(const char *path) FAST_FUNC;
-  
+
 extern size_t strlcat(char *__restrict dst, const char *__restrict src,
 	size_t n) __THROW __nonnull ((1, 2));
 extern size_t strlcpy(char *__restrict dst, const char *__restrict src,
