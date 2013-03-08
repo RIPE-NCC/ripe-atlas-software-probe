@@ -1707,9 +1707,11 @@ static int tdig_delete(void *state)
 		crondlog(LVL7 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
 		crondlog(LVL7 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
 #endif
-		qry->next->prev = qry->prev; 
-		qry->prev->next = qry->next;
-		if(qry->base->qry_head == qry) 
+		if(qry->next)
+			qry->next->prev = qry->prev; 
+		if(qry->prev)
+			qry->prev->next = qry->next;
+		if(qry->base && qry->base->qry_head == qry) 
 			qry->base->qry_head = qry->next;
 
 #if  ENABLE_FEATURE_EVTDIG_DEBUG
