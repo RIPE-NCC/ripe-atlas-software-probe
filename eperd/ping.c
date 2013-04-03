@@ -2,7 +2,7 @@
 ping.c
 */
 
-/* This include code
+/* This includes code
  * Copyright (c) 2009 Rocco Carbone
  * 
  * taken from the libevent-based ping.

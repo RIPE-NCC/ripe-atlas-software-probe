@@ -3560,6 +3560,10 @@
 #define rpm2cpio_full_usage "\n\n" \
        "Output a cpio archive of the rpm file"
 
+#define rptra6_trivial_usage \
+
+#define rptra6_full_usage "\n\n" \
+
 #define rtcwake_trivial_usage \
        "[-a | -l | -u] [-d DEV] [-m MODE] [-s SECS | -t TIME]"
 #define rtcwake_full_usage "\n\n" \
