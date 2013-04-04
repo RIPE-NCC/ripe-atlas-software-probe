@@ -92,6 +92,8 @@ int rptra6_main(int argc, char *argv[])
 		{
 			switch(icmp->icmp6_type)
 			{
+			case ICMP6_ECHO_REQUEST:	/* 128 */
+			case ICMP6_ECHO_REPLY:		/* 129 */
 			case ND_NEIGHBOR_SOLICIT:	/* 135 */
 			case ND_NEIGHBOR_ADVERT:	/* 136 */
 				break;	/* Ignore */
