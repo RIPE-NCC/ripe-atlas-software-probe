@@ -4,6 +4,8 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 
+#define OPT_STRING	"P:"
+
 #define DBQ(str) "\"" #str "\""
 
 #define IN6ADDR_ALL_NODES_INIT { { { 0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
@@ -34,6 +36,7 @@ int rptra6_main(int argc, char *argv[])
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
 	FILE *of;
+	char *str_pidfile;
 	struct stat sb;
 	struct sockaddr_in6 remote;          /* responding internet address */
 	struct sockaddr_in6 loc_sin6;
@@ -43,12 +46,25 @@ int rptra6_main(int argc, char *argv[])
 	char cmsgbuf[256];
 	char packet[4096];
 
-	if (argc != 3)
+	str_pidfile= NULL;
+	(void) getopt32(argv, OPT_STRING, &str_pidfile);
+	
+	if (argc != optind+2)
 		usage();
 
-	new_name= argv[1];
-	out_name= argv[2];
+	new_name= argv[optind];
+	out_name= argv[optind+1];
 
+	if (str_pidfile)
+	{
+		of= fopen(str_pidfile, "w");
+		if (of)
+		{
+			fprintf(of, "%d\n", getpid());
+			fclose(of);
+		}
+	}
+	
 	of= NULL;
 
 	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
