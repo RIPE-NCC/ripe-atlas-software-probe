@@ -25,6 +25,7 @@ int rptra6_main(int argc, char *argv[])
 	struct nd_router_advert *ra;
 	struct nd_opt_hdr *oh;
 	struct nd_opt_prefix_info *pi;
+	struct nd_opt_mtu *mtup;
 	struct icmp6_hdr * icmp;
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
@@ -145,6 +146,17 @@ int rptra6_main(int argc, char *argv[])
 		ra= (struct nd_router_advert *)packet;
 		fprintf(of, ", " DBQ(hop_limit) ": %d", ra->nd_ra_curhoplimit);
 		flags_reserved= ra->nd_ra_flags_reserved;
+		switch(flags_reserved & RA_PREF_MASK)
+		{
+		case RA_PREF_HIGH:
+			fprintf(of, ", " DBQ(preference) ": " DBQ(high));
+			flags_reserved &= ~RA_PREF_MASK;
+			break;
+		case RA_PREF_LOW:
+			fprintf(of, ", " DBQ(preference) ": " DBQ(low));
+			flags_reserved &= ~RA_PREF_MASK;
+			break;
+		}
 		if (flags_reserved)
 			fprintf(of, ", " DBQ(reserved) ": 0x%x", flags_reserved);
 		fprintf(of, ", " DBQ(lifetime) ": %d", ntohs(ra->nd_ra_router_lifetime));
@@ -188,7 +200,7 @@ int rptra6_main(int argc, char *argv[])
 					fprintf(of, "%s%02x", i == 2 ? "" : ":",
 						((uint8_t *)oh)[i]);
 				}
-				printf("\" }");
+				fprintf(of, "\" }");
 				break;
 			case ND_OPT_PREFIX_INFORMATION:	/* 3 */
 				if (olen < sizeof(*pi))
@@ -230,6 +242,14 @@ int rptra6_main(int argc, char *argv[])
 				fprintf(of, ", " DBQ(prefix) ": " DBQ(%s) " }",
 					inet_ntop(AF_INET6, &pi->nd_opt_pi_prefix,
 					namebuf, sizeof(namebuf)));
+				break;
+
+			case ND_OPT_MTU:	/* 5 */
+				fprintf(of, "{ " DBQ(type) ": " DBQ(mtu));
+				mtup= (struct nd_opt_mtu *)oh;
+				fprintf(of, ", " DBQ(reserved) ": 0x%x",
+					ntohs(mtup->nd_opt_mtu_reserved));
+				fprintf(of, ", " DBQ(mtu) ": %d", ntohs(mtup->nd_opt_mtu_mtu));
 				break;
 				
 			default:
