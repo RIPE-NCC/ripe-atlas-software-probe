@@ -9,6 +9,10 @@
 #define IN6ADDR_ALL_NODES_INIT { { { 0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 struct in6_addr in6addr_all_nodes = IN6ADDR_ALL_NODES_INIT;        /* ff02::1 */
 
+#define RA_PREF_MASK	0x18
+#define RA_PREF_HIGH	0x08
+#define RA_PREF_LOW	0x18
+
 static void usage(void)
 {
 	fprintf(stderr, "Usage: rptra6 <new> <out>\n");
