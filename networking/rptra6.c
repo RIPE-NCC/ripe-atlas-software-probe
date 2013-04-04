@@ -92,6 +92,9 @@ int rptra6_main(int argc, char *argv[])
 		{
 			switch(icmp->icmp6_type)
 			{
+			case ICMP6_DST_UNREACH:		/*   1 */
+			case ICMP6_PACKET_TOO_BIG:	/*   2 */
+			case ICMP6_TIME_EXCEEDED:	/*   3 */
 			case ICMP6_ECHO_REQUEST:	/* 128 */
 			case ICMP6_ECHO_REPLY:		/* 129 */
 			case ND_NEIGHBOR_SOLICIT:	/* 135 */
