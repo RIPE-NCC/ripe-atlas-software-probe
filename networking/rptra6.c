@@ -11,9 +11,19 @@
 #define IN6ADDR_ALL_NODES_INIT { { { 0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 struct in6_addr in6addr_all_nodes = IN6ADDR_ALL_NODES_INIT;        /* ff02::1 */
 
+#define OPT_RDNSS	25
+
 #define RA_PREF_MASK	0x18
 #define RA_PREF_HIGH	0x08
 #define RA_PREF_LOW	0x18
+
+struct opt_rdnss             /* RDNSS option */
+{
+	uint8_t   nd_opt_rdnss_type;
+	uint8_t   nd_opt_rdnss_len;
+	uint16_t  nd_opt_rdnss_reserved;
+	uint32_t  nd_opt_rdnss_lifetime;
+};
 
 static void usage(void)
 {
@@ -32,6 +42,7 @@ int rptra6_main(int argc, char *argv[])
 	struct nd_opt_hdr *oh;
 	struct nd_opt_prefix_info *pi;
 	struct nd_opt_mtu *mtup;
+	struct opt_rdnss *rdnssp;
 	struct icmp6_hdr * icmp;
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
@@ -171,6 +182,11 @@ int rptra6_main(int argc, char *argv[])
 		ra= (struct nd_router_advert *)packet;
 		fprintf(of, ", " DBQ(hop_limit) ": %d", ra->nd_ra_curhoplimit);
 		flags_reserved= ra->nd_ra_flags_reserved;
+		if (flags_reserved & ND_RA_FLAG_OTHER)
+		{
+			fprintf(of, ", " DBQ(other_conf) ": true");
+			flags_reserved &= ~ND_RA_FLAG_OTHER;
+		}
 		switch(flags_reserved & RA_PREF_MASK)
 		{
 		case RA_PREF_HIGH:
@@ -212,7 +228,6 @@ int rptra6_main(int argc, char *argv[])
 					(long)o);
 				break;
 			}
-			oh= (struct nd_opt_hdr *)&packet[o];
 			olen= oh->nd_opt_len * 8;
 
 			switch(oh->nd_opt_type)
@@ -272,11 +287,38 @@ int rptra6_main(int argc, char *argv[])
 			case ND_OPT_MTU:	/* 5 */
 				fprintf(of, "{ " DBQ(type) ": " DBQ(mtu));
 				mtup= (struct nd_opt_mtu *)oh;
-				fprintf(of, ", " DBQ(reserved) ": 0x%x",
+				if (mtup->nd_opt_mtu_reserved)
+				{
+					fprintf(of, ", " DBQ(reserved) ": 0x%x",
 					ntohs(mtup->nd_opt_mtu_reserved));
-				fprintf(of, ", " DBQ(mtu) ": %d", ntohs(mtup->nd_opt_mtu_mtu));
+				}
+				fprintf(of, ", " DBQ(mtu) ": %d }",
+					ntohs(mtup->nd_opt_mtu_mtu));
 				break;
-				
+
+			case OPT_RDNSS:	/* 25 */
+				fprintf(of, "{ " DBQ(type) ": " DBQ(rdnss));
+				rdnssp= (struct opt_rdnss *)oh;
+				fprintf(of, ", " DBQ(reserved) ": %d",
+					ntohs(rdnssp->nd_opt_rdnss_reserved));
+				fprintf(of, ", " DBQ(lifetime) ": %d",
+					ntohl(rdnssp->nd_opt_rdnss_lifetime));
+
+				fprintf(of, ", " DBQ(addrs) ": [ ");
+				for (i= 8; i+16 <= olen; i+= 16)
+				{
+					getnameinfo((struct sockaddr *)
+						((char *)oh)+i,
+						sizeof(struct in6_addr),
+						namebuf, sizeof(namebuf),
+						NULL, 0, NI_NUMERICHOST);
+					fprintf(of, "%s" DBQ(%s),
+						i == 8 ? "" : ", ",
+						namebuf);
+				}
+				fprintf(of, " ] }");
+				break;
+
 			default:
 				fprintf(of, "{ " DBQ(type_no) ": %d }", oh->nd_opt_type);
 				break;
