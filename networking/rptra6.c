@@ -126,6 +126,7 @@ int rptra6_main(int argc, char *argv[])
 			case ICMP6_ECHO_REPLY:		/* 129 */
 			case ND_NEIGHBOR_SOLICIT:	/* 135 */
 			case ND_NEIGHBOR_ADVERT:	/* 136 */
+			case ND_REDIRECT:		/* 137 */
 				break;	/* Ignore */
 			default:
 				printf("icmp6_type %d\n", icmp->icmp6_type);
@@ -293,25 +294,25 @@ int rptra6_main(int argc, char *argv[])
 					ntohs(mtup->nd_opt_mtu_reserved));
 				}
 				fprintf(of, ", " DBQ(mtu) ": %d }",
-					ntohs(mtup->nd_opt_mtu_mtu));
+					ntohl(mtup->nd_opt_mtu_mtu));
 				break;
 
 			case OPT_RDNSS:	/* 25 */
 				fprintf(of, "{ " DBQ(type) ": " DBQ(rdnss));
 				rdnssp= (struct opt_rdnss *)oh;
-				fprintf(of, ", " DBQ(reserved) ": %d",
+				if (rdnssp->nd_opt_rdnss_reserved)
+				{
+					fprintf(of, ", " DBQ(reserved) ": %d",
 					ntohs(rdnssp->nd_opt_rdnss_reserved));
+				}
 				fprintf(of, ", " DBQ(lifetime) ": %d",
 					ntohl(rdnssp->nd_opt_rdnss_lifetime));
 
 				fprintf(of, ", " DBQ(addrs) ": [ ");
 				for (i= 8; i+16 <= olen; i+= 16)
 				{
-					getnameinfo((struct sockaddr *)
-						((char *)oh)+i,
-						sizeof(struct in6_addr),
-						namebuf, sizeof(namebuf),
-						NULL, 0, NI_NUMERICHOST);
+					inet_ntop(AF_INET6, ((char *)oh)+i,
+						namebuf, sizeof(namebuf));
 					fprintf(of, "%s" DBQ(%s),
 						i == 8 ? "" : ", ",
 						namebuf);
