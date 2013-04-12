@@ -858,8 +858,13 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	BLURT(LVL5 "TCP readcb %s", qry->server_name );
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
-			bufferevent_free(bev);
-			return;
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
+				" \"red more bytes than expected %d, got %zu\""
+				, qry->err.size ? ", " : ""
+				, qry->wire_size, qry->packet.size);
+		buf_add(&qry->err, line, strlen(line));	
+		printReply (qry, 0, NULL);
+		return;
 	}
 
         gettimeofday(&rectime, NULL);
