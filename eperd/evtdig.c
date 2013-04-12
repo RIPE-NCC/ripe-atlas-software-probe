@@ -94,6 +94,7 @@
 #define STATUS_TCP_CONNECTING 		1002
 #define STATUS_TCP_CONNECTED 		1003
 #define STATUS_TCP_WRITE 		1004
+#define STATUS_NEXT_QUERY		1005
 #define STATUS_FREE 			0
 
 // seems T_DNSKEY is not defined header files of lenny and sdk
@@ -222,8 +223,10 @@ struct query_state {
 	struct sockaddr_in remote;     /* store the reply packet src address      */
 
 
-	struct event noreply_timer;    /* Timer to handle timeout            */
-	struct event nsm_timer;        /* Timer to next query intervals   */
+	struct event noreply_timer;    /* Timer to handle timeout */
+	struct event nsm_timer;       /* Timer to send UDP */
+	struct event next_qry_timer;  /* Timer event to start next query */
+
 	struct timeval xmit_time;	
 	double triptime;
 
@@ -662,7 +665,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 {
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
-	uint32_t nsent;
+	uint32_t nsent = 0;
 	u_char *outbuff;
 	int err = 0; 
 	int sockfd;
@@ -732,6 +735,13 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		return;
 	}
 }
+
+static void next_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
+	struct query_state *qry = h;
+	BLURT(LVL5 "next query for %s",  qry->server_name);
+	tdig_start(qry);  
+}
+
 /* The callback to handle timeouts due to destination host unreachable condition */
 static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
@@ -1075,11 +1085,17 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
 
-	/* initialize callbacks: no reply timeout and sendpacket */
+	/* initialize callbacks : */
+	/* sendpacket  called by UDP send */
 	evtimer_assign(&qry->nsm_timer, tdig_base->event_base,
 		tdig_send_query_callback, qry);
+	/* no reply timeout for udp  queries */
 	evtimer_assign(&qry->noreply_timer, tdig_base->event_base,
 		noreply_callback, qry); 
+
+	/* callback/timer used for restarting query by --resove */
+	evtimer_assign(&qry->next_qry_timer, tdig_base->event_base, next_qry_cb
+			                ,qry);
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:?", longopts, NULL), c != -1) {
@@ -1445,13 +1461,15 @@ void tdig_start (struct query_state *qry)
 	char port[] = "domain";
 	char port_as_char[] = "53";  
 
-	if(qry->qst !=  STATUS_FREE) {
-		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"query busy\": \"too frequent. previous one is not done yet\"", qry->err.size ? ", " : ""  );
-		buf_add(&qry->err, line, strlen(line));
-		printErrorQuick(qry);
-		return ;
+	switch(qry->qst)
+	{
+		case STATUS_NEXT_QUERY :
+		case  STATUS_FREE :
+			break;
+		default:
+			printErrorQuick(qry);
+			return ;
 	}
-
 
 	if(qry->opt_resolv_conf > tdig_base->resolv_max) {
 		qry->opt_resolv_conf = 0;
@@ -1611,6 +1629,7 @@ static void ChangetoDnsNameFormat(u_char *  dns, char* qry)
 
 static void free_qry_inst(struct query_state *qry)
 {
+	struct timeval asap = { 0, 0 };
 	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
 
 	if(qry->err.size) 
@@ -1649,7 +1668,8 @@ static void free_qry_inst(struct query_state *qry)
 			free (qry->server_name);
 			qry->server_name = strdup(tdig_base->nslist[qry->opt_resolv_conf]);
 			qry->opt_resolv_conf++;
-			tdig_start(qry);  
+			qry->qst = STATUS_NEXT_QUERY;
+			evtimer_add(&qry->next_qry_timer, &asap);
 			return;
 		}
 		else 
@@ -1756,21 +1776,17 @@ void printErrorQuick (struct query_state *qry)
 	else
 		fh = stdout;
 
-	gettimeofday(&now, NULL);
-	JS1(time, %ld,  now.tv_sec);
-
 	fprintf(fh, "RESULT { ");
 	if(qry->str_Atlas) 
 	{
 		JS(id,  qry->str_Atlas);
 	}
+	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
-	if(qry->err.size) 
-	{
-		line[0]  = '\0';
-		buf_add(&qry->err, line, 1 );
-		fprintf(fh, ", \"error\" : { %s }" , qry->err.buf);
-	}
+
+	snprintf(line, DEFAULT_LINE_LENGTH, "\"query busy\": \"too frequent. previous one is not done yet\"");
+	fprintf(fh, "\"error\" : { %s }" , line);
+
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
@@ -1784,7 +1800,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 	unsigned char *qname, *reader;
 	struct DNS_HEADER *dnsR = NULL;
 	struct RES_RECORD answers[20]; //the replies from the DNS server
-	void *ptr;
+	void *ptr = NULL;
 	char addrstr[100];
 	FILE *fh; 
 	//char buf[INET6_ADDRSTRLEN];
