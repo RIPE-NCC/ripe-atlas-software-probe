@@ -603,15 +603,15 @@ static void send_pkt(struct trtstate *state)
  { static int doit=1; if (doit && r != -1)
  	{ errno= ENOSYS; r= -1; } doit= !doit; }
 #endif
+			serrno= errno;
+			close(sock);
 
 			if (r == -1)
 			{
-				if (errno != EACCES &&
-					errno != ECONNREFUSED &&
-					errno != EMSGSIZE)
+				if (serrno != EACCES &&
+					serrno != ECONNREFUSED &&
+					serrno != EMSGSIZE)
 				{
-					serrno= errno;
-
 					snprintf(line, sizeof(line),
 			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
 						state->sent ? " }, " : "",
