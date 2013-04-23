@@ -448,7 +448,7 @@ int httppost_main(int argc, char *argv[])
 		out_file= fopen(output_file, "w");
 		if (!out_file)
 		{
-			report_err("unable to create '%s'", out_file);
+			report_err("unable to create '%s'", output_file);
 			goto err;
 		}
 	}
