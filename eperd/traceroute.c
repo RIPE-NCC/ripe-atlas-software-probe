@@ -372,7 +372,7 @@ static void send_pkt(struct trtstate *state)
 	struct udphdr udp;
 	struct timeval interval;
 	char line[80];
-	char id[]= "http://atlas.ripe.net Randy Bush, Atlas says Hi!";
+	char id[]= "http://atlas.ripe.net Atlas says Hi!";
 
 	state->gotresp= 0;
 
