@@ -342,7 +342,6 @@ static int setup_ipv6_rpt(char *cache_name, int *need_report)
 
 	if (cache_file)
 	{
-		printf ("there is cache file %s infile %s\n", cache_name, filename);
 		in_file= fopen(filename, "r");
 		if (in_file == NULL)
 		{
