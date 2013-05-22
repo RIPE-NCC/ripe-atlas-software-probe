@@ -1,6 +1,8 @@
 /*
-traceroute.c
-*/
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * traceroute.c
+ */
 
 #include "libbb.h"
 #include <event2/dns.h>

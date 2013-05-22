@@ -1,8 +1,8 @@
 /*
-httpget.c -- libevent-based version of httpget
-
-Created:	Jan 2012 by Philip Homburg for RIPE NCC
-*/
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * httpget.c -- libevent-based version of httpget
+ */
 
 #include "libbb.h"
 #include <assert.h>

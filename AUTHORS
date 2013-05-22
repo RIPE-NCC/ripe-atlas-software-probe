@@ -171,3 +171,9 @@ Bernhard Reutner-Fischer <rep.dot.nop@gmail.com>
 
 Mike Frysinger <vapier@gentoo.org>
     initial e2fsprogs, printenv, setarch, sum, misc
+
+Philip Homburg <philip.homburg@ripe.net>
+    eperd  evtraceroute evping perd condmv httpget httppost
+	
+Antony Antony <antony@ripe.net>
+    evtdig buddyinfo findpid 

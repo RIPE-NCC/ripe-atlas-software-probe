@@ -1,4 +1,8 @@
-/* Standalone version of the event-based httpget. */
+/* 
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Standalone version of the event-based httpget. 
+ */
 
 #include "libbb.h"
 #include <syslog.h>

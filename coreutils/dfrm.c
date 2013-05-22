@@ -1,8 +1,9 @@
 /*
-dfrm.c
-
-Remove the contents of directories if the amount of free space gets too low
-*/
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * dfrm.c
+ * Remove the contents of directories if the amount of free space gets too low
+ */
 
 #include <dirent.h>
 #include <errno.h>

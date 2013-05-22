@@ -1,11 +1,11 @@
-/* vi: set sw=4 ts=4: */
-/*
+/* vi: set sw=4 ts=4: 
  * eperd formerly crond but now heavily hacked for Atlas
  *
  * crond -d[#] -c <crondir> -f -b
  *
  * run as root, but NOT setuid root
  *
+ * Copyright(c) 2013 RIPE NCC <atlas@ripe.net>
  * Copyright 1994 Matthew Dillon (dillon@apollo.west.oic.com)
  * (version 2.3.2)
  * Vladimir Oleynik <dzo@simtreas.ru> (C) 2002

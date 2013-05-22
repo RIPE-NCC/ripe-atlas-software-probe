@@ -1,11 +1,9 @@
-/* vi: set sw=4 ts=4: */
-/*
- * sleep implementation for busybox with watchdog petting. 
- *
+/* vi: set sw=4 ts=4: 
  * Copyright (C) 2003  Manuel Novoa III  <mjn3@codepoet.org>
- * Copyright (C) 2010  Antony Antony <antony@ripe.net>
- *
+ * Copyright (c) 2010-2013 RIPE NCC, Antony <antony@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ *
+ * sleep implementation for busybox with watchdog petting. 
  */
 
 /* BB_AUDIT SUSv3 compliant */

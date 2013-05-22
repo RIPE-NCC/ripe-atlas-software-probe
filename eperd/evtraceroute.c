@@ -1,4 +1,8 @@
-/* Standalone version of the event-based traceroute. */
+/*
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Standalone version of the event-based traceroute. 
+ */
 
 #include "libbb.h"
 #include <syslog.h>

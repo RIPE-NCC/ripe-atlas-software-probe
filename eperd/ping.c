@@ -1,11 +1,10 @@
 /*
-ping.c
-*/
-
-/* This includes code
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone
- * 
+ * This includes code  Copyright (c) 2009 Rocco Carbone
  * taken from the libevent-based ping.
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * ping.c
  */
 
 #include "libbb.h"

@@ -1,11 +1,10 @@
-/* vi: set sw=2 ts=2: */
-/*
+/* vi: set sw=2 ts=2: 
+ *
+ * 2010-2013  Copyright (c) 2013 RIPE NCC <atlas@ripe.net> 
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * read /cat/proc/buddyinfo and print out.
  * if env variable LOWMEM_REBOOT is set KBytes same as buddyinfo reboot
  *
- * 2010 Antony Antony <antony@ripe.net>
- *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
 
 #include "libbb.h"

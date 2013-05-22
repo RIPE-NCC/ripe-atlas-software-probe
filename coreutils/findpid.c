@@ -1,10 +1,8 @@
-/* vi: set sw=4 ts=4: */
-/*
- * simple find_pid_name. return 0 if a name is found
+/* vi: set sw=4 ts=4: 
  *
- * 2010 Antony Antony <antony@ripe.net>
- *
+ * Copyright (c) 2010-2013 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * simple find_pid_name. return 0 if a name is found
  */
 
 #include "libbb.h"

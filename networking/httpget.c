@@ -1,8 +1,8 @@
 /*
-httpget.c -- Simple program that uses the HTTP GET command
-
-Created:	Aug 2011 by Philip Homburg for RIPE NCC
-*/
+ * Copyright (c) 2011-2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * httpget.c -- Simple program that uses the HTTP GET command
+ */
 
 #include <errno.h>
 #include <fcntl.h>

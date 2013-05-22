@@ -1,7 +1,8 @@
 /*
-condmv.c -- move a file only if the destination doesn't exist
-
-*/
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * condmv.c -- move a file only if the destination doesn't exist
+ */
 
 #include "libbb.h"
 #include "eperd.h"

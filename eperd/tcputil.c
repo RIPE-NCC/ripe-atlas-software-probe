@@ -1,6 +1,8 @@
 /*
-tcputil.c
-*/
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * tcputil.c
+ */
 
 #include "libbb.h"
 #include "eperd.h"

@@ -3,6 +3,7 @@
  * universal getopt32 implementation for busybox
  *
  * Copyright (C) 2003-2005  Vladimir Oleynik  <dzo@simtreas.ru>
+ * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
  *
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
