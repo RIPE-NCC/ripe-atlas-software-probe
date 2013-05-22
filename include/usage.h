@@ -3562,6 +3562,10 @@
 
 #define rptra6_trivial_usage \
 
+#define rptaddr6_full_usage "\n\n" \
+
+#define rptaddr6_trivial_usage \
+
 #define rptra6_full_usage "\n\n" \
 
 #define rtcwake_trivial_usage \

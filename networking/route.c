@@ -462,7 +462,7 @@ static const char flagchars[] ALIGN1 =
 #endif
 ;
 
-static void set_flags(char *flagstr, int flags)
+void set_flags(char *flagstr, int flags)
 {
 	int i;
 

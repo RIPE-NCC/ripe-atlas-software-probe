@@ -719,6 +719,12 @@ config RPTRA6
 	help
 	  Report received IPv6 router advertisements
 
+config RPTADDR6
+	bool "rptaddr6"
+	default n
+	help
+	  Report IPv6 addresses and routes
+
 config RXTXRPT
 	bool "rxtxrpt"
 	default n

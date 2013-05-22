@@ -302,7 +302,7 @@ extern char *bb_get_last_path_component_strip(char *path) FAST_FUNC;
 /* "abc/def/" -> "" and it never modifies 'path' */
 extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 
-/* What's the best place for this? */
+/* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME	"/home/atlas"
 #define ATLAS_CRONS		ATLAS_HOME "/crons"
 #define ATLAS_STATUS		ATLAS_HOME "/status"
