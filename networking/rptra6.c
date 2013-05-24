@@ -35,7 +35,7 @@ static void usage(void)
 	exit(1);
 }
 
-int rptra6_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
+int rptaddr6_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
 int rptra6_main(int argc, char *argv[])
 {
 	int i, r, first, sock, on, nrecv, rcvd_ttl, olen;
