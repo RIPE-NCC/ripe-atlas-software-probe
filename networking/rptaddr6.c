@@ -39,10 +39,14 @@
 
 #define IPV6_ADDR_SCOPE_MASK    0x00f0U
 
+enum { 
+	OPT_a =  (1 << 0),
+};
+
 static int setup_ipv6_rpt(char *cache_name, int *need_report);
-static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas);
+static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas, int opt_append);
 static void report(const char *fmt, ...);
-static void report_err(const char *fmt, ...);
+static void report_err(const char *fmt, ...); 
 
 int rptaddr6_main(int argc, char *argv[])
 {
@@ -51,12 +55,14 @@ int rptaddr6_main(int argc, char *argv[])
 	char *opt_atlas;
        	char *cache_name;	/* temp file in an intermediate format */
 	char *out_name;		/* output file in json: timestamp opt_atlas */
+	int opt_append;
 
 	opt_atlas= NULL;
 	out_name = NULL;
 	cache_name = NULL;
 	opt_atlas = NULL;
 	opt_complementary= NULL;
+	opt_append = FALSE;
 
 	opt= getopt32(argv, OPT_STRING, &opt_atlas, &out_name, &cache_name);
 
@@ -73,12 +79,15 @@ int rptaddr6_main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (opt & OPT_a) 
+		opt_append = TRUE;
+
 	r= setup_ipv6_rpt(cache_name, &need_report);
 	if (r != 0)
 		return r;
 	if (need_report)
 	{
-		r = rpt_ipv6(cache_name, out_name, opt_atlas);
+		r = rpt_ipv6(cache_name, out_name, opt_atlas, opt_append);
 		if (r != 0)
 			return r;
 	}
@@ -402,7 +411,7 @@ static int setup_ipv6_rpt(char *cache_name, int *need_report)
 }
 
 
-static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas)
+static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas, int opt_append)
 {
 	FILE *file;
 	FILE *fh;
@@ -418,7 +427,11 @@ static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas)
 	}
 
 	if (out_name) {
-		fh= fopen(out_name, "w");
+		if(opt_append) 
+			fh= fopen(out_name, "w");
+		else 
+			fh= fopen(out_name, "w");
+
 		if (!fh)
 			crondlog(DIE9 "unable to append to '%s'", out_name);
 	}

@@ -830,7 +830,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("condmv" , builtin_condmv, "conditional move"),
 	BLTIN("dfrm"  , builtin_dfrm, "cleanup if free space gets too low"),
 	BLTIN("rxtxrpt"  , builtin_rxtxrpt, "report RX and TX"),
-	BLTIN("raptaddr6"  , builtin_rptaddr6, "report ipv6 address(es) and route(s)"),
+	BLTIN("rptaddr6"  , builtin_rptaddr6, "report ipv6 address(es) and route(s)"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
