@@ -1055,6 +1055,11 @@
 	"\n	-6		IPv6" \
      "todo"
 
+#define evsslgetcert_trivial_usage \
+       "todo"
+#define evsslgetcert_full_usage "\n\n" \
+     "todo"
+
 #define evtraceroute_trivial_usage \
        "todo"
 #define evtraceroute_full_usage "\n\n" \

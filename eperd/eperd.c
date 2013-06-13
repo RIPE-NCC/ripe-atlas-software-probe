@@ -794,6 +794,7 @@ static struct builtin
 {
 	{ "evhttpget", &httpget_ops },
 	{ "evping", &ping_ops },
+	{ "evsslgetcert", &sslgetcert_ops },
 	{ "evtdig", &tdig_ops },
 	{ "evtraceroute", &traceroute_ops },
 	{ "condmv", &condmv_ops },
