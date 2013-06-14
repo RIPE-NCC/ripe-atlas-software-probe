@@ -28,6 +28,7 @@
 struct slot
 {
 	void *cmdstate;
+	struct builtin *bp;
 };
 
 static struct 
@@ -51,6 +52,7 @@ static struct builtin
 	{ "evhttpget", &httpget_ops },
 	{ "evping", &ping_ops },
 	{ "evtdig", &tdig_ops },
+	{ "evsslgetcert", &sslgetcert_ops },
 	{ "evtraceroute", &traceroute_ops },
 	{ NULL, NULL }
 };
@@ -123,11 +125,6 @@ int eooqd_main(int argc, char *argv[])
 	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
 	if (!DnsBase)
 	{
-		crondlog(DIE9 "evdns_base_new failed"); /* exits */
-	}
-
-	DnsBase = evdns_base_new(EventBase, 1); 
-	if(!DnsBase) {
 		event_base_free(EventBase);
 		crondlog(DIE9 "evdns_base_new failed"); /* exits */
 	}
@@ -369,6 +366,7 @@ static void add_line(void)
 	if (cmdstate != NULL)
 	{
 		state->slots[slot].cmdstate= cmdstate;
+		state->slots[slot].bp= bp;
 		state->curr_index= slot;
 		state->curr_busy++;
 
@@ -421,7 +419,7 @@ error:
 
 static void cmddone(void *cmdstate)
 {
-	int i;
+	int i, r;
 	char from_filename[80];
 	char to_filename[80];
 	struct stat sb;
@@ -439,8 +437,14 @@ static void cmddone(void *cmdstate)
 		report("cmddone: state state %p", cmdstate);
 		return;
 	}
-	state->slots[i].cmdstate= NULL;
-	state->curr_busy--;
+	r= state->slots[i].bp->testops->delete(cmdstate);
+	if (r != 0)
+	{
+		state->slots[i].cmdstate= NULL;
+		state->curr_busy--;
+	}
+	else
+		report("cmddone: strange, cmd %p is busy", cmdstate);
 
 	snprintf(from_filename, sizeof(from_filename),
 		"/home/atlas/data/new/ooq.%d", i);

@@ -33,6 +33,12 @@ config EVPING
 	help
 		standalone version of event-driven ping
 
+config EVSSLGETCERT
+	bool "evsslgetcert"
+	default n
+	help
+		standalone version of event-driven sslgetcert
+
 config EVTDIG
 	bool "evtdig"
 	default n
