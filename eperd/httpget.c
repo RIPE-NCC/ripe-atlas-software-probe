@@ -472,6 +472,16 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		}
 		fclose(fh);
 	}
+
+	if (A_arg)
+	{
+		if (!validate_atlas_id(A_arg))
+		{
+			crondlog(LVL8 "bad atlas ID '%s'", A_arg);
+			return NULL;
+		}
+	}
+
 	if (post_header && !validate_filename(post_header, SAFE_PREFIX_IN))
 	{
 		crondlog(LVL8 "insecure file '%s'", post_header);

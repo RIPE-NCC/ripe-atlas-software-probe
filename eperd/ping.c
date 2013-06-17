@@ -1051,6 +1051,15 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		fclose(fh);
 	}
 
+	if (str_Atlas)
+	{
+		if (!validate_atlas_id(str_Atlas))
+		{
+			crondlog(LVL8 "bad atlas ID '%s'", str_Atlas);
+			return NULL;
+		}
+	}
+
 	af= AF_UNSPEC;
 	if (opt & opt_4)
 		af= AF_INET;

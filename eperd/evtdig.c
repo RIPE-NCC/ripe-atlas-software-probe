@@ -1094,6 +1094,13 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 
 			case 'A':
+				if (!validate_atlas_id(optarg))
+				{
+					crondlog(LVL8 "bad atlas ID '%s'",
+						optarg);
+					tdig_delete(qry);
+					return NULL;
+				}
 				qry->str_Atlas = strdup(optarg);
 				break;
 			case 'b':
