@@ -79,6 +79,11 @@ int rptaddr6_main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (!cache_name)  {
+		crondlog(LVL8 "missing requried option, -c <cache_file>");
+		return 1;
+	}
+
 	if (opt & OPT_a) 
 		opt_append = TRUE;
 
