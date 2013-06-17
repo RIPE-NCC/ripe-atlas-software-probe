@@ -99,6 +99,7 @@ lib-y += trim.o
 lib-y += u_signal_names.o
 lib-y += udp_io.o
 lib-y += uuencode.o
+lib-y += validate_atlas_id.o
 lib-y += validate_filename.o
 lib-y += vdprintf.o
 lib-y += verror_msg.o

@@ -2378,6 +2378,15 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 		fclose(fh);
 	}
 
+	if (str_Atlas)
+	{
+		if (!validate_atlas_id(str_Atlas))
+		{
+			crondlog(LVL8 "bad atlas ID '%s'", str_Atlas);
+			return NULL;
+		}
+	}
+
 	if (!delay_name_res)
 	{
 		/* Attempt to resolve 'name' */

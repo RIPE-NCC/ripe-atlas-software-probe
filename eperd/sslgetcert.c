@@ -675,6 +675,15 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		fclose(fh);
 	}
 
+	if (A_arg)
+	{
+		if (!validate_atlas_id(A_arg))
+		{
+			crondlog(LVL8 "bad atlas ID '%s'", A_arg);
+			return NULL;
+		}
+	}
+
 	state= xzalloc(sizeof(*state));
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
@@ -1104,8 +1113,6 @@ static void writecb(struct bufferevent *bev, void *ptr)
 
 static void err_reading(struct state *state)
 {
-	struct timeval endtime;
-
 	switch(state->readstate)
 	{
 	default:

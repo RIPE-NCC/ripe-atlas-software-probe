@@ -150,6 +150,15 @@ int httppost_main(int argc, char *argv[])
 	}
 	url= argv[optind];
 
+	if (atlas_id)
+	{
+		if (!validate_atlas_id(atlas_id))
+		{
+			fprintf(stderr, "bad atlas ID '%s'", atlas_id);
+			return 1;
+		}
+	}
+
 	if (maxpostsizestr)
 	{
 		maxpostsize= strtoul(maxpostsizestr, &check, 0);
