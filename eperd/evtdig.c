@@ -377,7 +377,7 @@ int evtdig_main(int argc, char **argv)
 		crondlog(LVL9 "event_base_new failed"); /* exits */
 	}
 
-	qry = tdig_init(argc, argv, NULL);
+	qry = tdig_init(argc, argv, local_exit);
 	if(!qry) {
 		crondlog(DIE9 "evdns_base_new failed"); /* exits */
 		event_base_free	(EventBase);
@@ -425,7 +425,7 @@ void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh)
 
 static void local_exit(void *state UNUSED_PARAM)
 {
-	//fprintf(stderr, "And we are done\n");
+	fprintf(stderr, "And we are done\n");
 	exit(0);
 }
 
