@@ -42,14 +42,16 @@ static struct option longopts[]=
 	{ "store-headers", required_argument, NULL, 'H' },
 	{ "store-body",	required_argument, NULL, 'B' },
 	{ "user-agent",	required_argument, NULL, 'u' },
+	{ "etim",	no_argument, NULL, 't' },
+	{ "eetim",	no_argument, NULL, 'T' },
 	{ NULL, }
 };
 
-enum readstate { READ_STATUS, READ_HEADER, READ_BODY, READ_SIMPLE,
+enum readstate { READ_FIRST, READ_STATUS, READ_HEADER, READ_BODY, READ_SIMPLE,
 	READ_CHUNKED, READ_CHUNK_BODY, READ_CHUNK_END, READ_CHUNKED_TRAILER,
 	READ_DONE };
-enum writestate { WRITE_HEADER, WRITE_POST_HEADER, WRITE_POST_FILE,
-	WRITE_POST_FOOTER, WRITE_DONE };
+enum writestate { WRITE_FIRST, WRITE_HEADER, WRITE_POST_HEADER,
+	WRITE_POST_FILE, WRITE_POST_FOOTER, WRITE_DONE };
 
 struct hgbase
 {
@@ -84,6 +86,7 @@ struct hgstate
 	char *post_footer;
 	int max_headers;
 	int max_body;
+	int etim;
 
 	/* State */
 	char busy;
@@ -111,6 +114,12 @@ struct hgstate
 	time_t gstart;
 	struct timeval start;
 	double resptime;
+	double ttr;		/* Time to resolve */
+	double ttc;		/* Time to connect */
+	double ttfb;		/* Time to first byte */
+	int roffset;
+	int report_roffset;
+	int first_connect;
 	FILE *post_fh;
 	char *post_buf;
 
@@ -304,6 +313,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 	}
 	switch(state->readstate)
 	{
+	case READ_FIRST:
 	case READ_STATUS:
 		add_str(state, DBQ(err) ":" DBQ(timeout reading status) ", ");
 		report(state);
@@ -342,7 +352,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 {
 	int c, i, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
-		do_all, do_http10;
+		do_all, do_http10, do_etim, do_eetim;
 	size_t newsiz;
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
@@ -368,6 +378,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	A_arg= NULL;
 	only_v4= 0;
 	only_v6= 0;
+	do_etim= 0;
+	do_eetim= 0;
 	user_agent= "httpget for atlas.ripe.net";
 
 	if (!hg_base)
@@ -439,6 +451,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		case '6':
 			only_v6= 1;
 			only_v4= 0;
+			break;
+		case 't':
+			do_etim= 1;
+			break;
+		case 'T':
+			do_eetim= 1;
 			break;
 		case 'u':				/* --user-agent */
 			user_agent= optarg;
@@ -561,6 +579,14 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	state->only_v4= !!only_v4;	/* Gcc bug? */
 	state->only_v6= !!only_v6;
+	
+	if (do_eetim)
+		state->etim= 2;
+	else if (do_etim)
+		state->etim= 1;
+	else
+		state->etim= 0;
+
 
 	//evtimer_assign(&state->timer, state->base->event_base,
 	//	timeout_callback, state);
@@ -600,6 +626,10 @@ static void report(struct hgstate *state)
 	char line[160];
 
 	//event_del(&state->timer);
+
+	/* End of readtiming */
+	if (state->etim >= 2 && state->readstate != READ_FIRST)
+		add_str(state, " ], ");
 
 	state->subid++;
 
@@ -694,6 +724,17 @@ static void report(struct hgstate *state)
 			state->headers_size,
 			state->content_offset);
 		add_str(state, line);
+		if (state->etim >= 1)
+		{
+			snprintf(line, sizeof(line),
+				", " DBQ(ttr) ":%f"
+				", " DBQ(ttc) ":%f"
+				", " DBQ(ttfb) ":%f",
+				state->ttr,
+				state->ttc,
+				state->ttfb);
+			add_str(state, line);
+		}
 	}
 
 	if (!state->dnserr)
@@ -744,6 +785,9 @@ static void report(struct hgstate *state)
 static int get_input(struct hgstate *state)
 {
 	int n;
+	double t;
+	struct timeval endtime;
+	char line[80];
 
 	/* Assume that we always end up with a full buffer anyway */
 	if (state->linemax == 0)
@@ -774,12 +818,27 @@ static int get_input(struct hgstate *state)
 		return -1;	/* We cannot get more data */
 	}
 
+	if (state->etim >= 2 && state->report_roffset)
+	{
+		gettimeofday(&endtime, NULL);
+		t= (endtime.tv_sec-state->start.tv_sec)*1e3 +
+			(endtime.tv_usec-state->start.tv_usec)/1e3;
+		if (state->roffset != 0)
+			add_str(state, ",");
+		snprintf(line, sizeof(line),
+			" { " DBQ(o) ":" DBQ(%d)
+			", " DBQ(t) ": %f }", state->roffset, t);
+		add_str(state, line);
+		state->report_roffset= 0;
+	}
+
 	n= bufferevent_read(state->bev,
 		&state->line[state->linelen],
 		state->linemax-state->linelen);
 	if (n < 0)
 		return -1;
 	state->linelen += n;
+	state->roffset += n;
 	return 0;
 }
 
@@ -874,10 +933,21 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
 	state= ENV2STATE(ptr);
 
+	state->report_roffset= 1;
 	for (;;)
 	{
 		switch(state->readstate)
 		{
+		case READ_FIRST:
+			gettimeofday(&endtime, NULL);
+			state->ttfb= (endtime.tv_sec-
+				state->start.tv_sec)*1e3 +
+				(endtime.tv_usec-state->start.tv_usec)/1e3;
+			state->readstate= READ_STATUS;
+			state->roffset= 0;
+			if (state->etim >= 2)
+				add_str(state, DBQ(readtiming) ": [");
+			continue;
 		case READ_STATUS:
 		case READ_HEADER:
 		case READ_CHUNKED:
@@ -1435,6 +1505,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 	struct evbuffer *output;
 	off_t cLength;
 	struct stat sb;
+	struct timeval endtime;
 
 	state= ENV2STATE(ptr);
 
@@ -1442,6 +1513,13 @@ static void writecb(struct bufferevent *bev, void *ptr)
 	{
 		switch(state->writestate)
 		{
+		case WRITE_FIRST:
+			gettimeofday(&endtime, NULL);
+			state->ttc= (endtime.tv_sec-
+				state->start.tv_sec)*1e3 +
+				(endtime.tv_usec-state->start.tv_usec)/1e3;
+			state->writestate= WRITE_HEADER;
+			continue;
 		case WRITE_HEADER:
 			output= bufferevent_get_output(bev);
 			evbuffer_add_printf(output, "%s %s HTTP/1.%c\r\n",
@@ -1593,6 +1671,7 @@ static void beforeconnect(struct tu_env *env,
 	struct sockaddr *addr, socklen_t addrlen)
 {
 	struct hgstate *state;
+	struct timeval endtime;
 
 	state= ENV2STATE(env);
 
@@ -1600,8 +1679,8 @@ static void beforeconnect(struct tu_env *env,
 	memcpy(&state->sin6, addr, state->socklen);
 
 	state->connecting= 1;
-	state->readstate= READ_STATUS;
-	state->writestate= WRITE_HEADER;
+	state->readstate= READ_FIRST;
+	state->writestate= WRITE_FIRST;
 
 	state->linelen= 0;
 	state->lineoffset= 0;
@@ -1614,6 +1693,13 @@ static void beforeconnect(struct tu_env *env,
 
 	add_str(state, "{ ");
 
+	if (state->first_connect)
+	{
+		gettimeofday(&endtime, NULL);
+		state->ttr= (endtime.tv_sec-state->start.tv_sec)*1e3 +
+			(endtime.tv_usec-state->start.tv_usec)/1e3;
+		state->first_connect= 0;
+	}
 	gettimeofday(&state->start, NULL);
 }
 
@@ -1698,6 +1784,8 @@ static void httpget_start(void *state)
 	hgstate->readstate= READ_STATUS;
 	hgstate->writestate= WRITE_HEADER;
 	hgstate->gstart= time(NULL);
+	gettimeofday(&hgstate->start, NULL);
+	hgstate->first_connect= 1;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
