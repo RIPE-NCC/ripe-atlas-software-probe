@@ -39,6 +39,7 @@ static struct option longopts[]=
 	{ "post-file",	required_argument, NULL, 'p' },
 	{ "post-header", required_argument, NULL, 'h' },
 	{ "post-footer", required_argument, NULL, 'f' },
+	{ "read-limit",	required_argument, NULL, 'r' },
 	{ "store-headers", required_argument, NULL, 'H' },
 	{ "store-body",	required_argument, NULL, 'B' },
 	{ "user-agent",	required_argument, NULL, 'u' },
@@ -87,6 +88,7 @@ struct hgstate
 	int max_headers;
 	int max_body;
 	int etim;
+	size_t read_limit;
 
 	/* State */
 	char busy;
@@ -120,6 +122,7 @@ struct hgstate
 	int roffset;
 	int report_roffset;
 	int first_connect;
+	int read_truncated;
 	FILE *post_fh;
 	char *post_buf;
 
@@ -140,6 +143,10 @@ struct hgstate
 	char *result;
 	size_t reslen;
 	size_t resmax;
+
+	char *result2;
+	size_t reslen2;
+	size_t resmax2;
 };
 
 static struct hgbase *hg_base;
@@ -147,6 +154,7 @@ static struct hgbase *hg_base;
 static void report(struct hgstate *state);
 static void add_str(struct hgstate *state, const char *str);
 static void add_str_quoted(struct hgstate *state, char *str);
+static void add_str2(struct hgstate *state, const char *str);
 
 static struct hgbase *httpget_base_new(struct event_base *event_base)
 {
@@ -353,10 +361,10 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	int c, i, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
 		do_all, do_http10, do_etim, do_eetim;
-	size_t newsiz;
+	size_t newsiz, read_limit;
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
-		*A_arg, *store_headers, *store_body;
+		*A_arg, *store_headers, *store_body, *read_limit_str;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
@@ -375,6 +383,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	output_file= NULL;
 	store_headers= NULL;
 	store_body= NULL;
+	read_limit_str= NULL;
 	A_arg= NULL;
 	only_v4= 0;
 	only_v6= 0;
@@ -402,48 +411,6 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		case '1':
 			do_http10= 0;
 			break;
-		case 'a':				/* --all */
-			do_all= 1;
-			break;
-		case 'A':
-			A_arg= optarg;
-			break;
-		case 'c':				/* --combine */
-			do_combine= 1;
-			break;
-		case 'O':
-			output_file= optarg;
-			break;
-		case 'g':				/* --get */
-			do_get = 1;
-			do_head = 0;
-			do_post = 0;
-			break;
-		case 'E':				/* --head */
-			do_get = 0;
-			do_head = 1;
-			do_post = 0;
-			break;
-		case 'P':				/* --post */
-			do_get = 0;
-			do_head = 0;
-			do_post = 1;
-			break;
-		case 'h':				/* --post-header */
-			post_header= optarg;
-			break;
-		case 'f':				/* --post-footer */
-			post_footer= optarg;
-			break;
-		case 'p':				/* --post-file */
-			post_file= optarg;
-			break;
-		case 'H':				/* --store-headers */
-			store_headers= optarg;
-			break;
-		case 'B':				/* --store-body */
-			store_body= optarg;
-			break;
 		case '4':
 			only_v4= 1;
 			only_v6= 0;
@@ -452,11 +419,56 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			only_v6= 1;
 			only_v4= 0;
 			break;
-		case 't':
-			do_etim= 1;
+		case 'A':
+			A_arg= optarg;
+			break;
+		case 'a':				/* --all */
+			do_all= 1;
+			break;
+		case 'B':				/* --store-body */
+			store_body= optarg;
+			break;
+		case 'c':				/* --combine */
+			do_combine= 1;
+			break;
+		case 'E':				/* --head */
+			do_get = 0;
+			do_head = 1;
+			do_post = 0;
+			break;
+		case 'g':				/* --get */
+			do_get = 1;
+			do_head = 0;
+			do_post = 0;
+			break;
+		case 'f':				/* --post-footer */
+			post_footer= optarg;
+			break;
+		case 'H':				/* --store-headers */
+			store_headers= optarg;
+			break;
+		case 'h':				/* --post-header */
+			post_header= optarg;
+			break;
+		case 'O':
+			output_file= optarg;
+			break;
+		case 'P':				/* --post */
+			do_get = 0;
+			do_head = 0;
+			do_post = 1;
+			break;
+		case 'p':				/* --post-file */
+			post_file= optarg;
+			break;
+		case 'r':
+			read_limit_str= optarg;		/* --read-limit */
 			break;
 		case 'T':
 			do_eetim= 1;
+			break;
+		case 't':
+			do_etim= 1;
 			break;
 		case 'u':				/* --user-agent */
 			user_agent= optarg;
@@ -543,6 +555,19 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+	read_limit= 0;
+	if (read_limit_str)
+	{
+		read_limit= strtoul(read_limit_str, &check, 10);
+		if (check[0] != '\0')
+		{
+			crondlog(LVL8
+				"unable to parse argument (--read-limit) '%s'",
+				read_limit_str);
+			return NULL;
+		}
+	}
+
 	if (!parse_url(url, &host, &port, &hostport, &path))
 	{
 		/* Do we need to report an error? */
@@ -574,6 +599,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->user_agent= user_agent ? strdup(user_agent) : NULL;
 	state->max_headers= max_headers;
 	state->max_body= max_body;
+	state->read_limit= read_limit;
 
 	state->only_v4= 2;
 
@@ -626,10 +652,6 @@ static void report(struct hgstate *state)
 	char line[160];
 
 	//event_del(&state->timer);
-
-	/* End of readtiming */
-	if (state->etim >= 2 && state->readstate != READ_FIRST)
-		add_str(state, " ], ");
 
 	state->subid++;
 
@@ -689,12 +711,26 @@ static void report(struct hgstate *state)
 			state->sin6.sin6_family == AF_INET6 ? 6 : 4);
 		add_str(state, line);
 
+		if (state->read_truncated)
+			add_str(state, ", " DBQ(read-truncated) ": True");
+
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
 		snprintf(line, sizeof(line), ", " DBQ(dst_addr) ":" DBQ(%s),
 			namebuf);
 		add_str(state, line);
+
+		/* End of readtiming */
+		if (state->etim >= 2)
+		{
+			add_str2(state, " ]");
+			add_str(state, state->result2);
+			free(state->result2);
+			state->result2= NULL;
+			state->resmax2= 0;
+			state->reslen2= 0;
+		}
 	}
 
 	if (!state->connecting && !state->dnserr)
@@ -824,11 +860,11 @@ static int get_input(struct hgstate *state)
 		t= (endtime.tv_sec-state->start.tv_sec)*1e3 +
 			(endtime.tv_usec-state->start.tv_usec)/1e3;
 		if (state->roffset != 0)
-			add_str(state, ",");
+			add_str2(state, ",");
 		snprintf(line, sizeof(line),
 			" { " DBQ(o) ":" DBQ(%d)
 			", " DBQ(t) ": %f }", state->roffset, t);
-		add_str(state, line);
+		add_str2(state, line);
 		state->report_roffset= 0;
 	}
 
@@ -892,9 +928,24 @@ static void add_str_quoted(struct hgstate *state, char *str)
 	}
 }
 
+static void add_str2(struct hgstate *state, const char *str)
+{
+	size_t len;
+
+	len= strlen(str);
+	if (state->reslen2 + len+1 > state->resmax2)
+	{
+		state->resmax2= state->reslen2 + len+1 + 80;
+		state->result2= xrealloc(state->result2, state->resmax2);
+	}
+	memcpy(state->result2+state->reslen2, str, len+1);
+	state->reslen2 += len;
+}
+
 static void err_status(struct hgstate *state, const char *reason)
 {
 	char line[80];
+
 	snprintf(line, sizeof(line),
 		DBQ(err) ":" DBQ(bad status line: %s) ", ", 
 		reason);
@@ -905,6 +956,7 @@ static void err_status(struct hgstate *state, const char *reason)
 static void err_header(struct hgstate *state, const char *reason)
 {
 	char line[80];
+
 	if (state->max_headers != 0)
 		add_str(state, " ], ");
 	snprintf(line, sizeof(line),
@@ -936,6 +988,24 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	state->report_roffset= 1;
 	for (;;)
 	{
+		if (state->read_limit > 0 &&
+			state->roffset >= state->read_limit)
+		{
+			state->read_truncated= 1;
+			switch(state->readstate)
+			{
+			case READ_FIRST:
+			case READ_STATUS:
+				err_status(state, "read truncated");
+				return;
+			case READ_HEADER:
+				err_header(state, "read truncated");
+				return;
+			default:
+				state->readstate= READ_DONE;
+				break;
+			}
+		}
 		switch(state->readstate)
 		{
 		case READ_FIRST:
@@ -946,7 +1016,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			state->readstate= READ_STATUS;
 			state->roffset= 0;
 			if (state->etim >= 2)
-				add_str(state, DBQ(readtiming) ": [");
+				add_str2(state, ", " DBQ(readtiming) ": [");
 			continue;
 		case READ_STATUS:
 		case READ_HEADER:
@@ -1686,6 +1756,8 @@ static void beforeconnect(struct tu_env *env,
 	state->lineoffset= 0;
 	state->headers_size= 0;
 	state->tot_headers= 0;
+	state->roffset= 0;
+	state->read_truncated= 0;
 
 	/* Clear result */
 	if (!state->do_all || !state->do_combine)
