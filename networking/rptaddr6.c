@@ -175,7 +175,7 @@ static int setup_ipv6_rpt(char *cache_name, int *need_report)
 				snprintf(Scope, sizeof(Scope), "Compat");
 				break;
 			case IPV6_ADDR_LOOPBACK:
-				snprintf(Scope, sizeof(Scope), "ost");
+				snprintf(Scope, sizeof(Scope), "Host");
 				break;
 			default:
 				snprintf(Scope, sizeof(Scope), "Unknown %d", scope);
