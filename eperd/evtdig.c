@@ -1763,15 +1763,21 @@ void printErrorQuick (struct query_state *qry)
 		fh = stdout;
 
 	fprintf(fh, "RESULT { ");
-	if(qry->str_Atlas) 
-	{
-		JS(id,  qry->str_Atlas);
-	}
+
+	JS(id,  9202);
 	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
 
-	snprintf(line, DEFAULT_LINE_LENGTH, "\"query busy\": \"too frequent. previous one is not done yet\"");
-	fprintf(fh, "\"error\" : { %s }" , line);
+	snprintf(line, DEFAULT_LINE_LENGTH, "\"query busy\": \"too frequent."
+			"previous one is not done yet\"");
+	fprintf(fh, "\"error\" : [{ %s }" , line);
+	if(qry->str_Atlas)
+	{
+		fprintf(fh, ",{" , line);
+		JS_NC(id,  qry->str_Atlas);
+		fprintf(fh, "}" , line);
+	}
+	fprintf(fh, "]");
 
 	fprintf(fh, " }");
 	fprintf(fh, "\n");
