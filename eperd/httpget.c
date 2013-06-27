@@ -19,7 +19,7 @@
 #define SAFE_PREFIX_IN ATLAS_DATA_OUT
 #define SAFE_PREFIX_OUT ATLAS_DATA_NEW
 
-#define CONN_TO		   5
+#define CONN_TO		   5000		/* Timeout in milliseconds */
 
 #define ENV2STATE(env) \
 	((struct hgstate *)((char *)env - offsetof(struct hgstate, tu_env)))
@@ -43,6 +43,7 @@ static struct option longopts[]=
 	{ "store-headers", required_argument, NULL, 'H' },
 	{ "store-body",	required_argument, NULL, 'B' },
 	{ "user-agent",	required_argument, NULL, 'u' },
+	{ "timeout",	required_argument, NULL, 'S' },
 	{ "etim",	no_argument, NULL, 't' },
 	{ "eetim",	no_argument, NULL, 'T' },
 	{ NULL, }
@@ -89,6 +90,7 @@ struct hgstate
 	int max_body;
 	int etim;
 	size_t read_limit;
+	unsigned timeout;
 
 	/* State */
 	char busy;
@@ -362,9 +364,11 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		max_headers, max_body, only_v4, only_v6,
 		do_all, do_http10, do_etim, do_eetim;
 	size_t newsiz, read_limit;
+	unsigned timeout;
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
-		*A_arg, *store_headers, *store_body, *read_limit_str;
+		*A_arg, *store_headers, *store_body, *read_limit_str,
+		*timeout_str;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
@@ -384,6 +388,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	store_headers= NULL;
 	store_body= NULL;
 	read_limit_str= NULL;
+	timeout_str= NULL;
 	A_arg= NULL;
 	only_v4= 0;
 	only_v6= 0;
@@ -464,11 +469,14 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		case 'r':
 			read_limit_str= optarg;		/* --read-limit */
 			break;
-		case 'T':
+		case 'T':				/* --etim */
 			do_eetim= 1;
 			break;
-		case 't':
+		case 't':				/* --etim */
 			do_etim= 1;
+			break;
+		case 'S':
+			timeout_str= optarg;		/* --timeout */
 			break;
 		case 'u':				/* --user-agent */
 			user_agent= optarg;
@@ -568,6 +576,19 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+	timeout= CONN_TO;
+	if (timeout_str)
+	{
+		timeout= strtoul(timeout_str, &check, 10);
+		if (check[0] != '\0')
+		{
+			crondlog(LVL8
+				"unable to parse argument (--timeout) '%s'",
+				timeout_str);
+			return NULL;
+		}
+	}
+
 	if (!parse_url(url, &host, &port, &hostport, &path))
 	{
 		/* Do we need to report an error? */
@@ -600,6 +621,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->max_headers= max_headers;
 	state->max_body= max_body;
 	state->read_limit= read_limit;
+	state->timeout= timeout;
 
 	state->only_v4= 2;
 
@@ -813,9 +835,9 @@ static void report(struct hgstate *state)
 
 	tu_cleanup(&state->tu_env);
 
+	state->busy= 0;
 	if (state->base->done)
 		state->base->done(state);
-	state->busy= 0;
 }
 
 static int get_input(struct hgstate *state)
@@ -935,7 +957,7 @@ static void add_str2(struct hgstate *state, const char *str)
 	len= strlen(str);
 	if (state->reslen2 + len+1 > state->resmax2)
 	{
-		state->resmax2= state->reslen2 + len+1 + 80;
+		state->resmax2= 2*state->reslen2 + len+1 + 80;
 		state->result2= xrealloc(state->result2, state->resmax2);
 	}
 	memcpy(state->result2+state->reslen2, str, len+1);
@@ -1865,8 +1887,8 @@ static void httpget_start(void *state)
 		hints.ai_family= AF_INET;
 	else if (hgstate->only_v6)
 		hints.ai_family= AF_INET6;
-	interval.tv_sec= CONN_TO;
-	interval.tv_usec= 0;
+	interval.tv_sec= hgstate->timeout / 1000;
+	interval.tv_usec= (hgstate->timeout % 1000) * 1000;
 	tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->port,
 		&interval, &hints, timeout_callback,
 		reporterr, dnscount, beforeconnect,
