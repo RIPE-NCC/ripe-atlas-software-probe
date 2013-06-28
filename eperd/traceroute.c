@@ -689,14 +689,15 @@ static void send_pkt(struct trtstate *state)
 			/* Set port */
 			if (state->parismod)
 			{
-				((struct sockaddr_in *)&state->sin6)->sin_port=
-					htons(BASE_PORT +
+				((struct sockaddr_in *)&state->loc_sin6)->
+					sin_port= htons(SRC_BASE_PORT +
 					(state->paris % state->parismod));
 			}
 			else
 			{
-				((struct sockaddr_in *)&state->sin6)->sin_port=
-					htons(BASE_PORT + state->seq);
+				((struct sockaddr_in *)&state->loc_sin6)->
+					sin_port= htons(SRC_BASE_PORT +
+					state->seq);
 			}
 
 			tcphdr= (struct tcphdr *)base->packet;
@@ -704,7 +705,7 @@ static void send_pkt(struct trtstate *state)
 
 			len= sizeof(*tcphdr);
 
-			tcphdr->seq= htonl(state->seq);
+			tcphdr->seq= htonl((state->index) << 16 | state->seq);
 			tcphdr->doff= len / 4;
 			tcphdr->syn= 1;
 
@@ -1137,7 +1138,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 	struct trtbase *base;
 	struct trtstate *state;
 	int hlen, ehlen, ind, nextmtu, late, isDup, icmp_prefixlen, offset;
-	unsigned seq;
+	unsigned seq, srcport;
 	ssize_t nrecv;
 	socklen_t slen;
 	struct ip *ip, *eip;
@@ -1204,9 +1205,22 @@ static void ready_callback4(int __attribute((unused)) unused,
 			/* ICMP only guarantees 8 bytes! */
 			etcp= (struct tcphdr *)((char *)eip+ehlen);
 
-			/* We store the id in the source port.
+			/* Quick check if the source port is in range */
+			srcport= ntohs(etcp->source);
+			if (srcport < SRC_BASE_PORT ||
+				srcport > SRC_BASE_PORT+256)
+			{
+				printf(
+	"ready_callback4: unknown TCP port in ICMP: %d\n", srcport);
+				return;	/* Not for us */
+			}
+
+			/* We store the id in high order 16 bits of the
+			 * sequence number
 			 */
-			ind= ntohs(etcp->source) - SRC_BASE_PORT;
+			ind= ntohl(etcp->seq) >> 16;
+
+			printf("ready_callback4: index %d\n", ind);
 
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
@@ -1219,7 +1233,9 @@ static void ready_callback4(int __attribute((unused)) unused,
 			if (!state)
 			{
 				/* Nothing here */
-				// printf("ready_callback4: no state\n");
+				printf(
+				"ready_callback4: no state for ind %d\n",
+					ind);
 				return;
 			}
 
@@ -1245,7 +1261,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			isDup= 0;
 
 			/* Sequence number is in seq field */
-			seq= ntohl(etcp->seq);
+			seq= ntohl(etcp->seq) & 0xffff;
 
 			if (seq != state->seq)
 			{
@@ -2060,8 +2076,15 @@ static void ready_tcp4(int __attribute((unused)) unused,
 
 	tcphdr= (struct tcphdr *)(base->packet+hlen);
 
+	/* Quick check if the port is in range */
 	myport= ntohs(tcphdr->dest);
-	ind= myport-SRC_BASE_PORT;
+	if (myport < SRC_BASE_PORT || myport > SRC_BASE_PORT+256)
+	{
+		return;	/* Not for us */
+	}
+
+	/* We store the id in high order 16 bits of the sequence number */
+	ind= ntohl(tcphdr->ack_seq) >> 16;
 
 	state= NULL;
 	if (ind >= 0 && ind < base->tabsiz)
@@ -2074,12 +2097,12 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	if (!state)
 	{
 		/* Nothing here */
-		// printf("ready_callback4: no state\n");
+		printf("ready_tcp4: no state for index %d\n", ind);
 		return;
 	}
 
-	printf("ready_tcp4: source port %d, dest port %d\n",
-		ntohs(tcphdr->source), ntohs(tcphdr->dest));
+	printf("ready_tcp4: source port %d, dest port %d, index %d\n",
+		ntohs(tcphdr->source), ntohs(tcphdr->dest), ind);
 
 	if (!state->busy)
 	{
@@ -2094,8 +2117,8 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	isDup= 0;
 
 	/* Only check if the ack is without 64k of what we expect */
-	seq= ntohl(tcphdr->ack_seq);
-	if (seq-state->seq > 0x10000)
+	seq= ntohl(tcphdr->ack_seq) & 0xffff;
+	if (seq-state->seq > 0x2000)
 	{
 printf("got seq %d, expected %d\n", seq, state->seq);
 		if (seq > state->seq)
