@@ -64,6 +64,7 @@ struct trtbase
 	int v4icmp_snd;
 	int v6icmp_snd;
 	int v4tcp_rcv;
+	int v6tcp_rcv;
 	int v4udp_snd;
 
 	int my_pid;
@@ -71,6 +72,7 @@ struct trtbase
 	struct event event4;
 	struct event tcp_event4;
 	struct event event6;
+	struct event tcp_event6;
 
 	struct trtstate **table;
 	int tabsiz;
@@ -388,6 +390,7 @@ static void send_pkt(struct trtstate *state)
 	struct v6_ph v6_ph;
 	struct udphdr udp;
 	struct timeval interval;
+	struct sockaddr_in6 sin6copy;
 	char line[80];
 	char id[]= "http://atlas.ripe.net Randy Bush, Atlas says Hi!";
 
@@ -441,7 +444,129 @@ static void send_pkt(struct trtstate *state)
 	{
 		hop= state->hop;
 
-		if (state->do_Xicmp)
+		if (state->do_tcp)
+		{
+			sock= socket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
+			if (sock == -1)
+			{
+				crondlog(DIE9 "socket failed");
+			}
+
+			on= 1;
+			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
+				sizeof(on));
+
+			/* Bind to source addr/port */
+			r= bind(sock,
+				(struct sockaddr *)&state->loc_sin6,
+				state->loc_socklen);
+			if (r == -1)
+			{
+				serrno= errno;
+
+				snprintf(line, sizeof(line),
+		"%s{ " DBQ(error) ":" DBQ(bind failed: %s) " } ] }",
+					state->sent ? " }, " : "",
+					strerror(serrno));
+				add_str(state, line);
+				report(state);
+				close(sock);
+				return;
+			}
+
+			/* Set port */
+			if (state->parismod)
+			{
+				state->sin6.sin6_port= htons(SRC_BASE_PORT +
+                                        (state->paris % state->parismod));
+			}
+			else
+			{
+				state->sin6.sin6_port=
+					htons(SRC_BASE_PORT +
+                                        state->seq);
+			}
+
+			tcphdr= (struct tcphdr *)base->packet;
+			memset(tcphdr, '\0', sizeof(*tcphdr));
+
+			len= sizeof(*tcphdr);
+
+			tcphdr->seq= htonl((state->index) << 16 | state->seq);
+			tcphdr->doff= len / 4;
+			tcphdr->syn= 1;
+
+			if (state->curpacksize < len)
+				state->curpacksize= len;
+			if (state->curpacksize > len)
+			{
+				memset(&base->packet[len], '\0',
+					state->curpacksize-len);
+				strcpy((char *)&base->packet[len], id);
+				len= state->curpacksize;
+			}
+
+			{
+				int  offset = 2;
+				setsockopt(sock, IPPROTO_IPV6, IPV6_CHECKSUM,
+					&offset, sizeof(offset));
+			}
+
+			memset(&v6_ph, '\0', sizeof(v6_ph));
+			v6_ph.src= state->loc_sin6.sin6_addr;
+			v6_ph.dst= state->sin6.sin6_addr;
+			v6_ph.len= htonl(len);
+			v6_ph.nxt= IPPROTO_TCP;
+			tcphdr->source= state->loc_sin6.sin6_port;
+			tcphdr->dest= state->sin6.sin6_port;
+			tcphdr->dest= htons(80);
+			tcphdr->uh_sum= 0;
+
+			sum= in_cksum_icmp6(&v6_ph, 
+				(unsigned short *)base->packet, len);
+			
+			tcphdr->check= sum;
+
+			/* Set hop count */
+			setsockopt(sock, SOL_IPV6, IPV6_UNICAST_HOPS,
+				&hop, sizeof(hop));
+
+			/* Set/clear don't fragment */
+			on= (state->dont_fragment ? IPV6_PMTUDISC_DO :
+				IPV6_PMTUDISC_DONT);
+			setsockopt(sock, IPPROTO_IPV6,
+					IPV6_MTU_DISCOVER, &on, sizeof(on));
+
+			sin6copy= state->sin6;
+			sin6copy.sin6_port= 0;
+			r= sendto(sock, base->packet, len, 0,
+				(struct sockaddr *)&sin6copy,
+				state->socklen);
+
+#if 0
+ { static int doit=1; if (doit && r != -1)
+ 	{ errno= ENOSYS; r= -1; } doit= !doit; }
+#endif
+			serrno= errno;
+			close(sock);
+
+			if (r == -1)
+			{
+				if (serrno != EACCES &&
+					serrno != ECONNREFUSED &&
+					serrno != EMSGSIZE)
+				{
+					snprintf(line, sizeof(line),
+			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s) " } ] }",
+						state->sent ? " }, " : "",
+						strerror(serrno));
+					add_str(state, line);
+					report(state);
+					return;
+				}
+			}
+		}
+		else if (state->do_Xicmp)
 		{
 			/* Set hop count */
 			setsockopt(base->v6icmp_snd, SOL_IPV6,
@@ -2188,18 +2313,197 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	return;
 }
 
+static void ready_tcp6(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s)
+{
+	uint16_t myport;
+	int late, isDup, rcvdttl;
+	unsigned ind, seq;
+	ssize_t nrecv;
+	struct trtbase *base;
+	struct trtstate *state;
+	double ms;
+	struct tcphdr *tcphdr;
+	struct cmsghdr *cmsgptr;
+	struct msghdr msg;
+	struct iovec iov[1];
+	struct sockaddr_in6 remote;
+	struct in6_addr dstaddr;
+	struct timeval now;
+	struct timeval interval;
+	char buf[INET6_ADDRSTRLEN];
+	char line[80];
+	char cmsgbuf[256];
+
+	gettimeofday(&now, NULL);
+
+	printf("in ready_tcp6\n");
+
+	base= s;
+
+	iov[0].iov_base= base->packet;
+	iov[0].iov_len= sizeof(base->packet);
+	msg.msg_name= &remote;
+	msg.msg_namelen= sizeof(remote);
+	msg.msg_iov= iov;
+	msg.msg_iovlen= 1;
+	msg.msg_control= cmsgbuf;
+	msg.msg_controllen= sizeof(cmsgbuf);
+	msg.msg_flags= 0;			/* Not really needed */
+
+	nrecv= recvmsg(base->v6tcp_rcv, &msg, MSG_DONTWAIT);
+	if (nrecv == -1)
+	{
+		/* Strange, read error */
+		printf("ready_tcp6: read error '%s'\n", strerror(errno));
+		return;
+	}
+
+	rcvdttl= -42;	/* To spot problems */
+	memset(&dstaddr, '\0', sizeof(dstaddr));
+	for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
+		cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
+	{
+		if (cmsgptr->cmsg_len == 0)
+			break;	/* Can this happen? */
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			cmsgptr->cmsg_type == IPV6_HOPLIMIT)
+		{
+			rcvdttl= *(int *)CMSG_DATA(cmsgptr);
+		}
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			cmsgptr->cmsg_type == IPV6_PKTINFO)
+		{
+			dstaddr= ((struct in6_pktinfo *)
+				CMSG_DATA(cmsgptr))->ipi6_addr;
+		}
+	}
+
+	tcphdr= (struct tcphdr *)(base->packet);
+
+	/* Quick check if the port is in range */
+	myport= ntohs(tcphdr->dest);
+	if (myport < SRC_BASE_PORT || myport > SRC_BASE_PORT+256)
+	{
+		return;	/* Not for us */
+	}
+
+	/* We store the id in high order 16 bits of the sequence number */
+	ind= ntohl(tcphdr->ack_seq) >> 16;
+
+	state= NULL;
+	if (ind >= 0 && ind < base->tabsiz)
+		state= base->table[ind];
+	if (state && state->sin6.sin6_family != AF_INET6)
+		state= NULL;
+	if (state && !state->do_tcp)
+		state= NULL;	
+
+	if (!state)
+	{
+		/* Nothing here */
+		printf("ready_tcp6: no state for index %d\n", ind);
+		return;
+	}
+
+	printf("ready_tcp6: source port %d, dest port %d, index %d\n",
+		ntohs(tcphdr->source), ntohs(tcphdr->dest), ind);
+
+	if (!state->busy)
+	{
+printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
+		printf("ready_tcp6: index (%d) is not busy\n", ind);
+		return;
+	}
+
+	late= 0;
+	isDup= 0;
+
+	/* Only check if the ack is within 64k of what we expect */
+	seq= ntohl(tcphdr->ack_seq) & 0xffff;
+	if (seq-state->seq > 0x2000)
+	{
+printf("got seq %d, expected %d\n", seq, state->seq);
+		if (seq > state->seq)
+		{
+#if 0
+			printf(
+"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x, for %s\n",
+				seq, state->seq, state->hostname);
+#endif
+			return;
+		}
+		late= 1;
+
+		snprintf(line, sizeof(line), "\"late\":%d",
+			state->seq-seq);
+		add_str(state, line);
+	}
+	else if (state->gotresp)
+	{
+		isDup= 1;
+		add_str(state, " }, { \"dup\":true");
+	}
+
+	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
+		(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+
+	snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+		(late || isDup) ? ", " : "",
+		inet_ntop(AF_INET6, &remote.sin6_addr, buf, sizeof(buf)));
+	add_str(state, line);
+	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
+		rcvdttl, (int)nrecv);
+	add_str(state, line);
+	if (!late)
+	{
+		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
+		add_str(state, line);
+	}
+
+#if 0
+	printf("ready_callback4: from %s, ttl %d",
+		inet_ntoa(remote.sin_addr), ip->ip_ttl);
+	printf(" for %s hop %d\n",
+		inet_ntoa(((struct sockaddr_in *)
+		&state->sin6)->sin_addr), state->hop);
+#endif
+
+	/* Done */
+	state->done= 1;
+
+	if (late)
+		add_str(state, " }, { ");
+
+	if (!late && !isDup)
+	{
+		if (state->duptimeout)
+		{
+			state->gotresp= 1;
+			interval.tv_sec= state->duptimeout/1000000;
+			interval.tv_usec= state->duptimeout % 1000000;
+			evtimer_add(&state->timer, &interval);
+		}
+		else
+			send_pkt(state);
+	}
+
+	return;
+}
+
 static void ready_callback6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	ssize_t nrecv;
 	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset;
 	unsigned nextmtu, seq;
-	size_t ehdrsiz, siz;
+	size_t ehdrsiz, v6info_siz, siz;
 	struct trtbase *base;
 	struct trtstate *state;
 	struct ip6_hdr *eip;
 	struct ip6_frag *frag;
 	struct icmp6_hdr *icmp, *eicmp;
+	struct tcphdr *etcp;
 	struct udphdr *eudp;
 	struct v6info *v6info;
 	struct cmsghdr *cmsgptr;
@@ -2284,8 +2588,9 @@ static void ready_callback6(int __attribute((unused)) unused,
 			return;
 		}
 
-		/* Make sure we have UDP or ICMP or a fragment header */
+		/* Make sure we have TCP, UDP, ICMP or a fragment header */
 		if (eip->ip6_nxt == IPPROTO_FRAGMENT ||
+			eip->ip6_nxt == IPPROTO_TCP ||
 			eip->ip6_nxt == IPPROTO_UDP ||
 			eip->ip6_nxt == IPPROTO_ICMPV6)
 		{
@@ -2319,7 +2624,13 @@ static void ready_callback6(int __attribute((unused)) unused,
 				nxt= frag->ip6f_nxt;
 			}
 
-			if (nxt == IPPROTO_UDP)
+			v6info_siz= sizeof(*v6info);
+			if (nxt == IPPROTO_TCP)
+			{
+				ehdrsiz += sizeof(*etcp);
+				v6info_siz= 0;
+			}
+			else if (nxt == IPPROTO_UDP)
 				ehdrsiz += sizeof(*eudp);
 			else
 				ehdrsiz += sizeof(*eicmp);
@@ -2328,7 +2639,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			 * packet.
 			 */
 			if (nrecv < sizeof(*icmp) + sizeof(*eip)
-				+ ehdrsiz + sizeof(*v6info))
+				+ ehdrsiz + v6info_siz)
 			{
 #if 0
 				printf(
@@ -2339,10 +2650,16 @@ static void ready_callback6(int __attribute((unused)) unused,
 				return;
 			}
 
+			etcp= NULL;
 			eudp= NULL;
 			eicmp= NULL;
+			v6info= NULL;
 			ptr= (frag ? (void *)&frag[1] : (void *)&eip[1]);
-			if (nxt == IPPROTO_UDP)
+			if (nxt == IPPROTO_TCP)
+			{
+				etcp= (struct tcphdr *)ptr;
+			}
+			else if (nxt == IPPROTO_UDP)
 			{
 				eudp= (struct udphdr *)ptr;
 				v6info= (struct v6info *)&eudp[1];
@@ -2361,13 +2678,23 @@ static void ready_callback6(int __attribute((unused)) unused,
 				ntohl(v6info->seq));
 #endif
 
-			if (ntohl(v6info->pid) != base->my_pid)
+			if (etcp)
 			{
-				/* From a different process */
-				return;
+				/* We store the id in high order 16 bits of the
+				 * sequence number
+				 */
+				ind= ntohl(etcp->seq) >> 16;
 			}
+			else
+			{
+				if (ntohl(v6info->pid) != base->my_pid)
+				{
+					/* From a different process */
+					return;
+				}
 
-			ind= ntohl(v6info->id);
+				ind= ntohl(v6info->id);
+			}
 
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
@@ -2378,7 +2705,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 			if (state)
 			{
-				if ((eudp && !state->do_udp) ||
+				if ((etcp && !state->do_tcp) ||
+					(eudp && !state->do_udp) ||
 					(eicmp && !state->do_Xicmp))
 				{
 					state= NULL;	
@@ -2411,15 +2739,23 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 			late= 0;
 			isDup= 0;
-			seq= ntohl(v6info->seq);
+			if (etcp)
+			{
+				/* Sequence number is in seq field */
+				seq= ntohl(etcp->seq) & 0xffff;
+			}
+			else
+				seq= ntohl(v6info->seq);
 			if (seq != state->seq)
 			{
 				if (seq > state->seq)
 				{
+#if 0
 					printf(
 	"ready_callback6: mismatch for seq, got 0x%x, expected 0x%x\n",
 						ntohl(v6info->seq),
 						state->seq);
+#endif
 					return;
 				}
 				late= 1;
@@ -2479,7 +2815,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 					(now.tv_usec-state->xmit_time.tv_usec)/
 					1e3;
 			}
-			else
+			else if (v6info)
 			{
 				ms= (now.tv_sec-v6info->tv.tv_sec)*1000 +
 					(now.tv_usec-v6info->tv.tv_usec)/
@@ -2809,6 +3145,7 @@ static struct trtbase *traceroute_base_new(struct event_base
 	base->v4icmp_snd= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	base->v6icmp_snd= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	base->v4tcp_rcv= xsocket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+	base->v6tcp_rcv= xsocket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
 	base->v4udp_snd= xsocket(AF_INET, SOCK_DGRAM, 0);
 
 	base->my_pid= getpid();
@@ -2820,6 +3157,9 @@ static struct trtbase *traceroute_base_new(struct event_base
 	on = 1;
 	setsockopt(base->v6icmp_rcv, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
 		&on, sizeof(on));
+	on = 1;
+	setsockopt(base->v6tcp_rcv, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
+		&on, sizeof(on));
 
 	event_assign(&base->event4, base->event_base, base->v4icmp_rcv,
 		EV_READ | EV_PERSIST, ready_callback4, base);
@@ -2827,9 +3167,12 @@ static struct trtbase *traceroute_base_new(struct event_base
 		EV_READ | EV_PERSIST, ready_tcp4, base);
 	event_assign(&base->event6, base->event_base, base->v6icmp_rcv,
 		EV_READ | EV_PERSIST, ready_callback6, base);
+	event_assign(&base->tcp_event6, base->event_base, base->v6tcp_rcv,
+		EV_READ | EV_PERSIST, ready_tcp6, base);
 	event_add(&base->event4, NULL);
 	event_add(&base->tcp_event4, NULL);
 	event_add(&base->event6, NULL);
+	event_add(&base->tcp_event6, NULL);
 
 	return base;
 }
