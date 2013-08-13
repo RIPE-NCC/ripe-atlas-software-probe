@@ -29,8 +29,6 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	void (*readcb)(struct bufferevent *bev, void *ptr),
 	void (*writecb)(struct bufferevent *bev, void *ptr))
 {
-	struct evdns_getaddrinfo_request *evdns_req;
-
 	env->interval= *interval;
 	env->reporterr= reporterr;
 	env->reportcount= reportcount;
@@ -46,8 +44,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 
 	env->dnsip= 1;
 	env->connecting= 0;
-	evdns_req= evdns_getaddrinfo(DnsBase, host, port,
-		hints, dns_cb, env);
+	(void) evdns_getaddrinfo(DnsBase, host, port, hints, dns_cb, env);
 }
 
 void tu_restart_connect(struct tu_env *env)

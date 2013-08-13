@@ -1174,7 +1174,6 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		add_str(state, line);
 		state->dnserr= 1;
 		report(state);
-		abort();
 		break;
 
 	case TU_READ_ERR:
