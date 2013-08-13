@@ -1764,7 +1764,7 @@ void printErrorQuick (struct query_state *qry)
 
 	fprintf(fh, "RESULT { ");
 
-	JS(id,  9202);
+	JS(id, "9202");
 	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
 
