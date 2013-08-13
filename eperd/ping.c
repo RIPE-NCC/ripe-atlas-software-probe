@@ -1219,7 +1219,6 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 static void ping_start(void *state)
 {
 	struct pingstate *pingstate;
-	struct evdns_getaddrinfo_request *evdns_req;
 	struct evutil_addrinfo hints;
 
 	pingstate= state;
@@ -1252,8 +1251,8 @@ static void ping_start(void *state)
 	hints.ai_family= pingstate->af;
 	printf("hostname '%s', family %d\n",
 		pingstate->hostname, hints.ai_family);
-	evdns_req= evdns_getaddrinfo(DnsBase, pingstate->hostname,
-		NULL, &hints, dns_cb, pingstate);
+	(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
+		&hints, dns_cb, pingstate);
 }
 
 static int ping_delete(void *state)
