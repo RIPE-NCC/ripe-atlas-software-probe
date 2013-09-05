@@ -267,7 +267,7 @@ static void ping_cb(int result, int bytes,
 {
 	struct pingstate *pingstate;
 	unsigned long usecs;
-	char namebuf[NI_MAXHOST];
+	char namebuf1[NI_MAXHOST], namebuf2[NI_MAXHOST];
 	char line[256];
 
 	(void)socklen;	/* Suppress GCC unused parameter warning */
@@ -334,14 +334,21 @@ static void ping_cb(int result, int bytes,
 			add_str(pingstate, line);
 			pingstate->ttl= ttl;
 		}
-		if (memcmp(&pingstate->loc_sin6, loc_sa, loc_socklen) != 0)
+		namebuf1[0]= '\0';
+		getnameinfo(&pingstate->loc_sin6, loc_socklen, namebuf1,
+			sizeof(namebuf1), NULL, 0, NI_NUMERICHOST);
+		namebuf2[0]= '\0';
+		getnameinfo(loc_sa, loc_socklen, namebuf2,
+			sizeof(namebuf2), NULL, 0, NI_NUMERICHOST);
+
+		if (strcmp(namebuf1, namebuf2) != 0)
 		{
-			namebuf[0]= '\0';
-			getnameinfo(loc_sa, loc_socklen, namebuf,
-				sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+			printf("loc_sin6: %s\n", namebuf1);
+
+			printf("loc_sa: %s\n", namebuf2);
 
 			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf2);
 			add_str(pingstate, line);
 		}
 
@@ -369,14 +376,14 @@ static void ping_cb(int result, int bytes,
 	{
 		if (pingstate->first && pingstate->loc_socklen != 0)
 		{
-			namebuf[0]= '\0';
+			namebuf1[0]= '\0';
 			getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
 				pingstate->loc_socklen,
-				namebuf, sizeof(namebuf),
+				namebuf1, sizeof(namebuf1),
 				NULL, 0, NI_NUMERICHOST);
 
 			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf1);
 			add_str(pingstate, line);
 		}
 		add_str(pingstate, " }");
