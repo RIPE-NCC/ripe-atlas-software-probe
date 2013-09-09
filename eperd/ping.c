@@ -481,7 +481,7 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 
 	/* Last, compute ICMP checksum */
 	icmp->icmp_cksum = 0;
-	icmp->icmp_cksum = mkcksum((u_short *) icmp, *sizep);  /* ones complement checksum of struct */
+	icmp->icmp_cksum = mkcksum((u_short *) icmp, ICMP_MINLEN + *sizep);  /* ones complement checksum of struct */
 }
 
 
@@ -541,6 +541,7 @@ static void ping_xmit(struct pingstate *host)
 	int nsent, fd4, fd6, t_errno, r;
 
 	host->send_error= 0;
+	host->got_reply= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
