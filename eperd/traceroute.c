@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrta:c:f:g:m:w:z:A:O:S:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:m:p:w:z:A:O:S:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -36,7 +36,9 @@
 #define OPT_U	(1 << 3)
 #define OPT_F	(1 << 4)
 #define OPT_r	(1 << 5)
-#define OPT_t	(1 << 6)
+#define OPT_T	(1 << 6)
+
+#define IPHDR              20
 
 #define BASE_PORT	(0x8000 + 666)
 #define SRC_BASE_PORT	(20480)
@@ -91,6 +93,7 @@ struct trtstate
 	/* Parameters */
 	char *atlas;
 	char *hostname;
+	char *destportstr;
 	char *out_filename;
 	char do_Xicmp;
 	char do_tcp;
@@ -474,19 +477,6 @@ static void send_pkt(struct trtstate *state)
 				return;
 			}
 
-			/* Set port */
-			if (state->parismod)
-			{
-				state->sin6.sin6_port= htons(SRC_BASE_PORT +
-                                        (state->paris % state->parismod));
-			}
-			else
-			{
-				state->sin6.sin6_port=
-					htons(SRC_BASE_PORT +
-                                        state->seq);
-			}
-
 			tcphdr= (struct tcphdr *)base->packet;
 			memset(tcphdr, '\0', sizeof(*tcphdr));
 
@@ -519,7 +509,6 @@ static void send_pkt(struct trtstate *state)
 			v6_ph.nxt= IPPROTO_TCP;
 			tcphdr->source= state->loc_sin6.sin6_port;
 			tcphdr->dest= state->sin6.sin6_port;
-			tcphdr->dest= htons(80);
 			tcphdr->uh_sum= 0;
 
 			sum= in_cksum_icmp6(&v6_ph, 
@@ -811,20 +800,6 @@ static void send_pkt(struct trtstate *state)
 
 			hop= state->hop;
 
-			/* Set port */
-			if (state->parismod)
-			{
-				((struct sockaddr_in *)&state->loc_sin6)->
-					sin_port= htons(SRC_BASE_PORT +
-					(state->paris % state->parismod));
-			}
-			else
-			{
-				((struct sockaddr_in *)&state->loc_sin6)->
-					sin_port= htons(SRC_BASE_PORT +
-					state->seq);
-			}
-
 			tcphdr= (struct tcphdr *)base->packet;
 			memset(tcphdr, '\0', sizeof(*tcphdr));
 
@@ -856,7 +831,6 @@ static void send_pkt(struct trtstate *state)
 				sin_port;
 			tcphdr->dest= ((struct sockaddr_in *)&state->sin6)->
 				sin_port;
-			tcphdr->dest= htons(80);
 			tcphdr->uh_sum= 0;
 
 			sum= in_cksum_udp(&v4_ph, NULL,
@@ -944,14 +918,14 @@ static void send_pkt(struct trtstate *state)
 
 			len= offsetof(struct icmp, icmp_data[2]);
 
-			if (state->curpacksize < len)
-				state->curpacksize= len;
-			if (state->curpacksize > len)
+			if (state->curpacksize+ICMP_MINLEN < len)
+				state->curpacksize= len-ICMP_MINLEN;
+			if (state->curpacksize+ICMP_MINLEN > len)
 			{
 				memset(&base->packet[len], '\0',
-					state->curpacksize-len);
+					state->curpacksize-ICMP_MINLEN-len);
 				strcpy((char *)&base->packet[len], id);
-				len= state->curpacksize;
+				len= state->curpacksize+ICMP_MINLEN;
 			}
 
 			if (state->parismod)
@@ -1345,8 +1319,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 			 */
 			ind= ntohl(etcp->seq) >> 16;
 
-			printf("ready_callback4: index %d\n", ind);
-
 			state= NULL;
 			if (ind >= 0 && ind < base->tabsiz)
 				state= base->table[ind];
@@ -1424,7 +1396,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			add_str(state, line);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"size\":%d",
-				ip->ip_ttl, (int)nrecv);
+				ip->ip_ttl, (int)nrecv - ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
@@ -1432,6 +1404,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 					ms);
 				add_str(state, line);
 			}
+
 			if (eip->ip_ttl != 1)
 			{
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
@@ -1851,9 +1824,10 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
+printf("nrecv=%d\n", nrecv);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"size\":%d",
-				ip->ip_ttl, (int)nrecv);
+				ip->ip_ttl, (int)nrecv-IPHDR-ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
@@ -2226,9 +2200,6 @@ static void ready_tcp4(int __attribute((unused)) unused,
 		return;
 	}
 
-	printf("ready_tcp4: source port %d, dest port %d, index %d\n",
-		ntohs(tcphdr->source), ntohs(tcphdr->dest), ind);
-
 	if (!state->busy)
 	{
 printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
@@ -2277,6 +2248,15 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
 		ip->ip_ttl, (int)nrecv);
 	add_str(state, line);
+	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
+		(tcphdr->fin ? "F" : ""),
+		(tcphdr->syn ? "S" : ""),
+		(tcphdr->rst ? "R" : ""),
+		(tcphdr->psh ? "P" : ""),
+		(tcphdr->ack ? "A" : ""),
+		(tcphdr->urg ? "U" : ""));
+	add_str(state, line);
+
 	if (!late)
 	{
 		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
@@ -2336,8 +2316,6 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	char cmsgbuf[256];
 
 	gettimeofday(&now, NULL);
-
-	printf("in ready_tcp6\n");
 
 	base= s;
 
@@ -2406,9 +2384,6 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		return;
 	}
 
-	printf("ready_tcp6: source port %d, dest port %d, index %d\n",
-		ntohs(tcphdr->source), ntohs(tcphdr->dest), ind);
-
 	if (!state->busy)
 	{
 printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
@@ -2454,6 +2429,14 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
 		rcvdttl, (int)nrecv);
+	add_str(state, line);
+	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
+		(tcphdr->fin ? "F" : ""),
+		(tcphdr->syn ? "S" : ""),
+		(tcphdr->rst ? "R" : ""),
+		(tcphdr->psh ? "P" : ""),
+		(tcphdr->ack ? "A" : ""),
+		(tcphdr->urg ? "U" : ""));
 	add_str(state, line);
 	if (!late)
 	{
@@ -3198,6 +3181,7 @@ static void noreply_callback(int __attribute((unused)) unused,
 static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state))
 {
+	uint16_t destport;
 	uint32_t opt;
 	int i, do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
@@ -3206,6 +3190,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	char *str_Atlas;
 	const char *hostname;
 	char *out_filename;
+	char *destportstr;
+	char *check;
 	struct trtstate *state;
 	sa_family_t af;
 	len_and_sockaddr *lsa;
@@ -3224,15 +3210,16 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	gaplimit= 5;
 	maxhops= 32;
 	maxpacksize= 40;
+	destportstr= "80";
 	duptimeout= 10;
 	timeout= 1000;
 	parismod= 16;
 	str_Atlas= NULL;
 	out_filename= NULL;
-	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+";
+	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:p:w+:z+:S+";
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
-		&firsthop, &gaplimit, &maxhops, &timeout, &duptimeout,
-		&str_Atlas, &out_filename, &maxpacksize);
+		&firsthop, &gaplimit, &maxhops, &destportstr, &timeout,
+		&duptimeout, &str_Atlas, &out_filename, &maxpacksize);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -3245,7 +3232,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	do_v6= !!(opt & OPT_6);
 	dont_fragment= !!(opt & OPT_F);
 	delay_name_res= !!(opt & OPT_r);
-	do_tcp= !!(opt & OPT_t);
+	do_tcp= !!(opt & OPT_T);
 	do_udp= !(do_icmp || do_tcp);
 	if (maxpacksize > sizeof(trt_base->packet))
 		maxpacksize= sizeof(trt_base->packet);
@@ -3280,7 +3267,10 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	{
 		/* Attempt to resolve 'name' */
 		af= do_v6 ? AF_INET6 : AF_INET;
-		lsa= host_and_af2sockaddr(hostname, 0, af);
+		destport= strtoul(destportstr, &check, 0);
+		if (check[0] != '\0' || destport == 0)
+			return NULL;
+		lsa= host_and_af2sockaddr(hostname, destport, af);
 		if (!lsa)
 			return NULL;
 
@@ -3304,6 +3294,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	state->maxpacksize= maxpacksize;
 	state->maxhops= maxhops;
 	state->gaplimit= gaplimit;
+	state->destportstr= destportstr;
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
@@ -3339,9 +3330,6 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	state->index= i;
 	trt_base->table[i]= state;
 	trt_base->done= done;
-
-	printf("traceroute_init: state %p, index %d\n",
-		state, state->index);
 
 	memset(&state->loc_sin6, '\0', sizeof(state->loc_sin6));
 	state->loc_socklen= 0;
@@ -3504,7 +3492,6 @@ static void traceroute_start2(void *state)
                         {
                                 crondlog(DIE9 "socket failed");
                         }
-printf("traceroute_start2: before bind\n");
 			r= bind(sock, (struct sockaddr *)&loc_sa6,
 				sizeof(loc_sa6));
 			if (r == -1)
@@ -3565,9 +3552,12 @@ printf("traceroute_start2: before bind\n");
 			loc_sa4.sin_port= htons(SRC_BASE_PORT +
 				trtstate->index);;
 
-			/* Also set destination port */
-			((struct sockaddr_in *)&trtstate->sin6)->
-				sin_port= htons(BASE_PORT);
+			if (!trtstate->do_tcp)
+			{
+				/* Also set destination port */
+				((struct sockaddr_in *)&trtstate->sin6)->
+					sin_port= htons(BASE_PORT);
+			}
 
 			sock= socket(AF_INET, SOCK_DGRAM, 0);
 			if (sock == -1)
@@ -3722,8 +3712,8 @@ static void traceroute_start(void *state)
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
 	trtstate->dnsip= 1;
-	(void) evdns_getaddrinfo(DnsBase, trtstate->hostname, NULL,
-	                &hints, dns_cb, trtstate);
+	(void) evdns_getaddrinfo(DnsBase, trtstate->hostname,
+		trtstate->destportstr, &hints, dns_cb, trtstate);
 }
 
 static int traceroute_delete(void *state)
