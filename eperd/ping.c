@@ -40,7 +40,9 @@ enum
  * default data size is calculated as to be like the original
  */
 #define IPHDR              20
-#define MAX_DATA_SIZE      (4096 - IPHDR - ICMP_MINLEN)
+#define MAX_DATA_SIZE      (4096 - IPHDR)
+
+#define ICMP6_HDRSIZE (offsetof(struct icmp6_hdr, icmp6_data16[2]))
 
 /* Error codes */
 #define PING_ERR_NONE      0
@@ -265,7 +267,7 @@ static void ping_cb(int result, int bytes,
 {
 	struct pingstate *pingstate;
 	unsigned long usecs;
-	char namebuf[NI_MAXHOST];
+	char namebuf1[NI_MAXHOST], namebuf2[NI_MAXHOST];
 	char line[256];
 
 	(void)socklen;	/* Suppress GCC unused parameter warning */
@@ -332,14 +334,21 @@ static void ping_cb(int result, int bytes,
 			add_str(pingstate, line);
 			pingstate->ttl= ttl;
 		}
-		if (memcmp(&pingstate->loc_sin6, loc_sa, loc_socklen) != 0)
+		namebuf1[0]= '\0';
+		getnameinfo(&pingstate->loc_sin6, loc_socklen, namebuf1,
+			sizeof(namebuf1), NULL, 0, NI_NUMERICHOST);
+		namebuf2[0]= '\0';
+		getnameinfo(loc_sa, loc_socklen, namebuf2,
+			sizeof(namebuf2), NULL, 0, NI_NUMERICHOST);
+
+		if (strcmp(namebuf1, namebuf2) != 0)
 		{
-			namebuf[0]= '\0';
-			getnameinfo(loc_sa, loc_socklen, namebuf,
-				sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+			printf("loc_sin6: %s\n", namebuf1);
+
+			printf("loc_sa: %s\n", namebuf2);
 
 			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf2);
 			add_str(pingstate, line);
 		}
 
@@ -367,14 +376,14 @@ static void ping_cb(int result, int bytes,
 	{
 		if (pingstate->first && pingstate->loc_socklen != 0)
 		{
-			namebuf[0]= '\0';
+			namebuf1[0]= '\0';
 			getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
 				pingstate->loc_socklen,
-				namebuf, sizeof(namebuf),
+				namebuf1, sizeof(namebuf1),
 				NULL, 0, NI_NUMERICHOST);
 
 			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf);
+				", " DBQ(srcaddr) ":" DBQ(%s), namebuf1);
 			add_str(pingstate, line);
 		}
 		add_str(pingstate, " }");
@@ -450,11 +459,11 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 
 	struct timeval now;
 
-	minlen= ICMP_MINLEN + sizeof(*data);
+	minlen= sizeof(*data);
 	if (*sizep < minlen)
 		*sizep= minlen;
-	if (*sizep > MAX_DATA_SIZE)
-		*sizep= MAX_DATA_SIZE;
+	if (*sizep > MAX_DATA_SIZE - ICMP_MINLEN)
+		*sizep= MAX_DATA_SIZE - ICMP_MINLEN;
 
 	if (*sizep > minlen)
 		memset(buffer+minlen, '\0', *sizep-minlen);
@@ -472,7 +481,7 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 
 	/* Last, compute ICMP checksum */
 	icmp->icmp_cksum = 0;
-	icmp->icmp_cksum = mkcksum((u_short *) icmp, *sizep);  /* ones complement checksum of struct */
+	icmp->icmp_cksum = mkcksum((u_short *) icmp, ICMP_MINLEN + *sizep);  /* ones complement checksum of struct */
 }
 
 
@@ -496,15 +505,15 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 {
 	size_t minlen;
 	struct icmp6_hdr *icmp = (struct icmp6_hdr *) buffer;
-	struct evdata *data = (struct evdata *) (buffer + offsetof(struct icmp6_hdr, icmp6_data16[2]));
+	struct evdata *data = (struct evdata *) (buffer + ICMP6_HDRSIZE);
 
 	struct timeval now;
 
-	minlen= offsetof(struct icmp6_hdr, icmp6_data16[2]) + sizeof(*data);
+	minlen= sizeof(*data);
 	if (*sizep < minlen)
 		*sizep= minlen;
-	if (*sizep > MAX_DATA_SIZE)
-		*sizep= MAX_DATA_SIZE;
+	if (*sizep > MAX_DATA_SIZE - ICMP6_HDRSIZE)
+		*sizep= MAX_DATA_SIZE - ICMP6_HDRSIZE;
 
 	if (*sizep > minlen)
 		memset(buffer+minlen, '\0', *sizep-minlen);
@@ -532,6 +541,7 @@ static void ping_xmit(struct pingstate *host)
 	int nsent, fd4, fd6, t_errno, r;
 
 	host->send_error= 0;
+	host->got_reply= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
@@ -575,7 +585,7 @@ static void ping_xmit(struct pingstate *host)
 			}
 		}
 
-		nsent = sendto(fd6, base->packet, host->cursize,
+		nsent = sendto(fd6, base->packet, host->cursize+ICMP6_HDRSIZE,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
 
@@ -604,7 +614,7 @@ static void ping_xmit(struct pingstate *host)
 		}
 
 
-		nsent = sendto(fd4, base->packet, host->cursize,
+		nsent = sendto(fd4, base->packet, host->cursize+ICMP_MINLEN,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
 
@@ -769,7 +779,7 @@ printf("ready_callback4: too short\n");
 	     */
 	    isDup= (ntohs(icmp->un.echo.sequence) != host->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - IPHDR,
+		    nrecv - IPHDR - ICMP_MINLEN,
 		    (struct sockaddr *)&host->sin6, host->socklen,
 		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
@@ -899,7 +909,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	     */
 	    isDup= (ntohs(icmp->icmp6_seq) != host->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - IPHDR,\
+		    nrecv - ICMP6_HDRSIZE,
 		    (struct sockaddr *)&host->sin6, host->socklen,
 		    (struct sockaddr *)&loc_sin6, sizeof(loc_sin6),
 		    ntohs(icmp->icmp6_seq), host->rcvd_ttl, &elapsed,
