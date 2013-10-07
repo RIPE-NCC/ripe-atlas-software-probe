@@ -558,9 +558,6 @@ static void ping_xmit(struct pingstate *host)
 		if (host->base->done)
 			host->base->done(host);
 
-		/* Fake packet sent to kill timer */
-	    	host->sentpkts++;
-
 		return;
 	}
 
@@ -641,6 +638,10 @@ static void ping_xmit(struct pingstate *host)
 			errno, 0, NULL,
 			host);
 	}
+
+
+	/* Add the timer to handle no reply condition in the given timeout */
+	evtimer_add(&host->ping_timer, &host->base->tv_interval);
 }
 
 
@@ -662,11 +663,6 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 	}
 
 	ping_xmit(host);
-
-	if (host->sentpkts <= host->maxpkts)
-	{
-		evtimer_add(&host->ping_timer, &host->base->tv_interval);
-	}
 }
 
 /*
@@ -1150,9 +1146,6 @@ static void ping_start2(void *state)
 	pingstate->cursize= pingstate->maxsize;
 
 	ping_xmit(pingstate);
-
-	/* Add the timer to handle no reply condition in the given timeout */
-	evtimer_add(&pingstate->ping_timer, &pingstate->base->tv_interval);
 }
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
