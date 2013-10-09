@@ -319,6 +319,8 @@ static struct option longopts[]=
 	{ "ds", required_argument, NULL, (100000 + T_DS) },
 	{ "rrsig", required_argument, NULL, (100000 + T_RRSIG) },
 	{ "soa", required_argument, NULL, 's' },
+	{ "srv", required_argument, NULL, (100000 + T_SRV) },
+	{ "naptr", required_argument, NULL, (100000 + T_NAPTR) },
 
 	// clas CHAOS
 	{ "hostname.bind", no_argument, NULL, 'h' },
@@ -1253,7 +1255,19 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->qtype = T_RRSIG;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
-				break;break;
+				break;
+
+			case (100000 + T_SRV):
+				qry->qtype = T_SRV;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_NAPTR):
+				qry->qtype = T_NAPTR;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
 
 			default:
 				fprintf(stderr, "ERROR unknown option %d ??\n", c); 
