@@ -14,6 +14,7 @@
 
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
 #include "eperd.h"
@@ -111,6 +112,7 @@ struct pingstate
 	char no_dst;
 	unsigned char ttl;
 	unsigned size;
+	unsigned psize;
 
 	char *result;
 	size_t reslen;
@@ -248,6 +250,8 @@ static void report(struct pingstate *state)
 		fprintf(fh, ", " DBQ(ttl) ":%d", state->ttl);
 
 	fprintf(fh, ", " DBQ(size) ":%d", state->size);
+	if (state->psize != -1)
+		fprintf(fh, ", " DBQ(psize) ":%d", state->psize);
 
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
@@ -259,7 +263,7 @@ static void report(struct pingstate *state)
 		fclose(fh);
 }
 
-static void ping_cb(int result, int bytes,
+static void ping_cb(int result, int bytes, int psize,
 	struct sockaddr *sa, socklen_t socklen,
 	struct sockaddr *loc_sa, socklen_t loc_socklen,
 	int seq, int ttl,
@@ -289,6 +293,7 @@ static void ping_cb(int result, int bytes,
 	if (pingstate->first)
 	{
 		pingstate->size= bytes;
+		pingstate->psize= psize;
 		pingstate->ttl= ttl;
 	}
 
@@ -326,6 +331,13 @@ static void ping_cb(int result, int bytes,
 				", " DBQ(size) ":%d", bytes);
 			add_str(pingstate, line);
 			pingstate->size= bytes;
+		}
+		if (pingstate->psize != psize && psize != -1)
+		{
+			snprintf(line, sizeof(line),
+				", " DBQ(psize) ":%d", psize);
+			add_str(pingstate, line);
+			pingstate->psize= psize;
 		}
 		if (pingstate->ttl != ttl)
 		{
@@ -392,6 +404,7 @@ static void ping_cb(int result, int bytes,
 	if (result == PING_ERR_DNS)
 	{
 		pingstate->size= bytes;
+		pingstate->psize= psize;
 		snprintf(line, sizeof(line),
 			"%s{ " DBQ(error) ":" DBQ(dns resolution failed: %s) " }",
 			pingstate->first ? "" : ", ", (char *)sa);
@@ -545,7 +558,7 @@ static void ping_xmit(struct pingstate *host)
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
-		ping_cb(PING_ERR_DONE, host->cursize,
+		ping_cb(PING_ERR_DONE, host->cursize, host->psize,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
 			0, host->rcvd_ttl, NULL,
@@ -632,7 +645,7 @@ static void ping_xmit(struct pingstate *host)
 	  host->send_error= 1;
 
 	  /* Report the failure and stop */
-	  ping_cb(PING_ERR_SENDTO, host->cursize,
+	  ping_cb(PING_ERR_SENDTO, host->cursize, -1,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			(struct sockaddr *)&host->loc_sin6, host->loc_socklen,
 			errno, 0, NULL,
@@ -652,7 +665,7 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 
 	if (!host->got_reply && !host->send_error)
 	{
-		ping_cb(PING_ERR_TIMEOUT, host->cursize,
+		ping_cb(PING_ERR_TIMEOUT, host->cursize, -1,
 			(struct sockaddr *)&host->sin6, host->socklen,
 			NULL, 0,
 			host->seq, -1, &host->base->tv_interval,
@@ -775,7 +788,7 @@ printf("ready_callback4: too short\n");
 	     */
 	    isDup= (ntohs(icmp->un.echo.sequence) != host->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - IPHDR - ICMP_MINLEN,
+		    nrecv - IPHDR - ICMP_MINLEN, nrecv,
 		    (struct sockaddr *)&host->sin6, host->socklen,
 		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
@@ -905,7 +918,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	     */
 	    isDup= (ntohs(icmp->icmp6_seq) != host->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
-		    nrecv - ICMP6_HDRSIZE,
+		    nrecv - ICMP6_HDRSIZE, nrecv + sizeof(struct ip6_hdr),
 		    (struct sockaddr *)&host->sin6, host->socklen,
 		    (struct sockaddr *)&loc_sin6, sizeof(loc_sin6),
 		    ntohs(icmp->icmp6_seq), host->rcvd_ttl, &elapsed,
@@ -1169,12 +1182,12 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 	if (result != 0)
 	{
-		ping_cb(PING_ERR_DNS, env->maxsize,
+		ping_cb(PING_ERR_DNS, env->maxsize, -1,
 			(struct sockaddr *)evutil_gai_strerror(result), 0,
 			(struct sockaddr *)NULL, 0,
 			0, 0, NULL,
 			env);
-		ping_cb(PING_ERR_DONE, env->maxsize,
+		ping_cb(PING_ERR_DONE, env->maxsize, -1,
 			(struct sockaddr *)NULL, 0,
 			(struct sockaddr *)NULL, 0,
 			0, 0, NULL,
@@ -1210,7 +1223,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	evutil_freeaddrinfo(env->dns_res);
 	env->dns_res= NULL;
 	env->dns_curr= NULL;
-	ping_cb(PING_ERR_DNS_NO_ADDR, env->cursize,
+	ping_cb(PING_ERR_DNS_NO_ADDR, env->cursize, -1,
 		(struct sockaddr *)NULL, 0,
 		(struct sockaddr *)NULL, 0,
 		0, 0, NULL,
