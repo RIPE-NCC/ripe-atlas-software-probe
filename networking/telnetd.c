@@ -1024,6 +1024,7 @@ static int equal_sessionid(char *passwd)
 		return 0;
 	}
 
+	fgets(line, sizeof(line), file);	/* Skip first empty line */
 	if (fgets(line, sizeof(line), file) == NULL)
 	{
 		syslog(LOG_ERR, "unable to read from '%s': %m",
