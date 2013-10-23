@@ -254,7 +254,7 @@ static int con_init_main( int argc, char *argv[] )
 			        FILE *f1  = fopen( atlas_con_session_id, "wt" );
 
 				fprintf  (f, "P_TO_C_HELLO\nSESSION_ID %s", line+11);
-				fprintf  (f1, "SESSION_ID %s\n", line+11);
+				fprintf  (f1, "\nSESSION_ID %s\n", line+11);
 				print_token_ver (f, 0 );
 				fclose (f);
 				fclose (f1);
