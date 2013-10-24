@@ -387,8 +387,7 @@ int evtdig_main(int argc, char **argv)
 		crondlog(LVL9 "event_base_new failed"); /* exits */
 	}
 
-	//qry = tdig_init(argc, argv, local_exit);
-	qry = tdig_init(argc, argv, NULL);
+	qry = tdig_init(argc, argv, local_exit);
 	if(!qry) {
 		crondlog(DIE9 "evdns_base_new failed"); /* exits */
 		event_base_free	(EventBase);
@@ -1337,11 +1336,18 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	else 
 		qry->server_name = strdup(argv[optind]);
 
-	 if(qry->lookupname == NULL) {
+	if (qry->lookupname == NULL) {
 		crondlog(LVL9 "ERROR no query in command line");
 		tdig_delete(qry);
 		return NULL;
 	}
+
+	if (qry->lookupname[strlen(qry->lookupname) - 1] != '.') {
+		crondlog(LVL9 "ERROR query %s does not end with a dot ", qry->lookupname);
+		tdig_delete(qry);
+		return NULL;
+	}
+
 
 	if (qry->out_filename &&
 		!validate_filename(qry->out_filename, SAFE_PREFIX))
