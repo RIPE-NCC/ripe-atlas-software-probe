@@ -1443,6 +1443,12 @@ evutil_gai_strerror(int err)
 		return "invalid value for ai_flags";
 	case EVUTIL_EAI_FAIL:
 		return "non-recoverable failure in name resolution";
+	case EVUTIL_EAI_FAIL_1:
+		return "non-recoverable failure in name resolution (1)";
+	case EVUTIL_EAI_FAIL_2:
+		return "non-recoverable failure in name resolution (2)";
+	case EVUTIL_EAI_FAIL_3:
+		return "non-recoverable failure in name resolution (3)";
 	case EVUTIL_EAI_FAMILY:
 		return "ai_family not supported";
 	case EVUTIL_EAI_MEMORY:

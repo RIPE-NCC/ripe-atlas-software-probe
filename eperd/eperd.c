@@ -568,6 +568,48 @@ static void SynchronizeFile(const char *fileName)
 	DeleteFile();
 }
 
+#define RESOLV_CONF	"/etc/resolv.conf"
+static void check_resolv_conf(void)
+{
+	static time_t last_time= -1;
+
+	int r;
+	FILE *fn;
+	struct stat sb;
+
+	r= stat(RESOLV_CONF, &sb);
+	if (r == -1)
+	{
+		crondlog(LVL8 "error accessing resolv.conf: %s",
+			strerror(errno));
+		return;
+	}
+
+	if (sb.st_mtime == last_time)
+		return;	/* resolv.conf did not change */
+	r= evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
+		RESOLV_CONF);
+
+	if (r != 0 || last_time != -1)
+	{
+		fn= fopen(out_filename, "a");
+		if (!fn)
+			crondlog(DIE9 "unable to append to '%s'", out_filename);
+		fprintf(fn, "RESULT { ");
+		if (atlas_id)
+			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
+		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
+			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, DBQ(event) ": " DBQ(load resolv.conf)
+			", " DBQ(result) ": %d", r);
+
+		fprintf(fn, " }\n");
+		fclose(fn);
+	}
+
+	last_time= sb.st_mtime;
+}
+
 static void CheckUpdates(evutil_socket_t __attribute__ ((unused)) fd,
 	short __attribute__ ((unused)) what,
 	void __attribute__ ((unused)) *arg)
@@ -584,6 +626,8 @@ static void CheckUpdates(evutil_socket_t __attribute__ ((unused)) fd,
 		}
 		fclose(fi);
 	}
+
+	check_resolv_conf();
 }
 
 static void CheckUpdatesHour(evutil_socket_t __attribute__ ((unused)) fd,

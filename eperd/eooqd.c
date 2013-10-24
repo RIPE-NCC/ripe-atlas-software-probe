@@ -57,6 +57,7 @@ static struct builtin
 	{ NULL, NULL }
 };
 
+static const char *atlas_id;
 
 static void process(FILE *file);
 static void report(const char *fmt, ...);
@@ -76,7 +77,7 @@ int eooqd_main(int argc, char *argv[])
 {
 	int r;
 	uint32_t opt;
-	char *atlas_id, *pid_file_name;
+	char *pid_file_name;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
 
@@ -466,6 +467,53 @@ static void cmddone(void *cmdstate)
 	{
 		post_results();
 	}
+}
+
+#define RESOLV_CONF	"/etc/resolv.conf"
+static void check_resolv_conf2(const char *out_file, const char *atlasid)
+{
+	static time_t last_time= -1;
+
+	int r;
+	FILE *fn;
+	struct stat sb;
+
+	r= stat(RESOLV_CONF, &sb);
+	if (r == -1)
+	{
+		crondlog(LVL8 "error accessing resolv.conf: %s",
+			strerror(errno));
+		return;
+	}
+
+	if (sb.st_mtime == last_time)
+		return;	/* resolv.conf did not change */
+	r= evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
+		RESOLV_CONF);
+
+	if (r != 0 || last_time != -1)
+	{
+		fn= fopen(out_file, "a");
+		if (!fn)
+			crondlog(DIE9 "unable to append to '%s'", out_file);
+		fprintf(fn, "RESULT { ");
+		if (atlasid)
+			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlasid);
+		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
+			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, DBQ(event) ": " DBQ(load resolv.conf)
+			", " DBQ(result) ": %d", r);
+
+		fprintf(fn, " }\n");
+		fclose(fn);
+	}
+
+	last_time= sb.st_mtime;
+}
+
+static void check_resolv_conf(void)
+{
+	check_resolv_conf1();
 }
 
 static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
