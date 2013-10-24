@@ -809,14 +809,12 @@ static void send_pkt(struct trtstate *state)
 			tcphdr->doff= len / 4;
 			tcphdr->syn= 1;
 
-			if (state->curpacksize < len)
-				state->curpacksize= len;
-			if (state->curpacksize > len)
+			if (state->curpacksize > 0)
 			{
 				memset(&base->packet[len], '\0',
-					state->curpacksize-len);
+					state->curpacksize);
 				strcpy((char *)&base->packet[len], id);
-				len= state->curpacksize;
+				len += state->curpacksize;
 			}
 
 			v4_ph.src= ((struct sockaddr_in *)&state->loc_sin6)->
@@ -1396,7 +1394,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			add_str(state, line);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"size\":%d",
-				ip->ip_ttl, (int)nrecv - ICMP_MINLEN);
+				ip->ip_ttl, (int)nrecv - IPHDR - ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
@@ -1608,7 +1606,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 			add_str(state, line);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"size\":%d",
-				ip->ip_ttl, (int)nrecv);
+				ip->ip_ttl, (int)nrecv-IPHDR-ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
@@ -1904,9 +1902,11 @@ printf("nrecv=%d\n", nrecv);
 						", \"mtu\":%d",
 						nextmtu);
 					add_str(state, line);
-					if (!late && nextmtu >= sizeof(*ip))
+					if (!late && nextmtu >= sizeof(*ip) +
+						ICMP_MINLEN)
 					{
-						nextmtu -= sizeof(*ip);
+						nextmtu -= sizeof(*ip) +
+							ICMP_MINLEN;
 						if (nextmtu <
 							state->curpacksize)
 						{
@@ -2082,7 +2082,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			inet_ntoa(remote.sin_addr));
 		add_str(state, line);
 		snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
-			ip->ip_ttl, (int)nrecv);
+			ip->ip_ttl, (int)nrecv - IPHDR - ICMP_MINLEN);
 		add_str(state, line);
 		if (!late)
 		{
@@ -2246,7 +2246,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		inet_ntoa(remote.sin_addr));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
-		ip->ip_ttl, (int)nrecv);
+		ip->ip_ttl, (int)nrecv - IPHDR - sizeof(*tcphdr));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
@@ -3216,7 +3216,11 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	parismod= 16;
 	str_Atlas= NULL;
 	out_filename= NULL;
-	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:p:w+:z+:S+";
+	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+";
+
+for (i= 0; argv[i] != NULL; i++)
+	printf("argv[%d] = '%s'\n", i, argv[i]);
+
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
 		&firsthop, &gaplimit, &maxhops, &destportstr, &timeout,
 		&duptimeout, &str_Atlas, &out_filename, &maxpacksize);

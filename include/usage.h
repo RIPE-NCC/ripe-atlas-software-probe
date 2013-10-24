@@ -1061,16 +1061,18 @@
      "todo"
 
 #define evtraceroute_trivial_usage \
-	"-[46FIU] [-a <paris mod>] [-c <count>] [-f <hop>]" \
+	"-[46FIrTU] [-a <paris mod>] [-c <count>] [-f <hop>]" \
 "\n	[-g <gap>] [-m <hop>] [-w <ms>] [-z <ms>] [-A <string>] [-O <file>]" \
 "\n	[-S <size>]" 
 
 #define evtraceroute_full_usage "\n" \
      "\n	-4			Use IPv4 (default)" \
      "\n	-6			Use IPv6" \
-     "\n	-I			Use ICMP" \
-     "\n	-U			Use UDP (default)" \
      "\n	-F			Don't fragment" \
+     "\n	-I			Use ICMP" \
+     "\n	-r			Name resolution during each run" \
+     "\n	-T			Use TCP" \
+     "\n	-U			Use UDP (default)" \
      "\n	-a <paris modulus>	Enables Paris-traceroute" \
      "\n	-c <count>		#packets per hop" \
      "\n	-f <hop>		Starting hop" \
