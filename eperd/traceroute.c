@@ -39,6 +39,8 @@
 #define OPT_T	(1 << 6)
 
 #define IPHDR              20
+#define ICMP6_HDR 	(sizeof(struct icmp6_hdr))
+#define TCP_HDR		(sizeof(*tcphdr))
 
 #define BASE_PORT	(0x8000 + 666)
 #define SRC_BASE_PORT	(20480)
@@ -486,14 +488,12 @@ static void send_pkt(struct trtstate *state)
 			tcphdr->doff= len / 4;
 			tcphdr->syn= 1;
 
-			if (state->curpacksize < len)
-				state->curpacksize= len;
-			if (state->curpacksize > len)
+			if (state->curpacksize > 0)
 			{
 				memset(&base->packet[len], '\0',
-					state->curpacksize-len);
+					state->curpacksize);
 				strcpy((char *)&base->packet[len], id);
-				len= state->curpacksize;
+				len += state->curpacksize;
 			}
 
 			{
@@ -581,17 +581,20 @@ static void send_pkt(struct trtstate *state)
 			v6info->seq= htonl(state->seq);
 			v6info->tv= state->xmit_time;
 
-			len= sizeof(*icmp6_hdr)+sizeof(*v6info);
+			len= sizeof(*v6info);
 
 			if (state->curpacksize < len)
 				state->curpacksize= len;
 			if (state->curpacksize > len)
 			{
-				memset(&base->packet[len], '\0',
+				memset(&base->packet[ICMP6_HDR+len], '\0',
 					state->curpacksize-len);
-				strcpy((char *)&base->packet[len], id);
+				strcpy((char *)&base->packet[ICMP6_HDR+len],
+					id);
 				len= state->curpacksize;
 			}
+
+			len += ICMP6_HDR;
 
 			if (state->parismod)
 			{
@@ -624,9 +627,12 @@ static void send_pkt(struct trtstate *state)
 #endif
 			}
 
+			memset(&sin6copy, '\0', sizeof(sin6copy));
+			sin6copy.sin6_family= AF_INET6;
+			sin6copy.sin6_addr= state->sin6.sin6_addr;
 			r= sendto(base->v6icmp_snd, base->packet, len, 0,
-				(struct sockaddr *)&state->sin6,
-				state->socklen);
+				(struct sockaddr *)&sin6copy,
+				sizeof(sin6copy));
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -2428,7 +2434,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		inet_ntop(AF_INET6, &remote.sin6_addr, buf, sizeof(buf)));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
-		rcvdttl, (int)nrecv);
+		rcvdttl, (int)nrecv - sizeof(*tcphdr));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
@@ -2812,7 +2818,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			add_str(state, line);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
-				rcvdttl, ms, (int)nrecv);
+				rcvdttl, ms, (int)nrecv-ICMP6_HDR);
 			add_str(state, line);
 			if (eip->ip6_hops != 1)
 			{
@@ -2844,6 +2850,10 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				siz= sizeof(*eip);
 				if (eudp)
 					siz += sizeof(*eudp);
+				else if (eicmp)
+					siz += sizeof(*eicmp);
+				else if (etcp)
+					siz += sizeof(*etcp);
 				if (!late && nextmtu >= siz)
 				{
 					nextmtu -= siz;
@@ -3065,7 +3075,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		add_str(state, line);
 		snprintf(line, sizeof(line),
 			", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
-			rcvdttl, ms, (int)nrecv);
+			rcvdttl, ms, (int)nrecv - ICMP6_HDR);
 		add_str(state, line);
 
 #if 0
