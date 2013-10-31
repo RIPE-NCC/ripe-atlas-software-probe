@@ -21,6 +21,9 @@
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
 
+/* Don't report psize yet. */
+#define DO_PSIZE	0
+
 #define DBQ(str) "\"" #str "\""
 
 #define PING_OPT_STRING ("!46rc:s:A:O:")
@@ -250,8 +253,10 @@ static void report(struct pingstate *state)
 		fprintf(fh, ", " DBQ(ttl) ":%d", state->ttl);
 
 	fprintf(fh, ", " DBQ(size) ":%d", state->size);
+#if DO_PSIZE
 	if (state->psize != -1)
 		fprintf(fh, ", " DBQ(psize) ":%d", state->psize);
+#endif /* DO_PSIZE */
 
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
@@ -334,9 +339,11 @@ static void ping_cb(int result, int bytes, int psize,
 		}
 		if (pingstate->psize != psize && psize != -1)
 		{
+#if DO_PSIZE
 			snprintf(line, sizeof(line),
 				", " DBQ(psize) ":%d", psize);
 			add_str(pingstate, line);
+#endif /* DO_PSIZE */
 			pingstate->psize= psize;
 		}
 		if (pingstate->ttl != ttl)
