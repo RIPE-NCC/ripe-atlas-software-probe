@@ -1252,8 +1252,6 @@ static void ping_start(void *state)
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= pingstate->af;
-	printf("hostname '%s', family %d\n",
-		pingstate->hostname, hints.ai_family);
 	(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
 		&hints, dns_cb, pingstate);
 }

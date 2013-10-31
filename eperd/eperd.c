@@ -587,10 +587,12 @@ static void check_resolv_conf(void)
 
 	if (sb.st_mtime == last_time)
 		return;	/* resolv.conf did not change */
+	evdns_base_clear_nameservers_and_suspend(DnsBase);
 	r= evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
 		RESOLV_CONF);
+	evdns_base_resume(DnsBase);
 
-	if (r != 0 || last_time != -1)
+	if ((r != 0 || last_time != -1) && out_filename)
 	{
 		fn= fopen(out_filename, "a");
 		if (!fn)
