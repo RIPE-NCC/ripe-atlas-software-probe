@@ -6,6 +6,8 @@
 #define LINEL (INET6_ADDRSTRLEN * 2)
 #include "libbb.h"
 #include "resolv.h"
+#include "eperd.h"
+#include <math.h>
 
 static  void nameserver_ip_add (char *nsentry, char *ip_as_string) 
 {
@@ -39,12 +41,55 @@ static int resolv_conf_parse_line (char *nsentry, char *line)
 	return 0;
 } 
 
-int get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2])
+void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
+		int *resolv_max)
 {
+
+#ifndef RESOLV_CONF 
+#define RESOLV_CONF     "/etc/resolv.conf"
+#endif 	
 	char buf[LINEL]; 
 	int  i = 0;
+	time_t now;
+	int r;
+	struct stat sb;
 
-	FILE *R = fopen ("/etc/resolv.conf", "r");
+	static resolv_last_check = -1;
+	static time_t last_time= -1;
+
+	now = time(NULL);
+
+	if(*resolv_max){
+		if ( pow (resolv_last_check - now, 2) > 3) {
+			crondlog(LVL5 "check the %s", RESOLV_CONF);
+		}
+		else {
+			return;
+		}
+
+	}
+
+
+	r = stat(RESOLV_CONF, &sb);
+	if (r == -1)
+	{
+		crondlog(LVL8 "error accessing resolv.conf: %s",
+				strerror(errno));
+		return;
+	}
+
+	resolv_last_check = now;
+
+	if (last_time  == sb.st_mtime) 
+	{
+		/* nothing changed */
+		return;
+	}
+	else {
+			crondlog(LVL5 "re-read %s . it has changed", RESOLV_CONF);
+	}
+
+	FILE *R = fopen (RESOLV_CONF, "r");
 	if (R != NULL) {
 		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
 			if(resolv_conf_parse_line(nslist[i], buf) )
@@ -52,5 +97,9 @@ int get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2])
 		}
 		fclose (R);
 	}
-	return i;
+
+	last_time= sb.st_mtime;
+
+	*resolv_max = i;
+	return;
 }

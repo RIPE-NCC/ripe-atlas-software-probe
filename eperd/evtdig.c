@@ -46,7 +46,6 @@
 
 #undef MIN	/* just in case */
 #undef MAX	/* also, just in case */
-#define Q_RESOLV_CONF -1
 #define O_RESOLV_CONF  1003
 #define O_PREPEND_PROBE_ID  1004
 #define O_EVDNS 1005
@@ -192,6 +191,7 @@ struct query_state {
 	int opt_evdns;
 	int opt_retry_max;
 	int retry;
+	int resolv_i;
 
 	char * str_Atlas; 
 	u_int16_t qtype;
@@ -563,7 +563,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->ns_count = 0;
 	dns->add_count = htons(0);
 
-	if (( qry->opt_resolv_conf > Q_RESOLV_CONF ) ||  (qry->opt_rd )){
+	if (qry->opt_resolv_conf ||  qry->opt_rd ){
 		// if you need more falgs do a bitwise and here.
 		dns->flags = htons(DNS_FLAG_RD);
 	}
@@ -1074,6 +1074,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	tdig_base->activeqry++;
 	qry->qst = 0;
 	qry->retry  = 0;
+	qry->resolv_i = 0;
 	qry->opt_retry_max = DEFAULT_RETRY_MAX;
 	qry->wire_size = 0;
 	qry->triptime = 0;
@@ -1089,7 +1090,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->ressent = NULL;
 	buf_init(&qry->err, -1);
 	buf_init(&qry->packet, -1);
-	qry->opt_resolv_conf = (Q_RESOLV_CONF - 1);
+	qry->opt_resolv_conf = 0;
 	qry->lookupname = NULL;
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
@@ -1103,7 +1104,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	evtimer_assign(&qry->noreply_timer, tdig_base->event_base,
 		noreply_callback, qry); 
 
-	/* callback/timer used for restarting query by --resove */
+	/* callback/timer used for restarting query by --resolve */
 	evtimer_assign(&qry->next_qry_timer, tdig_base->event_base, next_qry_cb
 			                ,qry);
 
@@ -1193,7 +1194,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 
 			case O_RESOLV_CONF :
-				qry->opt_resolv_conf = Q_RESOLV_CONF ;
+				qry->opt_resolv_conf = 1;
 				qry->opt_v6_only = 1;
 				qry->opt_v4_only = 1;
 				break;
@@ -1309,18 +1310,18 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 		}
 	}
-	if( qry->opt_resolv_conf == Q_RESOLV_CONF ) {
+	if( qry->opt_resolv_conf) {
+		get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
 		if(tdig_base->resolv_max ) {
-			qry->opt_resolv_conf = 1;
-			qry->server_name = strdup(tdig_base->nslist[0]);
+			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 		}
 		else {
-			// may be the /etc/resolv.conf is yet to red. 
-			// try once then use it || give up
-			tdig_base->resolv_max = get_local_resolvers (tdig_base->nslist);
+			/* may be the /etc/resolv.conf is yet to red
+			 * try once then use it || give up */
+
+			get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
 			if(tdig_base->resolv_max ){
-				qry->opt_resolv_conf = 1;
-				qry->server_name = strdup(tdig_base->nslist[0]);
+				qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 			}
 			else {
 				tdig_delete(qry);
@@ -1503,8 +1504,20 @@ void tdig_start (struct query_state *qry)
 
 	switch(qry->qst)
 	{
-		case STATUS_NEXT_QUERY :
 		case STATUS_FREE :
+			crondlog(LVL5 "AA RESOLV QUERY FREE %s", qry->server_name);
+			if( qry->opt_resolv_conf) {
+				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
+				if(tdig_base->resolv_max ) {
+					qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+				}
+				else {
+					printErrorQuick(qry);
+				}
+			}
+			break;
+
+		case STATUS_NEXT_QUERY :
 		case STATUS_RETRANSMIT_QUERY:
 			break;
 		default:
@@ -1512,11 +1525,11 @@ void tdig_start (struct query_state *qry)
 			return ;
 	}
 
-	if(qry->opt_resolv_conf > tdig_base->resolv_max) {
-		qry->opt_resolv_conf = 0;
+	if(qry->resolv_i > tdig_base->resolv_max) {
+		qry->resolv_i = 0;
 		free (qry->server_name);
-		qry->server_name = strdup(tdig_base->nslist[qry->opt_resolv_conf]);
-		qry->opt_resolv_conf++;
+		qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+		qry->resolv_i++;
 	}
 
 	bzero(&hints, sizeof(hints));
@@ -1702,19 +1715,19 @@ static void free_qry_inst(struct query_state *qry)
 	if(qry->opt_proto == 6)
 		tu_cleanup(&qry->tu_env);
 
-	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
+	if ( qry->opt_resolv_conf) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
-		if(qry->opt_resolv_conf < tdig_base->resolv_max) {
+		if(qry->resolv_i < tdig_base->resolv_max) {
 			free (qry->server_name);
-			qry->server_name = strdup(tdig_base->nslist[qry->opt_resolv_conf]);
-			qry->opt_resolv_conf++;
+			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+			qry->resolv_i++;
 			qry->qst = STATUS_NEXT_QUERY;
 			evtimer_add(&qry->next_qry_timer, &asap);
 			return;
 		}
 		else 
-			qry->opt_resolv_conf++;
+			qry->resolv_i++;
 	}
 
 	if(qry->base->done)
@@ -1874,8 +1887,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JS(id,  qry->str_Atlas);
 	}
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
-	if ( qry->opt_resolv_conf > Q_RESOLV_CONF ) {
-		JD (subid, qry->opt_resolv_conf);
+	if ( qry->opt_resolv_conf ) {
+		JD (subid, qry->resolv_i++);
 		JD (submax, qry->base->resolv_max);
 	}
 	if( qry->ressent)
