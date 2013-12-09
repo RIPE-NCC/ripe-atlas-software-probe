@@ -354,7 +354,8 @@ static void ping_cb(int result, int bytes, int psize,
 			pingstate->ttl= ttl;
 		}
 		namebuf1[0]= '\0';
-		getnameinfo(&pingstate->loc_sin6, loc_socklen, namebuf1,
+		getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
+			loc_socklen, namebuf1,
 			sizeof(namebuf1), NULL, 0, NI_NUMERICHOST);
 		namebuf2[0]= '\0';
 		getnameinfo(loc_sa, loc_socklen, namebuf2,
@@ -560,8 +561,6 @@ static void ping_xmit(struct pingstate *host)
 
 	int nsent, fd4, fd6, t_errno, r;
 
-	host->send_error= 0;
-	host->got_reply= 0;
 	if (host->sentpkts >= host->maxpkts)
 	{
 		/* Done. */
@@ -1164,6 +1163,9 @@ static void ping_start2(void *state)
 
 	pingstate->sentpkts= 0;
 	pingstate->cursize= pingstate->maxsize;
+
+	pingstate->send_error= 0;
+	pingstate->got_reply= 0;
 
 	ping_xmit(pingstate);
 }
