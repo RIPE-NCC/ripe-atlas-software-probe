@@ -42,13 +42,14 @@ static int resolv_conf_parse_line (char *nsentry, char *line)
 } 
 
 void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
-		int *resolv_max)
+		int *resolv_max, int *resolv_cur)
 {
 
 #ifndef RESOLV_CONF 
 #define RESOLV_CONF     "/etc/resolv.conf"
 #endif 	
 	char buf[LINEL]; 
+	char *buf_start;
 	int  i = 0;
 	time_t now;
 	int r;
@@ -83,23 +84,30 @@ void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2],
 	if (last_time  == sb.st_mtime) 
 	{
 		/* nothing changed */
+		crondlog(LVL5 "re-read %s. not reading this time", RESOLV_CONF);
 		return;
 	}
 	else {
-			crondlog(LVL5 "re-read %s . it has changed", RESOLV_CONF);
+		crondlog(LVL5 "re-read %s . it has changed", RESOLV_CONF);
 	}
 
 	FILE *R = fopen (RESOLV_CONF, "r");
 	if (R != NULL) {
 		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
-			if(resolv_conf_parse_line(nslist[i], buf) )
+			buf_start = buf;
+			if(resolv_conf_parse_line(nslist[i], buf) ) {
+				crondlog(LVL5 "parsed file %s , line %s i=%d", RESOLV_CONF, buf_start, i);
 				i++;
+			}
+			else 
+				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", RESOLV_CONF, i, buf_start);
 		}
 		fclose (R);
 	}
 
-	last_time= sb.st_mtime;
+	last_time = sb.st_mtime;
 
 	*resolv_max = i;
+	*resolv_cur = 0;
 	return;
 }

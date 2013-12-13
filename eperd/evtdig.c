@@ -76,6 +76,9 @@
 #define STATUS_TCP_WRITE 		1004
 #define STATUS_NEXT_QUERY		1005
 #define STATUS_RETRANSMIT_QUERY         1006
+#define STATUS_PRINT_FREE         	1006
+#define STATUS_SEND			1007
+#define STATUS_WAIT_RESPONSE		1008
 #define STATUS_FREE 			0
 
 // seems T_DNSKEY is not defined header files of lenny and sdk
@@ -210,6 +213,7 @@ struct query_state {
 	struct event noreply_timer;    /* Timer to handle timeout */
 	struct event nsm_timer;       /* Timer to send UDP */
 	struct event next_qry_timer;  /* Timer event to start next query */
+	struct event done_qry_timer;  /* Timer event to call done */
 
 	struct timeval xmit_time;	
 	double triptime;
@@ -240,24 +244,36 @@ struct DNS_HEADER
 {
 	u_int16_t id;        // identification number
 
-	u_int16_t flags;
-/* 
-	u_int16_t rd :1,     // recursion desired
-		  tc :1,     // truncated message
-		  aa :1,     // authoritive answer
-		  opcode :4, // purpose of message
-		  qr :1,     // query/response flag
-		  rcode :4,  // response code
-		  cd :1,     // checking disabled
-		  ad :1,     // authenticated data
-		  z :1,      // its z! reserved
-		  ra :1;     // recursion available
+#if BYTE_ORDER == BIG_ENDIAN
+	u_int16_t qr :1,     /* query/response flag               */
+		  opcode :4, /* purpose of message                */
+		  aa :1,     /* authoritive answer                */
+		  tc :1,     /* truncated message                 */
+		  rd :1,     /* recursion desired                 */
 
-*/
-	u_int16_t q_count; // number of question entries
-	u_int16_t ans_count; // number of answer entries
-	u_int16_t ns_count; // number of authority entries
-	u_int16_t add_count; // number of resource entries
+		  ra :1,     /* recursion available               */
+		  z :1,      /* its z! reserved                   */
+		  ad :1,     /* authenticated data                */
+		  cd :1,     /* checking disabled                 */
+		  rcode :4;  /* response code                     */
+#elif BYTE_ORDER == LITTLE_ENDIAN || BYTE_ORDER == PDP_ENDIAN
+	u_int16_t rd :1,     
+		  tc :1,     
+		  aa :1,     
+		  opcode :4, 
+		  qr :1,     
+
+		  rcode :4,  
+		  cd :1,     
+		  ad :1,     
+		  z :1,      
+		  ra :1;     
+#endif
+
+	u_int16_t q_count;   /* number of question entries       */
+	u_int16_t ans_count; /* number of answer entries         */
+	u_int16_t ns_count;  /* number of authority entries      */
+	u_int16_t add_count; /* number of resource entries       */
 };
 
 // EDNS OPT pseudo-RR : EDNS0
@@ -336,7 +352,7 @@ static struct option longopts[]=
 	// flags
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
-	{ "d0", no_argument, NULL, 'd' },
+	{ "do", no_argument, NULL, 'd' },
  	
 	{ "retry",  required_argument, NULL, O_RETRY },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
@@ -435,6 +451,24 @@ void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh)
 
 static void local_exit(void *state UNUSED_PARAM)
 {
+	/*
+	   qry->base->done(qry);
+	   void (*terminator)(void *state);
+	   struct event_base *event_base;
+	   struct tdig_base *tbase;
+	   terminator = qry->base->done;
+	   event_base = qry->base->event_base;
+	   if(DnsBase) {
+	   evdns_base_free(DnsBase, 0);
+	   DnsBase = NULL;
+	   }
+	   tbase = qry->base;
+	   tdig_delete(qry);
+	   free(tbase);
+	   event_base_loopbreak(event_base);
+	   event_base_free(event_base);
+	   terminator(qry);
+	   */
 	fprintf(stderr, "And we are done\n");
 	exit(0);
 }
@@ -546,7 +580,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
 	BLURT(LVL5 "dns qyery id %d", qry->qryid);
 	dns->id = (uint16_t) htons(r); 
- /*
+ 
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
 	dns->aa = 0; //Not Authoritative
@@ -557,15 +591,14 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->ad = 0;
 	dns->cd = 0;
 	dns->rcode = 0;
-*/
-	dns->q_count = htons(1); //we have only 1 question
+
+	dns->q_count = htons(1); /* we have only 1 question */
 	dns->ans_count = 0;
 	dns->ns_count = 0;
 	dns->add_count = htons(0);
 
 	if (qry->opt_resolv_conf ||  qry->opt_rd ){
-		// if you need more falgs do a bitwise and here.
-		dns->flags = htons(DNS_FLAG_RD);
+		dns->rd = 1;
 	}
 
 	//point to the query portion
@@ -659,9 +692,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	int err = 0; 
 	int sockfd;
 
-		/* Clean the no reply timer (if any was previously set) */
+	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
 
+	qry->qst = STATUS_SEND;
 	outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
@@ -723,6 +757,13 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		printReply (qry, 0, NULL);
 		return;
 	}
+	qry->qst = STATUS_WAIT_RESPONSE;
+}
+static void done_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
+	struct query_state *qry = h;
+	qry->qst = STATUS_FREE;
+	BLURT(LVL5 "query %s is done call done",  qry->server_name);
+	qry->base->done(qry);
 }
 
 static void next_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
@@ -743,8 +784,8 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 	BLURT(LVL5 "AAA timeout for %s retry %d/%d ", qry->server_name, qry->retry,  qry->opt_retry_max);
 	if (qry->retry < qry->opt_retry_max) {
 		qry->retry++;
-		free_qry_inst(qry);
 		qry->qst = STATUS_RETRANSMIT_QUERY;
+		free_qry_inst(qry);
 		evtimer_add(&qry->next_qry_timer, &asap);
 	} else {
 		printReply (qry, 0, NULL);
@@ -804,8 +845,8 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
         }
 	if (qry->retry < qry->opt_retry_max) {
 		qry->retry++;
-		free_qry_inst(qry);
 		qry->qst = STATUS_RETRANSMIT_QUERY;
+		free_qry_inst(qry);
 		evtimer_add(&qry->next_qry_timer, &asap);
 	} else {
 		printReply (qry, 0, NULL);
@@ -816,6 +857,7 @@ static void tcp_dnscount(struct tu_env *env, int count)
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
+	qry->qst = STATUS_SEND;
 	BLURT(LVL5 "dns count for %s : %d", qry->server_name , count);
 }
 
@@ -1105,8 +1147,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		noreply_callback, qry); 
 
 	/* callback/timer used for restarting query by --resolve */
-	evtimer_assign(&qry->next_qry_timer, tdig_base->event_base, next_qry_cb
-			                ,qry);
+	evtimer_assign(&qry->next_qry_timer, tdig_base->event_base, next_qry_cb, qry);
+	evtimer_assign(&qry->done_qry_timer, tdig_base->event_base, done_qry_cb, qry);
 
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:?", longopts, NULL), c != -1) {
@@ -1311,7 +1353,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		}
 	}
 	if( qry->opt_resolv_conf) {
-		get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
+		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
 		if(tdig_base->resolv_max ) {
 			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 		}
@@ -1319,13 +1361,9 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			/* may be the /etc/resolv.conf is yet to red
 			 * try once then use it || give up */
 
-			get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
+			get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
 			if(tdig_base->resolv_max ){
 				qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-			}
-			else {
-				tdig_delete(qry);
-				return NULL;
 			}
 		}
 	}
@@ -1476,9 +1514,7 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 }
 
 static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_state *qry) {
-	
 	if (err)  {
-		qry->qst = STATUS_FREE;
 		snprintf(line, DEFAULT_LINE_LENGTH, "\"evdns_getaddrinfo\": \"%s\"", evutil_gai_strerror(err));
 		buf_add(&qry->err, line, strlen(line));
 		printReply (qry, 0, NULL);
@@ -1488,6 +1524,7 @@ static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_sta
 	else {
 		qry->res = ev_res;
 		qry->ressave = ev_res;
+		qry->qst = STATUS_SEND;
 		tdig_send_query_callback(0, 0, qry);
 	}
 }
@@ -1505,14 +1542,20 @@ void tdig_start (struct query_state *qry)
 	switch(qry->qst)
 	{
 		case STATUS_FREE :
-			crondlog(LVL5 "AA RESOLV QUERY FREE %s", qry->server_name);
+			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  tdig_base->resolv_max);
 			if( qry->opt_resolv_conf) {
-				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
+				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
+				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
 				if(tdig_base->resolv_max ) {
 					qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 				}
 				else {
-					printErrorQuick(qry);
+					crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max is zero %d i %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
+					free(qry->server_name);
+					qry->server_name = NULL;
+					snprintf(line, DEFAULT_LINE_LENGTH, "\"nameserver\": \"no local resolvers found\"");
+					buf_add(&qry->err, line, strlen(line));
+					printReply (qry, 0, NULL);
 				}
 			}
 			break;
@@ -1524,13 +1567,15 @@ void tdig_start (struct query_state *qry)
 			printErrorQuick(qry);
 			return ;
 	}
-
+/* AAA do we need this bit?
 	if(qry->resolv_i > tdig_base->resolv_max) {
 		qry->resolv_i = 0;
 		free (qry->server_name);
+		qry->server_name = NULL;
 		qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 		qry->resolv_i++;
 	}
+*/
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -1566,9 +1611,7 @@ void tdig_start (struct query_state *qry)
 			{
 				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getaddrinfo\": \"port %s, AF %d %s\"", qry->err.size ? ", " : "",  port,  hints.ai_family, gai_strerror(err_num));
 				buf_add(&qry->err, line, strlen(line));
-
 				printReply (qry, 0, NULL);
-				qry->qst = STATUS_FREE;
 				return ;
 			}
 
@@ -1576,6 +1619,7 @@ void tdig_start (struct query_state *qry)
 			qry->ressave = res;
 
 			evtimer_add(&qry->nsm_timer, &asap);
+			qry->qst =  STATUS_SEND;
 		}
 	}
 	else { // TCP Query
@@ -1704,7 +1748,6 @@ static void free_qry_inst(struct query_state *qry)
 		qry->ressave  = NULL;
 		qry->ressent = NULL;
 	}
-	qry->qst = STATUS_FREE;
 	qry->wire_size = 0;
 
 	if(qry->packet.size)
@@ -1719,7 +1762,10 @@ static void free_qry_inst(struct query_state *qry)
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
 		if(qry->resolv_i < tdig_base->resolv_max) {
-			free (qry->server_name);
+			if(qry->server_name) {
+				free (qry->server_name);
+				qry->server_name = NULL;
+			}
 			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 			qry->resolv_i++;
 			qry->qst = STATUS_NEXT_QUERY;
@@ -1730,28 +1776,17 @@ static void free_qry_inst(struct query_state *qry)
 			qry->resolv_i++;
 	}
 
-	if(qry->base->done)
-	{
-		qry->base->done(qry);
-	/*
-		void (*terminator)(void *state);
-		struct event_base *event_base;
-		struct tdig_base *tbase;
-		terminator = qry->base->done;
-		event_base = qry->base->event_base;
-		if(DnsBase) {
-			evdns_base_free(DnsBase, 0);
-			DnsBase = NULL;
-		}
-		tbase = qry->base;
-		tdig_delete(qry);
-		free(tbase);
-		event_base_loopbreak(event_base);
-		event_base_free(event_base);
-		terminator(qry);
-	*/
+	switch(qry->qst){
+		case STATUS_RETRANSMIT_QUERY:
+			break;
+
+		default:
+			qry->qst =  STATUS_FREE;
+			if(qry->base->done) {
+				evtimer_add(&qry->done_qry_timer, &asap);
+			}
+			break;
 	}
-	
 }
 
 
@@ -1854,7 +1889,7 @@ void printErrorQuick (struct query_state *qry)
 }
 
 
-void printReply(struct query_state *qry, int wire_size, unsigned char *result )
+void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 {
 	int i, stop=0;
 	unsigned char *qname, *reader;
@@ -1891,7 +1926,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JD (subid, qry->resolv_i++);
 		JD (submax, qry->base->resolv_max);
 	}
-	if( qry->ressent)
+	if( qry->ressent && qry->server_name)
 	{  // started to send query
 	   // historic resaons only works with UDP 
 		switch (qry->ressent->ai_family)
@@ -1910,7 +1945,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JS(dst_addr, addrstr);
 		JD(af, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
 	}
-	else if(qry->dst_ai_family)
+	else if(qry->dst_ai_family && qry->server_name)
 	{
 		if(strcmp(qry->dst_addr_str, qry->server_name)) {
 			JS(dst_name,  qry->server_name);
@@ -1918,9 +1953,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result )
 		JS(dst_addr , qry->dst_addr_str);
 		JD(af, qry->dst_ai_family == PF_INET6 ? 6 : 4);
 	}
-	else {
-		JS(dst_name,  qry->server_name);
+	else if(qry->server_name) {
+			JS(dst_name,  qry->server_name);
 	}
+
 	if(qry->loc_sin6.sin6_family) {
 		line[0]  = '\0';
 		getnameinfo((struct sockaddr *)&qry->loc_sin6,
