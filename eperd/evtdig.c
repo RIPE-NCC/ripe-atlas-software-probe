@@ -1114,7 +1114,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
 	tdig_base->activeqry++;
-	qry->qst = 0;
+	qry->qst = STATUS_FREE;
 	qry->retry  = 0;
 	qry->resolv_i = 0;
 	qry->opt_retry_max = DEFAULT_RETRY_MAX;
@@ -1761,13 +1761,13 @@ static void free_qry_inst(struct query_state *qry)
 	if ( qry->opt_resolv_conf) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
+		qry->resolv_i++;
 		if(qry->resolv_i < tdig_base->resolv_max) {
 			if(qry->server_name) {
 				free (qry->server_name);
 				qry->server_name = NULL;
 			}
 			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-			qry->resolv_i++;
 			qry->qst = STATUS_NEXT_QUERY;
 			evtimer_add(&qry->next_qry_timer, &asap);
 			return;
@@ -1923,7 +1923,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	}
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
 	if ( qry->opt_resolv_conf ) {
-		JD (subid, qry->resolv_i++);
+		JD (subid, (qry->resolv_i+1));
 		JD (submax, qry->base->resolv_max);
 	}
 	if( qry->ressent && qry->server_name)
