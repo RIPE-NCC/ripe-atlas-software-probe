@@ -52,6 +52,8 @@
 #define MAXLINES        256	/* max lines in non-root crontabs */
 #endif
 
+#define MAX_INTERVAL	(2*366*24*3600)	/* No intervals bigger than 2 years */
+
 #define URANDOM_DEV	"/dev/urandom"
 #define ATLAS_FW_VERSION	"/home/atlas/state/FIRMWARE_APPS_VERSION"
 
@@ -496,7 +498,9 @@ static void SynchronizeFile(const char *fileName)
 			line->start_time= strtoul(tokens[1], &check1, 10);
 			line->end_time= strtoul(tokens[2], &check2, 10);
 
-			if (line->interval <= 0 || check0[0] != '\0' ||
+			if (line->interval <= 0 ||
+				line->interval > MAX_INTERVAL ||
+				check0[0] != '\0' ||
 				check1[0] != '\0' ||
 				check2[0] != '\0')
 			{
