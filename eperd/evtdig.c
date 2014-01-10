@@ -29,15 +29,17 @@
 #include <event2/util.h>
 #define DQ(str) "\"" #str "\""
 #define DQC(str) "\"" #str "\" : "
-#define JS(key, val) fprintf(fh, "\"" #key"\" : \"%s\" , ",  val); 
-#define JS_NC(key, val) fprintf(fh, "\"" #key"\" : \"%s\" ",  val); 
-#define JSDOT(key, val) fprintf(fh, "\"" #key"\" : \"%s.\" , ",  val); 
-#define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val); 
-#define JD(key, val) fprintf(fh, "\"" #key"\" : %d , ",  val); 
-#define JD_NC(key, val) fprintf(fh, "\"" #key"\" : %d ",  val); 
-#define JU(key, val) fprintf(fh, "\"" #key"\" : %u , ",  val); 
-#define JU_NC(key, val) fprintf(fh, "\"" #key"\" : %u",  val); 
-#define JC fprintf(fh, ","); 
+#define ADDRESULT buf_add(&qry->result, line, strlen(line));
+#define AS(val)  buf_add(&qry->result, val, strlen (val));
+#define JS(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s\" , ",  val); ADDRESULT  
+#define JS_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH,"\"" #key"\" : \"%s\" ",  val); ADDRESULT 
+#define JSDOT(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s.\" , ",  val); ADDRESULT
+#define JS1(key, fmt, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : "#fmt" , ",  val); ADDRESULT
+#define JD(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d , ",  val); ADDRESULT
+#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d ",  val); ADDRESULT
+#define JU(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u , ",  val); ADDRESULT
+#define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val); ADDRESULT
+#define JC snprintf(line, DEFAULT_LINE_LENGTH, ","); ADDRESULT
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
 
@@ -50,6 +52,7 @@
 #define O_PREPEND_PROBE_ID  1004
 #define O_EVDNS 1005
 #define O_RETRY 1006
+#define O_OUTPUT_COBINED 1101
 
 #define DNS_FLAG_RD 0x0100
 
@@ -192,6 +195,7 @@ struct query_state {
 	int opt_rd;
 	int opt_prepend_probe_id;
 	int opt_evdns;
+	int opt_rset;
 	int opt_retry_max;
 	int retry;
 	int resolv_i;
@@ -228,6 +232,7 @@ struct query_state {
 	struct buf err; 
 	struct buf qbuf; 
 	struct buf packet;
+	struct buf result;
 	int qst ; 
 	char dst_addr_str[(INET6_ADDRSTRLEN+1)]; 
 	char loc_addr_str[(INET6_ADDRSTRLEN+1)]; 
@@ -362,9 +367,11 @@ static struct option longopts[]=
 	{ "evdns", no_argument, NULL, O_EVDNS },
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
+	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
+	
 	{ NULL, }
 };
-static char line[DEFAULT_LINE_LENGTH];
+static char line[(DEFAULT_LINE_LENGTH+1)];
 
 static void tdig_stats(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h);
 static int tdig_delete(void *state);
@@ -390,7 +397,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
         int* count);
 /* from tdig.c */
 
-void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh);
+void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry);
 
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
@@ -427,26 +434,28 @@ int evtdig_main(int argc, char **argv)
 	return 0;
 }
 
-void print_txt_json(unsigned char *rdata, int txt_len, FILE *fh)
+void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry)
 {
         int i;
 
-        fprintf(fh, ", \"RDATA\" : \"");
+        AS("\"RDATA\" : \"");
         for(i = 0; i < txt_len; i++) {
                 if( (*rdata == 34  ) || (*rdata == 92  ))  {
-                        fprintf(fh, "\\%c", *(char *)rdata  );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\%c", *(char *)rdata  );
+			buf_add(&qry->result, line, strlen (line));
                 }
                 // Space - DEL
                 else if ((*rdata > 31  ) && (*rdata < 128)) {
-                        fprintf(fh, "%c", *(char *)rdata );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "%c", *(char *)rdata );
+			buf_add(&qry->result, line, strlen (line));
                 }
                 else {
-                        fprintf(fh, "\\u00%02X", *rdata   );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\u00%02X", *rdata   );
+			buf_add(&qry->result, line, strlen (line));
                 }
                 rdata++;
         }
-
-        fprintf(fh, "\"");
+        AS("\"");
 }
 
 static void local_exit(void *state UNUSED_PARAM)
@@ -468,7 +477,7 @@ static void local_exit(void *state UNUSED_PARAM)
 	   event_base_loopbreak(event_base);
 	   event_base_free(event_base);
 	   terminator(qry);
-	   */
+	*/
 	fprintf(stderr, "And we are done\n");
 	exit(0);
 }
@@ -775,7 +784,7 @@ static void next_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM
 /* The callback to handle timeouts due to destination host unreachable condition */
 static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	struct timeval asap = { 0, 0 };
+	struct timeval asap = { 1, 1 };
 	struct query_state *qry = h;
 	qry->base->timeout++;
 	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", DEFAULT_NOREPLY_TIMEOUT);
@@ -1084,6 +1093,60 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	return;
 }
 
+static bool argProcess (int argc, char *argv[], struct query_state *qry )
+{
+	if( qry->opt_resolv_conf) {
+		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
+		if(tdig_base->resolv_max ) {
+			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+		}
+		else {
+			/* may be the /etc/resolv.conf is yet to red
+			 * try once then use it || give up */
+
+			get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
+			if(tdig_base->resolv_max ){
+				qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+			}
+		}
+	}
+	else if (optind != argc-1)  {
+		crondlog(LVL9 "ERROR no server IP address in input");
+		tdig_delete(qry);
+		return TRUE;
+	}
+	else 
+		qry->server_name = strdup(argv[optind]);
+
+	if (qry->lookupname == NULL) {
+		crondlog(LVL9 "ERROR no query in command line");
+		tdig_delete(qry);
+		return TRUE;
+	}
+
+	if (qry->lookupname[strlen(qry->lookupname) - 1] != '.') {
+		crondlog(LVL9 "ERROR query %s does not end with a dot ", qry->lookupname);
+		tdig_delete(qry);
+		return TRUE;
+	}
+
+	if (qry->out_filename &&
+		!validate_filename(qry->out_filename, SAFE_PREFIX))
+	{
+		crondlog(LVL8 "insecure file '%s'", qry->out_filename);
+		tdig_delete(qry);
+		return TRUE;
+	}
+
+
+	if(qry->opt_v6_only  == 0)
+	{
+		qry->opt_v4_only = 1;
+		qry->opt_AF = AF_INET;
+	}
+	return FALSE;
+}
+
 /* this called for each query/line in eperd */
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 {
@@ -1127,6 +1190,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
 	qry->opt_evdns = 0;
+	qry->opt_rset = 0;
 	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
 	qry->ressent = NULL;
@@ -1239,6 +1303,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_resolv_conf = 1;
 				qry->opt_v6_only = 1;
 				qry->opt_v4_only = 1;
+				qry->opt_rset = 1;
 				break;
 
 			case O_PREPEND_PROBE_ID:
@@ -1352,56 +1417,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 		}
 	}
-	if( qry->opt_resolv_conf) {
-		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
-		if(tdig_base->resolv_max ) {
-			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-		}
-		else {
-			/* may be the /etc/resolv.conf is yet to red
-			 * try once then use it || give up */
 
-			get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
-			if(tdig_base->resolv_max ){
-				qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-			}
-		}
-	}
-	else if (optind != argc-1)  {
-		crondlog(LVL9 "ERROR no server IP address in input");
-		tdig_delete(qry);
-		return NULL;
-	}
-	else 
-		qry->server_name = strdup(argv[optind]);
+	if(argProcess(argc, argv, qry))
+			return NULL;
 
-	if (qry->lookupname == NULL) {
-		crondlog(LVL9 "ERROR no query in command line");
-		tdig_delete(qry);
-		return NULL;
-	}
-
-	if (qry->lookupname[strlen(qry->lookupname) - 1] != '.') {
-		crondlog(LVL9 "ERROR query %s does not end with a dot ", qry->lookupname);
-		tdig_delete(qry);
-		return NULL;
-	}
-
-
-	if (qry->out_filename &&
-		!validate_filename(qry->out_filename, SAFE_PREFIX))
-	{
-		crondlog(LVL8 "insecure file '%s'", qry->out_filename);
-		tdig_delete(qry);
-		return NULL;
-	}
-
-
-	if(qry->opt_v6_only  == 0)
-	{
-		qry->opt_v4_only = 1;
-		qry->opt_AF = AF_INET;
-	}
 	qry->base = tdig_base;
 
 	/* insert this qry into the list of queries */
@@ -1424,8 +1443,12 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 		crondlog(LVL7 " qry %s qry->prev %s qry->next  %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
 		crondlog(LVL7 "new head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
 	}
+
 	return qry;
 }
+
+
+
 
 /* called only once. Initialize tdig_base variables here */
 struct tdig_base * tdig_base_new(struct event_base *event_base)
@@ -1663,6 +1686,8 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	struct tdig_base *base;
 	struct query_state *qry;
 
+	
+
 	base = h;	
 	if(!base->qry_head )
 		return;
@@ -1672,6 +1697,13 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	if(! base->sentok )
 		return;
 
+	if(qry->base->done) {
+		now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+		now.tv_usec =  0;
+		event_add(&tdig_base->statsReportEvent, &now);
+		return;
+	}
+
 	if (qry->out_filename) {
 		fh= fopen(qry->out_filename, "a");
 		if (!fh)
@@ -1680,7 +1712,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	else
 		fh = stdout;  
 
-	fprintf(fh, "RESULT { ");
+	AS("RESULT { ");
 	JS(id, "9201" ); 
 	gettimeofday(&now, NULL); 
 	JS1(time, %ld,  now.tv_sec);
@@ -1695,7 +1727,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JU(martian, base->martian);
 	JU_NC(q, base->activeqry);
 
-	fprintf(fh, " }\n");
+	AS(" }\n");
 	if (qry->out_filename) 
 		fclose (fh);
 	// reuse timeval now
@@ -1761,7 +1793,6 @@ static void free_qry_inst(struct query_state *qry)
 	if ( qry->opt_resolv_conf) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
-		qry->resolv_i++;
 		if(qry->resolv_i < tdig_base->resolv_max) {
 			if(qry->server_name) {
 				free (qry->server_name);
@@ -1772,8 +1803,6 @@ static void free_qry_inst(struct query_state *qry)
 			evtimer_add(&qry->next_qry_timer, &asap);
 			return;
 		}
-		else 
-			qry->resolv_i++;
 	}
 
 	switch(qry->qst){
@@ -1867,22 +1896,18 @@ void printErrorQuick (struct query_state *qry)
 
 	fprintf(fh, "RESULT { ");
 
-	JS(id, "9202");
+	fprintf(fh,"\"id\" :9202");
 	gettimeofday(&now, NULL);
-	JS1(time, %ld,  now.tv_sec);
+	fprintf(fh, "\"time\" : %ld ,",  now.tv_sec);
 
-	snprintf(line, DEFAULT_LINE_LENGTH, "\"query busy\": \"too frequent."
-			"previous one is not done yet\"");
-	fprintf(fh, "\"error\" : [{ %s }" , line);
+	fprintf(fh, "\"error\" : [{ ");
+	fprintf(fh, "\"query busy\": \"too frequent. previous one is not done yet\"}");
 	if(qry->str_Atlas)
 	{
-		fprintf(fh, ",{" , line);
-		JS_NC(id,  qry->str_Atlas);
-		fprintf(fh, "}" , line);
+		fprintf(fh, ",{\"id\" \"%s\"}",  qry->str_Atlas);
 	}
-	fprintf(fh, "]");
+	fprintf(fh,"]}");
 
-	fprintf(fh, " }");
 	fprintf(fh, "\n");
 	if (qry->out_filename)
 		fclose(fh);
@@ -1896,36 +1921,41 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	struct DNS_HEADER *dnsR = NULL;
 	struct RES_RECORD answers[20]; //the replies from the DNS server
 	void *ptr = NULL;
-	char addrstr[100];
 	FILE *fh; 
-	//char buf[INET6_ADDRSTRLEN];
+	char addrstr[INET6_ADDRSTRLEN];
 	u_int32_t serial;
 	struct buf tmpbuf;
 	char str[4]; 
 	int iMax ;
 	int flagAnswer = 1;
 	int data_len;
+	int write_out = FALSE;
 
-	if (qry->out_filename)
-	{
-		fh= fopen(qry->out_filename, "a");
-		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
-					qry->out_filename);
-	}
-	else
-		fh = stdout;
+	if(! qry->result.size){
+		buf_init(&qry->result, -1);
 
-	fprintf(fh, "RESULT { ");
-	if(qry->str_Atlas) 
-	{
-		JS(id,  qry->str_Atlas);
+		AS("RESULT { ");
+
+		if(qry->str_Atlas) 
+		{
+			JS(id,  qry->str_Atlas);
+		}
+
+		if (qry->opt_rset){
+			JS1(time, %ld,  qry->xmit_time.tv_sec);
+			AS("\"resultset\" : [ {");
+		}
 	}
+	else if(qry->opt_rset) {
+		AS (",{");
+	}
+
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
 	if ( qry->opt_resolv_conf ) {
 		JD (subid, (qry->resolv_i+1));
 		JD (submax, qry->base->resolv_max);
 	}
+
 	if( qry->ressent && qry->server_name)
 	{  // started to send query
 	   // historic resaons only works with UDP 
@@ -1938,7 +1968,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				ptr = &((struct sockaddr_in6 *) qry->ressent->ai_addr)->sin6_addr;
 				break;
 		}
-		inet_ntop (qry->ressent->ai_family, ptr, addrstr, 100);
+		inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
 		if(strcmp(addrstr, qry->server_name)) {
 			JS(name,  qry->server_name);
 		}
@@ -1956,25 +1986,25 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	else if(qry->server_name) {
 			JS(dst_name,  qry->server_name);
 	}
-
+	
 	if(qry->loc_sin6.sin6_family) {
-		line[0]  = '\0';
 		getnameinfo((struct sockaddr *)&qry->loc_sin6,
-				qry->loc_socklen, line, sizeof(line),
+				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
 				NULL, 0, NI_NUMERICHOST);
-		if(strlen(line)) 
-			JS(src_addr, line); 
+		if(strlen(addrstr)) 
+			JS(src_addr, addrstr); 
 	}
+	
 	if(qry->retry) {
 		JS1(retry, %d,  qry->retry);
 	}
 
 	JS_NC(proto, qry->opt_proto == 6 ? "TCP" : "UDP" );
+
 	if(qry->opt_qbuf && qry->qbuf.size) {
-		str[0]  = '\0';
-		buf_add(&qry->qbuf, str, 1);
-		JC;
-		JS_NC(qbuf, qry->qbuf.buf );
+		AS(",\"qbuf\" : \"");
+		buf_add(&qry->result,  qry->qbuf.buf,  qry->qbuf.size);
+		AS("\" ");
 	} 
 
 	if(result)
@@ -1987,28 +2017,26 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		//move ahead of the dns header and the query field
 		reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
 
-		fprintf (fh, ", \"result\" : { ");
-		fprintf (fh, " \"rt\" : %.3f", qry->triptime);
-		fprintf (fh, " , \"size\" : %d", wire_size);
-		fprintf (fh, " , \"ID\" : %d", ntohs(dnsR->id));
+		snprintf(line, DEFAULT_LINE_LENGTH, ",\"result\" : { \"rt\" : %.3f,", qry->triptime);
+		buf_add(&qry->result,line, strlen(line));
+
+		JD (size,  wire_size);
+		JU (ID, ntohs(dnsR->id));
 		/*
 		fprintf (fh, " , \"RCODE\" : %d",  dnsR->rcode);
 		fprintf (fh, " , \"AA\" : %d",  dnsR->aa);
 		fprintf (fh, " , \"TC\" : %d",  dnsR->tc);
 		*/
-		fprintf (fh, " , \"ANCOUNT\" : %d ", ntohs(dnsR->ans_count ));
-		fprintf (fh, " , \"QDCOUNT\" : %u ",ntohs(dnsR->q_count));
-		fprintf (fh, " , \"NSCOUNT\" : %d" , ntohs(dnsR->ns_count));
-		fprintf (fh, " , \"ARCOUNT\" : %d ",ntohs(dnsR->add_count));
+		JU (ANCOUNT, ntohs(dnsR->ans_count ));
+		JU (QDCOUNT, ntohs(dnsR->q_count));
+		JU (NSCOUNT, ntohs(dnsR->ns_count));
+		JU (ARCOUNT, ntohs(dnsR->add_count));
 
-		str[0]  = '\0'; 
 		if(qry->opt_abuf) {
-			JC;
-			buf_init(&tmpbuf, -1);
-			buf_add_b64(&tmpbuf, result, wire_size, 0);
-			buf_add(&tmpbuf, str, 1);
-			JS_NC(abuf, tmpbuf.buf );
-			buf_cleanup(&tmpbuf); 
+			snprintf(line, DEFAULT_LINE_LENGTH, "\"abuf\" : \"");
+			buf_add(&qry->result,line, strlen(line));
+			buf_add_b64(&qry->result, result, wire_size, 0);
+			AS("\"");
 		}
 
 		stop=0;  
@@ -2036,34 +2064,33 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					data_len = ntohs(answers[i].resource->data_len) - 1;
 
 					if(flagAnswer) {
-						fprintf (fh, ", \"answers\" : [ ");
+						AS(",\"answers\" : [ ");
 						flagAnswer = 0;
 					}
 					if (flagAnswer == 0) {
 						if(i > 0) 
-							fprintf(fh, ", ");
-						fprintf(fh, " { ");
+							AS(",");
+						AS("{");
 					}
-					fprintf(fh, " \"TYPE\" : \"TXT\"");
-					fprintf(fh, " , \"NAME\" : \"%s.\" ",answers[i].name);
-					print_txt_json(&result[reader-result+1], data_len, fh);
+					JS (TYPE, "TXT");
+					JS (NAME, answers[i].name);
+					print_txt_json(&result[reader-result+1], data_len, qry);
 					reader = reader + ntohs(answers[i].resource->data_len);
 					if(flagAnswer == 0) 
-						fprintf(fh, " } ");
+						AS("}");
 
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
 					if(flagAnswer) {
-						fprintf (fh, ", \"answers\" : [ ");
+						AS(",\"answers\" : [ ");
 						flagAnswer = 0;
 					}
 					if (flagAnswer == 0) {
-					if(i > 0) 
-						fprintf(fh, ", ");
-					fprintf(fh, " { ");
+						if(i > 0) 
+							AS(",");
+						AS(" { ");
 					}
-
 	
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
@@ -2084,7 +2111,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					reader =  reader + 4;
 					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
 					if(flagAnswer == 0) 
-						fprintf(fh, " } ");
+						AS(" } ");
 				}
 				else  
 				{
@@ -2093,13 +2120,12 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
 	
-				fflush(fh);
 				// free mem 
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
 			}
 			if(flagAnswer == 0) 
-				fprintf (fh, " ]");
+				AS(" ]");
 		}
 
 		for(i=0;i<iMax;i++)
@@ -2107,18 +2133,53 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			free(answers[i].name);
 		}
 
-		fprintf (fh , " }"); //result
+		AS (" }"); //result {
 	} 
 	if(qry->err.size) 
 	{
-		line[0]  = '\0';
-		buf_add(&qry->err, line, 1 );
-		fprintf(fh, ", \"error\" : { %s }" , qry->err.buf);
+		AS(", \"error\" : {");
+		buf_add(&qry->result,qry->err.buf, qry->err.size);
+		AS("}"); 
 	}
-	fprintf(fh, " }");
-	fprintf(fh, "\n");
-	if (qry->out_filename)
-		fclose(fh);
+
+	/* end of result only JSON closing brackets from here on */
+
+	if(qry->opt_rset) {
+			AS("}");  /* resultset : [{ } */
+	}
+	else {
+		write_out = TRUE;
+	}
+
+	if(qry->opt_resolv_conf){
+		qry->resolv_i++;
+
+		if(qry->resolv_i >= tdig_base->resolv_max) {
+			write_out = TRUE;
+			if(qry->opt_rset) {
+				AS ("]"); /* reseultset : [{}] */
+			}
+		}
+	}
+
+	if(write_out && qry->result.size){
+		if (qry->out_filename)
+		{
+			fh= fopen(qry->out_filename, "a");
+			if (!fh)
+				crondlog(DIE9 "unable to append to '%s'",
+						qry->out_filename);
+		}
+		else
+			fh = stdout;
+
+		AS (" }\n");   /* RESULT { } */
+		fprintf(fh, "%s", qry->result.buf);
+		buf_cleanup(&qry->result);
+
+		if (qry->out_filename)
+			fclose(fh);
+	}
 	qry->retry = 0;
 	free_qry_inst(qry);
 }
