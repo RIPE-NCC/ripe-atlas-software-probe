@@ -1685,6 +1685,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	FILE *fh;	
 	struct tdig_base *base;
 	struct query_state *qry;
+	u_int32_t fw;
 
 	
 
@@ -1714,6 +1715,8 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 
 	AS("RESULT { ");
 	JS(id, "9201" ); 
+	fw = get_atlas_fw_version();
+	JU(fw, fw);
 	gettimeofday(&now, NULL); 
 	JS1(time, %ld,  now.tv_sec);
 	JU(sok , base->sentok);
@@ -1896,6 +1899,7 @@ void printErrorQuick (struct query_state *qry)
 
 	fprintf(fh, "RESULT { ");
 
+	fprintf(fh, "\"fw\" : \"%d\"", get_atlas_fw_version());
 	fprintf(fh,"\"id\" :9202");
 	gettimeofday(&now, NULL);
 	fprintf(fh, "\"time\" : %ld ,",  now.tv_sec);
@@ -1930,6 +1934,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	int flagAnswer = 1;
 	int data_len;
 	int write_out = FALSE;
+	u_int32_t fw;
 
 	if(! qry->result.size){
 		buf_init(&qry->result, -1);
@@ -1940,6 +1945,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		{
 			JS(id,  qry->str_Atlas);
 		}
+
+		fw = get_atlas_fw_version();
+		JU(fw, fw);
 
 		if (qry->opt_rset){
 			JS1(time, %ld,  qry->xmit_time.tv_sec);
