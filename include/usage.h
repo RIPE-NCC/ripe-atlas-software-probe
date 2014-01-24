@@ -1062,7 +1062,7 @@
 
 #define evtraceroute_trivial_usage \
 	"-[46FIrTU] [-a <paris mod>] [-c <count>] [-f <hop>]" \
-"\n	[-g <gap>] [-m <hop>] [-w <ms>] [-z <ms>] [-A <string>] [-O <file>]" \
+"\n	[-g <gap>] [-m <hop>] [-p <port>] [-w <ms>] [-z <ms>] [-A <string>] [-O <file>]" \
 "\n	[-S <size>]" 
 
 #define evtraceroute_full_usage "\n" \
@@ -1078,6 +1078,7 @@
      "\n	-f <hop>		Starting hop" \
      "\n	-g <gap>		Gap limit" \
      "\n	-m <hop>		Max hops" \
+     "\n	-p <port>		Destination port" \
      "\n	-w <timeout>		No reply timeout (ms)" \
      "\n	-z <timeout>		Dup timeout (ms)" \
      "\n	-A <string>		Atlas measurement ID" \
