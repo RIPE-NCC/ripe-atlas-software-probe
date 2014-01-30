@@ -1538,7 +1538,9 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 
 static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_state *qry) {
 	if (err)  {
-		snprintf(line, DEFAULT_LINE_LENGTH, "\"evdns_getaddrinfo\": \"%s\"", evutil_gai_strerror(err));
+		snprintf(line, DEFAULT_LINE_LENGTH, "\"evdns_getaddrinfo\": "
+				"\"%s %s\"", qry->server_name, 
+				evutil_gai_strerror(err));
 		buf_add(&qry->err, line, strlen(line));
 		printReply (qry, 0, NULL);
 		return ;
@@ -2182,7 +2184,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			fh = stdout;
 
 		AS (" }\n");   /* RESULT { } */
-		fprintf(fh, "%s", qry->result.buf);
+		fwrite(qry->result.buf, qry->result.size, 1 , fh);
 		buf_cleanup(&qry->result);
 
 		if (qry->out_filename)
