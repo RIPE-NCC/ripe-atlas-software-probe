@@ -42,7 +42,7 @@ static int resolv_conf_parse_line (char *nsentry, char *line)
 } 
 
 void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
-		int *resolv_max, int *resolv_cur)
+		int *resolv_max)
 {
 
 #ifndef RESOLV_CONF 
@@ -108,6 +108,5 @@ void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2],
 	last_time = sb.st_mtime;
 
 	*resolv_max = i;
-	*resolv_cur = 0;
 	return;
 }

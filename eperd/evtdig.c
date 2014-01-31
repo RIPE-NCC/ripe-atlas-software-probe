@@ -549,8 +549,7 @@ static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, 
 		i++;
 		if (qry->qryid == idx)
 		{
-			//AA chnage to LVL5
-			crondlog(LVL7 "found matching query id %d", idx);
+			crondlog(LVL5 "found matching query id %d", idx);
 			if( qry->ressent && ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
 				crondlog(LVL7 "matching id and address id %d", idx);
 				return qry;
@@ -1096,18 +1095,10 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 static bool argProcess (int argc, char *argv[], struct query_state *qry )
 {
 	if( qry->opt_resolv_conf) {
-		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
+		qry->resolv_i = 0;
+		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max);
 		if(tdig_base->resolv_max ) {
 			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-		}
-		else {
-			/* may be the /etc/resolv.conf is yet to red
-			 * try once then use it || give up */
-
-			get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
-			if(tdig_base->resolv_max ){
-				qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-			}
 		}
 	}
 	else if (optind != argc-1)  {
@@ -1567,9 +1558,10 @@ void tdig_start (struct query_state *qry)
 	switch(qry->qst)
 	{
 		case STATUS_FREE :
+			qry->resolv_i = 0;
 			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  tdig_base->resolv_max);
 			if( qry->opt_resolv_conf) {
-				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max, &qry->resolv_i);
+				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
 				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
 				if(tdig_base->resolv_max ) {
 					qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
@@ -1592,15 +1584,6 @@ void tdig_start (struct query_state *qry)
 			printErrorQuick(qry);
 			return ;
 	}
-/* AAA do we need this bit?
-	if(qry->resolv_i > tdig_base->resolv_max) {
-		qry->resolv_i = 0;
-		free (qry->server_name);
-		qry->server_name = NULL;
-		qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-		qry->resolv_i++;
-	}
-*/
 
 	bzero(&hints, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -1764,7 +1747,7 @@ static void ChangetoDnsNameFormat(u_char *  dns, char* qry)
 
 static void free_qry_inst(struct query_state *qry)
 {
-	struct timeval asap = { 0, 0 };
+	struct timeval asap = { 1, 0 };
 	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
 
 	if(qry->err.size) 
