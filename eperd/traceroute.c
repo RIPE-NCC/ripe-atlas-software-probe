@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:m:p:w:z:A:O:S:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:m:p:w:z:A:O:S:H:D:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -95,7 +95,7 @@ struct trtstate
 	/* Parameters */
 	char *atlas;
 	char *hostname;
-	char *destportstr;
+	const char *destportstr;
 	char *out_filename;
 	char do_Xicmp;
 	char do_tcp;
@@ -105,6 +105,8 @@ struct trtstate
 	char delay_name_res;
 	char trtcount;
 	unsigned short maxpacksize;
+	unsigned short hbhoptsize;
+	unsigned short destoptsize;
 	unsigned char firsthop;
 	unsigned char maxhops;
 	unsigned char gaplimit;
@@ -188,6 +190,64 @@ struct v6info
 	uint32_t seq;
 	struct timeval tv;
 };
+
+#define OPT_PAD1 0
+#define OPT_PADN 1
+static void do_hbh_dest_opt(struct trtbase *base, int sock, int hbh_dest,
+	unsigned size)
+{
+	int i;
+	size_t totsize, ehlen, padlen;
+
+	if (size == 0)
+	{
+		setsockopt(sock, IPPROTO_IPV6,
+			hbh_dest ? IPV6_DSTOPTS : IPV6_HOPOPTS, NULL, 0);
+		return;
+	}
+
+	/* Compute the totsize we need */
+	totsize = 2 + size;
+	if (totsize % 8)
+		totsize += 8 - (totsize % 8);
+
+	/* Consistency check */
+	if (totsize > sizeof(base->packet))
+		return;
+
+	ehlen= totsize/8 - 1;
+	if (ehlen > 255)
+		return;
+
+	memset(base->packet, '\0', totsize);
+	base->packet[1]= ehlen;
+	for (i= 2; i<totsize;)
+	{
+		padlen= totsize-i;
+		if (padlen == 1)
+		{
+			base->packet[i]= OPT_PAD1;
+			i++;
+			continue;
+		}
+		padlen -= 2;
+		if (padlen > 255)
+			padlen= 255;
+		base->packet[i]= OPT_PADN;
+		base->packet[i+1]= padlen;
+		i += 2+padlen;
+	}
+	if (hbh_dest)
+	{
+		setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, base->packet,
+			totsize);
+	}
+	else
+	{
+		setsockopt(sock, IPPROTO_IPV6, IPV6_HOPOPTS, base->packet,
+			totsize);
+	}
+}
 
 static int in_cksum(unsigned short *buf, int sz)
 {
@@ -461,6 +521,19 @@ static void send_pkt(struct trtstate *state)
 			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
 				sizeof(on));
 
+#if 1
+			if (state->hbhoptsize != 0)
+			{
+				do_hbh_dest_opt(base, sock, 0 /* hbh */,
+					 state->hbhoptsize);
+			}
+			if (state->destoptsize != 0)
+			{
+				do_hbh_dest_opt(base, sock, 1 /* dest */,
+					 state->destoptsize);
+			}
+#endif
+
 			/* Bind to source addr/port */
 			r= bind(sock,
 				(struct sockaddr *)&state->loc_sin6,
@@ -567,6 +640,11 @@ static void send_pkt(struct trtstate *state)
 			setsockopt(base->v6icmp_snd, IPPROTO_IPV6,
 					IPV6_MTU_DISCOVER, &on, sizeof(on));
 
+			do_hbh_dest_opt(base, base->v6icmp_snd, 0 /* hbh */,
+					 state->hbhoptsize);
+			do_hbh_dest_opt(base, base->v6icmp_snd, 1 /* dest */,
+					 state->destoptsize);
+
 			icmp6_hdr= (struct icmp6_hdr *)base->packet;
 			icmp6_hdr->icmp6_type= ICMP6_ECHO_REQUEST;
 			icmp6_hdr->icmp6_code= 0;
@@ -666,6 +744,17 @@ static void send_pkt(struct trtstate *state)
 			on= 1;
 			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
 				sizeof(on));
+
+			if (state->hbhoptsize != 0)
+			{
+				do_hbh_dest_opt(base, sock, 0 /* hbh */,
+					 state->hbhoptsize);
+			}
+			if (state->destoptsize != 0)
+			{
+				do_hbh_dest_opt(base, sock, 1 /* dest */,
+					 state->destoptsize);
+			}
 
 			/* Bind to source addr/port */
 			r= bind(sock,
@@ -1828,7 +1917,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
-printf("nrecv=%d\n", nrecv);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"size\":%d",
 				ip->ip_ttl, (int)nrecv-IPHDR-ICMP_MINLEN);
@@ -2252,7 +2340,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		inet_ntoa(remote.sin_addr));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
-		ip->ip_ttl, (int)nrecv - IPHDR - sizeof(*tcphdr));
+		ip->ip_ttl, (int)(nrecv - IPHDR - sizeof(*tcphdr)));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
@@ -2434,7 +2522,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		inet_ntop(AF_INET6, &remote.sin6_addr, buf, sizeof(buf)));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
-		rcvdttl, (int)nrecv - sizeof(*tcphdr));
+		rcvdttl, (int)(nrecv - sizeof(*tcphdr)));
 	add_str(state, line);
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
@@ -2485,12 +2573,13 @@ static void ready_callback6(int __attribute((unused)) unused,
 {
 	ssize_t nrecv;
 	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset;
-	unsigned nextmtu, seq;
+	unsigned nextmtu, seq, optlen, hbhoptsize, dstoptsize;
 	size_t ehdrsiz, v6info_siz, siz;
 	struct trtbase *base;
 	struct trtstate *state;
 	struct ip6_hdr *eip;
 	struct ip6_frag *frag;
+	struct ip6_ext *opthdr;
 	struct icmp6_hdr *icmp, *eicmp;
 	struct tcphdr *etcp;
 	struct udphdr *eudp;
@@ -2561,6 +2650,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 	icmp= (struct icmp6_hdr *)&base->packet;
 
+	hbhoptsize= 0;
+	dstoptsize= 0;
 	if (icmp->icmp6_type == ICMP6_DST_UNREACH ||
 		icmp->icmp6_type == ICMP6_PACKET_TOO_BIG ||
 		icmp->icmp6_type == ICMP6_TIME_EXCEEDED)
@@ -2579,6 +2670,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 		/* Make sure we have TCP, UDP, ICMP or a fragment header */
 		if (eip->ip6_nxt == IPPROTO_FRAGMENT ||
+			eip->ip6_nxt == IPPROTO_HOPOPTS ||
+			eip->ip6_nxt == IPPROTO_DSTOPTS ||
 			eip->ip6_nxt == IPPROTO_TCP ||
 			eip->ip6_nxt == IPPROTO_UDP ||
 			eip->ip6_nxt == IPPROTO_ICMPV6)
@@ -2586,6 +2679,35 @@ static void ready_callback6(int __attribute((unused)) unused,
 			ehdrsiz= 0;
 			frag= NULL;
 			nxt= eip->ip6_nxt;
+			ptr= &eip[1];
+			if (nxt == IPPROTO_HOPOPTS)
+			{
+				/* Make sure the options header is completely
+				 * there.
+				 */
+				if (nrecv < sizeof(*icmp) + sizeof(*eip)
+					+ sizeof(*opthdr))
+				{
+#if 0
+					printf(
+			"ready_callback6: too short %d (icmp+ip+opt)\n",
+						(int)nrecv);
+#endif
+					return;
+				}
+				opthdr= (struct ip6_ext *)&eip[1];
+				hbhoptsize= 8*opthdr->ip6e_len;
+				optlen= hbhoptsize+8;
+				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
+					optlen)
+				{
+					/* Does not contain the full header */
+					return;
+				}
+				ehdrsiz= optlen;
+				nxt= opthdr->ip6e_nxt;
+				ptr= ((char *)opthdr)+optlen;
+			}
 			if (nxt == IPPROTO_FRAGMENT)
 			{
 				/* Make sure the fragment header is completely
@@ -2611,6 +2733,35 @@ static void ready_callback6(int __attribute((unused)) unused,
 				}
 				ehdrsiz= sizeof(*frag);
 				nxt= frag->ip6f_nxt;
+				ptr= &frag[1];
+			}
+			if (nxt == IPPROTO_DSTOPTS)
+			{
+				/* Make sure the options header is completely
+				 * there.
+				 */
+				if (nrecv < sizeof(*icmp) + sizeof(*eip)
+					+ sizeof(*opthdr))
+				{
+#if 0
+					printf(
+			"ready_callback6: too short %d (icmp+ip+opt)\n",
+						(int)nrecv);
+#endif
+					return;
+				}
+				opthdr= (struct ip6_ext *)&eip[1];
+				dstoptsize= 8*opthdr->ip6e_len;
+				optlen= dstoptsize+8;
+				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
+					optlen)
+				{
+					/* Does not contain the full header */
+					return;
+				}
+				ehdrsiz= optlen;
+				nxt= opthdr->ip6e_nxt;
+				ptr= ((char *)opthdr)+optlen;
 			}
 
 			v6info_siz= sizeof(*v6info);
@@ -2643,7 +2794,6 @@ static void ready_callback6(int __attribute((unused)) unused,
 			eudp= NULL;
 			eicmp= NULL;
 			v6info= NULL;
-			ptr= (frag ? (void *)&frag[1] : (void *)&eip[1]);
 			if (nxt == IPPROTO_TCP)
 			{
 				etcp= (struct tcphdr *)ptr;
@@ -2660,11 +2810,14 @@ static void ready_callback6(int __attribute((unused)) unused,
 			}
 
 #if 0
-			printf(
+			if (v6info)
+			{
+				printf(
 "ready_callback6: pid = htonl(%d), id = htonl(%d), seq = htonl(%d)\n",
-				ntohl(v6info->pid),
-				ntohl(v6info->id),
-				ntohl(v6info->seq));
+					ntohl(v6info->pid),
+					ntohl(v6info->id),
+					ntohl(v6info->seq));
+			}
 #endif
 
 			if (etcp)
@@ -2818,12 +2971,24 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			add_str(state, line);
 			snprintf(line, sizeof(line),
 				", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
-				rcvdttl, ms, (int)nrecv-ICMP6_HDR);
+				rcvdttl, ms, (int)(nrecv-ICMP6_HDR));
 			add_str(state, line);
 			if (eip->ip6_hops != 1)
 			{
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip6_hops);
+				add_str(state, line);
+			}
+			if (hbhoptsize)
+			{
+				snprintf(line, sizeof(line),
+					", \"hbhoptsize\":%d", hbhoptsize);
+				add_str(state, line);
+			}
+			if (dstoptsize)
+			{
+				snprintf(line, sizeof(line),
+					", \"dstoptsize\":%d", dstoptsize);
 				add_str(state, line);
 			}
 
@@ -3075,7 +3240,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		add_str(state, line);
 		snprintf(line, sizeof(line),
 			", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
-			rcvdttl, ms, (int)nrecv - ICMP6_HDR);
+			rcvdttl, ms, (int)(nrecv - ICMP6_HDR));
 		add_str(state, line);
 
 #if 0
@@ -3195,12 +3360,13 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	uint32_t opt;
 	int i, do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
-		parismod, timeout; /* must be int-sized */
+		hbhoptsize, destoptsize, parismod, timeout;
+		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
 	const char *hostname;
 	char *out_filename;
-	char *destportstr;
+	const char *destportstr;
 	char *check;
 	struct trtstate *state;
 	sa_family_t af;
@@ -3226,14 +3392,15 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	parismod= 16;
 	str_Atlas= NULL;
 	out_filename= NULL;
-	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+";
+	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
 
 for (i= 0; argv[i] != NULL; i++)
 	printf("argv[%d] = '%s'\n", i, argv[i]);
 
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
 		&firsthop, &gaplimit, &maxhops, &destportstr, &timeout,
-		&duptimeout, &str_Atlas, &out_filename, &maxpacksize);
+		&duptimeout, &str_Atlas, &out_filename, &maxpacksize,
+		&hbhoptsize, &destoptsize);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -3319,6 +3486,8 @@ for (i= 0; argv[i] != NULL; i++)
 	state->do_v6= do_v6;
 	state->dont_fragment= dont_fragment;
 	state->delay_name_res= delay_name_res;
+	state->hbhoptsize= hbhoptsize;
+	state->destoptsize= destoptsize;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 	state->base= trt_base;
 	state->busy= 0;
