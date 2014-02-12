@@ -1086,6 +1086,8 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 			}
 			offset += size;
 
+			fprintf(stderr, "httppost: chunk data '%.*s'\n", 
+				size, buffer);
 			for (i= 0; i<size; i++)
 			{
 				if (!okp)
@@ -1178,6 +1180,9 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 			return 0;
 		}
 		offset += size;
+
+		fprintf(stderr, "httppost: normal data '%.*s'\n", 
+				size, buffer);
 
 		for (i= 0; i<size; i++)
 		{
