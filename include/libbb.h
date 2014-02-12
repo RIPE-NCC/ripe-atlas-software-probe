@@ -313,6 +313,7 @@ extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 
 extern int validate_filename(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
+extern int get_probe_id(void);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;

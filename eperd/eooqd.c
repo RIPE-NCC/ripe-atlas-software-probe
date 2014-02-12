@@ -17,6 +17,7 @@
 #define SUFFIX 		".curr"
 #define OOQD_NEW_PREFIX	"/home/atlas/data/new/ooq"
 #define OOQD_OUT	"/home/atlas/data/ooq.out/ooq"
+#define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */
@@ -34,7 +35,7 @@ struct slot
 static struct 
 {
 	char *queue_file;
-	char *atlas_id;
+	const char *atlas_id;
 	char curr_qfile[256];
 	FILE *curr_file;
 	int max_busy;
@@ -59,7 +60,6 @@ static struct builtin
 
 static const char *atlas_id;
 
-static void process(FILE *file);
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
 
@@ -71,12 +71,15 @@ static void post_results(void);
 static void skip_space(char *cp, char **ncpp);
 static void skip_nonspace(char *cp, char **ncpp);
 static void find_eos(char *cp, char **ncpp);
+static void check_resolv_conf2(const char *out_file, const char *atlasid);
+static const char *get_session_id(void);
+
+extern int httppost_main(int argc, char *argv[]); /* in networking/httppost.c */
 
 int eooqd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int eooqd_main(int argc, char *argv[])
 {
 	int r;
-	uint32_t opt;
 	char *pid_file_name;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
@@ -84,7 +87,7 @@ int eooqd_main(int argc, char *argv[])
 	atlas_id= NULL;
 	pid_file_name= NULL;
 
-	opt = getopt32(argv, "A:P:", &atlas_id, &pid_file_name);
+	(void)getopt32(argv, "A:P:", &atlas_id, &pid_file_name);
 
 	if (argc != optind+1)
 	{
@@ -145,38 +148,7 @@ int eooqd_main(int argc, char *argv[])
 	tv.tv_sec= 60;
 	tv.tv_usec= 0;
 	event_add(rePostEvent, &tv);
-#if 0
-	for(;;)
-	{
-		/* Try to move queue_file to curr_qfile. This provide at most
-		 * once behavior and allows producers to create a new
-		 * queue_file while we process the old one.
-		 */
-		if (rename(queue_file, curr_qfile) == -1)
-		{
-			if (errno == ENOENT)
-			{
-				sleep(WAIT_TIME);
-				continue;
-			}
-			report_err("rename failed");
-			return 1;
-		}
 
-		file= fopen(curr_qfile, "r");
-		if (file == NULL)
-		{
-			report_err("open '%s' failed", curr_qfile);
-			continue;
-		}
-
-		process(file);
-
-		fclose(file);
-
-		/* No need to delete curr_qfile */
-	}
-#endif
 	r= event_base_loop(EventBase, 0);
 	if (r != 0)
 		crondlog(LVL9 "event_base_loop failed");
@@ -214,6 +186,8 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 	{
 		add_line();
 	}
+
+	check_resolv_conf2(NULL, atlas_id);
 }
 
 static void add_line(void)
@@ -361,7 +335,7 @@ static void add_line(void)
 	for (i= 0; i<argc; i++)
 		crondlog(LVL7 "atlas_run: argv[%d] = '%s'", i, argv[i]);
 
-	cmdstate= bp->testops->init(argc, argv, cmddone);
+	cmdstate= bp->testops->init(argc, (char **)argv, cmddone);
 	crondlog(LVL7 "init returned %p for '%s'", cmdstate, cmdline);
 
 	if (cmdstate != NULL)
@@ -513,11 +487,6 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 	last_time= sb.st_mtime;
 }
 
-static void check_resolv_conf(void)
-{
-	check_resolv_conf1();
-}
-
 static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
 	void *arg UNUSED_PARAM)
 {
@@ -529,10 +498,12 @@ static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
 
 static void post_results(void)
 {
-	int i, j, r, need_post;
+	int i, j, r, need_post, probe_id;
+	const char *session_id;
 	const char *argv[20];
 	char from_filename[80];
 	char to_filename[80];
+	char url[200];
 	struct stat sb;
 
 	for (j= 0; j<5; j++)
@@ -583,6 +554,16 @@ static void post_results(void)
 		if (!need_post)
 			break;
 
+		probe_id= get_probe_id();
+		if (probe_id == -1)
+			break;
+		session_id= get_session_id();
+		if (session_id == NULL)
+			break;
+		snprintf(url, sizeof(url),
+			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s",
+			probe_id, session_id);
+
 		i= 0;
 		argv[i++]= "httppost";
 		argv[i++]= "-A";
@@ -596,9 +577,9 @@ static void post_results(void)
 		argv[i++]= "/home/atlas/status/con_session_id.txt";
 		argv[i++]= "-O";
 		argv[i++]= "/home/atlas/data/new/ooq_sent.vol";
-		argv[i++]= "http://127.0.0.1:8080/";
+		argv[i++]= url;
 		argv[i]= NULL;
-		r= httppost_main(i, argv);
+		r= httppost_main(i, (char **)argv);
 		if (r != 0)
 		{
 			report("httppost failed with %d", r);
@@ -606,6 +587,34 @@ static void post_results(void)
 		}
 
 	}
+}
+
+static const char *get_session_id(void)
+{
+	static char session_id[80];
+
+	char *cp;
+	FILE *file;
+
+	file= fopen(ATLAS_SESSION_FILE, "r");
+	if (file == NULL)
+	{
+		return NULL;
+	}
+
+	/* Skip first empty line */
+	fgets(session_id, sizeof(session_id), file);
+
+	if (fgets(session_id, sizeof(session_id), file) == NULL)
+	{
+		fclose(file);
+		return NULL;
+	}
+	fclose(file);
+	cp= strchr(session_id, '\n');
+	if (cp)
+		*cp= '\0';
+	return session_id;
 }
 
 static void skip_space(char *cp, char **ncpp)
@@ -628,208 +637,6 @@ static void find_eos(char *cp, char **ncpp)
 		cp++;
 	*ncpp= cp;
 }
-
-#if 0
-static void process(FILE *file)
-{
-	int i, argc, do_append, saved_fd, out_fd, flags;
-	size_t len;
-	char *cp, *ncp, *outfile;
-	struct builtin *bp;
-	char line[256];
-	char *argv[NARGS];
-
-printf("in process\n");
-	while (cp= fgets(line, sizeof(line), file), cp  != NULL)
-	{
-printf("got cp %p, line %p, '%s'\n", cp, line, cp);
-		if (strchr(line, '\n') == NULL)
-		{
-			report("line '%s' too long", line);
-			return;
-		}
-
-		/* Skip leading white space */
-		cp= line;
-		while (cp[0] != '\0' && isspace((unsigned char)cp[0]))
-			cp++;
-
-		if (cp[0] == '\0' || cp[0] == '#')
-			continue;	/* Empty or comment line */
-
-		for (bp= builtin_cmds; bp->cmd != NULL; bp++)
-		{
-			len= strlen(bp->cmd);
-			if (strncmp(cp, bp->cmd, len) != 0)
-				continue;
-			if (cp[len] != ' ')
-				continue;
-			break;
-		}
-		if (bp->cmd == NULL)
-		{
-			report("nothing found for '%s'", cp);
-			return;		/* Nothing found */
-		}
-
-		/* Remove trailing white space */
-		len= strlen(cp);
-		while (len > 0 && isspace((unsigned char)cp[len-1]))
-		{
-			cp[len-1]= '\0';
-			len--;
-		}
-		
-		outfile= NULL;
-		do_append= 0;
-
-		/* Split the command line */
-		argc= 0;
-		argv[argc]= cp;
-		skip_nonspace(cp, &ncp);
-		cp= ncp;
-
-		for(;;)
-		{
-			/* End of list */
-			if (cp[0] == '\0')
-			{
-				argc++;
-				break;
-			}
-
-			/* Find start of next argument */
-			skip_space(cp, &ncp);
-
-			/* Terminate current one */
-			cp[0]= '\0';
-
-			/* Special case for '>' */
-			if (argv[argc][0] == '>')
-			{
-				cp= argv[argc]+1;
-				if (cp[0] == '>')
-				{
-					/* Append */
-					do_append= 1;
-					cp++;
-				}
-				if (cp[0] != '\0')
-				{
-					/* Filename immediately follows '>' */
-					outfile= cp;
-					
-					/* And move on with the next option */
-				}
-				else
-				{
-					/* Get the next argument */
-					outfile= ncp;
-					cp= ncp;
-					skip_nonspace(cp, &ncp);
-					cp= ncp;
-
-					if (cp[0] == '\0')
-						break;
-
-					/* Find start of next argument */
-					skip_space(cp, &ncp);
-					*cp= '\0';
-
-					if (ncp[0] == '\0')
-						break;	/* No more arguments */
-				}
-			}
-			else
-			{
-				argc++;
-			}
-
-			if (argc >= NARGS-1)
-			{
-				report("command line '%s', too arguments",
-					line);
-				continue;	/* Just skip it */
-			}
-
-			cp= ncp;
-			argv[argc]= cp;
-			if (cp[0] == '"')
-			{
-				/* Special code for strings */
-				find_eos(cp+1, &ncp);
-				if (ncp[0] != '"')
-				{
-					report(
-			"command line '%s', end of string not found",
-						line);
-					continue;	/* Just skip it */
-				}
-				argv[argc]= cp+1;
-				cp= ncp;
-				cp[0]= '\0';
-				cp++;
-			}
-			else
-			{
-				skip_nonspace(cp, &ncp);
-				cp= ncp;
-			}
-		}
-
-		if (argc >= NARGS)
-		{
-			report("command line '%s', too many arguments", line);
-			return;
-		}
-		argv[argc]= NULL;
-
-		for (i= 0; i<argc; i++)
-			report("argv[%d] = '%s'", i, argv[i]);
-
-		saved_fd= -1;	/* lint */
-		if (outfile)
-		{
-			/* Redirect I/O */
-			report("sending output to '%s'", outfile);
-			if (!validate_filename(outfile, SAFE_PREFIX))
-			{
-				report("insecure output file '%s'", outfile);
-				return;
-			}
-			flags= O_CREAT | O_WRONLY;
-			if (do_append)
-				flags |= O_APPEND;
-			out_fd= open(outfile, flags, 0644);
-			if (out_fd == -1)
-			{
-				report_err("unable to create output file '%s'",
-					outfile);
-				return;
-			}
-			fflush(stdout);
-			saved_fd= dup(1);
-			if (saved_fd == -1)
-			{
-				report("unable to dub stdout");
-				close(out_fd);
-				return;
-			}
-			dup2(out_fd, 1);
-			close(out_fd);
-		}
-
-		bp->func(argc, argv);
-
-		if (outfile)
-		{
-			fflush(stdout);
-			dup2(saved_fd, 1);
-			close(saved_fd);
-		}
-	}
-}
-#endif
 
 static void report(const char *fmt, ...)
 {

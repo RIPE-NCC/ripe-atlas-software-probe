@@ -115,7 +115,6 @@ static int start_crontab(struct tsession *ts, char *line);
 static void add_to_crontab(struct tsession *ts, char *line);
 static void end_crontab(struct tsession *ts);
 static void do_oneoff(struct tsession *ts, char *line);
-static int get_probe_id(void);
 int validate_filename(const char *path, const char *prefix);
 #endif
 
@@ -1363,36 +1362,6 @@ static void do_oneoff(struct tsession *ts, char *line)
 
 	/* And rename back. Ignore any errors */
 	rename(filename_new, filename);
-}
-
-static int get_probe_id(void)
-{
-	int probe_id;
-	size_t len;
-	char *check;
-	const char *key;
-	FILE *fp;
-	char buf[80];
-
-	fp= fopen("/home/atlas/status/reg_init_reply.txt", "r");
-	if (!fp)
-		return -1;
-
-	probe_id= -1;
-	while (fgets(buf, sizeof(buf), fp) != NULL)
-	{
-		if (strchr(buf, '\n') == NULL)
-			continue;
-		key= "PROBE_ID ";
-		len= strlen(key);
-
-		if (strncmp(buf, key, len) != 0 || strlen(buf) <= len)
-			continue;
-		probe_id= strtol(buf+len, &check, 10);
-		break;
-	}
-	fclose(fp);
-	return probe_id;
 }
 
 #endif /* ATLAS */
