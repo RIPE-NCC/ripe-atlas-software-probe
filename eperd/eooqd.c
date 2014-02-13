@@ -561,7 +561,7 @@ static void post_results(void)
 		if (session_id == NULL)
 			break;
 		snprintf(url, sizeof(url),
-			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s",
+			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s&SRC=oneoff",
 			probe_id, session_id);
 
 		i= 0;
