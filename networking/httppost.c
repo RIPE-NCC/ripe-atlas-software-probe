@@ -50,6 +50,7 @@ char *do_dir(char *dir_name, off_t curr_size, off_t max_size, off_t *lenp);
 static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp);
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len,
 	int *found_okp);
+static int copy_all(FILE *in_file, FILE *out_file, int *found_okp);
 static void fatal(const char *fmt, ...);
 // static void fatal_err(const char *fmt, ...);
 static void report(const char *fmt, ...);
@@ -398,6 +399,7 @@ int httppost_main(int argc, char *argv[])
 		goto err;
 	fprintf(stderr, "httppost: getting reply headers \n");
 	server_time= 0;
+	content_length= -1;
 	if (!eat_headers(tcp_file, &chunked, &content_length, &server_time))
 		goto err;
 
@@ -466,14 +468,20 @@ int httppost_main(int argc, char *argv[])
 
 	fprintf(stderr, "httppost: chunked %d, content_length %d\n",
 		chunked, content_length);
+	found_ok= 0;
 	if (chunked)
 	{
 		if (!copy_chunked(tcp_file, out_file, &found_ok))
 			goto err;
 	}
-	else if (content_length)
+	else if (content_length >= 0)
 	{
 		if (!copy_bytes(tcp_file, out_file, content_length, &found_ok))
+			goto err;
+	}
+	else
+	{
+		if (!copy_all(tcp_file, out_file, &found_ok))
 			goto err;
 	}
 	if (!found_ok)
@@ -766,7 +774,6 @@ static int eat_headers(FILE *tcp_file, int *chunked, int *content_length, time_t
 	char buffer[1024];
 
 	*chunked= 0;
-	*content_length= 0;
 	while (fgets(buffer, sizeof(buffer), tcp_file) != NULL)
 	{
 		line= buffer;
@@ -1197,6 +1204,49 @@ static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 			}
 			okp++;
 		}
+	}
+	*found_okp= (okp != NULL && *okp == '\0');
+	return 1;
+}
+
+static int copy_all(FILE *in_file, FILE *out_file, int *found_okp)
+{
+	int i, size;
+	const char *okp;
+	char buffer[1024];
+
+	okp= OK_STR;
+
+	while (!feof(in_file) && !ferror(in_file))
+	{
+		size= fread(buffer, 1, sizeof(buffer), in_file);
+		if (size <= 0)
+			break;
+		if (fwrite(buffer, size, 1, out_file) != 1)
+		{
+			report_err("error writing output");
+			return 0;
+		}
+
+		fprintf(stderr, "httppost: all data '%.*s'\n", 
+				(int)size, buffer);
+
+		for (i= 0; i<size; i++)
+		{
+			if (!okp)
+				break;
+			if (*okp != buffer[i] || *okp == '\0')
+			{
+				okp= NULL;
+				break;
+			}
+			okp++;
+		}
+	}
+	if  (ferror(in_file))
+	{
+		report_err("error reading input");
+		return 0;
 	}
 	*found_okp= (okp != NULL && *okp == '\0');
 	return 1;
