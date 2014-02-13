@@ -1883,17 +1883,27 @@ void printErrorQuick (struct query_state *qry)
 		fh = stdout;
 
 	fprintf(fh, "RESULT { ");
-
-	fprintf(fh, "\"fw\" : \"%d\"", get_atlas_fw_version());
-	fprintf(fh,"\"id\" :9202");
+	fprintf(fh, "\"fw\" : \"%d\",", get_atlas_fw_version());
+	fprintf(fh, "\"id\" : 9202 ,");
 	gettimeofday(&now, NULL);
 	fprintf(fh, "\"time\" : %ld ,",  now.tv_sec);
 
 	fprintf(fh, "\"error\" : [{ ");
-	fprintf(fh, "\"query busy\": \"too frequent. previous one is not done yet\"}");
+	fprintf(fh, "\"query busy\": \"not starting a new one. previous one is not done yet\"}");
 	if(qry->str_Atlas)
 	{
-		fprintf(fh, ",{\"id\" \"%s\"}",  qry->str_Atlas);
+		fprintf(fh, ",{");
+		fprintf(fh, "\"id\" : \"%s\"",  qry->str_Atlas);
+		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time.tv_sec);
+		if(qry->retry) {
+			fprintf(fh, ",\"retry\": %d",  qry->retry);
+			
+		}	
+		if(qry->opt_retry_max) {
+			fprintf(fh, ",\"retry max\": %d",  qry->opt_retry_max);
+
+		}	
+		fprintf(fh, "}",  qry->str_Atlas);
 	}
 	fprintf(fh,"]}");
 
@@ -1901,7 +1911,6 @@ void printErrorQuick (struct query_state *qry)
 	if (qry->out_filename)
 		fclose(fh);
 }
-
 
 void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 {
@@ -2023,10 +2032,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		JU (ANCOUNT, ntohs(dnsR->ans_count ));
 		JU (QDCOUNT, ntohs(dnsR->q_count));
 		JU (NSCOUNT, ntohs(dnsR->ns_count));
-		JU (ARCOUNT, ntohs(dnsR->add_count));
+		JU_NC (ARCOUNT, ntohs(dnsR->add_count));
 
 		if(qry->opt_abuf) {
-			snprintf(line, DEFAULT_LINE_LENGTH, "\"abuf\" : \"");
+			snprintf(line, DEFAULT_LINE_LENGTH, ",\"abuf\" : \"");
 			buf_add(&qry->result,line, strlen(line));
 			buf_add_b64(&qry->result, result, wire_size, 0);
 			AS("\"");
