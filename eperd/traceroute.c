@@ -3019,6 +3019,14 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 					siz += sizeof(*eicmp);
 				else if (etcp)
 					siz += sizeof(*etcp);
+				if (nextmtu < 1200)
+				{
+					/* This is IPv6, no need to go 
+					 * below 1280. Use 1200 to deal with
+					 * off by one error or weird tunnels.
+					 */
+					nextmtu= 1200;
+				}
 				if (!late && nextmtu >= siz)
 				{
 					nextmtu -= siz;
