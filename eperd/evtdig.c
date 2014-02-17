@@ -467,9 +467,9 @@ static void local_exit(void *state UNUSED_PARAM)
 	   struct tdig_base *tbase;
 	   terminator = qry->base->done;
 	   event_base = qry->base->event_base;
-	   if(DnsBase) {
-	   evdns_base_free(DnsBase, 0);
-	   DnsBase = NULL;
+	   if (DnsBase) {
+	   	evdns_base_free(DnsBase, 0);
+	   	DnsBase = NULL;
 	   }
 	   tbase = qry->base;
 	   tdig_delete(qry);
@@ -1145,11 +1145,13 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	struct query_state *qry;
 	int c;
 
-	if(!tdig_base)
+	if (!tdig_base)
 		tdig_base = tdig_base_new(EventBase);
 
-	if(!tdig_base)
-		crondlog(DIE9 "tdig_base_new failed");
+	if (!tdig_base) {
+		crondlog(LVL8 "tdig_base_new failed");
+		return NULL;
+	}
 
 	tdig_base->done = done;
 
@@ -1192,6 +1194,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
+	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
+	qry->result.buf = NULL;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -1669,34 +1673,38 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	struct timeval now;
 	FILE *fh;	
 	struct tdig_base *base;
-	struct query_state *qry;
+	struct query_state *qry_h;
 	u_int32_t fw;
-
-	
+	struct query_state *qry;
 
 	base = h;	
 	if(!base->qry_head )
 		return;
 
-	qry = base->qry_head; 
+	qry_h = base->qry_head; 
 
 	if(! base->sentok )
 		return;
 
-	if(qry->base->done) {
+
+	if(qry_h->base->done) {
 		now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
 		now.tv_usec =  0;
 		event_add(&tdig_base->statsReportEvent, &now);
 		return;
 	}
 
-	if (qry->out_filename) {
-		fh= fopen(qry->out_filename, "a");
-		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'", qry->out_filename);
+	if (qry_h->out_filename) {
+		fh= fopen(qry_h->out_filename, "a");
+		if (!fh) {
+			crondlog(LVL8 "unable to append to '%s'", qry_h->out_filename);
+			return;
+		}
 	}
 	else
 		fh = stdout;  
+
+	qry=xzalloc(sizeof(*qry));
 
 	AS("RESULT { ");
 	JS(id, "9201" ); 
@@ -1716,8 +1724,13 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JU_NC(q, base->activeqry);
 
 	AS(" }\n");
-	if (qry->out_filename) 
+	fwrite(qry->result.buf, qry->result.size, 1 , fh);
+	if (qry_h->out_filename) 
 		fclose (fh);
+
+	buf_cleanup(&qry->result);
+	free(qry);
+
 	// reuse timeval now
 	now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
 	now.tv_usec =  0;
@@ -1875,9 +1888,11 @@ void printErrorQuick (struct query_state *qry)
 	if (qry->out_filename)
 	{
 		fh= fopen(qry->out_filename, "a");
-		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
+		if (!fh){
+			crondlog(LVL8 "unable to append to '%s'",
 					qry->out_filename);
+			return;
+		}
 	}
 	else
 		fh = stdout;
@@ -1901,9 +1916,8 @@ void printErrorQuick (struct query_state *qry)
 		}	
 		if(qry->opt_retry_max) {
 			fprintf(fh, ",\"retry max\": %d",  qry->opt_retry_max);
-
 		}	
-		fprintf(fh, "}",  qry->str_Atlas);
+		fprintf(fh, "}");
 	}
 	fprintf(fh,"]}");
 
@@ -1922,10 +1936,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	FILE *fh; 
 	char addrstr[INET6_ADDRSTRLEN];
 	u_int32_t serial;
-	struct buf tmpbuf;
-	char str[4]; 
 	int iMax ;
-	int flagAnswer = 1;
+	int flagAnswer = 0;
 	int data_len;
 	int write_out = FALSE;
 	u_int32_t fw;
@@ -2059,41 +2071,34 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 				answers[i].rdata  = NULL;
 
-
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
-					answers[i].rdata =  NULL;
 					data_len = ntohs(answers[i].resource->data_len) - 1;
-
-					if(flagAnswer) {
-						AS(",\"answers\" : [ ");
-						flagAnswer = 0;
+					if(flagAnswer == 0) {
+						AS(",\"answers\" : [ {");
+						flagAnswer++;
 					}
-					if (flagAnswer == 0) {
-						if(i > 0) 
-							AS(",");
-						AS("{");
+					else if (flagAnswer >  0) {
+							AS(", {");
 					}
+					flagAnswer++;
 					JS (TYPE, "TXT");
 					JS (NAME, answers[i].name);
 					print_txt_json(&result[reader-result+1], data_len, qry);
 					reader = reader + ntohs(answers[i].resource->data_len);
-					if(flagAnswer == 0) 
-						AS("}");
+					AS("}");
 
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
-					if(flagAnswer) {
-						AS(",\"answers\" : [ ");
-						flagAnswer = 0;
+					if(flagAnswer == 0) {
+						AS(",\"answers\" : [ { ");
 					}
-					if (flagAnswer == 0) {
-						if(i > 0) 
-							AS(",");
-						AS(" { ");
+					else if (flagAnswer > 0) {
+						AS(",{ ");
 					}
-	
+					flagAnswer++;
+
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
 					JU(TTL, ntohl(answers[i].resource->ttl));
@@ -2112,13 +2117,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					JU_NC(SERIAL, serial);
 					reader =  reader + 4;
 					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
-					if(flagAnswer == 0) 
 						AS(" } ");
 				}
 				else  
 				{
-					// JU(TYPE, ntohs(answers[i].resource->type));
-					// JU_NC(RDLENGTH, ntohs(answers[i].resource->data_len))
 					reader =  reader + ntohs(answers[i].resource->data_len);
 				}
 	
@@ -2126,7 +2128,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				if(answers[i].rdata != NULL) 
 					free (answers[i].rdata); 
 			}
-			if(flagAnswer == 0) 
+			if(flagAnswer > 0) 
 				AS(" ]");
 		}
 
@@ -2168,15 +2170,17 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		if (qry->out_filename)
 		{
 			fh= fopen(qry->out_filename, "a");
-			if (!fh)
-				crondlog(DIE9 "unable to append to '%s'",
+			if (!fh) {
+				crondlog(LVL8 "unable to append to '%s'",
 						qry->out_filename);
+			}
 		}
 		else
 			fh = stdout;
-
-		AS (" }\n");   /* RESULT { } */
-		fwrite(qry->result.buf, qry->result.size, 1 , fh);
+		if (fh) {
+			AS (" }\n");   /* RESULT { } */
+			fwrite(qry->result.buf, qry->result.size, 1 , fh);
+		}
 		buf_cleanup(&qry->result);
 
 		if (qry->out_filename)
