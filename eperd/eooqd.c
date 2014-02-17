@@ -59,6 +59,7 @@ static struct builtin
 };
 
 static const char *atlas_id;
+static const char *out_filename;
 
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
@@ -87,7 +88,8 @@ int eooqd_main(int argc, char *argv[])
 	atlas_id= NULL;
 	pid_file_name= NULL;
 
-	(void)getopt32(argv, "A:P:", &atlas_id, &pid_file_name);
+	(void)getopt32(argv, "A:P:O:", &atlas_id, &pid_file_name,
+		&out_filename);
 
 	if (argc != optind+1)
 	{
@@ -187,7 +189,7 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 		add_line();
 	}
 
-	check_resolv_conf2(NULL, atlas_id);
+	check_resolv_conf2(out_filename, atlas_id);
 }
 
 static void add_line(void)
@@ -467,7 +469,7 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 		RESOLV_CONF);
 	evdns_base_resume(DnsBase);
 
-	if (r != 0 || last_time != -1)
+	if ((r != 0 || last_time != -1) && out_filename != NULL)
 	{
 		fn= fopen(out_file, "a");
 		if (!fn)
