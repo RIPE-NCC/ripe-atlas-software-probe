@@ -548,7 +548,7 @@ static int Xeat_server_hello(struct msgbuf *msgbuf)
 
 static int Xeat_certificate(struct msgbuf *msgbuf)
 {
-	int i, n, r, first, slen;
+	int i, n, r, first, slen, need_nl;
 	size_t o, len;
 	uint8_t *p;
 	struct buf tmpbuf;
@@ -597,14 +597,23 @@ static int Xeat_certificate(struct msgbuf *msgbuf)
 			buf_add_b64(&tmpbuf, p+o+3, slen);
 			printf("%s\"-----BEGIN CERTIFICATE-----\\n",
 				!first ? ", " : "");
+			need_nl=0;
 			for (i= tmpbuf.offset; i<tmpbuf.size; i++)
 			{
 				if (tmpbuf.buf[i] == '\n')
+				{
 					fputs("\\n", stdout);
+					need_nl=0;
+				}
 				else
+				{
 					putchar(tmpbuf.buf[i]);
+					need_nl=1;
+				}
 			}
-			printf("\\n-----END CERTIFICATE-----\"");
+			if (need_nl)
+				fputs("\\n", stdout);
+			printf("-----END CERTIFICATE-----\"");
 			tmpbuf.size= tmpbuf.offset;
 			o += 3+slen;
 			first= 0;

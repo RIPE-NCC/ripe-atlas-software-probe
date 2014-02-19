@@ -909,7 +909,7 @@ static int eat_server_hello(struct state *state)
 
 static int eat_certificate(struct state *state)
 {
-	int i, n, r, first, slen;
+	int i, n, r, first, slen, need_nl;
 	size_t o, len;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
@@ -1019,14 +1019,23 @@ static int eat_certificate(struct state *state)
 			buf_add_b64(&tmpbuf, p+o+3, slen);
 			fprintf(fh, "%s\"-----BEGIN CERTIFICATE-----\\n",
 				!first ? ", " : "");
+			need_nl= 0;
 			for (i= tmpbuf.offset; i<tmpbuf.size; i++)
 			{
 				if (tmpbuf.buf[i] == '\n')
+				{
 					fputs("\\n", fh);
+					need_nl= 0;
+				}
 				else
+				{
 					fputc(tmpbuf.buf[i], fh);
+					need_nl= 1;
+				}
 			}
-			fprintf(fh, "\\n-----END CERTIFICATE-----\"");
+			if (need_nl)
+				fputs("\\n", fh);
+			fprintf(fh, "-----END CERTIFICATE-----\"");
 			tmpbuf.size= tmpbuf.offset;
 			o += 3+slen;
 			first= 0;
