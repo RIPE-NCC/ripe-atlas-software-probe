@@ -52,6 +52,8 @@
 #define O_PREPEND_PROBE_ID  1004
 #define O_EVDNS 1005
 #define O_RETRY 1006
+#define O_TYPE 1007
+#define O_CLASS 1008
 #define O_OUTPUT_COBINED 1101
 
 #define DNS_FLAG_RD 0x0100
@@ -84,7 +86,49 @@
 #define STATUS_WAIT_RESPONSE		1008
 #define STATUS_FREE 			0
 
-// seems T_DNSKEY is not defined header files of lenny and sdk
+// seems the following are defined in header files we use
+
+#ifndef ns_t_apl
+#define ns_t_apl   42
+#endif
+
+#ifndef T_APL
+#define T_APL ns_t_apl
+#endif 
+
+#ifndef ns_t_caa
+#define ns_t_caa   257
+#endif
+
+#ifndef T_CAA
+#define T_CAA ns_t_caa
+#endif 
+
+#ifndef ns_t_cert
+#define ns_t_cert   37
+#endif
+
+#ifndef T_CERT
+#define T_CERT ns_t_cert
+#endif 
+
+#ifndef ns_t_dlv
+#define ns_t_dlv   32769
+#endif
+
+#ifndef T_DLV
+#define T_DLV ns_t_dlv
+#endif 
+
+
+#ifndef ns_t_ds
+#define ns_t_ds   43
+#endif
+
+#ifndef T_DS
+#define T_DS ns_t_ds
+#endif 
+
 #ifndef ns_t_dnskey
 #define ns_t_dnskey   48
 #endif
@@ -92,6 +136,15 @@
 #ifndef T_DNSKEY
 #define T_DNSKEY ns_t_dnskey
 #endif
+
+#ifndef ns_t_ipseckey
+#define ns_t_ipseckey   45
+#endif
+
+#ifndef T_IPSECKEY
+#define T_IPSECKEY ns_t_ipseckey
+#endif
+
 
 #ifndef ns_t_rrsig
 #define ns_t_rrsig   46
@@ -109,23 +162,54 @@
 #define T_NSEC ns_t_nsec
 #endif  
 
-#ifndef T_NSEC3
-#define T_NSEC3 ns_t_nsec3
-#endif  
-
 #ifndef ns_t_nsec3
 #define ns_t_nsec3   50
 #endif
 
+#ifndef T_NSEC3
+#define T_NSEC3 ns_t_nsec3
+#endif  
 
-#ifndef ns_t_ds
-#define ns_t_ds   43
+#ifndef ns_t_nsec3param
+#define ns_t_nsec3param   51
 #endif
 
-#ifndef T_DS
-#define T_DS ns_t_ds
-#endif 
+#ifndef T_NSEC3PARAM
+#define T_NSEC3PARAM ns_t_nsec3param
+#endif  
 
+#ifndef ns_t_spf
+#define ns_t_spf   99
+#endif
+
+#ifndef T_SPF
+#define T_SPF ns_t_spf
+#endif
+
+#ifndef ns_t_ta
+#define ns_t_ta  32768
+#endif
+
+#ifndef T_TA
+#define T_TA ns_t_ta
+#endif
+
+#ifndef ns_t_tlsa
+#define ns_t_tlsa  52
+#endif
+
+#ifndef T_TLSA
+#define T_TLSA ns_t_tlsa
+#endif
+
+
+#ifndef ns_t_sshfp
+#define ns_t_sshfp   44
+#endif
+
+#ifndef T_SSHFP
+#define T_SSHFP ns_t_sshfp
+#endif
 
 /* Definition for various types of counters */
 typedef uint32_t counter_t;
@@ -331,22 +415,42 @@ static struct option longopts[]=
 {
 	// class IN
 	{ "a", required_argument, NULL, (100000 + T_A) },
-	{ "ns", required_argument, NULL, (100000 + T_NS) },
-	{ "cname", required_argument, NULL, (100000 + T_CNAME) },
-	{ "ptr", required_argument, NULL, (100000 + T_PTR ) },
-	{ "mx", required_argument, NULL, (100000 + T_MX ) },
-	{ "txt", required_argument, NULL, (100000 + T_TXT ) },
 	{ "aaaa", required_argument, NULL, (100000 + T_AAAA) },
-	{ "axfr", required_argument, NULL, (100000 + T_AXFR ) },  //yet to be tested.
 	{ "any", required_argument, NULL, (100000 + T_ANY) },
+	{ "afsdb", required_argument, NULL, (100000 + T_AFSDB) },
+	{ "apl", required_argument, NULL, (100000 + T_APL) },
+	{ "axfr", required_argument, NULL, (100000 + T_AXFR ) },  //yet to be tested.
+	{ "caa", required_argument, NULL, (100000 + T_CAA) },
+	{ "cert", required_argument, NULL, (100000 + T_CERT) },
+	{ "cname", required_argument, NULL, (100000 + T_CNAME) },
+	{ "dlv", required_argument, NULL, (100000 + T_DLV) },
+	{ "dname", required_argument, NULL, (100000 + T_DNAME) },
 	{ "dnskey", required_argument, NULL, (100000 + T_DNSKEY) },
+	{ "ds", required_argument, NULL, (100000 + T_DS) },
+	{ "ipseckey", required_argument, NULL, (100000 + T_IPSECKEY) },
+	{ "key", required_argument, NULL, (100000 + T_KEY) },
+	{ "loc", required_argument, NULL, (100000 + T_LOC) },
+	{ "mx", required_argument, NULL, (100000 + T_MX ) },
+	{ "naptr", required_argument, NULL, (100000 + T_NAPTR) },
+	{ "ns", required_argument, NULL, (100000 + T_NS) },
 	{ "nsec", required_argument, NULL, (100000 + T_NSEC) },
 	{ "nsec3", required_argument, NULL, (100000 + T_NSEC3) },
-	{ "ds", required_argument, NULL, (100000 + T_DS) },
+	{ "nsec3param", required_argument, NULL, (100000 + T_NSEC3PARAM) },
+	{ "ptr", required_argument, NULL, (100000 + T_PTR) },
 	{ "rrsig", required_argument, NULL, (100000 + T_RRSIG) },
+	{ "rp", required_argument, NULL, (100000 + T_RP) },
 	{ "soa", required_argument, NULL, 's' },
+	{ "sig", required_argument, NULL, (100000 + T_SIG) },
+	{ "spf", required_argument, NULL, (100000 + T_SPF) },
+	{ "sshfp", required_argument, NULL, (100000 + T_SSHFP) },
 	{ "srv", required_argument, NULL, (100000 + T_SRV) },
-	{ "naptr", required_argument, NULL, (100000 + T_NAPTR) },
+	{ "ta", required_argument, NULL, (100000 + T_TA) },
+	{ "tlsa", required_argument, NULL, (100000 + T_TLSA) },
+	{ "tsig", required_argument, NULL, (100000 + T_TSIG) },
+	{ "txt", required_argument, NULL, (100000 + T_TXT) },
+
+	{ "type", required_argument, NULL, 'O_TYPE' },
+	{ "class", required_argument, NULL, 'O_CLASS' },
 
 	// clas CHAOS
 	{ "hostname.bind", no_argument, NULL, 'h' },
@@ -1290,6 +1394,39 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_abuf = 0;
 				break;
 
+			case 'O_TYPE':
+				qry->qtype = strtoul(optarg, &check, 10);
+				if ((qry->qtype >= 0 ) && 
+						(qry->qclass < 65536)) {
+
+					if (! qry->qclass ) 
+						qry->qclass = C_IN;
+
+					break;
+				}
+				else {
+					fprintf(stderr, "ERROR unknown Q "
+							"--typae %s ??. 0 - "
+							"65535\n", optarg); 
+					tdig_delete(qry);
+					return (0);
+				}
+				break;
+
+			case 'O_CLASS':
+				qry->qclass = strtoul(optarg, &check, 10);
+				if ((qry->qclass  >= 0 ) && 
+						(qry->qclass < 65536)) {
+					break;
+				}
+				else {
+					fprintf(stderr, "ERROR unknown Q class"
+							" --class %s ??. 0 - "
+							"65535\n", optarg); 
+					tdig_delete(qry);
+					return (0);
+				}
+
 			case O_RETRY :
 				qry->opt_retry_max = strtoul(optarg, NULL, 10);
 				break;
@@ -1315,44 +1452,14 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->lookupname = strdup(optarg);
 				break;
 
-			case (100000 + T_NS):
-				qry->qtype = T_NS;
-				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
-				break;
-
-			case (100000 + T_CNAME):
-				qry->qtype = T_CNAME;
-				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
-				break;
-
-			case (100000 + T_PTR):
-				qry->qtype = T_PTR;
-				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
-				break;
-
-			case (100000 + T_MX):
-				qry->qtype = T_MX;
-				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
-				break;
-
-			case (100000 + T_TXT):
-				qry->qtype = T_TXT;
-				qry->qclass = C_IN;
-				qry->lookupname =  strdup(optarg);
-				break;
-
 			case (100000 + T_AAAA ):
 				qry->qtype = T_AAAA ;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
 				break;
 
-			case (100000 + T_AXFR ):
-				qry->qtype = T_AXFR ;
+			case (100000 + T_AFSDB ):
+				qry->qtype = T_AFSDB ;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
 				break;
@@ -1363,10 +1470,88 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->lookupname = strdup(optarg);
 				break;
 
+			case (100000 + T_APL):
+				qry->qtype = T_APL ;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_AXFR ):
+				qry->qtype = T_AXFR ;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_CAA):
+				qry->qtype = T_CAA ;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_CERT):
+				qry->qtype = T_CERT ;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_CNAME):
+				qry->qtype = T_CNAME;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_DLV):
+				qry->qtype = T_DLV;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break; 
+
+			case (100000 + T_DNAME):
+				qry->qtype = T_DNAME;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_DNSKEY):
+				qry->qtype = T_DNSKEY;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
 			case (100000 + T_DS):
 				qry->qtype = T_DS;
 				qry->qclass = C_IN;
 				qry->lookupname  = strdup(optarg);
+				break;
+
+			case (100000 + T_IPSECKEY):
+				qry->qtype = T_IPSECKEY;
+				qry->qclass = C_IN;
+				qry->lookupname  = strdup(optarg);
+				break;
+
+			case (100000 + T_LOC):
+				qry->qtype = T_LOC;
+				qry->qclass = C_IN;
+				qry->lookupname  = strdup(optarg);
+				break;
+
+			case (100000 + T_MX):
+				qry->qtype = T_MX;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_NAPTR):
+				qry->qtype = T_NAPTR;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_NS):
+				qry->qtype = T_NS;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NSEC):
@@ -1381,8 +1566,14 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->lookupname = strdup(optarg);
 				break;
 
-			case (100000 + T_DNSKEY):
-				qry->qtype = T_DNSKEY;
+			case (100000 + T_NSEC3PARAM):
+				qry->qtype = T_NSEC3PARAM;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_PTR):
+				qry->qtype = T_PTR;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
 				break;
@@ -1393,21 +1584,63 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->lookupname = strdup(optarg);
 				break;
 
+			case (100000 + T_RP):
+				qry->qtype = T_RP;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_SIG):
+				qry->qtype = T_SIG;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
+			case (100000 + T_SPF):
+				qry->qtype = T_SPF;
+				qry->qclass = C_IN;
+				qry->lookupname = strdup(optarg);
+				break;
+
 			case (100000 + T_SRV):
 				qry->qtype = T_SRV;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
 				break;
 
-			case (100000 + T_NAPTR):
-				qry->qtype = T_NAPTR;
+			case (100000 + T_SSHFP):
+				qry->qtype = T_SSHFP;
 				qry->qclass = C_IN;
 				qry->lookupname = strdup(optarg);
 				break;
 
+			case (100000 + T_TA):
+				qry->qtype = T_TA;
+				qry->qclass = C_IN;
+				qry->lookupname =  strdup(optarg);
+				break;
+
+			case (100000 + T_TLSA):
+				qry->qtype = T_TLSA;
+				qry->qclass = C_IN;
+				qry->lookupname =  strdup(optarg);
+				break;
+
+			case (100000 + T_TSIG):
+				qry->qtype = T_TSIG;
+				qry->qclass = C_IN;
+				qry->lookupname =  strdup(optarg);
+				break;
+
+			case (100000 + T_TXT):
+				qry->qtype = T_TXT;
+				qry->qclass = C_IN;
+				qry->lookupname =  strdup(optarg);
+				break;
+
 			default:
 				fprintf(stderr, "ERROR unknown option %d ??\n", c); 
-				 tdig_delete(qry);
+				tdig_delete(qry);
 				return (0);
 				break;
 		}
