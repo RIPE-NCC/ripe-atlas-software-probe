@@ -113,6 +113,17 @@
 #define T_CERT ns_t_cert
 #endif 
 
+#ifndef ns_t_dname
+#define ns_t_dname 39
+#endif
+
+#ifndef T_DNAME
+#define T_DNAME ns_t_dname
+#endif 
+
+
+
+
 #ifndef ns_t_dlv
 #define ns_t_dlv   32769
 #endif
