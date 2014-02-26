@@ -54,6 +54,7 @@
 #define O_RETRY 1006
 #define O_TYPE 1007
 #define O_CLASS 1008
+#define O_QUERY 1009
 #define O_OUTPUT_COBINED 1101
 
 #define DNS_FLAG_RD 0x0100
@@ -72,7 +73,7 @@
 #define DEFAULT_LINE_LENGTH 80 
 #define DEFAULT_STATS_REPORT_INTERVEL 180 		/* in seconds */
 #define CONN_TO            5  /* TCP connection time out in seconds */
-#define DEFAULT_RETRY_MAX 10 
+#define DEFAULT_RETRY_MAX 0 
 
 /* state of the dns query */
 #define STATUS_DNS_RESOLV 		1001
@@ -281,6 +282,7 @@ struct query_state {
 	int opt_evdns;
 	int opt_rset;
 	int opt_retry_max;
+	int opt_query_arg;
 	int retry;
 	int resolv_i;
 
@@ -451,6 +453,7 @@ static struct option longopts[]=
 
 	{ "type", required_argument, NULL, 'O_TYPE' },
 	{ "class", required_argument, NULL, 'O_CLASS' },
+	{ "query", required_argument, NULL, O_QUERY},
 
 	// clas CHAOS
 	{ "hostname.bind", no_argument, NULL, 'h' },
@@ -1300,6 +1303,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->loc_sin6.sin6_family = 0;
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
+	qry->opt_query_arg = 0;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -1428,7 +1432,13 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				}
 
 			case O_RETRY :
+				qry->opt_query_arg = 1;
 				qry->opt_retry_max = strtoul(optarg, NULL, 10);
+				break;
+
+			case O_QUERY:
+				qry->opt_query_arg  = 1;
+				qry->lookupname = strdup(optarg);
 				break;
 
 			case O_RESOLV_CONF :
