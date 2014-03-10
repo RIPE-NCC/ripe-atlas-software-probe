@@ -2695,7 +2695,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				opthdr= (struct ip6_ext *)&eip[1];
+				opthdr= (struct ip6_ext *)ptr;
 				hbhoptsize= 8*opthdr->ip6e_len;
 				optlen= hbhoptsize+8;
 				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
@@ -2704,7 +2704,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					/* Does not contain the full header */
 					return;
 				}
-				ehdrsiz= optlen;
+				ehdrsiz += optlen;
 				nxt= opthdr->ip6e_nxt;
 				ptr= ((char *)opthdr)+optlen;
 			}
@@ -2723,7 +2723,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				frag= (struct ip6_frag *)&eip[1];
+				frag= (struct ip6_frag *)ptr;
 				if ((ntohs(frag->ip6f_offlg) & ~3) != 0)
 				{
 					/* Not first fragment, just ignore
@@ -2731,7 +2731,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					 */
 					return;
 				}
-				ehdrsiz= sizeof(*frag);
+				ehdrsiz += sizeof(*frag);
 				nxt= frag->ip6f_nxt;
 				ptr= &frag[1];
 			}
@@ -2750,7 +2750,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				opthdr= (struct ip6_ext *)&eip[1];
+				opthdr= (struct ip6_ext *)ptr;
 				dstoptsize= 8*opthdr->ip6e_len;
 				optlen= dstoptsize+8;
 				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
@@ -2759,7 +2759,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					/* Does not contain the full header */
 					return;
 				}
-				ehdrsiz= optlen;
+				ehdrsiz += optlen;
 				nxt= opthdr->ip6e_nxt;
 				ptr= ((char *)opthdr)+optlen;
 			}

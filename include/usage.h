@@ -1062,8 +1062,8 @@
 
 #define evtraceroute_trivial_usage \
 	"-[46FIrTU] [-a <paris mod>] [-c <count>] [-f <hop>]" \
-"\n	[-g <gap>] [-m <hop>] [-p <port>] [-w <ms>] [-z <ms>] [-A <string>] [-O <file>]" \
-"\n	[-S <size>]" 
+"\n	[-g <gap>] [-m <hop>] [-p <port>] [-w <ms>] [-z <ms>] [-A <string>]" \
+"\n	[-O <file>] [-S <size>] [-H <hbh size>] [-D <dest. opt. size>]" 
 
 #define evtraceroute_full_usage "\n" \
      "\n	-4			Use IPv4 (default)" \
@@ -1082,6 +1082,8 @@
      "\n	-w <timeout>		No reply timeout (ms)" \
      "\n	-z <timeout>		Dup timeout (ms)" \
      "\n	-A <string>		Atlas measurement ID" \
+     "\n	-D <size>		Add IPv6 Destination Option this size" \
+     "\n	-H <size>		Add IPv6 Hop-by-hop Option this size" \
      "\n	-O <file>		Name of output file" \
      "\n	-S <size>		Size of packet" \
 
