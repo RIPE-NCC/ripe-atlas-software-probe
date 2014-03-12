@@ -26,7 +26,7 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46rc:s:A:O:")
+#define PING_OPT_STRING ("!46rc:s:A:O:i:")
 
 enum 
 {
@@ -79,9 +79,6 @@ struct pingbase
 	pid_t pid;                     /* Identifier to send with each ICMP
 					* Request */
 
-	struct timeval tv_interval;    /* Ping interval between two subsequent
-					* pings */
-
 	/* A list of hosts to ping. */
 	struct pingstate **table;
 	int tabsiz;
@@ -103,6 +100,7 @@ struct pingstate
 	int pingcount;
 	char *out_filename;
 	char delay_name_res;
+	unsigned interval;
 
 	/* State */
 	struct sockaddr_in6 sin6;
@@ -545,6 +543,7 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 static void ping_xmit(struct pingstate *host)
 {
 	struct pingbase *base = host->base;
+	struct timeval tv_interval;
 
 	int nsent, fd4, fd6, t_errno, r;
 
@@ -647,7 +646,8 @@ static void ping_xmit(struct pingstate *host)
 
 
 	/* Add the timer to handle no reply condition in the given timeout */
-	evtimer_add(&host->ping_timer, &host->base->tv_interval);
+	msecstotv(host->interval, &tv_interval);
+	evtimer_add(&host->ping_timer, &tv_interval);
 }
 
 
@@ -660,9 +660,7 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 	{
 		ping_cb(PING_ERR_TIMEOUT, host->cursize, -1,
 			(struct sockaddr *)&host->sin6, host->socklen,
-			NULL, 0,
-			host->seq, -1, &host->base->tv_interval,
-			host);
+			NULL, 0, host->seq, -1, NULL, host);
 
 		/* Update the sequence number for the next run */
 		host->seq = (host->seq + 1) % 256;
@@ -940,7 +938,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	int i, newsiz, delay_name_res;
 	uint32_t opt;
 	unsigned pingcount; /* must be int-sized */
-	unsigned size;
+	unsigned size, interval;
 	sa_family_t af;
 	const char *hostname;
 	char *str_Atlas;
@@ -1006,8 +1004,6 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		/* Set default values */
 		ping_base->pid = getpid();
 
-		msecstotv(DEFAULT_PING_INTERVAL, &ping_base->tv_interval);
-
 		/* Define the callback to handle ICMP Echo Reply and add the
 		 * raw file descriptor to those monitored for read events */
 		event_assign(&ping_base->event4, ping_base->event_base,
@@ -1027,15 +1023,22 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	size= 0;
 	str_Atlas= NULL;
 	out_filename= NULL;
+	interval= DEFAULT_PING_INTERVAL;
 	/* exactly one argument needed; -c NUM */
-	opt_complementary = "=1:c+:s+";
+	opt_complementary = "=1:c+:s+:i+";
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
-		&str_Atlas, &out_filename);
+		&str_Atlas, &out_filename, &interval);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
 	{
 		crondlog(LVL8 "bad options");
+		return NULL;
+	}
+
+	if (interval < 1 || interval > 60000)
+	{
+		crondlog(LVL8 "bad interval");
 		return NULL;
 	}
 
@@ -1100,6 +1103,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->base = ping_base;
 	state->af= af;
 	state->delay_name_res= delay_name_res;
+	state->interval= interval;
 
 	state->seq = 1;
 
