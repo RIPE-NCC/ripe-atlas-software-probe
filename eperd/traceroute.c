@@ -3378,7 +3378,12 @@ static void noreply_callback(int __attribute((unused)) unused,
 #endif
 
 	if (!state->gotresp)
-		add_str(state, "\"x\":\"*\"");
+	{
+		if (state->open_result)
+			add_str(state, " }, { ");
+		add_str(state, DBQ(x) ":" DBQ(*));
+		state->open_result= 1;
+	}
 
 	send_pkt(state);
 }
@@ -3420,6 +3425,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	duptimeout= 10;
 	timeout= 1000;
 	parismod= 16;
+	hbhoptsize= 0;
+	destoptsize= 0;
 	str_Atlas= NULL;
 	out_filename= NULL;
 	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
