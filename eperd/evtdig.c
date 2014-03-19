@@ -712,7 +712,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->aa = 0; //Not Authoritative
 	dns->tc = 0; //This message is not truncated
 	dns->rd = 0; //Recursion  not Desired
-	dns->ra = 1; //Recursion not available! hey we dont have it (lol)
+	dns->ra = 0; //Recursion not available! hey we dont have it (lol)
 	dns->z = 0;
 	dns->ad = 0;
 	dns->cd = 0;
