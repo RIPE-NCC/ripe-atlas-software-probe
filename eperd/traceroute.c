@@ -160,6 +160,7 @@ struct trtstate
 	char *result;
 	size_t reslen;
 	size_t resmax;
+	char open_result;
 };
 
 static struct trtbase *trt_base;
@@ -498,8 +499,9 @@ static void send_pkt(struct trtstate *state)
 		}
 
 		snprintf(line, sizeof(line),
-			", { \"hop\":%d, \"result\": [ ", state->hop);
+			", { " DBQ(hop) ":%d, " DBQ(result) ": [ ", state->hop);
 		add_str(state, line);
+		state->open_result= 0;
 	}
 	state->seq++;
 
@@ -1224,9 +1226,10 @@ static void send_pkt(struct trtstate *state)
 		}
 	}
 
-	if (state->sent)
+	if (state->open_result)
 		add_str(state, " }, ");
 	add_str(state, "{ ");
+	state->open_result= 0;
 
 	/* Increment packets sent */
 	state->sent++;
@@ -1453,6 +1456,9 @@ static void ready_callback4(int __attribute((unused)) unused,
 			/* Sequence number is in seq field */
 			seq= ntohl(etcp->seq) & 0xffff;
 
+			if (state->open_result)
+				add_str(state, " }, { ");
+
 			if (seq != state->seq)
 			{
 				if (seq > state->seq)
@@ -1467,14 +1473,14 @@ static void ready_callback4(int __attribute((unused)) unused,
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "\"late\":%d",
+				snprintf(line, sizeof(line), DBQ(late) ":%d",
 					state->seq-seq);
 				add_str(state, line);
 			}
 			else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, " }, { \"dup\":true");
+				add_str(state, " " DBQ(dup) ":true");
 			}
 
 			if (!late && !isDup)
@@ -1665,6 +1671,9 @@ printf("curpacksize: %d\n", state->curpacksize);
 				seq= ntohs(eudp->uh_dport)-BASE_PORT;
 			}
 
+			if (state->open_result)
+				add_str(state, " }, { ");
+
 			if (seq != state->seq)
 			{
 				if (seq > state->seq)
@@ -1679,14 +1688,14 @@ printf("curpacksize: %d\n", state->curpacksize);
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "\"late\":%d",
+				snprintf(line, sizeof(line), DBQ(late) ":%d",
 					state->seq-seq);
 				add_str(state, line);
 			}
 			else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, " }, { \"dup\":true");
+				add_str(state, " " DBQ(dup) ":true");
 			}
 
 			if (!late && !isDup)
@@ -1880,6 +1889,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 					state->hostname);
 			}
 
+			if (state->open_result)
+				add_str(state, " }, { ");
+
 			late= 0;
 			isDup= 0;
 			seq= ntohs(eicmp->icmp_seq);
@@ -1897,14 +1909,14 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "\"late\":%d",
+				snprintf(line, sizeof(line), DBQ(late) ":%d",
 					state->seq-seq);
 				add_str(state, line);
 			}
 			else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, " }, { \"dup\":true");
+				add_str(state, DBQ(dup) ":true");
 			}
 
 			if (!late && !isDup)
@@ -2072,8 +2084,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 		}
 
-		if (late)
-			add_str(state, " }, { ");
+		state->open_result= 1;
 
 		if (!late && !isDup)
 		{
@@ -2134,6 +2145,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			return;
 		}
 
+		if (state->open_result)
+			add_str(state, " }, { ");
+
 		late= 0;
 		isDup= 0;
 		seq= ntohs(icmp->icmp_seq);
@@ -2150,14 +2164,14 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 			late= 1;
 
-			snprintf(line, sizeof(line), "\"late\":%d",
+			snprintf(line, sizeof(line), DBQ(late) ":%d",
 				state->seq-seq);
 			add_str(state, line);
 		}
 		else if (state->gotresp)
 		{
 			isDup= 1;
-			add_str(state, " }, { \"dup\":true");
+			add_str(state, DBQ(dup) ":true");
 		}
 
 		if (memcmp(&ip->ip_dst,
@@ -2195,8 +2209,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		/* Done */
 		state->done= 1;
 
-		if (late)
-			add_str(state, " }, { ");
+		state->open_result= 1;
 
 		if (!late && !isDup)
 		{
@@ -2306,6 +2319,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	late= 0;
 	isDup= 0;
 
+	if (state->open_result)
+		add_str(state, " }, { ");
+
 	/* Only check if the ack is without 64k of what we expect */
 	seq= ntohl(tcphdr->ack_seq) & 0xffff;
 	if (seq-state->seq > 0x2000)
@@ -2322,14 +2338,14 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		}
 		late= 1;
 
-		snprintf(line, sizeof(line), "\"late\":%d",
+		snprintf(line, sizeof(line), DBQ(late) ":%d",
 			state->seq-seq);
 		add_str(state, line);
 	}
 	else if (state->gotresp)
 	{
 		isDup= 1;
-		add_str(state, " }, { \"dup\":true");
+		add_str(state, DBQ(dup) ":true");
 	}
 
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
@@ -2368,8 +2384,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	/* Done */
 	state->done= 1;
 
-	if (late)
-		add_str(state, " }, { ");
+	state->open_result= 1;
 
 	if (!late && !isDup)
 	{
@@ -2488,6 +2503,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	late= 0;
 	isDup= 0;
 
+	if (state->open_result)
+		add_str(state, " }, { ");
+
 	/* Only check if the ack is within 64k of what we expect */
 	seq= ntohl(tcphdr->ack_seq) & 0xffff;
 	if (seq-state->seq > 0x2000)
@@ -2504,14 +2522,14 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		}
 		late= 1;
 
-		snprintf(line, sizeof(line), "\"late\":%d",
+		snprintf(line, sizeof(line), DBQ(late) ":%d",
 			state->seq-seq);
 		add_str(state, line);
 	}
 	else if (state->gotresp)
 	{
 		isDup= 1;
-		add_str(state, " }, { \"dup\":true");
+		add_str(state, DBQ(dup) ":true");
 	}
 
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
@@ -2549,8 +2567,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	/* Done */
 	state->done= 1;
 
-	if (late)
-		add_str(state, " }, { ");
+	state->open_result= 1;
 
 	if (!late && !isDup)
 	{
@@ -2695,7 +2712,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				opthdr= (struct ip6_ext *)&eip[1];
+				opthdr= (struct ip6_ext *)ptr;
 				hbhoptsize= 8*opthdr->ip6e_len;
 				optlen= hbhoptsize+8;
 				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
@@ -2704,7 +2721,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					/* Does not contain the full header */
 					return;
 				}
-				ehdrsiz= optlen;
+				ehdrsiz += optlen;
 				nxt= opthdr->ip6e_nxt;
 				ptr= ((char *)opthdr)+optlen;
 			}
@@ -2723,7 +2740,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				frag= (struct ip6_frag *)&eip[1];
+				frag= (struct ip6_frag *)ptr;
 				if ((ntohs(frag->ip6f_offlg) & ~3) != 0)
 				{
 					/* Not first fragment, just ignore
@@ -2731,7 +2748,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					 */
 					return;
 				}
-				ehdrsiz= sizeof(*frag);
+				ehdrsiz += sizeof(*frag);
 				nxt= frag->ip6f_nxt;
 				ptr= &frag[1];
 			}
@@ -2750,7 +2767,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 #endif
 					return;
 				}
-				opthdr= (struct ip6_ext *)&eip[1];
+				opthdr= (struct ip6_ext *)ptr;
 				dstoptsize= 8*opthdr->ip6e_len;
 				optlen= dstoptsize+8;
 				if (nrecv < sizeof(*icmp) + sizeof(*eip) +
@@ -2759,7 +2776,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 					/* Does not contain the full header */
 					return;
 				}
-				ehdrsiz= optlen;
+				ehdrsiz += optlen;
 				nxt= opthdr->ip6e_nxt;
 				ptr= ((char *)opthdr)+optlen;
 			}
@@ -2888,6 +2905,10 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 			else
 				seq= ntohl(v6info->seq);
+
+			if (state->open_result)
+				add_str(state, " }, { ");
+
 			if (seq != state->seq)
 			{
 				if (seq > state->seq)
@@ -2902,13 +2923,13 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				}
 				late= 1;
 
-				snprintf(line, sizeof(line), "\"late\":%d",
+				snprintf(line, sizeof(line), DBQ(late) ":%d",
 					state->seq-seq);
 				add_str(state, line);
 			} else if (state->gotresp)
 			{
 				isDup= 1;
-				add_str(state, " }, { \"dup\":true");
+				add_str(state, DBQ(dup) ":true");
 			}
 
 			if (!late && !isDup)
@@ -3110,8 +3131,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 		}
 
-		if (late)
-			add_str(state, " }, { ");
+		state->open_result= 1;
 
 		if (!late && !isDup)
 		{
@@ -3189,6 +3209,9 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			return;
 		}
 
+		if (state->open_result)
+			add_str(state, " }, { ");
+
 		late= 0;
 		isDup= 0;
 		seq= ntohl(v6info->seq);
@@ -3204,14 +3227,14 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 			late= 1;
 
-			snprintf(line, sizeof(line), "\"late\":%d",
+			snprintf(line, sizeof(line), DBQ(late) ":%d",
 				state->seq-seq);
 			add_str(state, line);
 		}
 		else if (state->gotresp)
 		{
 			isDup= 1;
-			add_str(state, " }, { \"dup\":true");
+			add_str(state, DBQ(dup) ":true");
 		}
 
 		if (!late && !isDup)
@@ -3260,8 +3283,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			sizeof(buf)), state->hop);
 #endif
 
-		if (late)
-			add_str(state, " }, { ");
+		state->open_result= 1;
 
 		if (!late && !isDup)
 		{
@@ -3356,7 +3378,12 @@ static void noreply_callback(int __attribute((unused)) unused,
 #endif
 
 	if (!state->gotresp)
-		add_str(state, "\"x\":\"*\"");
+	{
+		if (state->open_result)
+			add_str(state, " }, { ");
+		add_str(state, DBQ(x) ":" DBQ(*));
+		state->open_result= 1;
+	}
 
 	send_pkt(state);
 }
@@ -3398,6 +3425,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	duptimeout= 10;
 	timeout= 1000;
 	parismod= 16;
+	hbhoptsize= 0;
+	destoptsize= 0;
 	str_Atlas= NULL;
 	out_filename= NULL;
 	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
@@ -3586,6 +3615,7 @@ static void traceroute_start2(void *state)
 	trtstate->resmax= 80;
 	trtstate->result= xmalloc(trtstate->resmax);
 	trtstate->reslen= 0;
+	trtstate->open_result= 0;
 	trtstate->starttime= time(NULL);
 
 	snprintf(line, sizeof(line), "{ \"hop\":%d", trtstate->hop);
