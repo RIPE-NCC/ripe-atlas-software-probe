@@ -186,19 +186,6 @@ static void add_str(struct pingstate *state, const char *str)
 	//printf("add_str: result = '%s'\n", state->result);
 }
 
-static int get_timesync(void)
-{
-	FILE *fh;
-	int lastsync;
-
-	fh= fopen(ATLAS_TIMESYNC_FILE, "r");
-	if (!fh)
-		return -1;
-	fscanf(fh, "%d", &lastsync);
-	fclose(fh);
-	return time(NULL)-lastsync;
-}
-
 static void report(struct pingstate *state)
 {
 	FILE *fh;

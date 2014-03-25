@@ -701,8 +701,10 @@ static void report(struct hgstate *state)
 		{
 			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
 				DBQ(fw) ":%d, "
+				DBQ(lts) ":%d, "
 				DBQ(time) ":%ld, ",
 				state->atlas, get_atlas_fw_version(),
+				get_timesync(),
 				state->gstart);
 		}
 		fprintf(fh, DBQ(result) ":[ ");

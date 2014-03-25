@@ -388,9 +388,11 @@ static void report(struct trtstate *state)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", " DBQ(fw) ":%d"
+			", " DBQ(lts) ":%d"
 			", " DBQ(time) ":%ld"
 			", " DBQ(endtime) ":%ld, ",
 			state->atlas, get_atlas_fw_version(),
+			get_timesync(),
 			state->starttime,
 			(long)time(NULL));
 	}
