@@ -26,7 +26,7 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46rc:s:A:O:i:")
+#define PING_OPT_STRING ("!46rc:s:A:O:i:I:")
 
 enum 
 {
@@ -71,11 +71,6 @@ struct pingbase
 {
 	struct event_base *event_base;
 
-	evutil_socket_t rawfd4;	       /* Raw socket used to ping hosts (IPv4)
-					*/
-	evutil_socket_t rawfd6;	       /* Raw socket used to ping hosts (IPv6)
-					*/
-
 	pid_t pid;                     /* Identifier to send with each ICMP
 					* Request */
 
@@ -83,10 +78,6 @@ struct pingbase
 	struct pingstate **table;
 	int tabsiz;
 
-	struct event event4;            /* Used to detect read events on raw
-					 * socket */
-	struct event event6;            /* Used to detect read events on raw
-					 * socket */
 	void (*done)(void *state);	/* Called when a ping is done */
 
 	u_char packet [MAX_DATA_SIZE];
@@ -97,6 +88,7 @@ struct pingstate
 	/* Parameters */
 	char *atlas;
 	char *hostname;
+	char *interface;
 	int pingcount;
 	char *out_filename;
 	char delay_name_res;
@@ -108,12 +100,16 @@ struct pingstate
 	struct sockaddr_in6 loc_sin6;
 	socklen_t loc_socklen;
 	int busy;
+	int socket;
 	char got_reply;
 	char first;
 	char no_dst;
 	unsigned char ttl;
 	unsigned size;
 	unsigned psize;
+
+	struct event event;		/* Used to detect read events on raw
+					 * socket */
 
 	char *result;
 	size_t reslen;
@@ -246,6 +242,14 @@ static void report(struct pingstate *state)
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 	free(state->result);
 	state->result= NULL;
+
+	/* Kill the event and close socket */
+	event_del(&state->event);
+	if (state->socket != -1)
+	{
+		close(state->socket);
+		state->socket= -1;
+	}
 
 	state->busy= 0;
 
@@ -545,7 +549,7 @@ static void ping_xmit(struct pingstate *host)
 	struct pingbase *base = host->base;
 	struct timeval tv_interval;
 
-	int nsent, fd4, fd6, t_errno, r;
+	int nsent;
 
 	if (host->sentpkts >= host->maxpkts)
 	{
@@ -573,27 +577,14 @@ static void ping_xmit(struct pingstate *host)
 		fmticmp6(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-		fd6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-		if (fd6 != -1)
-		{
-			r= connect(fd6, (struct sockaddr *)&host->sin6,
-	                        host->socklen);
-			if (r == 0)
-			{
-				host->loc_socklen= 
-					sizeof(host->loc_sin6);
-				getsockname(fd6, &host->loc_sin6,
-					&host->loc_socklen);
-			}
-		}
+		host->loc_socklen= sizeof(host->loc_sin6);
+		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
 
-		nsent = sendto(fd6, base->packet, host->cursize+ICMP6_HDRSIZE,
+		nsent = sendto(host->socket, base->packet,
+			host->cursize+ICMP6_HDRSIZE,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
 
-		t_errno= errno;
-		close(fd6);
-		errno= t_errno;
 	}
 	else
 	{
@@ -601,28 +592,13 @@ static void ping_xmit(struct pingstate *host)
 		fmticmp4(base->packet, &host->cursize, host->seq, host->index,
 			base->pid);
 
-		fd4 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-		if (fd4 != -1)
-		{
-			r= connect(fd4, (struct sockaddr *)&host->sin6,
-	                        host->socklen);
-			if (r == 0)
-			{
-				host->loc_socklen= 
-					sizeof(host->loc_sin6);
-				getsockname(fd4, &host->loc_sin6,
-					&host->loc_socklen);
-			}
-		}
+		host->loc_socklen= sizeof(host->loc_sin6);
+		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
 
-
-		nsent = sendto(fd4, base->packet, host->cursize+ICMP_MINLEN,
+		nsent = sendto(host->socket, base->packet,
+			host->cursize+ICMP_MINLEN,
 			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 			host->socklen);
-
-		t_errno= errno;
-		close(fd4);
-		errno= t_errno;
 	}
 
 	if (nsent > 0)
@@ -683,29 +659,32 @@ static void noreply_callback(int __attribute((unused)) unused, const short __att
 static void ready_callback4 (int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void * arg)
 {
-	struct pingbase *base = arg;
-
+	struct pingstate *state;
+	struct pingbase *base;
 	int nrecv, isDup;
-	struct sockaddr_in remote;                  /* responding internet address */
+	struct sockaddr_in remote;	/* responding internet address */
 	socklen_t slen = sizeof(struct sockaddr);
 	struct sockaddr_in *sin4p;
 	struct sockaddr_in loc_sin4;
-
-	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
-	struct ip * ip = (struct ip *) base->packet;
+	struct ip * ip;
 	struct icmphdr * icmp;
-	struct evdata * data = (struct evdata *) (base->packet + IPHDR + ICMP_MINLEN);
+	struct evdata * data;
 	int hlen = 0;
-
 	struct timeval now;
-	struct pingstate * host;
+	state= arg;
+	base = state->base;
+
+	/* Pointer to relevant portions of the packet (IP, ICMP and user
+	 * data) */
+	ip = (struct ip *) base->packet;
+	data = (struct evdata *) (base->packet + IPHDR + ICMP_MINLEN);
 
 	/* Time the packet has been received */
 	gettimeofday(&now, NULL);
 
 // printf("ready_callback4: before recvfrom\n");
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd4, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	  {
 	    goto done;
@@ -751,7 +730,8 @@ printf("ready_callback4: too short\n");
 	  }
 
 	/* Get the pointer to the host descriptor in our internal table */
-	host= base->table[data->index];
+	if (state != base->table[data->index])
+		goto done;	/* Not for us */
 
 	/* Check for Destination Host Unreachable */
 	if (icmp->type == ICMP_ECHO)
@@ -771,31 +751,31 @@ printf("ready_callback4: too short\n");
 	    memset(sin4p, '\0', sizeof(*sin4p));
 	    sin4p->sin_family= AF_INET;
 	    sin4p->sin_addr= ip->ip_dst;
-	    host->rcvd_ttl= ip->ip_ttl;
+	    state->rcvd_ttl= ip->ip_ttl;
 
 	    /* Report everything with the wrong sequence number as a dup. 
 	     * This is not quite right, it could be a late packet. Do we
 	     * care?
 	     */
-	    isDup= (ntohs(icmp->un.echo.sequence) != host->seq);
+	    isDup= (ntohs(icmp->un.echo.sequence) != state->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR - ICMP_MINLEN, nrecv,
-		    (struct sockaddr *)&host->sin6, host->socklen,
+		    (struct sockaddr *)&state->sin6, state->socklen,
 		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
-		    host);
+		    state);
 
 	    /* Update the sequence number for the next run */
-	    host->seq = (host->seq + 1) % 256;
+	    state->seq = (state->seq + 1) % 256;
 
             if (!isDup)
-		host->got_reply= 1;
+		state->got_reply= 1;
 	  }
 	else
 	{
 printf("ready_callback4: not an echo reply\n");
 	  /* Handle this condition exactly as the request has expired */
-	  noreply_callback (-1, -1, host);
+	  noreply_callback (-1, -1, state);
 	}
 
 done:
@@ -816,24 +796,31 @@ done:
 static void ready_callback6 (int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void * arg)
 {
-	struct pingbase *base = arg;
+	struct pingbase *base;
+	struct pingstate *state;
 
 	int nrecv, isDup;
 	struct sockaddr_in remote;                  /* responding internet address */
 
-	/* Pointer to relevant portions of the packet (IP, ICMP and user data) */
-	struct icmp6_hdr * icmp = (struct icmp6_hdr *) base->packet;
-	struct evdata * data = (struct evdata *) (base->packet +
-		offsetof(struct icmp6_hdr, icmp6_data16[2]));
+	struct icmp6_hdr *icmp;
+	struct evdata * data;
 
 	struct timeval now;
-	struct pingstate * host;
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
 	struct msghdr msg;
 	struct sockaddr_in6 loc_sin6;
 	struct iovec iov[1];
 	char cmsgbuf[256];
+
+	state= arg;
+	base = state->base;
+
+	/* Pointer to relevant portions of the packet (IP, ICMP and user
+	 * data) */
+	icmp = (struct icmp6_hdr *) base->packet;
+	data = (struct evdata *) (base->packet +
+		offsetof(struct icmp6_hdr, icmp6_data16[2]));
 
 	/* Time the packet has been received */
 	gettimeofday(&now, NULL);
@@ -849,7 +836,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	msg.msg_flags= 0;			/* Not really needed */
 
 	/* Receive data from the network */
-	nrecv= recvmsg(base->rawfd6, &msg, MSG_DONTWAIT);
+	nrecv= recvmsg(state->socket, &msg, MSG_DONTWAIT);
 	if (nrecv < 0)
 	  {
 	    goto done;
@@ -870,7 +857,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  }
 
 	/* Get the pointer to the host descriptor in our internal table */
-	host= base->table[data->index];
+	if (state != base->table[data->index])
+		goto done;	/* Not for us */
 
 	/* Check for Destination Host Unreachable */
 	if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
@@ -899,7 +887,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 			    cmsgptr->cmsg_type == IPV6_HOPLIMIT)
 		    {
-			    host->rcvd_ttl= *(int *)CMSG_DATA(cmsgptr);
+			    state->rcvd_ttl= *(int *)CMSG_DATA(cmsgptr);
 		    }
 	    }
 
@@ -907,23 +895,23 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	     * This is not quite right, it could be a late packet. Do we
 	     * care?
 	     */
-	    isDup= (ntohs(icmp->icmp6_seq) != host->seq);
+	    isDup= (ntohs(icmp->icmp6_seq) != state->seq);
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - ICMP6_HDRSIZE, nrecv + sizeof(struct ip6_hdr),
-		    (struct sockaddr *)&host->sin6, host->socklen,
+		    (struct sockaddr *)&state->sin6, state->socklen,
 		    (struct sockaddr *)&loc_sin6, sizeof(loc_sin6),
-		    ntohs(icmp->icmp6_seq), host->rcvd_ttl, &elapsed,
-		    host);
+		    ntohs(icmp->icmp6_seq), state->rcvd_ttl, &elapsed,
+		    state);
 
 	    /* Update the sequence number for the next run */
-	    host->seq = (host->seq + 1) % 256;
+	    state->seq = (state->seq + 1) % 256;
 
 	    if (!isDup)
-		host->got_reply= 1;
+		state->got_reply= 1;
 	  }
 	else
 	  /* Handle this condition exactly as the request has expired */
-	  noreply_callback (-1, -1, host);
+	  noreply_callback (-1, -1, state);
 
 done:
 	;
@@ -943,48 +931,13 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	const char *hostname;
 	char *str_Atlas;
 	char *out_filename;
+	char *interface;
 	struct pingstate *state;
 	len_and_sockaddr *lsa;
 	FILE *fh;
 
 	if (!ping_base)
 	{
-		int p_proto, on;
-		struct protoent *protop;
-		evutil_socket_t fd4, fd6;
-
-		/* Check if the ICMP protocol is available on this system */
-		protop = getprotobyname("icmp");
-		if (protop)
-			p_proto= protop->p_proto;
-		else
-			p_proto= IPPROTO_ICMP;
-
-		/* Create an endpoint for communication using raw socket for ICMP calls */
-		if ((fd4 = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
-		  return NULL;
-		}
-
-		/* Check if the ICMP6 protocol is available on this system */
-		protop = getprotobyname("icmp6");
-		if (protop)
-			p_proto= protop->p_proto;
-		else
-			p_proto= IPPROTO_ICMPV6;
-
-		if ((fd6 = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
-		  close(fd4);
-		  return NULL;
-		}
-
-		on = 1;
-		setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
-			sizeof(on));
-
-		on = 1;
-		setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
-			sizeof(on));
-
 		ping_base = malloc(sizeof(*ping_base));
 		if (ping_base == NULL)
 			return (NULL);
@@ -996,24 +949,8 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		ping_base->table= xzalloc(ping_base->tabsiz *
 			sizeof(*ping_base->table));
 
-		ping_base->rawfd4 = fd4;
-		ping_base->rawfd6 = fd6;
-		evutil_make_socket_nonblocking(ping_base->rawfd4);
-		evutil_make_socket_nonblocking(ping_base->rawfd6);
-
 		/* Set default values */
 		ping_base->pid = getpid();
-
-		/* Define the callback to handle ICMP Echo Reply and add the
-		 * raw file descriptor to those monitored for read events */
-		event_assign(&ping_base->event4, ping_base->event_base,
-			ping_base->rawfd4, EV_READ | EV_PERSIST,
-			ready_callback4, ping_base);
-		event_assign(&ping_base->event6, ping_base->event_base,
-			ping_base->rawfd6, EV_READ | EV_PERSIST,
-			ready_callback6, ping_base);
-		event_add(&ping_base->event4, NULL);
-		event_add(&ping_base->event6, NULL);
 
 		ping_base->done= 0;
 	}
@@ -1024,10 +961,11 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	str_Atlas= NULL;
 	out_filename= NULL;
 	interval= DEFAULT_PING_INTERVAL;
+	interface= NULL;
 	/* exactly one argument needed; -c NUM */
 	opt_complementary = "=1:c+:s+:i+";
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
-		&str_Atlas, &out_filename, &interval);
+		&str_Atlas, &out_filename, &interval, &interface);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -1104,6 +1042,8 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->af= af;
 	state->delay_name_res= delay_name_res;
 	state->interval= interval;
+	state->interface= interface;
+	state->socket= -1;
 
 	state->seq = 1;
 
@@ -1148,7 +1088,9 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 static void ping_start2(void *state)
 {
+	int p_proto, on, fd;
 	struct pingstate *pingstate;
+	char line[80];
 
 	pingstate= state;
 
@@ -1157,6 +1099,98 @@ static void ping_start2(void *state)
 
 	pingstate->send_error= 0;
 	pingstate->got_reply= 0;
+
+	if (pingstate->af == AF_INET)
+	{
+		/* Check if the ICMP protocol is available on this system */
+		p_proto= IPPROTO_ICMP;
+
+		/* Create an endpoint for communication using raw socket for
+		 * ICMP calls */
+		if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
+			snprintf(line, sizeof(line),
+				"{ " DBQ(error) ":" DBQ(socket failed: %s)
+				" }", strerror(errno));
+			add_str(pingstate, line);
+			report(pingstate);
+			if (pingstate->base->done)
+				pingstate->base->done(pingstate);
+			return;
+		}
+		pingstate->socket= fd;
+
+		/* Define the callback to handle ICMP Echo Reply and add the
+		 * raw file descriptor to those monitored for read events */
+		event_assign(&pingstate->event, pingstate->base->event_base,
+			pingstate->socket, EV_READ | EV_PERSIST,
+			ready_callback4, state);
+	}
+	else
+	{
+		/* Check if the ICMP6 protocol is available on this system */
+		p_proto= IPPROTO_ICMPV6;
+
+		if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
+			snprintf(line, sizeof(line),
+				"{ " DBQ(error) ":" DBQ(socket failed: %s)
+				" }", strerror(errno));
+			add_str(pingstate, line);
+			report(pingstate);
+			if (pingstate->base->done)
+				pingstate->base->done(pingstate);
+			return;
+		}
+
+		on = 1;
+		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+			sizeof(on));
+
+		on = 1;
+		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+			sizeof(on));
+
+		pingstate->socket= fd;
+
+		/* Define the callback to handle ICMP Echo Reply and add the
+		 * raw file descriptor to those monitored for read events */
+		event_assign(&pingstate->event, pingstate->base->event_base,
+			pingstate->socket, EV_READ | EV_PERSIST,
+			ready_callback6, state);
+	}
+
+	evutil_make_socket_nonblocking(pingstate->socket);
+
+	if (pingstate->interface)
+	{
+		if (bind_interface(pingstate->socket, pingstate->af,
+			pingstate->interface) == -1)
+		{
+			snprintf(line, sizeof(line),
+				"{ " DBQ(error) ":"
+				DBQ(bind to interface failed)
+				" }");
+			add_str(pingstate, line);
+			report(pingstate);
+			if (pingstate->base->done)
+				pingstate->base->done(pingstate);
+			return;
+		}
+	}
+
+	if (connect(pingstate->socket, &pingstate->sin6, 
+		pingstate->socklen) == -1)
+	{
+		snprintf(line, sizeof(line),
+			"{ " DBQ(error) ":" DBQ(connect failed: %s)
+			" }", strerror(errno));
+		add_str(pingstate, line);
+		report(pingstate);
+		if (pingstate->base->done)
+			pingstate->base->done(pingstate);
+		return;
+	}
+
+	event_add(&pingstate->event, NULL);
 
 	ping_xmit(pingstate);
 }

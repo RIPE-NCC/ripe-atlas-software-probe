@@ -18,6 +18,7 @@ lib-y += bb_pwd.o
 lib-y += bb_qsort.o
 lib-y += bb_strtod.o
 lib-y += bb_strtonum.o
+lib-y += bind_interface.o
 lib-y += change_identity.o
 lib-y += chomp.o
 lib-y += compare_string_array.o
