@@ -1006,10 +1006,9 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
-	af= AF_UNSPEC;
 	if (opt & opt_4)
 		af= AF_INET;
-	if (opt & opt_6)
+	else
 		af= AF_INET6;
 	delay_name_res= !!(opt & opt_r);
 
