@@ -1263,7 +1263,7 @@ static void sslgetcert_start(void *vstate)
 
 	tu_connect_to_name(&state->tu_env, state->hostname,
 		state->portname,
-		&interval, &hints, timeout_callback,
+		&interval, &hints, NULL, timeout_callback,
 		reporterr, dnscount, beforeconnect,
 		connected, readcb, writecb);
 }

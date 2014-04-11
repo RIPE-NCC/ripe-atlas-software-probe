@@ -91,6 +91,7 @@ struct hgstate
 	int etim;
 	size_t read_limit;
 	unsigned timeout;
+	char *infname;
 
 	/* State */
 	char busy;
@@ -368,7 +369,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body, *read_limit_str,
-		*timeout_str;
+		*timeout_str, *infname;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
@@ -390,6 +391,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	read_limit_str= NULL;
 	timeout_str= NULL;
 	A_arg= NULL;
+	infname= NULL;
 	only_v4= 0;
 	only_v6= 0;
 	do_etim= 0;
@@ -406,7 +408,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "01aA:cO:46", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "01aA:cI:O:46", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -454,6 +456,9 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'h':				/* --post-header */
 			post_header= optarg;
+			break;
+		case 'I':
+			infname= optarg;
 			break;
 		case 'O':
 			output_file= optarg;
@@ -622,6 +627,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->max_body= max_body;
 	state->read_limit= read_limit;
 	state->timeout= timeout;
+	state->infname= infname;
 
 	state->only_v4= 2;
 
@@ -1824,6 +1830,13 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		err_reading(state);
 		break;
 
+	case TU_SOCKET_ERR:
+		snprintf(line, sizeof(line),
+			"{ " DBQ(sockerr) ":" DBQ(%s) ", ", str);
+		add_str(state, line);
+		report(state);
+		break;
+
 	case TU_CONNECT_ERR:
 		snprintf(line, sizeof(line),
 			DBQ(err) ":" DBQ(connect: %s) ", ", str);
@@ -1892,7 +1905,7 @@ static void httpget_start(void *state)
 	interval.tv_sec= hgstate->timeout / 1000;
 	interval.tv_usec= (hgstate->timeout % 1000) * 1000;
 	tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->port,
-		&interval, &hints, timeout_callback,
+		&interval, &hints, hgstate->infname, timeout_callback,
 		reporterr, dnscount, beforeconnect,
 		connected, readcb, writecb);
 }

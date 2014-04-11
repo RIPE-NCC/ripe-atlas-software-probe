@@ -13,12 +13,13 @@
 #include "tcputil.h"
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
-static void create_bev(struct tu_env *env);
+static int create_bev(struct tu_env *env);
 static void eventcb(struct bufferevent *bev, short events, void *ptr);
 
 void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	struct timeval *interval,
 	struct evutil_addrinfo *hints,
+	char *infname,
 	void (*timeout_callback)(int unused, const short event, void *s),
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *err),
@@ -30,6 +31,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	void (*writecb)(struct bufferevent *bev, void *ptr))
 {
 	env->interval= *interval;
+	env->infname= infname;
 	env->reporterr= reporterr;
 	env->reportcount= reportcount;
 	env->beforeconnect= beforeconnect;
@@ -49,6 +51,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 
 void tu_restart_connect(struct tu_env *env)
 {
+	int r;
 	struct bufferevent *bev;
 
 	/* Delete old bev */
@@ -59,7 +62,11 @@ void tu_restart_connect(struct tu_env *env)
 	}
 
 	/* And create a new one */
-	create_bev(env);
+	r= create_bev(env);
+	if (r == -1)
+	{
+		return;
+	}
 	bev= env->bev;
 
 	/* Connect failed, try next address */
@@ -118,7 +125,7 @@ void tu_cleanup(struct tu_env *env)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct tu_env *env;
 	struct bufferevent *bev;
 	struct evutil_addrinfo *cur;
@@ -151,7 +158,11 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 	env->reportcount(env, count);
 
-	create_bev(env);
+	r= create_bev(env);
+	if (r == -1)
+	{
+		return;
+	}
 
 	while (env->dns_curr)
 	{
@@ -192,9 +203,12 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->reporterr(env, TU_OUT_OF_ADDRS, "");
 }
 
-static void create_bev(struct tu_env *env)
+static int create_bev(struct tu_env *env)
 {
+	int af, fd;
 	struct bufferevent *bev;
+
+	af= env->dns_curr->ai_addr->sa_family;
 
 	bev= bufferevent_socket_new(EventBase, -1,
 		BEV_OPT_CLOSE_ON_FREE);
@@ -202,11 +216,31 @@ static void create_bev(struct tu_env *env)
 	{
 		crondlog(DIE9 "bufferevent_socket_new failed");
 	}
+	if (env->infname)
+	{
+		fd= socket(af, SOCK_STREAM, 0);
+		if (fd == -1)
+		{
+			env->reporterr(env, TU_SOCKET_ERR,
+				"socket call failed");
+			return -1;
+		}
+
+		if (bind_interface(fd, af, env->infname) == -1)
+		{
+			env->reporterr(env, TU_SOCKET_ERR,
+				"bind_interface failed");
+			close(fd);
+			return -1;
+		}
+		bufferevent_setfd(bev, fd);
+	}
 	bufferevent_setcb(bev, env->readcb, env->writecb, eventcb, env);
 	bufferevent_enable(bev, EV_WRITE);
 	env->bev= bev;
 	env->connecting= 1;
 
+	return 0;
 }
 
 static void eventcb(struct bufferevent *bev, short events, void *ptr)

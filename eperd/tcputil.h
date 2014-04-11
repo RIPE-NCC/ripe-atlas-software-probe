@@ -6,7 +6,8 @@
 
 #include <event2/event_struct.h>
 
-enum tu_err { TU_DNS_ERR, TU_READ_ERR, TU_CONNECT_ERR, TU_OUT_OF_ADDRS };
+enum tu_err { TU_DNS_ERR, TU_READ_ERR, TU_SOCKET_ERR, TU_CONNECT_ERR,
+	TU_OUT_OF_ADDRS };
 struct tu_env
 {
 	char dnsip;
@@ -15,6 +16,7 @@ struct tu_env
 	struct evutil_addrinfo *dns_curr;
 	struct bufferevent *bev;
 	struct timeval interval;
+	char *infname;
 	struct event timer;
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *str);
@@ -29,6 +31,7 @@ struct tu_env
 void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	struct timeval *timeout,
 	struct evutil_addrinfo *hints,
+	char *infname,
 	void (*timeout_callback)(int unused, const short event, void *env),
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *err),

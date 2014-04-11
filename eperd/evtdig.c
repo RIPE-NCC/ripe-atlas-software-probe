@@ -1895,7 +1895,8 @@ void tdig_start (struct query_state *qry)
 		interval.tv_sec = CONN_TO;
 		interval.tv_usec= 0;
 		tu_connect_to_name (&qry->tu_env,   qry->server_name, port_as_char,
-				&interval, &hints, tcp_timeout_callback, tcp_reporterr,
+				&interval, &hints, NULL,
+				tcp_timeout_callback, tcp_reporterr,
 				tcp_dnscount, tcp_beforeconnect,
 				tcp_connected, tcp_readcb, tcp_writecb);
 
