@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:m:p:w:z:A:O:S:H:D:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:i:m:p:w:z:A:O:S:H:D:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -63,20 +63,7 @@ struct trtbase
 {
 	struct event_base *event_base;
 
-	int v4icmp_rcv;
-	int v6icmp_rcv;
-	int v4icmp_snd;
-	int v6icmp_snd;
-	int v4tcp_rcv;
-	int v6tcp_rcv;
-	int v4udp_snd;
-
 	int my_pid;
-
-	struct event event4;
-	struct event tcp_event4;
-	struct event event6;
-	struct event tcp_event6;
 
 	struct trtstate **table;
 	int tabsiz;
@@ -97,7 +84,8 @@ struct trtstate
 	char *hostname;
 	const char *destportstr;
 	char *out_filename;
-	char do_Xicmp;
+	char *interface;
+	char do_icmp;
 	char do_tcp;
 	char do_udp;
 	char do_v6;
@@ -128,6 +116,13 @@ struct trtstate
 	uint16_t paris;
 	uint16_t seq;
 	unsigned short curpacksize;
+	
+	int socket_icmp;		/* Socket for sending and receiving
+					 * ICMPs */
+	struct event event_icmp;	/* Event for this socket */
+	int socket_tcp;			/* Socket for sending and receiving
+					 * raw TCP */
+	struct event event_tcp;		/* Event for this socket */
 
 	uint8_t last_response_hop;	/* Hop at which we last got something
 					 * back.
@@ -191,6 +186,8 @@ struct v6info
 	uint32_t seq;
 	struct timeval tv;
 };
+
+static int create_socket(struct trtstate *state, int do_tcp);
 
 #define OPT_PAD1 0
 #define OPT_PADN 1
@@ -415,7 +412,7 @@ static void report(struct trtstate *state)
 		fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), namebuf);
 	}
 
-	if (state->do_Xicmp)
+	if (state->do_icmp)
 		proto= "ICMP";
 	else if (state->do_tcp)
 		proto= "TCP";
@@ -436,6 +433,20 @@ static void report(struct trtstate *state)
 	free(state->result);
 	state->result= NULL;
 	state->busy= 0;
+
+	/* Kill the event and close socket */
+	if (state->socket_icmp != -1)
+	{
+		event_del(&state->event_icmp);
+		close(state->socket_icmp);
+		state->socket_icmp= -1;
+	}
+	if (state->socket_tcp != -1)
+	{
+		event_del(&state->event_tcp);
+		close(state->socket_tcp);
+		state->socket_tcp= -1;
+	}
 
 	if (state->out_filename)
 		fclose(fh);
@@ -632,21 +643,21 @@ static void send_pkt(struct trtstate *state)
 				}
 			}
 		}
-		else if (state->do_Xicmp)
+		else if (state->do_icmp)
 		{
 			/* Set hop count */
-			setsockopt(base->v6icmp_snd, SOL_IPV6,
+			setsockopt(state->socket_icmp, SOL_IPV6,
 				IPV6_UNICAST_HOPS, &hop, sizeof(hop));
 
 			/* Set/clear don't fragment */
 			on= (state->dont_fragment ? IPV6_PMTUDISC_DO :
 				IPV6_PMTUDISC_DONT);
-			setsockopt(base->v6icmp_snd, IPPROTO_IPV6,
+			setsockopt(state->socket_icmp, IPPROTO_IPV6,
 					IPV6_MTU_DISCOVER, &on, sizeof(on));
 
-			do_hbh_dest_opt(base, base->v6icmp_snd, 0 /* hbh */,
+			do_hbh_dest_opt(base, state->socket_icmp, 0 /* hbh */,
 					 state->hbhoptsize);
-			do_hbh_dest_opt(base, base->v6icmp_snd, 1 /* dest */,
+			do_hbh_dest_opt(base, state->socket_icmp, 1 /* dest */,
 					 state->destoptsize);
 
 			icmp6_hdr= (struct icmp6_hdr *)base->packet;
@@ -712,7 +723,7 @@ static void send_pkt(struct trtstate *state)
 			memset(&sin6copy, '\0', sizeof(sin6copy));
 			sin6copy.sin6_family= AF_INET6;
 			sin6copy.sin6_addr= state->sin6.sin6_addr;
-			r= sendto(base->v6icmp_snd, base->packet, len, 0,
+			r= sendto(state->socket_icmp, base->packet, len, 0,
 				(struct sockaddr *)&sin6copy,
 				sizeof(sin6copy));
 
@@ -1000,7 +1011,7 @@ static void send_pkt(struct trtstate *state)
 				}
 			}
 		}
-		else if (state->do_Xicmp)
+		else if (state->do_icmp)
 		{
 			hop= state->hop;
 
@@ -1048,16 +1059,16 @@ static void send_pkt(struct trtstate *state)
 #endif
 
 			/* Set hop count */
-			setsockopt(base->v4icmp_snd, IPPROTO_IP, IP_TTL,
+			setsockopt(state->socket_icmp, IPPROTO_IP, IP_TTL,
 				&hop, sizeof(hop));
 
 			/* Set/clear don't fragment */
 			on= (state->dont_fragment ? IP_PMTUDISC_DO :
 				IP_PMTUDISC_DONT);
-			setsockopt(base->v4icmp_snd, IPPROTO_IP,
+			setsockopt(state->socket_icmp, IPPROTO_IP,
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
-			r= sendto(base->v4icmp_snd, base->packet, len, 0,
+			r= sendto(state->socket_icmp, base->packet, len, 0,
 				(struct sockaddr *)&state->sin6,
 				state->socklen);
 
@@ -1349,10 +1360,11 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 	gettimeofday(&now, NULL);
 
-	base= s;
+	state= s;
+	base= state->base;
 
 	slen= sizeof(remote);
-	nrecv= recvfrom(base->v4icmp_rcv, base->packet, sizeof(base->packet),
+	nrecv= recvfrom(state->socket_icmp, base->packet, sizeof(base->packet),
 		MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
 	if (nrecv == -1)
 	{
@@ -1417,9 +1429,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 			 */
 			ind= ntohl(etcp->seq) >> 16;
 
-			state= NULL;
-			if (ind >= 0 && ind < base->tabsiz)
-				state= base->table[ind];
+			if (ind != state->index)
+				state= NULL;
 			if (state && state->sin6.sin6_family != AF_INET)
 				state= NULL;
 			if (state && !state->do_tcp)
@@ -1619,12 +1630,11 @@ printf("curpacksize: %d\n", state->curpacksize);
 			 */
 			ind= ntohs(eudp->uh_sport) - SRC_BASE_PORT;
 
-			state= NULL;
-			if (ind >= 0 && ind < base->tabsiz)
-				state= base->table[ind];
+			if (ind != state->index)
+				state= NULL;
 			if (state && state->sin6.sin6_family != AF_INET)
 				state= NULL;
-			if (state && state->do_Xicmp)
+			if (state && state->do_icmp)
 				state= NULL;	
 
 			if (!state)
@@ -1850,8 +1860,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 				return;
 			}
 
-			state= base->table[ind];
-			if (!state)
+			if (ind != state->index)
 			{
 				/* Nothing here */
 				printf(
@@ -1866,7 +1875,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 				return;
 			}
 
-			if (!state->do_Xicmp)
+			if (!state->do_icmp)
 			{
 				printf(
 			"ready_callback4: index (%d) is not doing ICMP\n",
@@ -2122,8 +2131,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			return;
 		}
 
-		state= base->table[ind];
-		if (!state)
+		if (ind != state->index)
 		{
 			/* Nothing here */
 			printf(
@@ -2260,10 +2268,11 @@ static void ready_tcp4(int __attribute((unused)) unused,
 
 	gettimeofday(&now, NULL);
 
-	base= s;
+	state= s;
+	base= state->base;
 
 	slen= sizeof(remote);
-	nrecv= recvfrom(base->v4tcp_rcv, base->packet, sizeof(base->packet),
+	nrecv= recvfrom(state->socket_tcp, base->packet, sizeof(base->packet),
 		MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
 	if (nrecv == -1)
 	{
@@ -2294,9 +2303,8 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	/* We store the id in high order 16 bits of the sequence number */
 	ind= ntohl(tcphdr->ack_seq) >> 16;
 
-	state= NULL;
-	if (ind >= 0 && ind < base->tabsiz)
-		state= base->table[ind];
+	if (ind != state->index)
+		state= NULL;
 	if (state && state->sin6.sin6_family != AF_INET)
 		state= NULL;
 	if (state && !state->do_tcp)
@@ -2428,7 +2436,8 @@ static void ready_tcp6(int __attribute((unused)) unused,
 
 	gettimeofday(&now, NULL);
 
-	base= s;
+	state= s;
+	base= state->base;
 
 	iov[0].iov_base= base->packet;
 	iov[0].iov_len= sizeof(base->packet);
@@ -2440,7 +2449,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	msg.msg_controllen= sizeof(cmsgbuf);
 	msg.msg_flags= 0;			/* Not really needed */
 
-	nrecv= recvmsg(base->v6tcp_rcv, &msg, MSG_DONTWAIT);
+	nrecv= recvmsg(state->socket_tcp, &msg, MSG_DONTWAIT);
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
@@ -2480,9 +2489,8 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	/* We store the id in high order 16 bits of the sequence number */
 	ind= ntohl(tcphdr->ack_seq) >> 16;
 
-	state= NULL;
-	if (ind >= 0 && ind < base->tabsiz)
-		state= base->table[ind];
+	if (ind != state->index)
+		state= NULL;
 	if (state && state->sin6.sin6_family != AF_INET6)
 		state= NULL;
 	if (state && !state->do_tcp)
@@ -2618,7 +2626,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 	gettimeofday(&now, NULL);
 
-	base= s;
+	state= s;
+	base= state->base;
 
 	iov[0].iov_base= base->packet;
 	iov[0].iov_len= sizeof(base->packet);
@@ -2630,7 +2639,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	msg.msg_controllen= sizeof(cmsgbuf);
 	msg.msg_flags= 0;			/* Not really needed */
 
-	nrecv= recvmsg(base->v6icmp_rcv, &msg, MSG_DONTWAIT);
+	nrecv= recvmsg(state->socket_icmp, &msg, MSG_DONTWAIT);
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
@@ -2857,9 +2866,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 				ind= ntohl(v6info->id);
 			}
 
-			state= NULL;
-			if (ind >= 0 && ind < base->tabsiz)
-				state= base->table[ind];
+			if (ind != state->index)
+				state= NULL;
 
 			if (state && state->sin6.sin6_family != AF_INET6)
 				state= NULL;
@@ -2868,7 +2876,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			{
 				if ((etcp && !state->do_tcp) ||
 					(eudp && !state->do_udp) ||
-					(eicmp && !state->do_Xicmp))
+					(eicmp && !state->do_icmp))
 				{
 					state= NULL;	
 				}
@@ -3175,14 +3183,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 		ind= ntohl(v6info->id);
 
-		state= NULL;
-		if (ind >= 0 && ind < base->tabsiz)
-			state= base->table[ind];
-
+		if (ind != state->index)
+			state= NULL;
 		if (state && state->sin6.sin6_family != AF_INET6)
 			state= NULL;
 
-		if (state && !state->do_Xicmp)
+		if (state && !state->do_icmp)
 		{
 			state= NULL;	
 		}
@@ -3320,7 +3326,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 static struct trtbase *traceroute_base_new(struct event_base
 	*event_base)
 {
-	int on;
 	struct trtbase *base;
 
 	base= xzalloc(sizeof(*base));
@@ -3330,39 +3335,7 @@ static struct trtbase *traceroute_base_new(struct event_base
 	base->tabsiz= 10;
 	base->table= xzalloc(base->tabsiz * sizeof(*base->table));
 
-	base->v4icmp_rcv= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-	base->v6icmp_rcv= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-	base->v4icmp_snd= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-	base->v6icmp_snd= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-	base->v4tcp_rcv= xsocket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-	base->v6tcp_rcv= xsocket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
-	base->v4udp_snd= xsocket(AF_INET, SOCK_DGRAM, 0);
-
 	base->my_pid= getpid();
-
-	on = 1;
-	setsockopt(base->v6icmp_rcv, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-		&on, sizeof(on));
-
-	on = 1;
-	setsockopt(base->v6icmp_rcv, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
-		&on, sizeof(on));
-	on = 1;
-	setsockopt(base->v6tcp_rcv, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
-		&on, sizeof(on));
-
-	event_assign(&base->event4, base->event_base, base->v4icmp_rcv,
-		EV_READ | EV_PERSIST, ready_callback4, base);
-	event_assign(&base->tcp_event4, base->event_base, base->v4tcp_rcv,
-		EV_READ | EV_PERSIST, ready_tcp4, base);
-	event_assign(&base->event6, base->event_base, base->v6icmp_rcv,
-		EV_READ | EV_PERSIST, ready_callback6, base);
-	event_assign(&base->tcp_event6, base->event_base, base->v6tcp_rcv,
-		EV_READ | EV_PERSIST, ready_tcp6, base);
-	event_add(&base->event4, NULL);
-	event_add(&base->tcp_event4, NULL);
-	event_add(&base->event6, NULL);
-	event_add(&base->tcp_event6, NULL);
 
 	return base;
 }
@@ -3404,6 +3377,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	const char *hostname;
 	char *out_filename;
 	const char *destportstr;
+	char *interface;
 	char *check;
 	struct trtstate *state;
 	sa_family_t af;
@@ -3421,6 +3395,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	count= 3;
 	firsthop= 1;
 	gaplimit= 5;
+	interface= NULL;
 	maxhops= 32;
 	maxpacksize= 40;
 	destportstr= "80";
@@ -3437,7 +3412,8 @@ for (i= 0; argv[i] != NULL; i++)
 	printf("argv[%d] = '%s'\n", i, argv[i]);
 
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
-		&firsthop, &gaplimit, &maxhops, &destportstr, &timeout,
+		&firsthop, &gaplimit, &interface, &maxhops, &destportstr,
+		&timeout,
 		&duptimeout, &str_Atlas, &out_filename, &maxpacksize,
 		&hbhoptsize, &destoptsize);
 	hostname = argv[optind];
@@ -3514,12 +3490,13 @@ for (i= 0; argv[i] != NULL; i++)
 	state->maxpacksize= maxpacksize;
 	state->maxhops= maxhops;
 	state->gaplimit= gaplimit;
+	state->interface= interface;
 	state->destportstr= destportstr;
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
 	state->hostname= strdup(hostname);
-	state->do_Xicmp= do_icmp;
+	state->do_icmp= do_icmp;
 	state->do_tcp= do_tcp;
 	state->do_udp= do_udp;
 	state->do_v6= do_v6;
@@ -3579,15 +3556,10 @@ for (i= 0; argv[i] != NULL; i++)
 
 static void traceroute_start2(void *state)
 {
-	int r, serrno;
 	struct trtstate *trtstate;
-	struct trtbase *trtbase;
-	struct sockaddr_in loc_sa4;
-	struct sockaddr_in6 loc_sa6;
 	char line[80];
 
 	trtstate= state;
-	trtbase= trtstate->base;
 
 	if (trtstate->busy)
 	{
@@ -3620,229 +3592,232 @@ static void traceroute_start2(void *state)
 	trtstate->open_result= 0;
 	trtstate->starttime= time(NULL);
 
+	trtstate->socket_icmp= -1;
+	trtstate->socket_tcp= -1;
+
 	snprintf(line, sizeof(line), "{ \"hop\":%d", trtstate->hop);
 	add_str(trtstate, line);
 
-	if (trtstate->do_Xicmp)
+	if (trtstate->do_icmp)
 	{
+		if (create_socket(trtstate, 0 /*do_tcp*/) == -1)
+			return;
+	}
+	else if (trtstate->do_udp)
+	{
+		if (create_socket(trtstate, 0 /*do_tcp*/) == -1)
+			return;
 		if (trtstate->do_v6)
 		{
-			memset(&loc_sa6, '\0', sizeof(loc_sa6));
-			loc_sa6.sin6_family= AF_INET;
-
-			r= connect(trtbase->v6icmp_snd,
-				(struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen);
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				return;
-			}
-			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
-			if (getsockname(trtbase->v6icmp_snd,
-				&trtstate->loc_sin6,
-				&trtstate->loc_socklen) == -1)
-			{
-				crondlog(DIE9 "getsockname failed");
-			}
-#if 0
-			printf("Got localname: %s\n",
-				inet_ntop(AF_INET6,
-				&trtstate->loc_sin6.sin6_addr,
-				buf, sizeof(buf)));
-#endif
+			trtstate->loc_sin6.sin6_port= htons(SRC_BASE_PORT +
+                                trtstate->index);
 		}
 		else
 		{
-			memset(&loc_sa4, '\0', sizeof(loc_sa4));
-			loc_sa4.sin_family= AF_INET;
-			((struct sockaddr_in *)&trtstate->sin6)->sin_port=
-				htons(0x8000);
-
-			r= connect(trtbase->v4icmp_snd,
-				(struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen);
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				return;
-			}
-			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
-			if (getsockname(trtbase->v4icmp_snd,
-				&trtstate->loc_sin6,
-				&trtstate->loc_socklen) == -1)
-			{
-				crondlog(DIE9 "getsockname failed");
-			}
-#if 0
-			printf("Got localname: %s\n",
-				inet_ntoa(((struct sockaddr_in *)
-				&trtstate->loc_sin6)->sin_addr));
-#endif
+			((struct sockaddr_in *)(&trtstate->loc_sin6))->
+				sin_port= htons(SRC_BASE_PORT +
+                                trtstate->index);
 		}
 	}
-	else
+	else if (trtstate->do_tcp)
 	{
+		if (create_socket(trtstate, 1 /*do_tcp*/) == -1)
+			return;
+
 		if (trtstate->do_v6)
 		{
-			int sock;
-
-			memset(&loc_sa6, '\0', sizeof(loc_sa6));
-			loc_sa6.sin6_family= AF_INET6;
-			loc_sa6.sin6_port= htons(SRC_BASE_PORT +
-				trtstate->index);;
-
-			sock= socket(AF_INET6, SOCK_DGRAM, 0);
-                        if (sock == -1)
-                        {
-                                crondlog(DIE9 "socket failed");
-                        }
-			r= bind(sock, (struct sockaddr *)&loc_sa6,
-				sizeof(loc_sa6));
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(bind failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				close(sock);
-				return;
-			}
-
-			r= connect(sock, (struct sockaddr *)&trtstate->sin6,
-				trtstate->socklen);
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				return;
-			}
-
-			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
-			if (getsockname(sock,
-				&trtstate->loc_sin6,
-				&trtstate->loc_socklen) == -1)
-			{
-				crondlog(DIE9 "getsockname failed");
-			}
-
-			close(sock);
-#if 0
-			printf("Got localname: %s:%d\n",
-				inet_ntop(AF_INET6,
-				&trtstate->loc_sin6.sin6_addr,
-				buf, sizeof(buf)),
-				ntohs(((struct sockaddr_in *)&trtstate->
-					loc_sin6)->sin_port));
-#endif
+			trtstate->loc_sin6.sin6_port= htons(SRC_BASE_PORT +
+                                trtstate->index);
 		}
 		else
 		{
-			int sock;
-
-			memset(&loc_sa4, '\0', sizeof(loc_sa4));
-			loc_sa4.sin_family= AF_INET;
-
-			loc_sa4.sin_port= htons(SRC_BASE_PORT +
-				trtstate->index);;
-
-			if (!trtstate->do_tcp)
-			{
-				/* Also set destination port */
-				((struct sockaddr_in *)&trtstate->sin6)->
-					sin_port= htons(BASE_PORT);
-			}
-
-			sock= socket(AF_INET, SOCK_DGRAM, 0);
-			if (sock == -1)
-			{
-				crondlog(DIE9 "socket failed");
-			}
-			r= bind(sock, (struct sockaddr *)&loc_sa4,
-				sizeof(loc_sa4));
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(bind failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				close(sock);
-				return;
-			}
-
-			r= connect(sock, (struct sockaddr *) &trtstate->sin6,
-				trtstate->socklen);
-#if 0
- { errno= ENOSYS; r= -1; }
-#endif
-			if (r == -1)
-			{
-				serrno= errno;
-
-				snprintf(line, sizeof(line),
-			", " DBQ(error) ":" DBQ(connect failed: %s) " }",
-					strerror(serrno));
-				add_str(trtstate, line);
-				report(trtstate);
-				close(sock);
-				return;
-			}
-			trtstate->loc_socklen= sizeof(trtstate->loc_sin6);
-			if (getsockname(sock,
-				&trtstate->loc_sin6,
-				&trtstate->loc_socklen) == -1)
-			{
-				crondlog(DIE9 "getsockname failed");
-			}
-			close(sock);
-#if 0
-			printf("Got localname: %s:%d\n",
-				inet_ntoa(((struct sockaddr_in *)
-				&trtstate->loc_sin6)->sin_addr),
-				ntohs(((struct sockaddr_in *)&trtstate->
-					loc_sin6)->sin_port));
-#endif
+			((struct sockaddr_in *)(&trtstate->loc_sin6))->
+				sin_port= htons(SRC_BASE_PORT +
+                                trtstate->index);
 		}
 	}
 
 	add_str(trtstate, ", \"result\": [ ");
 
 	send_pkt(trtstate);
+}
+
+static int create_socket(struct trtstate *state, int do_tcp)
+{
+	int af, type, protocol;
+	int r, on, serrno;
+	char line[80];
+
+	af= (state->do_v6 ? AF_INET6 : AF_INET);
+	type= SOCK_RAW;
+	protocol= (af == AF_INET6 ? IPPROTO_ICMPV6 : IPPROTO_ICMP);
+
+	state->socket_icmp= xsocket(af, type, protocol);
+	if (state->socket_icmp == -1)
+	{
+		serrno= errno;
+
+		snprintf(line, sizeof(line),
+	", " DBQ(error) ":" DBQ(socket failed: %s) " }",
+			strerror(serrno));
+		add_str(state, line);
+		report(state);
+		return -1;
+	} 
+
+	if (state->interface)
+	{
+		if (bind_interface(state->socket_icmp,
+			af, state->interface) == -1)
+		{
+			snprintf(line, sizeof(line),
+	", " DBQ(error) ":" DBQ(bind_interface failed) " }");
+			add_str(state, line);
+			report(state);
+			return -1;
+		}
+	}
+
+	r= connect(state->socket_icmp,
+		(struct sockaddr *)&state->sin6,
+		state->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+	if (r == -1)
+	{
+		serrno= errno;
+
+		snprintf(line, sizeof(line),
+	", " DBQ(error) ":" DBQ(connect failed: %s) " }",
+			strerror(serrno));
+		add_str(state, line);
+		report(state);
+		return -1;
+	}
+	state->loc_socklen= sizeof(state->loc_sin6);
+	if (getsockname(state->socket_icmp,
+		&state->loc_sin6,
+		&state->loc_socklen) == -1)
+	{
+		crondlog(DIE9 "getsockname failed");
+	}
+#if 0
+	printf("Got localname: %s\n",
+		inet_ntop(AF_INET6,
+		&state->loc_sin6.sin6_addr,
+		buf, sizeof(buf)));
+#endif
+
+	close(state->socket_icmp);
+	state->socket_icmp= xsocket(af, type,
+		protocol);
+	if (state->socket_icmp == -1)
+	{
+		serrno= errno;
+
+		snprintf(line, sizeof(line),
+	", " DBQ(error) ":" DBQ(socket failed: %s) " }",
+			strerror(serrno));
+		add_str(state, line);
+		report(state);
+		return -1;
+	} 
+
+	if (af == AF_INET6)
+	{
+		on = 1;
+		setsockopt(state->socket_icmp, IPPROTO_IPV6,
+			IPV6_RECVPKTINFO, &on, sizeof(on));
+
+		on = 1;
+		setsockopt(state->socket_icmp, IPPROTO_IPV6,
+			IPV6_RECVHOPLIMIT, &on, sizeof(on));
+	}
+
+	if (state->interface)
+	{
+		if (bind_interface(state->socket_icmp,
+			af, state->interface) == -1)
+		{
+			snprintf(line, sizeof(line),
+	", " DBQ(error) ":" DBQ(bind_interface failed) " }");
+			add_str(state, line);
+			report(state);
+			return -1;
+		}
+	}
+
+	event_assign(&state->event_icmp, state->base->event_base,
+		state->socket_icmp,
+		EV_READ | EV_PERSIST,
+		(af == AF_INET6 ? ready_callback6 : ready_callback4),
+		state);
+	event_add(&state->event_icmp, NULL);
+
+	if (do_tcp)
+	{
+		state->socket_tcp= xsocket(af, SOCK_RAW,
+			IPPROTO_TCP);
+		if (state->socket_tcp == -1)
+		{
+			serrno= errno;
+
+			snprintf(line, sizeof(line),
+		", " DBQ(error) ":" DBQ(socket failed: %s) " }",
+				strerror(serrno));
+			add_str(state, line);
+			report(state);
+			return -1;
+		} 
+
+		if (af == AF_INET6)
+		{
+			on = 1;
+			setsockopt(state->socket_tcp, IPPROTO_IPV6,
+				IPV6_RECVHOPLIMIT, &on, sizeof(on));
+		}
+
+		if (state->interface)
+		{
+			if (bind_interface(state->socket_tcp,
+				af, state->interface) == -1)
+			{
+				snprintf(line, sizeof(line),
+		", " DBQ(error) ":" DBQ(bind_interface failed) " }");
+				add_str(state, line);
+				report(state);
+				return -1;
+			}
+		}
+
+		r= connect(state->socket_tcp,
+			(struct sockaddr *)&state->sin6,
+			state->socklen);
+#if 0
+ { errno= ENOSYS; r= -1; }
+#endif
+		if (r == -1)
+		{
+			serrno= errno;
+
+			snprintf(line, sizeof(line),
+		", " DBQ(error) ":" DBQ(connect failed: %s) " }",
+				strerror(serrno));
+			add_str(state, line);
+			report(state);
+			return -1;
+		}
+
+		event_assign(&state->event_tcp, state->base->event_base,
+			state->socket_tcp,
+			EV_READ | EV_PERSIST,
+			(af == AF_INET6 ? ready_tcp6 : ready_tcp4),
+			state);
+		event_add(&state->event_tcp, NULL);
+	}
+
+	return 0;
 }
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)

@@ -13,6 +13,7 @@ int bind_interface(int socket, int af, char *name)
 
 	if (af == AF_INET)
 	{
+		sa.ss_family= AF_INET;
 		if (inet_pton(af, name,
 			&((struct sockaddr_in *)&sa)->sin_addr) == 1)
 		{
@@ -22,6 +23,7 @@ int bind_interface(int socket, int af, char *name)
 	}
 	else
 	{
+		sa.ss_family= AF_INET6;
 		if (inet_pton(af, name,
 			&((struct sockaddr_in6 *)&sa)->sin6_addr) == 1)
 		{
