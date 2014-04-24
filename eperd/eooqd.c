@@ -616,7 +616,10 @@ static const char *get_session_id(void)
 	cp= strchr(session_id, '\n');
 	if (cp)
 		*cp= '\0';
-	return session_id;
+	cp= strrchr(session_id, ' ');
+	if (!cp)
+		return NULL;
+	return cp+1;
 }
 
 static void skip_space(char *cp, char **ncpp)
