@@ -2195,7 +2195,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	int flagAnswer = 0;
 	int data_len;
 	int write_out = FALSE;
-	u_int32_t fw;
+
+	int fw = get_atlas_fw_version();
+	int lts = get_timesync();
 
 	if(! qry->result.size){
 		buf_init(&qry->result, -1);
@@ -2207,19 +2209,21 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			JS(id,  qry->str_Atlas);
 		}
 
-		fw = get_atlas_fw_version();
-		JU(fw, fw);
-
+		JD(fw, fw);
 		if (qry->opt_rset){
 			JS1(time, %ld,  qry->xmit_time.tv_sec);
+			JD(lts,lts);
 			AS("\"resultset\" : [ {");
 		}
+
 	}
 	else if(qry->opt_rset) {
 		AS (",{");
 	}
 
 	JS1(time, %ld,  qry->xmit_time.tv_sec);
+	JD(lts,lts);
+
 	if ( qry->opt_resolv_conf ) {
 		JD (subid, (qry->resolv_i+1));
 		JD (submax, qry->base->resolv_max);
