@@ -770,7 +770,7 @@ static int builtin_epoch(char **argv);
 static int builtin_condmv(char **argv);
 static int builtin_dfrm(char **argv);
 static int builtin_rxtxrpt(char **argv);
-static int builtin_rptaddr6(char **argv);
+static int builtin_rptaddrs(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -830,7 +830,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("condmv" , builtin_condmv, "conditional move"),
 	BLTIN("dfrm"  , builtin_dfrm, "cleanup if free space gets too low"),
 	BLTIN("rxtxrpt"  , builtin_rxtxrpt, "report RX and TX"),
-	BLTIN("rptaddr6"  , builtin_rptaddr6, "report ipv6 address(es) and route(s)"),
+	BLTIN("rptaddrs"  , builtin_rptaddrs, "report address(es), route(s), and dns"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -4682,15 +4682,15 @@ static int builtin_rxtxrpt(char **argv)
 	return rxtxrpt_main(argc, argv);
 }
 
-int builitin_rptaddr6(int argc, char *argv[]);
+int builitin_rptaddrs(int argc, char *argv[]);
 
-static int builtin_rptaddr6(char **argv) 
+static int builtin_rptaddrs(char **argv) 
 {
 	int argc;
 
 	for (argc= 0; argv[argc] != 0; argc++)
 		;
-	return rptaddr6_main(argc, argv);
+	return rptaddrs_main(argc, argv);
 }
 
 

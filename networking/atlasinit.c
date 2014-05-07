@@ -32,6 +32,8 @@ enum
 	OPT_P_TO_R_INIT = (1 << 4),  /* i */
 };
 
+#define DBQ(str) "\"" #str "\""
+
 /*********************************************************************
  * Set these constants to your liking
  */
@@ -55,15 +57,18 @@ const char atlas_netconfig_v6[] = "./netconfig_v6.vol";
 const char atlas_resolv_conf[] = "./resolv.conf.vol";
 const char atlas_network_v4_info[] = "/home/atlas/status/network_v4_info.txt";
 const char atlas_network_v4_static_info[] = "/home/atlas/status/network_v4_static_info.txt";
+const char atlas_network_v4_static_info_json[] = "/home/atlas/status/network_v4_static_info.json";
 const char atlas_network_v6_static_info[] = "/home/atlas/status/network_v6_static_info.txt";
+const char atlas_network_v6_static_info_json[] = "/home/atlas/status/network_v6_static_info.json";
 const char atlas_network_dns_static_info[] = "/home/atlas/status/network_dns_static_info.txt";
+const char atlas_network_dns_static_info_json[] = "/home/atlas/status/network_dns_static_info.json";
 
 const int max_lines = 16; /* maximum lines we'll process */
 const int min_rereg_time = 100; 
 const int max_rereg_time = 28*24*3600; /* 28d */
 const int default_rereg_time = 7*24*3600; /* 7d */
 char *str_reason;
-char *str_device;
+const char *str_device;
 
 /**********************************************************************/
 
@@ -336,6 +341,7 @@ static int reg_init_main( int argc, char *argv[] )
 	const char *search = " ";
 	const char *search_nl = " \n";
 	int ret = 0;
+	int first;
 
 	int reregister_time = default_rereg_time;
 	mytime = time(NULL);
@@ -361,11 +367,15 @@ static int reg_init_main( int argc, char *argv[] )
 		char *host_name;
 		char *type;
 		char *key;
+		int do_rm_v4_static_info;
+		int do_rm_v6_static_info;
 		int do_rm_dns_static_info;
 
 		bzero( line, ATLAS_BUF_SIZE );
 		fgets( line, MAX_READ, read_from );
 
+		do_rm_v4_static_info= 1;
+		do_rm_v6_static_info= 1;
 		do_rm_dns_static_info= 1;
 		while( !feof(read_from) && l<=max_lines ) {
 			if( strncmp(line,"CONTROLLER ", 11)==0 ) {
@@ -468,11 +478,6 @@ static int reg_init_main( int argc, char *argv[] )
 
 			} 
 
-			else if( strncmp(line,"DHCPV4 True ", 12)==0 ) 
-			{
-				// delete the static configuration 
-				unlink(atlas_netconfig_v4);
-			}
 			else if( strncmp(line,"DHCPV4 False ", 13)==0 ) 
 			{
 				FILE *f = fopen(atlas_netconfig_v4, "wt");
@@ -527,20 +532,34 @@ static int reg_init_main( int argc, char *argv[] )
 				fprintf (f, "echo \"STATIC_IPV4_NETMASK %s\" >>    %s \n", netmask, atlas_network_v4_static_info );
 				fprintf (f, "echo \"STATIC_IPV4_BROADCAST %s\" >>    %s \n", broadcast, atlas_network_v4_static_info );
 				fprintf (f, "echo \"STATIC_IPV4_GW %s\" >>    %s \n",ipv4_gw , atlas_network_v4_static_info );
+				fprintf(f, "echo '"
+					DBQ(static-inet-addresses) " : [ { "
+					DBQ(inet-addr) ": " DBQ(%s) ", "
+					DBQ(netmask) ": " DBQ(%s) ", "
+					DBQ(interface) ": " DBQ(%s)
+					" } ], "
+					DBQ(static-inet-routes) " : [ { "
+					DBQ(destination) ": " DBQ(0.0.0.0) ", "
+					DBQ(netmask) ": " DBQ(0.0.0.0) ", "
+					DBQ(next-hop) ": " DBQ(%s) ", "
+					DBQ(interface) ": " DBQ(%s)
+					" } ]' > %s\n",
+					ipv4_address,
+					netmask,
+					str_device,
+					ipv4_gw,
+					str_device,
+					atlas_network_v4_static_info_json);
 				// ping the gateway 
 				fprintf (f, "ping -c 2 -q %s \n", ipv4_gw);
 				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
 
 				fclose(f);
+
+				do_rm_v4_static_info= 0;
 			}
 			//DHCPV6 False  IPV6ADDRESS <address> IPV6PREFIXLEN <prefix> IPV6GATEWAY <gateway>]| [DHCPV6 True ]
-			else if( strncmp(line,"DHCPV6 True ", 12)==0 ) 
-			{
-				// delete the static configuration 
-				unlink(atlas_netconfig_v6);
-			}
 			else if( strncmp(line,"DHCPV6 False ", 13)==0 ) 
-
 			{
 				FILE *f = fopen(atlas_netconfig_v6, "wt");
 				char *ipv6_address;
@@ -578,12 +597,28 @@ static int reg_init_main( int argc, char *argv[] )
 				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s/%s\" >    %s \n", ipv6_address, prefixlen, atlas_network_v6_static_info );
 				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw , atlas_network_v6_static_info );
 
-				fclose(f);
+				fprintf(f, "echo '"
+					DBQ(static-inet6-addresses) ": [ { "
+					DBQ(inet6-addr) ": " DBQ(%s) ", "
+					DBQ(prefix-length) ": %s, "
+					DBQ(interface) ": " DBQ(%s) " } ], "
+					DBQ(static-inet6-routes) ": [ { "
+					DBQ(destination) ": " DBQ(::) ", "
+					DBQ(prefix-length) " : 0, "
+					DBQ(next-hop) ": " DBQ(%s) ", "
+					DBQ(interface) ": " DBQ(%s) " } ]"
+					"' > %s\n",
+					ipv6_address, prefixlen, str_device,
+					ipv6_gw, str_device,
+					atlas_network_v6_static_info_json);
+			
 
+				fclose(f);
+				do_rm_v6_static_info= 0;
 			}
 			else if( strncmp(line,"DNS_SERVERS ", 11)==0 ) 
 			{
-				FILE *f, *f1;
+				FILE *f, *f1, *f2;
 
 				f = fopen(atlas_resolv_conf, "wt");
 				if( f==NULL ) {
@@ -601,6 +636,16 @@ static int reg_init_main( int argc, char *argv[] )
 					fclose(f);
                                         return 1;
                                 }
+				f2 = fopen(atlas_network_dns_static_info_json,
+					"wt");
+				if( f2==NULL ) {
+                                        atlas_log(ERROR,
+						"Unable to create  %s\n",
+					atlas_network_dns_static_info_json);
+					fclose(f);
+					fclose(f1);
+                                        return 1;
+                                }
 
 
 				// Statically configured probe.
@@ -608,16 +653,25 @@ static int reg_init_main( int argc, char *argv[] )
 				// fprintf (f, "%s\n", line);
 				token = strtok(line+11, search_nl); //
 			 	fprintf (f1, "STATIC_DNS");
+				fprintf(f2, DBQ(static-dns) ": [ ");
+
+				first= 1;
 				while  (token != NULL) 
 				{
 			 		fprintf (f, "nameserver %s\n", token);
 					fprintf (f1, " %s", token);
+					fprintf(f2, "%s{ " DBQ(nameserver) ": "
+						DBQ(%s) " }",
+						first ? "" : ", ", token);
 					token = strtok(NULL, search_nl);
+					first= 0;
 				}
 				fprintf (f1, "\n");
+				fprintf(f2, " ]\n");
 
 				fclose(f);
 				fclose(f1);
+				fclose(f2);
 
 				do_rm_dns_static_info= 0;
 			}
@@ -628,8 +682,25 @@ static int reg_init_main( int argc, char *argv[] )
 			fgets( line, MAX_READ, read_from );
 			l++;
 		}
+		if(do_rm_v4_static_info)
+		{
+			// delete the static configuration 
+			unlink(atlas_netconfig_v4);
+			unlink(atlas_network_v4_static_info);
+			unlink(atlas_network_v4_static_info_json);
+		}
+		if(do_rm_v6_static_info)
+		{
+			// delete the static configuration 
+			unlink(atlas_netconfig_v6);
+			unlink(atlas_network_v6_static_info);
+			unlink(atlas_network_v6_static_info_json);
+		}
 		if (do_rm_dns_static_info)
+		{
 			unlink(atlas_network_dns_static_info);
+			unlink(atlas_network_dns_static_info_json);
+		}
 	}
 	else if  (strncmp(line,"WAIT\n",5) == 0 ) 
 	{

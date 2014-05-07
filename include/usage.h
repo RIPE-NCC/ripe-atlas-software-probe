@@ -3587,11 +3587,11 @@
 #define rpm2cpio_full_usage "\n\n" \
        "Output a cpio archive of the rpm file"
 
+#define rptaddrs_trivial_usage \
+
+#define rptaddrs_full_usage "\n\n" \
+
 #define rptra6_trivial_usage \
-
-#define rptaddr6_full_usage "\n\n" \
-
-#define rptaddr6_trivial_usage \
 
 #define rptra6_full_usage "\n\n" \
 

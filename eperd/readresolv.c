@@ -110,3 +110,42 @@ void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2],
 	*resolv_max = i;
 	return;
 }
+
+void get_local_resolvers_nocache(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
+		int *resolv_max)
+{
+
+#ifndef RESOLV_CONF 
+#define RESOLV_CONF     "/etc/resolv.conf"
+#endif 	
+	FILE *R;
+	char buf[LINEL]; 
+	char *buf_start;
+	int  i = 0;
+	int r;
+	struct stat sb;
+
+	r = stat(RESOLV_CONF, &sb);
+	if (r == -1)
+	{
+		crondlog(LVL8 "error accessing resolv.conf: %s",
+				strerror(errno));
+		return;
+	}
+
+	R = fopen (RESOLV_CONF, "r");
+	if (R != NULL) {
+		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
+			buf_start = buf;
+			if(resolv_conf_parse_line(nslist[i], buf) ) {
+				crondlog(LVL5 "parsed file %s , line %s i=%d", RESOLV_CONF, buf_start, i);
+				i++;
+			}
+			else 
+				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", RESOLV_CONF, i, buf_start);
+		}
+		fclose (R);
+	}
+
+	*resolv_max = i;
+}

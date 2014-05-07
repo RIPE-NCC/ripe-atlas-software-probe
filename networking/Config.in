@@ -719,11 +719,11 @@ config RPTRA6
 	help
 	  Report received IPv6 router advertisements
 
-config RPTADDR6
-	bool "rptaddr6"
+config RPTADDRS
+	bool "rptaddrs"
 	default n
 	help
-	  Report IPv6 addresses and routes
+	  Report addresses, routes, dns both static and dynamic
 
 config RXTXRPT
 	bool "rxtxrpt"
