@@ -82,7 +82,7 @@ struct trtstate
 	/* Parameters */
 	char *atlas;
 	char *hostname;
-	const char *destportstr;
+	char *destportstr;
 	char *out_filename;
 	char *interface;
 	char do_icmp;
@@ -3491,7 +3491,7 @@ for (i= 0; argv[i] != NULL; i++)
 	state->maxhops= maxhops;
 	state->gaplimit= gaplimit;
 	state->interface= interface;
-	state->destportstr= destportstr;
+	state->destportstr= strdup(destportstr);
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
@@ -3941,6 +3941,8 @@ static int traceroute_delete(void *state)
 	trtstate->atlas= NULL;
 	free(trtstate->hostname);
 	trtstate->hostname= NULL;
+	free(trtstate->destportstr);
+	trtstate->destportstr= NULL;
 	free(trtstate->out_filename);
 	trtstate->out_filename= NULL;
 
