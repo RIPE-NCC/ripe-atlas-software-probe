@@ -3073,16 +3073,19 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 					state->done= 1;
 				switch(icmp->icmp6_code)
 				{
-				case ICMP6_DST_UNREACH_NOROUTE:
+				case ICMP6_DST_UNREACH_NOROUTE:	/* 0 */
 					add_str(state, ", \"err\":\"N\"");
 					break;
-				case ICMP6_DST_UNREACH_ADDR:
+				case ICMP6_DST_UNREACH_ADMIN:	/* 1 */
+					add_str(state, ", \"err\":\"A\"");
+					break;
+				case ICMP6_DST_UNREACH_BEYONDSCOPE: /* 2 */
+					add_str(state, ", \"err\":\"h\"");
+					break;
+				case ICMP6_DST_UNREACH_ADDR:	/* 3 */
 					add_str(state, ", \"err\":\"H\"");
 					break;
-				case ICMP6_DST_UNREACH_NOPORT:
-					break;
-				case ICMP6_DST_UNREACH_ADMIN:
-					add_str(state, ", \"err\":\"A\"");
+				case ICMP6_DST_UNREACH_NOPORT:	/* 4 */
 					break;
 				default:
 					snprintf(line, sizeof(line),
