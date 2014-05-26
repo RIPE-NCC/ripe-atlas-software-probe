@@ -430,9 +430,12 @@ static void report(struct trtstate *state)
 			state->paris % state->parismod);
 	}
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
+
 	free(state->result);
 	state->result= NULL;
-	state->busy= 0;
+
+	if (state->out_filename)
+		fclose(fh);
 
 	/* Kill the event and close socket */
 	if (state->socket_icmp != -1)
@@ -448,8 +451,7 @@ static void report(struct trtstate *state)
 		state->socket_tcp= -1;
 	}
 
-	if (state->out_filename)
-		fclose(fh);
+	state->busy= 0;
 
 	if (state->base->done)
 		state->base->done(state);

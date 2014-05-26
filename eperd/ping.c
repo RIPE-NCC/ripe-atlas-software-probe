@@ -240,8 +240,12 @@ static void report(struct pingstate *state)
 #endif /* DO_PSIZE */
 
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
+
 	free(state->result);
 	state->result= NULL;
+
+	if (state->out_filename)
+		fclose(fh);
 
 	/* Kill the event and close socket */
 	event_del(&state->event);
@@ -253,8 +257,6 @@ static void report(struct pingstate *state)
 
 	state->busy= 0;
 
-	if (state->out_filename)
-		fclose(fh);
 }
 
 static void ping_cb(int result, int bytes, int psize,
