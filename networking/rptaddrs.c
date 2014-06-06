@@ -268,6 +268,8 @@ static int setup_ipv4_rpt(FILE *of)
 
 	fprintf(of, " ]");
 
+	fclose(in_file);
+
 	return 0;
 }
 
@@ -710,12 +712,15 @@ static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas, int opt_a
 
 	if (out_name) {
 		if(opt_append) 
-			fh= fopen(out_name, "w");
+			fh= fopen(out_name, "a");
 		else 
 			fh= fopen(out_name, "w");
 
 		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'", out_name);
+		{
+			report_err("unable to append to '%s'", out_name);
+			return 1;
+		}
 	}
 	else
 		fh = stdout;
