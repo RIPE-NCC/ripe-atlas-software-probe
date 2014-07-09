@@ -209,13 +209,15 @@ static void report(struct pingstate *state)
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
 		state->hostname);
 
+	fprintf(fh, ", " DBQ(af) ":%d",
+		state->af == AF_INET ? 4 : 6);
+
 	if (!state->no_dst)
 	{
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
-		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s) ", " DBQ(af) ":%d",
-			namebuf, state->sin6.sin6_family == AF_INET6 ? 6 : 4);
+		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
 	}
 
 	if (state->got_reply)
@@ -302,7 +304,6 @@ static void ping_cb(int result, int bytes, int psize,
 			"%s{ ", pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
 		pingstate->first= 0;
-		pingstate->no_dst= 0;
 		if (result == PING_ERR_DUP)
 		{
 			add_str(pingstate, DBQ(dup) ":1, ");
@@ -373,7 +374,6 @@ static void ping_cb(int result, int bytes, int psize,
 			"%s{ " DBQ(x) ":" DBQ(*),
 			pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
-		pingstate->no_dst= 0;
 	}
 	if (result == PING_ERR_SENDTO)
 	{
@@ -381,7 +381,6 @@ static void ping_cb(int result, int bytes, int psize,
 			"%s{ " DBQ(error) ":" DBQ(sendto failed: %s),
 			pingstate->first ? "" : ", ", strerror(seq));
 		add_str(pingstate, line);
-		pingstate->no_dst= 0;
 	}
 	if (result == PING_ERR_TIMEOUT || result == PING_ERR_SENDTO)
 	{
@@ -735,6 +734,14 @@ printf("ready_callback4: too short\n");
 	if (state != base->table[data->index])
 		goto done;	/* Not for us */
 
+	/* Make sure the source address is what we expect */
+	if (((struct sockaddr_in *)&remote)->sin_addr.s_addr !=
+		((struct sockaddr_in *)&state->sin6)->sin_addr.s_addr)
+	{
+		crondlog(LVL8 "ICMP from wrong address");
+		goto done;
+	}
+
 	/* Check for Destination Host Unreachable */
 	if (icmp->type == ICMP_ECHO)
 	{
@@ -802,7 +809,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	struct pingstate *state;
 
 	int nrecv, isDup;
-	struct sockaddr_in remote;                  /* responding internet address */
+	struct sockaddr_in6 remote;           /* responding internet address */
 
 	struct icmp6_hdr *icmp;
 	struct evdata * data;
@@ -861,6 +868,16 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	/* Get the pointer to the host descriptor in our internal table */
 	if (state != base->table[data->index])
 		goto done;	/* Not for us */
+
+	/* Make sure the source address is what we expect */
+	if (memcmp(&remote.sin6_addr,
+		&((struct sockaddr_in6 *)&state->sin6)->sin6_addr,
+		sizeof(remote.sin6_addr)) != 0)
+	{
+		crondlog(LVL8 "ICMP from wrong address");
+		goto done;
+	}
+
 
 	/* Check for Destination Host Unreachable */
 	if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
@@ -1100,6 +1117,7 @@ static void ping_start2(void *state)
 
 	pingstate->send_error= 0;
 	pingstate->got_reply= 0;
+	pingstate->no_dst= 0;
 
 	if (pingstate->af == AF_INET)
 	{
