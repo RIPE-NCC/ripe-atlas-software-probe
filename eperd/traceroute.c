@@ -426,8 +426,7 @@ static void report(struct trtstate *state)
 	fprintf(fh, ", \"size\":%d", state->maxpacksize);
 	if (state->parismod)
 	{
-		fprintf(fh, ", \"paris_id\":%d",
-			state->paris % state->parismod);
+		fprintf(fh, ", \"paris_id\":%d", state->paris);
 	}
 	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
 
@@ -703,7 +702,7 @@ static void send_pkt(struct trtstate *state)
 					(unsigned short *)base->packet, len);
 
 				/* Avoid 0 */
-				val= state->paris % state->parismod + 1;
+				val= state->paris + 1;
 
 				sum= ntohs(sum);
 				usum= sum + (0xffff - val);
@@ -795,7 +794,7 @@ static void send_pkt(struct trtstate *state)
 			if (state->parismod)
 			{
 				state->sin6.sin6_port= htons(BASE_PORT +
-					(state->paris % state->parismod));
+					state->paris);
 			}
 			else
 			{
@@ -1135,8 +1134,7 @@ static void send_pkt(struct trtstate *state)
 			if (state->parismod)
 			{
 				((struct sockaddr_in *)&state->sin6)->sin_port=
-					htons(BASE_PORT +
-					(state->paris % state->parismod));
+					htons(BASE_PORT + state->paris);
 			}
 			else
 			{
@@ -1898,8 +1896,8 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			{
 				printf(
 	"ready_callback4: mismatch for paris, got 0x%x, expected 0x%x (%s)\n",
-					ntohs(eicmp->icmp_cksum), state->paris,
-					state->hostname);
+					ntohs(eicmp->icmp_cksum),
+					state->paris, state->hostname);
 			}
 
 			if (state->open_result)
@@ -2976,12 +2974,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 			if (eicmp && state->parismod &&
 				ntohs(eicmp->icmp6_cksum) !=
-				state->paris % state->parismod + 1)
+				state->paris + 1)
 			{
 				printf(
 			"ready_callback6: got checksum 0x%x, expected 0x%x\n",
 					ntohs(eicmp->icmp6_cksum),
-					state->paris % state->parismod + 1);
+					state->paris + 1);
 			}
 
 			if (!late)
@@ -3511,6 +3509,7 @@ for (i= 0; argv[i] != NULL; i++)
 	state->destoptsize= destoptsize;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 	state->base= trt_base;
+	state->paris= 0;
 	state->busy= 0;
 	state->result= NULL;
 	state->reslen= 0;
@@ -3583,7 +3582,8 @@ static void traceroute_start2(void *state)
 	trtstate->hop= trtstate->firsthop;
 	trtstate->sent= 0;
 	trtstate->seq= 0;
-	trtstate->paris++;
+	if (trtstate->parismod)
+		trtstate->paris= (trtstate->paris+1) % trtstate->parismod;
 	trtstate->last_response_hop= 0;	/* Should be starting hop */
 	trtstate->done= 0;
 	trtstate->not_done= 0;
