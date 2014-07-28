@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:c:f:g:i:m:p:w:z:A:O:S:H:D:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:O:S:H:D:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -99,6 +99,7 @@ struct trtstate
 	unsigned char maxhops;
 	unsigned char gaplimit;
 	unsigned char parismod;
+	unsigned char parisbase;
 	unsigned duptimeout;
 	unsigned timeout;
 
@@ -3373,7 +3374,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	uint32_t opt;
 	int i, do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
-		hbhoptsize, destoptsize, parismod, timeout;
+		hbhoptsize, destoptsize, parismod, parisbase, timeout;
 		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
@@ -3405,16 +3406,18 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	duptimeout= 10;
 	timeout= 1000;
 	parismod= 16;
+	parisbase= 0;
 	hbhoptsize= 0;
 	destoptsize= 0;
 	str_Atlas= NULL;
 	out_filename= NULL;
-	opt_complementary = "=1:4--6:i--u:a+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
+	opt_complementary = "=1:4--6:i--u:a+:b+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
 
 for (i= 0; argv[i] != NULL; i++)
 	printf("argv[%d] = '%s'\n", i, argv[i]);
 
-	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &count,
+	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &parisbase,
+		&count,
 		&firsthop, &gaplimit, &interface, &maxhops, &destportstr,
 		&timeout,
 		&duptimeout, &str_Atlas, &out_filename, &maxpacksize,
@@ -3488,6 +3491,7 @@ for (i= 0; argv[i] != NULL; i++)
 
 	state= xzalloc(sizeof(*state));
 	state->parismod= parismod;
+	state->parisbase= parisbase;
 	state->trtcount= count;
 	state->firsthop= firsthop;
 	state->maxpacksize= maxpacksize;
@@ -3583,7 +3587,10 @@ static void traceroute_start2(void *state)
 	trtstate->sent= 0;
 	trtstate->seq= 0;
 	if (trtstate->parismod)
-		trtstate->paris= (trtstate->paris+1) % trtstate->parismod;
+	{
+		trtstate->paris= (trtstate->paris-trtstate->parisbase+1) %
+			trtstate->parismod + trtstate->parisbase;
+	}
 	trtstate->last_response_hop= 0;	/* Should be starting hop */
 	trtstate->done= 0;
 	trtstate->not_done= 0;
