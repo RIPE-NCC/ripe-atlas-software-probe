@@ -1043,6 +1043,12 @@
      "\n	-4			Only IPv4 addresses" \
      "\n	-6			Only IPv6 addresses" \
 
+#define evntp_trivial_usage \
+       "todo"
+
+#define evntp_full_usage \
+       "todo"
+
 #define evping_trivial_usage \
        "todo"
 #define evping_full_usage "\n\n" \
