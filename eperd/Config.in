@@ -27,6 +27,12 @@ config EVHTTPGET
        help
                standalone version of event-driven httpget
 
+config EVNTP
+	bool "evntp"
+	default n
+	help
+	    	standalone version of event-driven ntp
+
 config EVPING
 	bool "evping"
 	default n

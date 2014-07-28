@@ -51,6 +51,7 @@ static struct builtin
 } builtin_cmds[]=
 {
 	{ "evhttpget", &httpget_ops },
+	{ "evntp", &ntp_ops },
 	{ "evping", &ping_ops },
 	{ "evtdig", &tdig_ops },
 	{ "evsslgetcert", &sslgetcert_ops },
