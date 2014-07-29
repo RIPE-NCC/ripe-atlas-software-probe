@@ -85,6 +85,7 @@ int eooqd_main(int argc, char *argv[])
 	char *pid_file_name;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
+	struct rlimit limit;
 
 	atlas_id= NULL;
 	pid_file_name= NULL;
@@ -122,6 +123,12 @@ int eooqd_main(int argc, char *argv[])
 	strlcpy(state->curr_qfile, state->queue_file,
 		sizeof(state->curr_qfile));
 	strlcat(state->curr_qfile, SUFFIX, sizeof(state->curr_qfile));
+
+	signal(SIGQUIT, SIG_DFL);
+	chdir("/home/atlas/data");
+	limit.rlim_cur= RLIM_INFINITY;
+	limit.rlim_max= RLIM_INFINITY;
+	setrlimit(RLIMIT_CORE, &limit);
 
 	/* Create libevent event base */
 	EventBase= event_base_new();
