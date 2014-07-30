@@ -1864,9 +1864,11 @@ printf("curpacksize: %d\n", state->curpacksize);
 			if (ind != state->index)
 			{
 				/* Nothing here */
+#if 0
 				printf(
 				"ready_callback4: nothing at index (%d)\n",
 					ind);
+#endif
 				return;
 			}
 
@@ -2063,8 +2065,10 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		if (icmp_prefixlen != 0)
 		{
 			
+#if 0
 			printf("icmp_pmvoid: 0x%x for %s\n", icmp->icmp_pmvoid, state->hostname);
 			printf("icmp_prefixlen: 0x%x for %s\n", icmp_prefixlen, inet_ntoa(remote.sin_addr));
+#endif
 			offset= hlen + ICMP_MINLEN + icmp_prefixlen;
 			if (nrecv > offset)
 			{
@@ -2073,9 +2077,11 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			}
 			else
 			{
+#if 0
 				printf(
 			"ready_callback4: too short %d (Multi-Part ICMP)\n",
 					(int)nrecv);
+#endif
 			}
 		}
 		else if (nrecv > hlen + ICMP_MINLEN + 128)
