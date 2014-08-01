@@ -1298,9 +1298,13 @@ static void do_icmp_multi(struct trtstate *state,
 	cksum= in_cksum((unsigned short *)packet, size);
 	if (cksum != 0)
 	{
-		/* There is also anoption for a zero checksum. */
+		/* There is also an option for a zero checksum. */
 		if (!pre_rfc4884)
+		{
+#if 0
 			printf("do_icmp_multi: bad checksum\n");
+#endif
+		}
 		return;
 	}
 
@@ -1328,7 +1332,9 @@ static void do_icmp_multi(struct trtstate *state,
 		if (len < 4 || o+len > size)
 		{
 			add_str(state, " }");
+#if 0
 			printf("do_icmp_multi: bad len %d\n", len);
+#endif
 			break;
 		}
 		if (class == ICMPEXT_MPLS && ctype == ICMPEXT_MPLS_IN)
@@ -1420,8 +1426,10 @@ static void ready_callback4(int __attribute((unused)) unused,
 			if (srcport < SRC_BASE_PORT ||
 				srcport > SRC_BASE_PORT+256)
 			{
+#if 0
 				printf(
 	"ready_callback4: unknown TCP port in ICMP: %d\n", srcport);
+#endif
 				return;	/* Not for us */
 			}
 
@@ -2141,9 +2149,11 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		if (ind != state->index)
 		{
 			/* Nothing here */
+#if 0
 			printf(
 			"ready_callback4: nothing at index (%d)\n",
 				ind);
+#endif
 			return;
 		}
 
