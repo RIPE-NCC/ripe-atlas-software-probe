@@ -1822,6 +1822,8 @@ void tdig_start (struct query_state *qry)
 				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
 				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
 				if(tdig_base->resolv_max ) {
+					free(qry->server_name);
+					qry->server_name = NULL;
 					qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
 				}
 				else {
