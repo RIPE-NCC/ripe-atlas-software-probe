@@ -63,7 +63,9 @@ static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas, int opt_a
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...); 
 
-int rptaddrs_main(int argc, char *argv[])
+int rptaddrs_main(int argc, char *argv[]);
+
+int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 {
 	int r, need_report;
 	unsigned opt;
@@ -277,7 +279,7 @@ static int setup_dhcpv4(FILE *of)
 {
 	int found;
 	FILE *in_file;
-	char *value;
+	const char *value;
 	char line[128];
 
 	in_file= fopen(NETWORK_INFO, "r");
@@ -451,6 +453,9 @@ static int setup_ipv6_rpt(FILE *of)
 		if ( strncmp (dst6p[0], "ff00", strlen("ff00")) == 0 ) {
 			continue;
 		}
+
+		if (prefix_len == 128)
+			continue;	/* Skip host routes */
 
 		 snprintf(dst6in, sizeof(dst6in), "%s:%s:%s:%s:%s:%s:%s:%s",
                                                 dst6p[0], dst6p[1], dst6p[2], dst6p[3],
