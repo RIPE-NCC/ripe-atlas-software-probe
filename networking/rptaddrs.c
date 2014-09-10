@@ -621,6 +621,7 @@ static int report_line(FILE *of, const char *fn)
 static int check_cache(char *cache_name)
 {
 	int r, need_report;
+	struct stat sb;
 	char filename[80];
 
 	char buf1[1024];
@@ -631,6 +632,17 @@ static int check_cache(char *cache_name)
 	strlcat(filename, SUFFIX, sizeof(filename));
 
 	need_report= 0;
+
+	if (stat(cache_name, &sb) == 0 &&
+		sb.st_mtime < time(NULL) - 30 * 24 * 3600)
+	{
+		/* This basically makes sure that this information gets
+		 * reported again when the clock is set for the first time.
+		 * A side effect is that it gets reported once a month if
+		 * nothing changes.
+		 */
+		need_report= 1;
+	}
 
 	/* Now check if the new file is different from the cache one */
 	cache_file= fopen(cache_name, "r");
