@@ -16,7 +16,7 @@
 
 #define SUFFIX 		".curr"
 #define OOQD_NEW_PREFIX	"/home/atlas/data/new/ooq"
-#define OOQD_OUTDIR_PAT	"/home/atlas/data/out/ooq%s"
+#define OOQD_OUT_PREFIX	"/home/atlas/data/out/ooq"
 #define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
@@ -61,7 +61,6 @@ static struct builtin
 
 static const char *atlas_id;
 static const char *queue_id;
-static const char *out_filename;
 
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
@@ -92,8 +91,8 @@ int eooqd_main(int argc, char *argv[])
 	pid_file_name= NULL;
 	queue_id= "";
 
-	(void)getopt32(argv, "A:P:O:q:", &atlas_id, &pid_file_name,
-		&out_filename, &queue_id);
+	(void)getopt32(argv, "A:P:q:", &atlas_id, &pid_file_name,
+		&queue_id);
 
 	if (argc != optind+1)
 	{
@@ -170,6 +169,8 @@ int eooqd_main(int argc, char *argv[])
 static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 	short what UNUSED_PARAM, void *arg UNUSED_PARAM)
 {
+	char filename[80];
+
 	if (!state->curr_file)
 	{
 		/* Try to move queue_file to curr_qfile. This provide at most
@@ -199,7 +200,9 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 		add_line();
 	}
 
-	check_resolv_conf2(out_filename, atlas_id);
+	snprintf(filename, sizeof(filename),
+		OOQD_OUT_PREFIX "%s/ooq.out", queue_id);
+	check_resolv_conf2(filename, atlas_id);
 }
 
 static void add_line(void)
@@ -395,7 +398,7 @@ error:
 		fclose(fn);
 
 		snprintf(filename2, sizeof(filename2),
-			OOQD_OUTDIR_PAT "/ooq", queue_id);
+			OOQD_OUT_PREFIX "%s/ooq", queue_id);
 		if (stat(filename2, &sb) == -1 &&
 			stat(filename, &sb) == 0)
 		{
@@ -441,7 +444,7 @@ static void cmddone(void *cmdstate)
 	snprintf(from_filename, sizeof(from_filename),
 		OOQD_NEW_PREFIX "%s.%d", queue_id, i);
 	snprintf(to_filename, sizeof(to_filename),
-		OOQD_OUTDIR_PAT "/%d", queue_id, i);
+		OOQD_OUT_PREFIX "%s/%d", queue_id, i);
 	if (stat(to_filename, &sb) == 0)
 	{
 		report("output file '%s' is busy", to_filename);
@@ -484,7 +487,7 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 		RESOLV_CONF);
 	evdns_base_resume(DnsBase);
 
-	if ((r != 0 || last_time != -1) && out_filename != NULL)
+	if ((r != 0 || last_time != -1) && out_file != NULL)
 	{
 		fn= fopen(out_file, "a");
 		if (!fn)
@@ -518,7 +521,6 @@ static void post_results(void)
 	int i, j, r, need_post, probe_id;
 	const char *session_id;
 	const char *argv[20];
-	char filename[80];
 	char from_filename[80];
 	char to_filename[80];
 	char url[200];
@@ -529,13 +531,11 @@ static void post_results(void)
 		/* Grab results and see if something need to be done. */
 		need_post= 0;
 
-		snprintf(filename, sizeof(filename),
-			OOQD_OUTDIR_PAT "/ooq", queue_id);
 		snprintf(from_filename, sizeof(from_filename),
 			OOQD_NEW_PREFIX "%s", queue_id);
 		snprintf(to_filename, sizeof(to_filename),
-			OOQD_OUTDIR_PAT "/ooq", queue_id);
-		if (stat(filename, &sb) == 0)
+			OOQD_OUT_PREFIX "%s/ooq", queue_id);
+		if (stat(to_filename, &sb) == 0)
 		{
 			/* There is more to post */
 			need_post= 1;	
@@ -554,7 +554,7 @@ static void post_results(void)
 			snprintf(from_filename, sizeof(from_filename),
 				OOQD_NEW_PREFIX "%s.%d", queue_id, i);
 			snprintf(to_filename, sizeof(to_filename),
-				OOQD_OUTDIR_PAT "/%d", queue_id, i);
+				OOQD_OUT_PREFIX "%s/%d", queue_id, i);
 			if (stat(to_filename, &sb) == 0)
 			{
 				/* There is more to post */
@@ -587,8 +587,8 @@ static void post_results(void)
 		snprintf(url, sizeof(url),
 			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s&SRC=oneoff",
 			probe_id, session_id);
-		snprintf(filename, sizeof(filename),
-			OOQD_OUTDIR_PAT, queue_id);
+		snprintf(from_filename, sizeof(from_filename),
+			OOQD_OUT_PREFIX "%s", queue_id);
 
 		i= 0;
 		argv[i++]= "httppost";
@@ -598,7 +598,7 @@ static void post_results(void)
 		argv[i++]= "--post-header";
 		argv[i++]= "/home/atlas/status/p_to_c_report_header";
 		argv[i++]= "--post-dir";
-		argv[i++]= filename;
+		argv[i++]= from_filename;
 		argv[i++]= "--post-footer";
 		argv[i++]= "/home/atlas/status/con_session_id.txt";
 		argv[i++]= "-O";
