@@ -16,7 +16,7 @@
 
 #define SUFFIX 		".curr"
 #define OOQD_NEW_PREFIX	"/home/atlas/data/new/ooq"
-#define OOQD_OUT	"/home/atlas/data/ooq.out/ooq"
+#define OOQD_OUTDIR_PAT	"/home/atlas/data/ooq%s.out"
 #define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
@@ -60,6 +60,7 @@ static struct builtin
 };
 
 static const char *atlas_id;
+static const char *queue_id;
 static const char *out_filename;
 
 static void report(const char *fmt, ...);
@@ -89,9 +90,10 @@ int eooqd_main(int argc, char *argv[])
 
 	atlas_id= NULL;
 	pid_file_name= NULL;
+	queue_id= "";
 
-	(void)getopt32(argv, "A:P:O:", &atlas_id, &pid_file_name,
-		&out_filename);
+	(void)getopt32(argv, "A:P:O:q:", &atlas_id, &pid_file_name,
+		&out_filename, &queue_id);
 
 	if (argc != optind+1)
 	{
@@ -215,6 +217,7 @@ static void add_line(void)
 	char args[ATLAS_ARGSIZE];
 	char cmdline[256];
 	char filename[80];
+	char filename2[80];
 	struct stat sb;
 
 	if (fgets(cmdline, sizeof(cmdline), state->curr_file) == NULL)
@@ -337,7 +340,8 @@ static void add_line(void)
 	if (state->slots[slot].cmdstate != NULL)
 		crondlog(DIE9 "no empty slot?");
 	argv[argc++]= "-O";
-	snprintf(filename, sizeof(filename), OOQD_NEW_PREFIX ".%d", slot);
+	snprintf(filename, sizeof(filename), OOQD_NEW_PREFIX "%s.%d",
+		queue_id, slot);
 	argv[argc++]= filename;
 
 	argv[argc]= NULL;
@@ -361,11 +365,12 @@ static void add_line(void)
 error:
 	if (cmdstate == NULL)
 	{
-		fn= fopen(OOQD_NEW_PREFIX, "a");
+		snprintf(filename, sizeof(filename), OOQD_NEW_PREFIX "%s",
+			queue_id);
+		fn= fopen(filename, "a");
 		if (!fn) 
 		{
-			crondlog(DIE9 "unable to append to '%s'",
-				OOQD_NEW_PREFIX);
+			crondlog(DIE9 "unable to append to '%s'", filename);
 		}
 		fprintf(fn, "RESULT { ");
 		if (state->atlas_id)
@@ -389,13 +394,15 @@ error:
 		fprintf(fn, " }\n");
 		fclose(fn);
 
-		if (stat(OOQD_OUT, &sb) == -1 &&
-			stat(OOQD_NEW_PREFIX, &sb) == 0)
+		snprintf(filename2, sizeof(filename2),
+			OOQD_OUTDIR_PAT "/ooq", queue_id);
+		if (stat(filename2, &sb) == -1 &&
+			stat(filename, &sb) == 0)
 		{
-			if (rename(OOQD_NEW_PREFIX, OOQD_OUT) == -1)
+			if (rename(filename, filename2) == -1)
 			{
 				report_err("move '%s' to '%s' failed",
-					OOQD_NEW_PREFIX, OOQD_OUT);
+					filename, filename2);
 			}
 		}
 		post_results();
@@ -432,9 +439,9 @@ static void cmddone(void *cmdstate)
 		report("cmddone: strange, cmd %p is busy", cmdstate);
 
 	snprintf(from_filename, sizeof(from_filename),
-		"/home/atlas/data/new/ooq.%d", i);
+		OOQD_NEW_PREFIX "%s.%d", queue_id, i);
 	snprintf(to_filename, sizeof(to_filename),
-		"/home/atlas/data/ooq.out/%d", i);
+		OOQD_OUTDIR_PAT "/%d", queue_id, i);
 	if (stat(to_filename, &sb) == 0)
 	{
 		report("output file '%s' is busy", to_filename);
@@ -511,6 +518,7 @@ static void post_results(void)
 	int i, j, r, need_post, probe_id;
 	const char *session_id;
 	const char *argv[20];
+	char filename[80];
 	char from_filename[80];
 	char to_filename[80];
 	char url[200];
@@ -521,26 +529,32 @@ static void post_results(void)
 		/* Grab results and see if something need to be done. */
 		need_post= 0;
 
-		if (stat(OOQD_OUT, &sb) == 0)
+		snprintf(filename, sizeof(filename),
+			OOQD_OUTDIR_PAT "/ooq", queue_id);
+		snprintf(from_filename, sizeof(from_filename),
+			OOQD_NEW_PREFIX "%s", queue_id);
+		snprintf(to_filename, sizeof(to_filename),
+			OOQD_OUTDIR_PAT "/ooq", queue_id);
+		if (stat(filename, &sb) == 0)
 		{
 			/* There is more to post */
 			need_post= 1;	
-		} else if (stat(OOQD_NEW_PREFIX, &sb) == 0)
+		} else if (stat(from_filename, &sb) == 0)
 		{
-			if (rename(OOQD_NEW_PREFIX, OOQD_OUT) == 0)
+			if (rename(from_filename, to_filename) == 0)
 				need_post= 1;
 			else
 			{
 				report_err("move '%s' to '%s' failed",
-					OOQD_NEW_PREFIX, OOQD_OUT);
+					from_filename, to_filename);
 			}
 		}
 		for (i= 0; i<state->max_busy; i++)
 		{
 			snprintf(from_filename, sizeof(from_filename),
-				"/home/atlas/data/new/ooq.%d", i);
+				OOQD_NEW_PREFIX "%s.%d", queue_id, i);
 			snprintf(to_filename, sizeof(to_filename),
-				"/home/atlas/data/ooq.out/%d", i);
+				OOQD_OUTDIR_PAT "/%d", queue_id, i);
 			if (stat(to_filename, &sb) == 0)
 			{
 				/* There is more to post */
@@ -573,6 +587,8 @@ static void post_results(void)
 		snprintf(url, sizeof(url),
 			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s&SRC=oneoff",
 			probe_id, session_id);
+		snprintf(filename, sizeof(filename),
+			OOQD_OUTDIR_PAT, queue_id);
 
 		i= 0;
 		argv[i++]= "httppost";
@@ -582,7 +598,7 @@ static void post_results(void)
 		argv[i++]= "--post-header";
 		argv[i++]= "/home/atlas/status/p_to_c_report_header";
 		argv[i++]= "--post-dir";
-		argv[i++]= "/home/atlas/data/ooq.out";
+		argv[i++]= filename;
 		argv[i++]= "--post-footer";
 		argv[i++]= "/home/atlas/status/con_session_id.txt";
 		argv[i++]= "-O";
