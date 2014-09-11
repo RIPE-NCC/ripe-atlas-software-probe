@@ -26,6 +26,8 @@
 
 #define DBQ(str) "\"" #str "\""
 
+#define BARRIER_CMD "barrier"
+
 struct slot
 {
 	void *cmdstate;
@@ -42,6 +44,9 @@ static struct
 	int curr_busy;
 	int curr_index;
 	struct slot *slots;
+
+	int barrier;
+	char *barrier_file;
 } *state;
 
 static struct builtin 
@@ -66,7 +71,7 @@ static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
 
 static void checkQueue(evutil_socket_t fd, short what, void *arg);
-static void add_line(void);
+static int add_line(void);
 static void cmddone(void *cmdstate);
 static void re_post(evutil_socket_t fd, short what, void *arg);
 static void post_results(void);
@@ -169,11 +174,12 @@ int eooqd_main(int argc, char *argv[])
 static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 	short what UNUSED_PARAM, void *arg UNUSED_PARAM)
 {
+	int r;
 	char filename[80];
 
 	if (!state->curr_file)
 	{
-		/* Try to move queue_file to curr_qfile. This provide at most
+		/* Try to move queue_file to curr_qfile. This provides at most
 		 * once behavior and allows producers to create a new
 		 * queue_file while we process the old one.
 		 */
@@ -197,7 +203,9 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 
 	while (state->curr_file && state->curr_busy < state->max_busy)
 	{
-		add_line();
+		r= add_line();
+		if (r == -1)
+			break;	/* Wait for barrier to complete */
 	}
 
 	snprintf(filename, sizeof(filename),
@@ -205,10 +213,10 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 	check_resolv_conf2(filename, atlas_id);
 }
 
-static void add_line(void)
+static int add_line(void)
 {
 	char c;
-	int i, argc, skip, slot;
+	int i, argc, fd, skip, slot;
 	size_t len;
 	char *cp, *ncp;
 	struct builtin *bp;
@@ -223,13 +231,30 @@ static void add_line(void)
 	char filename2[80];
 	struct stat sb;
 
+	if (state->barrier)
+	{
+		if (state->curr_busy > 0)
+			return -1;
+		fd= open(state->barrier_file, O_CREAT, 0);
+		if (fd != -1)
+			close(fd);
+		else
+		{
+			report_err("unable to create barrier file '%s'",
+				state->barrier_file);
+		}
+		free(state->barrier_file);
+		state->barrier_file= NULL;
+		state->barrier= 0;
+	}
+
 	if (fgets(cmdline, sizeof(cmdline), state->curr_file) == NULL)
 	{
 		if (ferror(state->curr_file))
 			report_err("error reading queue file");
 		fclose(state->curr_file);
 		state->curr_file= NULL;
-		return;
+		return 0;
 	}
 
 	cp= strchr(cmdline, '\n');
@@ -237,6 +262,20 @@ static void add_line(void)
 		*cp= '\0';
 
 	crondlog(LVL7 "atlas_run: looking for '%s'", cmdline);
+
+	/* Check for barrier command */
+	len= strlen(BARRIER_CMD);
+	if (strlen(cmdline) >= len &&
+		strncmp(cmdline, BARRIER_CMD, len) == 0 &&
+		cmdline[len] == ' ')
+	{
+		p= &cmdline[len];
+		while (*p != '\0' && *p == ' ')
+			p++;
+		state->barrier= 1;
+		state->barrier_file= strdup(p);
+		return 0;
+	}
 
 	cmdstate= NULL;
 	reason= NULL;
@@ -410,6 +449,8 @@ error:
 		}
 		post_results();
 	}
+
+	return 0;
 }
 
 static void cmddone(void *cmdstate)
