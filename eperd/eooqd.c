@@ -272,6 +272,11 @@ static int add_line(void)
 		p= &cmdline[len];
 		while (*p != '\0' && *p == ' ')
 			p++;
+		if (!validate_filename(p, SAFE_PREFIX))
+		{
+			crondlog(LVL8 "insecure file '%s'. allowed path '%s'", 
+				p, SAFE_PREFIX);
+		}
 		state->barrier= 1;
 		state->barrier_file= strdup(p);
 		return 0;
