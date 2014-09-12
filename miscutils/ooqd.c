@@ -11,7 +11,7 @@ One-off queue daemon
 #include <cmdtable.h>
 
 #define SUFFIX 		".curr"
-#define WAIT_TIME	60	/* in seconds */
+#define WAIT_TIME	10	/* in seconds */
 #define NARGS		20	/* Max arguments to a built-in command */
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
@@ -103,7 +103,7 @@ static void process(FILE *file)
 	size_t len;
 	char *cp, *ncp, *outfile;
 	struct builtin *bp;
-	char line[256];
+	char line[1024];
 	char *argv[NARGS];
 
 printf("in process\n");
