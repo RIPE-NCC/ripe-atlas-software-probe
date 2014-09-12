@@ -27,6 +27,7 @@
 #define DBQ(str) "\"" #str "\""
 
 #define BARRIER_CMD "barrier"
+#define POST_CMD "post"
 
 struct slot
 {
@@ -74,7 +75,7 @@ static void checkQueue(evutil_socket_t fd, short what, void *arg);
 static int add_line(void);
 static void cmddone(void *cmdstate);
 static void re_post(evutil_socket_t fd, short what, void *arg);
-static void post_results(void);
+static void post_results(int force_post);
 static void skip_space(char *cp, char **ncpp);
 static void skip_nonspace(char *cp, char **ncpp);
 static void find_eos(char *cp, char **ncpp);
@@ -262,6 +263,14 @@ static int add_line(void)
 		*cp= '\0';
 
 	crondlog(LVL7 "atlas_run: looking for '%s'", cmdline);
+
+	/* Check for post command */
+	if (strcmp(cmdline, POST_CMD) == 0)
+	{
+		/* Trigger a post */
+		post_results(1 /* force_post */);
+		return 0;	/* Done */
+	}
 
 	/* Check for barrier command */
 	len= strlen(BARRIER_CMD);
@@ -452,7 +461,7 @@ error:
 					filename, filename2);
 			}
 		}
-		post_results();
+		post_results(0 /* !force_post */);
 	}
 
 	return 0;
@@ -505,7 +514,7 @@ static void cmddone(void *cmdstate)
 
 	if (state->curr_busy == 0)
 	{
-		post_results();
+		post_results(0 /* !force_post */);
 	}
 }
 
@@ -559,10 +568,10 @@ static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
 	/* Just call post_results every once in awhile in case some results
 	 * were left behind.
 	 */
-	post_results();
+	post_results(0 /* !force_post */);
 }
 
-static void post_results(void)
+static void post_results(int force_post)
 {
 	int i, j, r, need_post, probe_id;
 	const char *session_id;
@@ -575,7 +584,8 @@ static void post_results(void)
 	for (j= 0; j<5; j++)
 	{
 		/* Grab results and see if something need to be done. */
-		need_post= 0;
+		need_post= force_post;
+		force_post= 0;	/* Only one time */
 
 		snprintf(from_filename, sizeof(from_filename),
 			OOQD_NEW_PREFIX "%s", queue_id);
