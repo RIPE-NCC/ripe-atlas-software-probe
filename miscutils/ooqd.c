@@ -13,6 +13,7 @@ One-off queue daemon
 #define SUFFIX 		".curr"
 #define WAIT_TIME	10	/* in seconds */
 #define NARGS		20	/* Max arguments to a built-in command */
+#define WIFIMSM_PATH	"/tmp/wifimsm"
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
 
@@ -322,4 +323,33 @@ static void report_err(const char *fmt, ...)
 	fprintf(stderr, ": %s\n", strerror(terrno));
 
 	va_end(ap);
+}
+
+int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
+{
+	pid_t pid;
+	int r, status;
+
+	pid= fork();
+	if (pid == -1)
+	{
+		report_err("wifimsm_main: fork failed");
+		return 1;
+	}
+	if (pid)
+	{
+		r= waitpid(pid, &status, 0);
+		if (r == -1)
+		{
+			report_err("wifimsm_main: waitpid failed");
+			return 1;
+		}
+		if (WIFEXITED(status))
+			return WEXITSTATUS(status);
+		return 1;
+	}
+
+	execv(WIFIMSM_PATH, argv);
+	report_err("wifimsm_main: execv '%s' failed", WIFIMSM_PATH);
+	return 1;
 }
