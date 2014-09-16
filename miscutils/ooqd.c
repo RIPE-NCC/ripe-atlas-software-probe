@@ -12,8 +12,8 @@ One-off queue daemon
 
 #define SUFFIX 		".curr"
 #define WAIT_TIME	10	/* in seconds */
-#define NARGS		20	/* Max arguments to a built-in command */
-#define WIFIMSM_PATH	"/tmp/wifimsm"
+#define NARGS		40	/* Max arguments to a built-in command */
+#define WIFIMSM_PATH	"/home/atlas/bin/wifimsm"
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
 
@@ -215,7 +215,7 @@ printf("got cp %p, line %p, '%s'\n", cp, line, cp);
 
 			if (argc >= NARGS-1)
 			{
-				report("command line '%s', too arguments",
+				report("command line '%s', too many arguments",
 					line);
 				continue;	/* Just skip it */
 			}
