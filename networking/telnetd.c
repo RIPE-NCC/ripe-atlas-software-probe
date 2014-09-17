@@ -102,8 +102,8 @@ struct tsession {
 };
 
 /* Two buffers are directly after tsession in malloced memory.
- * Make whole thing fit in 4k */
-enum { BUFSIZE = (4 * 1024 - sizeof(struct tsession)) / 2 };
+ * Make whole thing fit in 8k */
+enum { BUFSIZE = (8 * 1024 - sizeof(struct tsession)) / 2 };
 
 #ifdef ATLAS
 static int equal_sessionid(char *passwd);
