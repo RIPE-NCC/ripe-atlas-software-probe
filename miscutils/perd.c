@@ -1174,8 +1174,8 @@ static void find_eos(char *cp, char **ncpp)
 }
 
 
-#define ATLAS_NARGS	20	/* Max arguments to a built-in command */
-#define ATLAS_ARGSIZE	512	/* Max size of the command line */
+#define ATLAS_NARGS	40	/* Max arguments to a built-in command */
+#define ATLAS_ARGSIZE	4096	/* Max size of the command line */
 
 static int atlas_run(char *cmdline)
 {
