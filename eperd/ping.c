@@ -884,8 +884,12 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	}
 
 	/* Check for Destination Host Unreachable */
-	if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
-	  {
+	if (icmp->icmp6_type == ICMP6_ECHO_REQUEST)
+	{
+		/* Completely ignore echo requests */
+	}
+	else if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
+	{
 	    /* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
 	    struct timeval elapsed;             /* response time */
 
@@ -931,7 +935,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 	    if (!isDup)
 		state->got_reply= 1;
-	  }
+	}
 	else
 	  /* Handle this condition exactly as the request has expired */
 	  noreply_callback (-1, -1, state);
