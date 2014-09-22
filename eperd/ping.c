@@ -222,14 +222,12 @@ static void report(struct pingstate *state)
 
 	if (!state->no_dst)
 	{
+		namebuf[0]= '\0';
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
 		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
-	}
 
-	if (state->got_reply)
-	{
 		namebuf[0]= '\0';
 		getnameinfo((struct sockaddr *)&state->loc_sin6,
 			state->loc_socklen, namebuf, sizeof(namebuf),
@@ -322,7 +320,7 @@ static void ping_cb(int result, int bytes, int psize,
 			usecs/1000.);
 		add_str(pingstate, line);
 
-		if (!pingstate->got_reply)
+		if (!pingstate->got_reply && result != PING_ERR_DUP)
 		{
 			memcpy(&pingstate->loc_sin6, loc_sa, loc_socklen);
 			pingstate->loc_socklen= loc_socklen;
@@ -355,7 +353,7 @@ static void ping_cb(int result, int bytes, int psize,
 		}
 		namebuf1[0]= '\0';
 		getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
-			loc_socklen, namebuf1,
+			pingstate->loc_socklen, namebuf1,
 			sizeof(namebuf1), NULL, 0, NI_NUMERICHOST);
 		namebuf2[0]= '\0';
 		getnameinfo(loc_sa, loc_socklen, namebuf2,
@@ -368,7 +366,7 @@ static void ping_cb(int result, int bytes, int psize,
 			printf("loc_sa: %s\n", namebuf2);
 
 			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf2);
+				", " DBQ(src_addr) ":" DBQ(%s), namebuf2);
 			add_str(pingstate, line);
 		}
 
@@ -392,18 +390,6 @@ static void ping_cb(int result, int bytes, int psize,
 	}
 	if (result == PING_ERR_TIMEOUT || result == PING_ERR_SENDTO)
 	{
-		if (pingstate->first && pingstate->loc_socklen != 0)
-		{
-			namebuf1[0]= '\0';
-			getnameinfo((struct sockaddr *)&pingstate->loc_sin6,
-				pingstate->loc_socklen,
-				namebuf1, sizeof(namebuf1),
-				NULL, 0, NI_NUMERICHOST);
-
-			snprintf(line, sizeof(line),
-				", " DBQ(srcaddr) ":" DBQ(%s), namebuf1);
-			add_str(pingstate, line);
-		}
 		add_str(pingstate, " }");
 		pingstate->first= 0;
 	}
@@ -556,9 +542,8 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 static void ping_xmit(struct pingstate *host)
 {
 	struct pingbase *base = host->base;
-	struct timeval tv_interval;
-
 	int nsent;
+	struct timeval tv_interval;
 
 	if (host->sentpkts >= host->maxpkts)
 	{
@@ -691,7 +676,6 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* Time the packet has been received */
 	gettimeofday(&now, NULL);
 
-// printf("ready_callback4: before recvfrom\n");
 	/* Receive data from the network */
 	nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
@@ -781,11 +765,13 @@ printf("ready_callback4: too short\n");
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
 		    state);
 
-	    /* Update the sequence number for the next run */
-	    state->seq = (state->seq + 1) % 256;
-
             if (!isDup)
+	    {
 		state->got_reply= 1;
+
+		/* Update the sequence number for the next run */
+		state->seq = (state->seq + 1) % 256;
+	    }
 	  }
 	else
 	{
@@ -1233,6 +1219,10 @@ static void ping_start2(void *state)
 			pingstate->base->done(pingstate);
 		return;
 	}
+
+	pingstate->loc_socklen= sizeof(pingstate->loc_sin6);
+	getsockname(pingstate->socket, &pingstate->loc_sin6,
+		&pingstate->loc_socklen);
 
 	event_add(&pingstate->event, NULL);
 
