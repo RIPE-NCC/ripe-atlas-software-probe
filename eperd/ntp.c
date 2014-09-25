@@ -342,12 +342,16 @@ static void report(struct ntpstate *state)
 
 		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
 
-		namebuf[0]= '\0';
-		getnameinfo((struct sockaddr *)&state->loc_sin6,
-			state->loc_socklen,
-			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+		if (state->loc_socklen != 0)
+		{
+			namebuf[0]= '\0';
+			getnameinfo((struct sockaddr *)&state->loc_sin6,
+				state->loc_socklen,
+				namebuf, sizeof(namebuf), NULL, 0,
+				NI_NUMERICHOST);
 
-		fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), namebuf);
+			fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), namebuf);
+		}
 	}
 
 	proto= "UDP";
@@ -1655,7 +1659,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	state= xzalloc(sizeof(*state));
 	state->count= count;
-	state->interface= interface;
+	state->interface= interface ? strdup(interface) : NULL;
 	state->destportstr= strdup(destportstr);
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
@@ -1764,7 +1768,7 @@ static int create_socket(struct ntpstate *state)
 		serrno= errno;
 
 		snprintf(line, sizeof(line),
-	", " DBQ(error) ":" DBQ(socket failed: %s) " }",
+	"{ " DBQ(error) ":" DBQ(socket failed: %s) " }",
 			strerror(serrno));
 		add_str(state, line);
 		report(state);
@@ -1777,7 +1781,7 @@ static int create_socket(struct ntpstate *state)
 			af, state->interface) == -1)
 		{
 			snprintf(line, sizeof(line),
-	", " DBQ(error) ":" DBQ(bind_interface failed) " }");
+	"{ " DBQ(error) ":" DBQ(bind_interface failed) " }");
 			add_str(state, line);
 			report(state);
 			return -1;
@@ -1945,6 +1949,8 @@ static int ntp_delete(void *state)
 	ntpstate->destportstr= NULL;
 	free(ntpstate->out_filename);
 	ntpstate->out_filename= NULL;
+	free(ntpstate->interface);
+	ntpstate->interface= NULL;
 
 	free(ntpstate);
 
