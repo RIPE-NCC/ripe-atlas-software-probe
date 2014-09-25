@@ -627,7 +627,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->max_body= max_body;
 	state->read_limit= read_limit;
 	state->timeout= timeout;
-	state->infname= infname;
+	state->infname= infname ? strdup(infname) : NULL;
 
 	state->only_v4= 2;
 
@@ -744,12 +744,16 @@ static void report(struct hgstate *state)
 		if (state->read_truncated)
 			add_str(state, ", " DBQ(read-truncated) ": True");
 
-		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
-			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
+		if (state->socklen != 0)
+		{
+			getnameinfo((struct sockaddr *)&state->sin6,
+				state->socklen, namebuf, sizeof(namebuf),
+				NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line), ", " DBQ(dst_addr) ":" DBQ(%s),
-			namebuf);
-		add_str(state, line);
+			snprintf(line, sizeof(line),
+				", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
+			add_str(state, line);
+		}
 
 		/* End of readtiming */
 		if (state->etim >= 2)
@@ -1940,6 +1944,8 @@ static int httpget_delete(void *state)
 	hgstate->atlas= NULL;
 	free(hgstate->output_file);
 	hgstate->output_file= NULL;
+	free(hgstate->infname);
+	hgstate->infname= NULL;
 	free(hgstate->host);
 	hgstate->host= NULL;
 	free(hgstate->hostport);

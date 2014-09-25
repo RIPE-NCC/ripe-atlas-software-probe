@@ -54,24 +54,8 @@ void tu_restart_connect(struct tu_env *env)
 	int r;
 	struct bufferevent *bev;
 
-	/* Delete old bev */
-	if (env->bev)
-	{
-		bufferevent_free(env->bev);
-		env->bev= NULL;
-	}
-
-	/* And create a new one */
-	r= create_bev(env);
-	if (r == -1)
-	{
-		return;
-	}
-	bev= env->bev;
-
 	/* Connect failed, try next address */
-	if (env->dns_curr)
-			/* Just to be on the safe side */
+	if (env->dns_curr)	/* Just to be on the safe side */
 	{
 		env->dns_curr= env->dns_curr->ai_next;
 	}
@@ -81,6 +65,22 @@ void tu_restart_connect(struct tu_env *env)
 
 		env->beforeconnect(env,
 			env->dns_curr->ai_addr, env->dns_curr->ai_addrlen);
+
+		/* Delete old bev */
+		if (env->bev)
+		{
+			bufferevent_free(env->bev);
+			env->bev= NULL;
+		}
+
+		/* And create a new one */
+		r= create_bev(env);
+		if (r == -1)
+		{
+			return;
+		}
+		bev= env->bev;
+
 		if (bufferevent_socket_connect(bev,
 			env->dns_curr->ai_addr,
 			env->dns_curr->ai_addrlen) == 0)
@@ -158,18 +158,27 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 	env->reportcount(env, count);
 
-	r= create_bev(env);
-	if (r == -1)
-	{
-		return;
-	}
-
 	while (env->dns_curr)
 	{
 		evtimer_add(&env->timer, &env->interval);
 
 		env->beforeconnect(env,
 			env->dns_curr->ai_addr, env->dns_curr->ai_addrlen);
+
+		/* Delete old bev if any */
+		if (env->bev)
+		{
+			bufferevent_free(env->bev);
+			env->bev= NULL;
+		}
+
+		/* And create a new one */
+		r= create_bev(env);
+		if (r == -1)
+		{
+			return;
+		}
+
 		bev= env->bev;
 		if (bufferevent_socket_connect(bev,
 			env->dns_curr->ai_addr,
