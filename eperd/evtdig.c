@@ -270,6 +270,7 @@ struct query_state {
 	char * name;                /* Host identifier as given by the user */
 	char * fqname;              /* Full qualified hostname          */ 
 	char * ipname;              /* Remote address in dot notation   */
+	char * infname;		    /* Bind to this interface (or address) */
 	u_int16_t qryid;             /* query id 16 bit */
 	int tcp_fd;
 	FILE *tcp_file;
@@ -947,6 +948,12 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
 		buf_add(&qry->err, line, strlen(line));
                 break;
 
+        case TU_SOCKET_ERR:
+
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TUSOCKET\" : \"%s\"", qry->err.size ? ", " : "", str );
+		buf_add(&qry->err, line, strlen(line));
+                break;
+
         case TU_READ_ERR:
 		// need more than this reporting for this case AA
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_READ_ERR\" : \"%s\"", qry->err.size ? ", " : "", str );
@@ -1287,6 +1294,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
+	qry->infname = NULL;
 	tdig_base->activeqry++;
 	qry->qst = STATUS_FREE;
 	qry->retry  = 0;
@@ -1329,7 +1337,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	evtimer_assign(&qry->done_qry_timer, tdig_base->event_base, done_qry_cb, qry);
 
 	optind = 0;
-	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:?", longopts, NULL), c != -1) {
+	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:I:?", longopts, NULL), c != -1) {
 		switch(c) {
 			case '4':
 				qry->opt_v4_only = 1;
@@ -1354,6 +1362,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 					return NULL;
 				}
 				qry->str_Atlas = strdup(optarg);
+				break;
+			case 'I':
+				free(qry->infname);
+				qry->infname= strdup(optarg);
 				break;
 			case 'b':
 				qry->lookupname = strdup ("version.bind.");
@@ -1897,7 +1909,7 @@ void tdig_start (struct query_state *qry)
 		interval.tv_sec = CONN_TO;
 		interval.tv_usec= 0;
 		tu_connect_to_name (&qry->tu_env,   qry->server_name, port_as_char,
-				&interval, &hints, NULL,
+				&interval, &hints, qry->infname,
 				tcp_timeout_callback, tcp_reporterr,
 				tcp_dnscount, tcp_beforeconnect,
 				tcp_connected, tcp_readcb, tcp_writecb);
@@ -2095,6 +2107,11 @@ static int tdig_delete(void *state)
 	{
 		free(qry->lookupname);
 		qry->lookupname = NULL;
+	}
+	if(qry->infname)
+	{
+		free(qry->infname);
+		qry->infname = NULL;
 	}
 
 	/* Delete timers */
