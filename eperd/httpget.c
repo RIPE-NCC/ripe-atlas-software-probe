@@ -1631,7 +1631,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 				state->do_head ? "HEAD" : "POST", state->path,
 				state->do_http10 ? '0' : '1');
 			evbuffer_add_printf(output, "Host: %s\r\n",
-				state->host);
+				state->hostport);
 			evbuffer_add_printf(output, "Connection: close\r\n");
 			evbuffer_add_printf(output, "User-Agent: %s\r\n",
 				state->user_agent);
