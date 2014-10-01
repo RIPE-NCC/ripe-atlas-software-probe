@@ -104,7 +104,7 @@ static void process(FILE *file)
 	size_t len;
 	char *cp, *ncp, *outfile;
 	struct builtin *bp;
-	char line[1024];
+	char line[2048];
 	char *argv[NARGS];
 
 printf("in process\n");
