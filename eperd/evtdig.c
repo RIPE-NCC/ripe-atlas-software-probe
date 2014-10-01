@@ -230,16 +230,11 @@ typedef uint32_t counter_t;
 struct tdig_base {
 	struct event_base *event_base;
 
-	evutil_socket_t rawfd_v4;       /* Raw socket used to nsm hosts              */
-	evutil_socket_t rawfd_v6;       /* Raw socket used to nsm hosts              */
-
 	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
 
 	/* A circular list of user queries */
 	struct query_state *qry_head;
 
-	struct event event4;            /* Used to detect read events on raw socket   */
-	struct event event6;            /* Used to detect read events on raw socket   */
 	struct event statsReportEvent;
 	int resolv_max;
 	char nslist[MAXNS][INET6_ADDRSTRLEN * 2];
@@ -271,7 +266,9 @@ struct query_state {
 	char * fqname;              /* Full qualified hostname          */ 
 	char * ipname;              /* Remote address in dot notation   */
 	char * infname;		    /* Bind to this interface (or address) */
-	u_int16_t qryid;             /* query id 16 bit */
+	u_int16_t qryid;            /* query id 16 bit */
+	struct event event;         /* Used to detect read events on udp socket   */
+	int udp_fd;		    /* udp_fd and tcp_fd should be merged */
 	int tcp_fd;
 	FILE *tcp_file;
 	int wire_size;
@@ -496,17 +493,18 @@ static void tdig_stats(int unused UNUSED_PARAM, const short event UNUSED_PARAM, 
 static int tdig_delete(void *state);
 static void ChangetoDnsNameFormat(u_char *dns, char * qry) ;
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
-void tdig_start (struct query_state *qry);
+void tdig_start (void *qry);
 void printReply(struct query_state *qry, int wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
-static void process_reply(void * arg, int nrecv, struct timeval now, int af, void *remote);
+static void process_reply(void * arg, int nrecv, struct timeval now);
 static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b);
-static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_state *qry);
+static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, void *arg);
 static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h);
 static void free_qry_inst(struct query_state *qry);
+static void ready_callback (int unused, const short event, void * arg);
 
 /* move the next functions from tdig.c */
 u_int32_t get32b (char *p);
@@ -655,39 +653,6 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 	return 1;
 }
 
-/* Lookup for a query by its index */
-static struct query_state* tdig_lookup_query( struct tdig_base * base, int idx, int af, void * remote)
-{ 
-	int i = 0;
-	struct query_state *qry;
-
-	qry = base->qry_head;
-	if (!qry)
-		return NULL;
-	do {
-		i++;
-		if (qry->qryid == idx)
-		{
-			crondlog(LVL5 "found matching query id %d", idx);
-			if( qry->ressent && ip_addr_cmp (af, remote, qry->ressent->ai_family, qry->ressent->ai_addr) == 0) {
-				crondlog(LVL7 "matching id and address id %d", idx);
-				return qry;
-			}
-			else {
-				crondlog(LVL7 "matching id and address mismatch id %d", idx);
-			} 
-		}
-		qry = qry->next;
-		if (i > (2*base->activeqry) ) {
-			crondlog(LVL7 "i am looping %d AA", idx);
-			return NULL;
-		}
-		
-	} while (qry != base->qry_head);
-
-	return NULL;
-}
-
 static void mk_dns_buff(struct query_state *qry,  u_char *packet) 
 {
 	struct DNS_HEADER *dns = NULL;
@@ -812,12 +777,13 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 /* Attempt to transmit a UDP DNS Request to a serveri. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
+	int fd;
+	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
 	uint32_t nsent = 0;
 	u_char *outbuff;
 	int err = 0; 
-	int sockfd;
 
 	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
@@ -829,33 +795,63 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	gettimeofday(&qry->xmit_time, NULL);
 	mk_dns_buff(qry, outbuff);
 	do {
-		switch (qry->res->ai_family) {
-			case AF_INET:
-				nsent = sendto(base->rawfd_v4, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
-				break;
-			case AF_INET6:
-				nsent = sendto(base->rawfd_v6, outbuff,qry->pktsize, MSG_DONTWAIT, qry->res->ai_addr, qry->res->ai_addrlen);
-				break;
+		if (qry->udp_fd != -1)
+		{
+			event_del(&qry->event);
+			close(qry->udp_fd);
+			qry->udp_fd= -1;
 		}
+
+		af = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
+
+		if ((fd = socket(af, SOCK_DGRAM, 0) ) < 0 )
+		{
+			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"socket failed %s\"", qry->err.size ? ", " : "", strerror(errno));
+			buf_add(&qry->err, line, strlen(line));
+			printReply (qry, 0, NULL);
+			return;
+		} 
+
+		qry->udp_fd= fd;
+
+		evutil_make_socket_nonblocking(fd); 
+
+		event_assign(&qry->event, tdig_base->event_base, fd, 
+			EV_READ | EV_PERSIST, ready_callback, qry);
+		event_add(&qry->event, NULL);
+
+		if (qry->infname)
+		{
+			if (bind_interface(fd, af, qry->infname) == -1)
+			{
+				snprintf(line, DEFAULT_LINE_LENGTH,
+					"%s \"socket\" : \"bind_interface failed\"",
+					qry->err.size ? ", " : "");
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				return;
+			}
+		}
+
+		qry->loc_socklen = sizeof(qry->loc_sin6);
+		if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
+		{
+				snprintf(line, DEFAULT_LINE_LENGTH,
+					"%s \"socket\" : \"connect failed %s\"",
+					qry->err.size ? ", " : "",
+					strerror(errno));
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				return;
+		}
+
+		nsent = send(qry->udp_fd, outbuff,qry->pktsize, MSG_DONTWAIT);
 		qry->ressent = qry->res;
 
 		if (nsent == qry->pktsize) {
-			// the packet is send. Now lets try to the source address we would have used.
-			// create another sock with same dest, connect and get the source address 
-    			// delete that socket and hope the the source address is the right one.
-			if ((sockfd = socket(qry->res->ai_family, SOCK_DGRAM, 0 ) ) < 0 ) { 
-                                        snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"temp socket to get src address failed %s\"", qry->err.size ? ", " : "", strerror(errno));
-                                        buf_add(&qry->err, line, strlen(line));
-				return;
-        		}
-			else  {
-				qry->loc_socklen = sizeof(qry->loc_sin6);
-				connect(sockfd, qry->res->ai_addr, qry->res->ai_addrlen);
-				if (getsockname(sockfd,(struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
-					snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getscokname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
-					buf_add(&qry->err, line, strlen(line));
-				}
-				close(sockfd);
+			if (getsockname(qry->udp_fd, (struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
+				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getscokname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
+				buf_add(&qry->err, line, strlen(line));
 			}
 
 			/* One more DNS Query is sent */
@@ -1085,7 +1081,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			dnsR = (struct DNS_HEADER*) qry->packet.buf;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
 				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;
-				printReply (qry, qry->packet.size, qry->packet.buf);
+				printReply (qry, qry->packet.size, (unsigned char *)qry->packet.buf);
 			}
 			else {
 				bzero(line, DEFAULT_LINE_LENGTH);
@@ -1098,7 +1094,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	}
 }
 
-static void tcp_writecb(struct bufferevent *bev, void *ptr) 
+static void tcp_writecb(struct bufferevent *bev UNUSED_PARAM, void *ptr UNUSED_PARAM) 
 {
 	/*
 	struct query_state * qry; 
@@ -1119,13 +1115,15 @@ static void tcp_writecb(struct bufferevent *bev, void *ptr)
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct timeval now, int af, void *remote )
+static void process_reply(void * arg, int nrecv, struct timeval now)
 {
-	struct tdig_base *base = arg;
-
 	struct DNS_HEADER *dnsR = NULL;
+	struct tdig_base * base;
 
 	struct query_state * qry;
+
+	qry= arg;
+	base= qry->base;
 
 	if (nrecv < sizeof (struct DNS_HEADER)) {
 		base->shortpkt++;
@@ -1137,13 +1135,10 @@ static void process_reply(void * arg, int nrecv, struct timeval now, int af, voi
 
 
 	crondlog(LVL7 "DBG: base address process reply %p, nrec %d", base, nrecv);
-	/* Get the pointer to the qry descriptor in our internal table */
-	qry = tdig_lookup_query(base, ntohs(dnsR->id), af, remote);
-	
-	if ( ! qry) {
+	if (ntohs(dnsR->id) != qry->qryid)
+	{
 		base->martian++;
-		crondlog(LVL7 "DBG: no match found for qry id i %d",\
-ntohs(dnsR->id));
+		crondlog(LVL7 "DBG: wrong id %d for qry", ntohs(dnsR->id));
 		return;
 	}
 
@@ -1157,46 +1152,50 @@ ntohs(dnsR->id));
 	return;
 }
 
-static void ready_callback4 (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
+static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
-	struct tdig_base *base = arg;
+	struct query_state * qry;
 	int nrecv;
-	struct sockaddr_in remote4;                  /* responding internet address */
-	socklen_t slen;
 	struct timeval rectime;
+
+	printf("in ready_callback\n");
+
+	qry = arg;
 	
-	slen = sizeof(struct sockaddr);
-	bzero(base->packet, MAX_DNS_BUF_SIZE);
+	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 	/* Time the packet has been received */
 
 	gettimeofday(&rectime, NULL);
 	/* Receive data from the network */
-	nrecv = recvfrom(base->rawfd_v4, base->packet, sizeof(base->packet), MSG_DONTWAIT, &remote4, &slen);
+	nrecv = recv(qry->udp_fd, qry->base->packet,
+		sizeof(qry->base->packet), MSG_DONTWAIT);
 	if (nrecv < 0) {
 		/* One more failure */
-		base->recvfail++;
+		qry->base->recvfail++;
 		return ;
 	}
-	process_reply(arg, nrecv, rectime, remote4.sin_family, &remote4);
+	process_reply(arg, nrecv, rectime);
 	return;
 } 
 
+#if 0
 static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
-	struct tdig_base *base = arg;
+	struct query_state * qry;
 	int nrecv; 
 	struct timeval rectime;
 	struct msghdr msg;
 	struct iovec iov[1];
 	//char buf[INET6_ADDRSTRLEN];
-	struct sockaddr_in6 remote6;
 	char cmsgbuf[256];
+
+	qry= arg;
 
 	/* Time the packet has been received */
 	gettimeofday(&rectime, NULL);
 
-	iov[0].iov_base= base->packet;
-	iov[0].iov_len= sizeof(base->packet);
+	iov[0].iov_base= qry->base->packet;
+	iov[0].iov_len= sizeof(qry->base->packet);
 
 	msg.msg_name= &remote6;
 	msg.msg_namelen= sizeof( struct sockaddr_in6);
@@ -1206,16 +1205,17 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 	msg.msg_controllen= sizeof(cmsgbuf);
 	msg.msg_flags= 0;                       /* Not really needed */
 
-	nrecv= recvmsg(base->rawfd_v6, &msg, MSG_DONTWAIT);
+	nrecv= recvmsg(qry->udp_fd, &msg, MSG_DONTWAIT);
 	if (nrecv == -1) {
 		/* Strange, read error */
 		printf("ready_callback6: read error '%s'\n", strerror(errno));
 		return;
 	}
-	process_reply(arg, nrecv, rectime, remote6.sin6_family, &remote6);
+	process_reply(arg, nrecv, rectime);
 
 	return;
 }
+#endif
 
 static bool argProcess (int argc, char *argv[], struct query_state *qry )
 {
@@ -1291,6 +1291,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->out_filename = NULL;
 	qry->opt_proto = 17; 
 	qry->tcp_file = NULL;
+	qry->udp_fd = -1;
 	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
@@ -1714,36 +1715,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 /* called only once. Initialize tdig_base variables here */
 struct tdig_base * tdig_base_new(struct event_base *event_base)
 {
-	evutil_socket_t fd6;
-	evutil_socket_t fd4;
-	struct addrinfo hints;
-	int on = 1;
 	struct timeval tv;
-
-	bzero(&hints,sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_flags = 0;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = 0;
-
-	/* Create an endpoint for communication using raw socket for ICMP calls */
-	if ((fd4 = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
-	{
-		return NULL;
-	} 
-
-	hints.ai_family = AF_INET6;
-	if ((fd6 = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol) ) < 0 )
-	{
-		close(fd4);
-		return NULL;
-	} 
 
 	tdig_base= xzalloc(sizeof( struct tdig_base));
 	if (tdig_base == NULL)
 	{
-		close(fd4);
-		close(fd6);
 		return (NULL);
 	}
 
@@ -1763,33 +1739,16 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	memset(tdig_base, 0, sizeof(struct tdig_base));
 	tdig_base->event_base = event_base;
 
-	tdig_base->rawfd_v4 = fd4;
-	tdig_base->rawfd_v6 = fd6;
-
-	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
-
-	on = 1;
-	setsockopt(fd6, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on));
-
 	//memset(&tdig_base-->loc_sin6, '\0', sizeof(tdig_base-->loc_sin6));
 	//tdig_base-->loc_socklen= 0;
 
-	evutil_make_socket_nonblocking(tdig_base->rawfd_v4); 
+	evtimer_assign(&tdig_base->statsReportEvent, tdig_base->event_base, tdig_stats, tdig_base);
 
 	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
 
 	// Define the callback to handle UDP Reply 
 	// add the raw file descriptor to those monitored for read events 
 
-	event_assign(&tdig_base->event4, tdig_base->event_base, tdig_base->rawfd_v4, 
-			EV_READ | EV_PERSIST, ready_callback4, tdig_base);
-	event_add(&tdig_base->event4, NULL);
-
-	event_assign(&tdig_base->event6, tdig_base->event_base, tdig_base->rawfd_v6, 
-			EV_READ | EV_PERSIST, ready_callback6, tdig_base);
-	event_add(&tdig_base->event6, NULL);
-	
-	evtimer_assign(&tdig_base->statsReportEvent, tdig_base->event_base, tdig_stats, tdig_base);
 	tv.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
 	tv.tv_usec =  0;
 	event_add(&tdig_base->statsReportEvent, &tv);
@@ -1797,7 +1756,9 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	return tdig_base;
 }
 
-static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_state *qry) {
+static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, void *arg) {
+	struct query_state *qry;
+	qry= arg;
 	if (err)  {
 		snprintf(line, DEFAULT_LINE_LENGTH, "\"evdns_getaddrinfo\": "
 				"\"%s %s\"", qry->server_name, 
@@ -1815,15 +1776,18 @@ static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, struct query_sta
 	}
 }
 
-void tdig_start (struct query_state *qry)
+void tdig_start (void *arg)
 {
 	struct timeval asap = { 0, 0 };
 	struct timeval interval;
 
 	int err_num;
+	struct query_state *qry;
 	struct addrinfo hints, *res;
 	char port[] = "domain";
 	char port_as_char[] = "53";  
+
+	qry= arg;
 
 	switch(qry->qst)
 	{
@@ -2060,6 +2024,13 @@ static void free_qry_inst(struct query_state *qry)
 	if(qry->opt_proto == 6)
 		tu_cleanup(&qry->tu_env);
 
+	if (qry->udp_fd != -1)
+	{
+		event_del(&qry->event);
+		close(qry->udp_fd);
+		qry->udp_fd= -1;
+	}
+
 	if ( qry->opt_resolv_conf) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
@@ -2148,6 +2119,12 @@ static int tdig_delete(void *state)
 		free(qry->server_name);
 		qry->server_name = NULL;
 	} 
+	if (qry->udp_fd != -1)
+	{
+		event_del(&qry->event);
+		close(qry->udp_fd);
+		qry->udp_fd= -1;
+	}
 	if(qry->base) 
 		qry->base->activeqry--;
 	free(qry);
@@ -2391,7 +2368,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 						reader-result,&stop);
 					JSDOT( RNAME, answers[i].rdata);
 					reader =  reader + stop;
-					serial = get32b(reader);
+					serial = get32b((char *)reader);
 					JU_NC(SERIAL, serial);
 					reader =  reader + 4;
 					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
@@ -2487,7 +2464,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			if ((len & 0xc0) != 0xc0)
 			{
 				/* Bad format */
-				strcpy(name, "format-error");
+				strcpy((char *)name, "format-error");
 				printf("format-error: len = %d\n",
 					len);
 				abort();
@@ -2497,7 +2474,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			offset= ((len & ~0xc0) << 8) | base[offset+1];
 			if (offset >= size)
 			{
-				strcpy(name, "offset-error");
+				strcpy((char *)name, "offset-error");
 				printf("offset-error\n");
 				abort();
 				return name;
@@ -2514,7 +2491,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		}
 		if (offset+len+1 > size)
 		{
-			strcpy(name, "buf-bounds-error");
+			strcpy((char *)name, "buf-bounds-error");
 			printf("buf-bounds-error\n");
 			abort();
 			return name;
@@ -2522,7 +2499,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 
 		if (p+len+1 > 255)
 		{
-			strcpy(name, "name-length-error");
+			strcpy((char *)name, "name-length-error");
 			printf("name-length-error\n");
 			abort();
 			return name;
