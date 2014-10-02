@@ -72,7 +72,9 @@ struct CronLine {
 	time_t end_time;
 	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
 	int distr_param;	/* Parameter for distribution, if any */
-	int distr_offset;	/* Current offset to randomize the interval */
+	struct timeval Xdistr_offset;	/* Current offset to randomize the
+					 * interval
+					 */
 	struct event event;
 	struct testops *testops;
 	void *teststate;
@@ -421,7 +423,8 @@ static void do_distr(CronLine *line)
 {
 	long n, r, modulus, max;
 
-	line->distr_offset= 0;		/* Safe default */
+	line->Xdistr_offset.tv_sec= 0;		/* Safe default */
+	line->Xdistr_offset.tv_usec= 0;
 	if (line->distribution == DISTR_UNIFORM)
 	{
 		/* Generate a random number in the range [0..distr_param] */
@@ -433,9 +436,11 @@ static void do_distr(CronLine *line)
 			r= random();
 		} while (r >= max);
 		r %= modulus;
-		line->distr_offset= r - line->distr_param/2;
+		line->Xdistr_offset.tv_sec= r - line->distr_param/2;
+		line->Xdistr_offset.tv_usec= random() % 1000000;
 	}
-	crondlog(LVL7 "do_distr: using %d", line->distr_offset);
+	crondlog(LVL7 "do_distr: using %f", line->Xdistr_offset.tv_sec + 
+		line->Xdistr_offset.tv_usec/1e6);
 }
 
 static void SynchronizeFile(const char *fileName)
@@ -662,14 +667,50 @@ static void SynchronizeDir(void)
 	DeleteFile();
 }
 
+static void set_timeout(CronLine *line, int init_next_cycle)
+{
+	struct timeval now, tv;
+
+	gettimeofday(&now, NULL);
+	if (now.tv_sec > line->end_time)
+		return;			/* This job has expired */
+
+	if (init_next_cycle)
+	{
+		if (now.tv_sec < line->start_time)
+			line->nextcycle= 0;
+		else
+		{
+			line->nextcycle= (now.tv_sec-line->start_time)/
+				line->interval + 1;
+		}
+		do_distr(line);
+	}
+
+	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
+		line->Xdistr_offset.tv_sec - now.tv_sec;
+	tv.tv_usec= line->Xdistr_offset.tv_usec - now.tv_usec;
+	if (tv.tv_usec < 0)
+	{
+		tv.tv_usec += 1e6;
+		tv.tv_sec--;
+	}
+	if (tv.tv_sec < 0)
+		tv.tv_sec= tv.tv_usec= 0;
+	crondlog(LVL7 "set_timeout: nextcycle %d, interval %d, start_time %d, distr_offset %f, now %d, tv_sec %d",
+		line->nextcycle, line->interval,
+		line->start_time,
+		line->Xdistr_offset.tv_sec + line->Xdistr_offset.tv_usec/1e6,
+		now.tv_sec, tv.tv_sec);
+	event_add(&line->event, &tv);
+}
+
 /*
  * Insert - insert if not already there
  */
 static int Insert(CronLine *line)
 {
 	CronLine *last;
-	struct timeval tv;
-	time_t now;
 
 	if (oldLine)
 	{
@@ -709,18 +750,7 @@ static int Insert(CronLine *line)
 		oldLine->needs_delete= 0;
 
 		/* Reschedule event */
-		now= time(NULL);
-		tv.tv_sec= oldLine->nextcycle*oldLine->interval +
-			oldLine->start_time +
-			oldLine->distr_offset - now;
-		if (tv.tv_sec < 0)
-			tv.tv_sec= 0;
-		tv.tv_usec= 0;
-		crondlog(LVL7 "Insert: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
-			oldLine->nextcycle, oldLine->interval,
-			oldLine->start_time, oldLine->distr_offset, now,
-			tv.tv_sec);
-		event_add(&oldLine->event, &tv);
+		set_timeout(oldLine, 0 /*!init_netcycle*/);
 
 		return 0;
 	}
@@ -736,9 +766,6 @@ static int Insert(CronLine *line)
 
 static void Start(CronLine *line)
 {
-	time_t now;
-	struct timeval tv;
-
 	line->testops= NULL;
 
 	/* Parse command line and init test */
@@ -746,26 +773,7 @@ static void Start(CronLine *line)
 	if (!line->testops)
 		return;			/* Test failed to initialize */
 
-	now= time(NULL);
-	if (now > line->end_time)
-		return;			/* This job has expired */
-
-	if (now < line->start_time)
-		line->nextcycle= 0;
-	else
-		line->nextcycle= (now-line->start_time)/line->interval + 1;
-	do_distr(line);
-
-	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
-		line->distr_offset - now;
-	if (tv.tv_sec < 0)
-		tv.tv_sec= 0;
-	tv.tv_usec= 0;
-	crondlog(LVL7 "Start: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
-		line->nextcycle, line->interval,
-		line->start_time, line->distr_offset, now,
-		tv.tv_sec);
-	event_add(&line->event, &tv);
+	set_timeout(line, 1 /*init_nextcycle*/);
 }
 
 /*
@@ -1164,27 +1172,28 @@ static void EndJob(const char *user, CronLine *line)
 static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	short __attribute__ ((unused)) what, void *arg)
 {
-	time_t now;
 	CronLine *line;
-	struct timeval tv;
+	struct timeval now;
 
 	line= arg;
 
-	now= time(NULL);
-
 	crondlog(LVL7 "RunJob for %p, '%s'\n", arg, line->cl_Shell);
-	crondlog(LVL7 "RubJob, now %d, end_time %d\n", now, line->end_time);
-	
-	if (now > line->end_time)
-	{
-		crondlog(LVL7 "RunJob: expired\n");
-		return;			/* This job has expired */
-	}
 
 	if (line->needs_delete)
 	{
 		crondlog(LVL7 "RunJob: needs delete\n");
 		return;			/* Line is to be deleted */
+	}
+
+	gettimeofday(&now, NULL);
+
+	crondlog(LVL7 "RubJob, now %d, end_time %d\n", now.tv_sec,
+		line->end_time);
+	
+	if (now.tv_sec > line->end_time)
+	{
+		crondlog(LVL7 "RunJob: expired\n");
+		return;			/* This job has expired */
 	}
 
 	if (!line->teststate)
@@ -1194,30 +1203,19 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 		return;
 	}
 
-	// crondlog(LVL8 "starting cmd '%s'\n", line->cl_Shell);
-
 	line->testops->start(line->teststate);
 
-	// crondlog(LVL8 "after cmd '%s'\n", line->cl_Shell);
-
 	line->nextcycle++;
-	if (line->start_time + line->nextcycle*line->interval < now)
+	if (line->start_time + line->nextcycle*line->interval < now.tv_sec)
 	{
 		crondlog(LVL7 "recomputing nextcycle");
-		line->nextcycle= (now-line->start_time)/line->interval + 1;
+		line->nextcycle= (now.tv_sec-line->start_time)/line->interval
+			+ 1;
 	}
 
 	do_distr(line);
-	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
-		line->distr_offset - now;
-	if (tv.tv_sec < 0)
-		tv.tv_sec= 0;
-	tv.tv_usec= 0;
-	crondlog(LVL7 "RunJob: nextcycle %d, interval %d, start_time %d, distr_offset %d, now %d, tv_sec %d",
-		line->nextcycle, line->interval,
-		line->start_time, line->distr_offset, now,
-		tv.tv_sec);
-	event_add(&line->event, &tv);
+
+	set_timeout(line, 0 /*!init_nextcycle*/);
 }
 
 #endif /* ENABLE_FEATURE_CROND_CALL_SENDMAIL */
