@@ -25,7 +25,7 @@
 #define IPV4_STATIC	ATLAS_STATUS "/network_v4_static_info.json"
 #define IPV6_STATIC	ATLAS_STATUS "/network_v6_static_info.json"
 #define DNS_STATIC	ATLAS_STATUS "/network_dns_static_info.json"
-#define NETWORK_INFO	ATLAS_STATUS "/network_info.txt"
+#define NETWORK_INFO	ATLAS_STATUS "/network_v4_info.txt"
 
 #define SAFE_PREFIX_N ATLAS_DATA_NEW
 
