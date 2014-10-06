@@ -580,7 +580,7 @@ static int report_line(FILE *of, const char *fn)
 {
 	FILE *f;
 	char *nl;
-	char line[256];
+	char line[512];
 
 	f= fopen(fn, "r");
 	if (f == NULL)
