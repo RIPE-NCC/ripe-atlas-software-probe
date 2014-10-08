@@ -132,7 +132,6 @@ int eooqd_main(int argc, char *argv[])
 	strlcat(state->curr_qfile, SUFFIX, sizeof(state->curr_qfile));
 
 	signal(SIGQUIT, SIG_DFL);
-	chdir("/home/atlas/data");
 	limit.rlim_cur= RLIM_INFINITY;
 	limit.rlim_max= RLIM_INFINITY;
 	setrlimit(RLIMIT_CORE, &limit);

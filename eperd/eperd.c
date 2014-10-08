@@ -252,6 +252,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned seed;
 	struct event *updateEventMin, *updateEventHour;
 	struct timeval tv;
+	struct rlimit limit;
 
 	const char *PidFileName = NULL;
 
@@ -291,6 +292,11 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	//signal(SIGHUP, SIG_IGN); /* ? original crond dies on HUP... */
 	xsetenv("SHELL", DEFAULT_SHELL); /* once, for all future children */
 	crondlog(LVL9 "crond (busybox "BB_VER") started, log level %d", LogLevel);
+
+	signal(SIGQUIT, SIG_DFL);
+	limit.rlim_cur= RLIM_INFINITY;
+	limit.rlim_max= RLIM_INFINITY;
+	setrlimit(RLIMIT_CORE, &limit);
 
 	/* Create libevent event base */
 	EventBase= event_base_new();
