@@ -72,7 +72,7 @@ struct CronLine {
 	time_t end_time;
 	enum distribution { DISTR_NONE, DISTR_UNIFORM } distribution;
 	int distr_param;	/* Parameter for distribution, if any */
-	struct timeval Xdistr_offset;	/* Current offset to randomize the
+	struct timeval distr_offset;	/* Current offset to randomize the
 					 * interval
 					 */
 	struct event event;
@@ -429,8 +429,8 @@ static void do_distr(CronLine *line)
 {
 	long n, r, modulus, max;
 
-	line->Xdistr_offset.tv_sec= 0;		/* Safe default */
-	line->Xdistr_offset.tv_usec= 0;
+	line->distr_offset.tv_sec= 0;		/* Safe default */
+	line->distr_offset.tv_usec= 0;
 	if (line->distribution == DISTR_UNIFORM)
 	{
 		/* Generate a random number in the range [0..distr_param] */
@@ -442,11 +442,11 @@ static void do_distr(CronLine *line)
 			r= random();
 		} while (r >= max);
 		r %= modulus;
-		line->Xdistr_offset.tv_sec= r - line->distr_param/2;
-		line->Xdistr_offset.tv_usec= random() % 1000000;
+		line->distr_offset.tv_sec= r - line->distr_param/2;
+		line->distr_offset.tv_usec= random() % 1000000;
 	}
-	crondlog(LVL7 "do_distr: using %f", line->Xdistr_offset.tv_sec + 
-		line->Xdistr_offset.tv_usec/1e6);
+	crondlog(LVL7 "do_distr: using %f", line->distr_offset.tv_sec + 
+		line->distr_offset.tv_usec/1e6);
 }
 
 static void SynchronizeFile(const char *fileName)
@@ -694,8 +694,8 @@ static void set_timeout(CronLine *line, int init_next_cycle)
 	}
 
 	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
-		line->Xdistr_offset.tv_sec - now.tv_sec;
-	tv.tv_usec= line->Xdistr_offset.tv_usec - now.tv_usec;
+		line->distr_offset.tv_sec - now.tv_sec;
+	tv.tv_usec= line->distr_offset.tv_usec - now.tv_usec;
 	if (tv.tv_usec < 0)
 	{
 		tv.tv_usec += 1e6;
@@ -706,7 +706,7 @@ static void set_timeout(CronLine *line, int init_next_cycle)
 	crondlog(LVL7 "set_timeout: nextcycle %d, interval %d, start_time %d, distr_offset %f, now %d, tv_sec %d",
 		line->nextcycle, line->interval,
 		line->start_time,
-		line->Xdistr_offset.tv_sec + line->Xdistr_offset.tv_usec/1e6,
+		line->distr_offset.tv_sec + line->distr_offset.tv_usec/1e6,
 		now.tv_sec, tv.tv_sec);
 	event_add(&line->event, &tv);
 }

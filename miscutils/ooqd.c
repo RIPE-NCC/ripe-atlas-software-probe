@@ -17,10 +17,15 @@ One-off queue daemon
 
 #define SAFE_PREFIX ATLAS_DATA_NEW
 
+#ifdef __uClinux__
+#define NO_FORK	1
+#endif
+
 static void process(FILE *file);
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
 
+int ooqd_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
 int ooqd_main(int argc, char *argv[])
 {
 	char *queue_file;
@@ -327,6 +332,9 @@ static void report_err(const char *fmt, ...)
 
 int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
 {
+#if NO_FORK
+	return 1;
+#else
 	pid_t pid;
 	int r, status;
 
@@ -352,4 +360,5 @@ int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
 	execv(WIFIMSM_PATH, argv);
 	report_err("wifimsm_main: execv '%s' failed", WIFIMSM_PATH);
 	return 1;
+#endif
 }
