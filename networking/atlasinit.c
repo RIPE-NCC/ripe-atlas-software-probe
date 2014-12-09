@@ -60,7 +60,7 @@ const char atlas_network_v4_static_info[] = "/home/atlas/status/network_v4_stati
 const char atlas_network_v4_static_info_json[] = "/home/atlas/status/network_v4_static_info.json";
 const char atlas_network_v6_static_info[] = "/home/atlas/status/network_v6_static_info.txt";
 const char atlas_network_v6_static_info_json[] = "/home/atlas/status/network_v6_static_info.json";
-const char atlas_network_dns_static_info[] = "/home/atlas/status/network_dns_static_info.txt";
+// const char atlas_network_dns_static_info[] = "/home/atlas/status/network_dns_static_info.txt";
 const char atlas_network_dns_static_info_json[] = "/home/atlas/status/network_dns_static_info.json";
 
 const int max_lines = 16; /* maximum lines we'll process */
@@ -618,7 +618,8 @@ static int reg_init_main( int argc, char *argv[] )
 			}
 			else if( strncmp(line,"DNS_SERVERS ", 11)==0 ) 
 			{
-				FILE *f, *f1, *f2;
+				FILE *f, *f2;
+				// FILE *f1;
 
 				f = fopen(atlas_resolv_conf, "wt");
 				if( f==NULL ) {
@@ -628,6 +629,7 @@ static int reg_init_main( int argc, char *argv[] )
                                         return 1;
                                 }
 
+#if 0
 				f1 = fopen(atlas_network_dns_static_info, "wt");
 				if( f1==NULL ) {
                                         atlas_log(ERROR,
@@ -636,6 +638,7 @@ static int reg_init_main( int argc, char *argv[] )
 					fclose(f);
                                         return 1;
                                 }
+#endif
 				f2 = fopen(atlas_network_dns_static_info_json,
 					"wt");
 				if( f2==NULL ) {
@@ -643,7 +646,7 @@ static int reg_init_main( int argc, char *argv[] )
 						"Unable to create  %s\n",
 					atlas_network_dns_static_info_json);
 					fclose(f);
-					fclose(f1);
+					// fclose(f1);
                                         return 1;
                                 }
 
@@ -652,25 +655,25 @@ static int reg_init_main( int argc, char *argv[] )
 				//DNS_SERVERS 8.8.8.8 194.109.6.66
 				// fprintf (f, "%s\n", line);
 				token = strtok(line+11, search_nl); //
-			 	fprintf (f1, "STATIC_DNS");
+			 	// fprintf (f1, "STATIC_DNS");
 				fprintf(f2, DBQ(static-dns) ": [ ");
 
 				first= 1;
 				while  (token != NULL) 
 				{
 			 		fprintf (f, "nameserver %s\n", token);
-					fprintf (f1, " %s", token);
+					// fprintf (f1, " %s", token);
 					fprintf(f2, "%s{ " DBQ(nameserver) ": "
 						DBQ(%s) " }",
 						first ? "" : ", ", token);
 					token = strtok(NULL, search_nl);
 					first= 0;
 				}
-				fprintf (f1, "\n");
+				// fprintf (f1, "\n");
 				fprintf(f2, " ]\n");
 
 				fclose(f);
-				fclose(f1);
+				// fclose(f1);
 				fclose(f2);
 
 				do_rm_dns_static_info= 0;
@@ -698,7 +701,7 @@ static int reg_init_main( int argc, char *argv[] )
 		}
 		if (do_rm_dns_static_info)
 		{
-			unlink(atlas_network_dns_static_info);
+			// unlink(atlas_network_dns_static_info);
 			unlink(atlas_network_dns_static_info_json);
 		}
 	}
