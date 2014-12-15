@@ -56,6 +56,7 @@
 #define O_CLASS 1008
 #define O_QUERY 1009
 #define O_OUTPUT_COBINED 1101
+#define O_CD 1010
 
 #define DNS_FLAG_RD 0x0100
 
@@ -287,6 +288,7 @@ struct query_state {
 	int opt_abuf;
 	int opt_resolv_conf;
 	int opt_rd;
+	int opt_cd;
 	int opt_prepend_probe_id;
 	int opt_evdns;
 	int opt_rset;
@@ -474,6 +476,7 @@ static struct option longopts[]=
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
 	{ "do", no_argument, NULL, 'd' },
+	{ "cd", no_argument, NULL, 'O_CD'},
  	
 	{ "retry",  required_argument, NULL, O_RETRY },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
@@ -689,9 +692,12 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 	dns->ns_count = 0;
 	dns->add_count = htons(0);
 
-	if (qry->opt_resolv_conf ||  qry->opt_rd ){
+	if (qry->opt_resolv_conf ||  qry->opt_rd ) {
 		dns->rd = 1;
 	}
+
+	if (qry->opt_cd)
+		dns->cd = 1;
 
 	//point to the query portion
 	qname =(u_char *)&packet[sizeof(struct DNS_HEADER)];
@@ -1309,6 +1315,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
+	qry->opt_cd = 0;
 	qry->opt_evdns = 0;
 	qry->opt_rset = 0;
 	qry->opt_prepend_probe_id = 0;
@@ -1439,6 +1446,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 					tdig_delete(qry);
 					return (0);
 				}
+				break;
+
+			case 'O_CD':
+				qry->opt_cd = 1;
 				break;
 
 			case 'O_CLASS':
