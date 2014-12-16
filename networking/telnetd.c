@@ -2,6 +2,7 @@
 /*
  * Simple telnet server
  * Bjorn Wesen, Axis Communications AB (bjornw@axis.com)
+ * Copyright (c) 2014 RIPE NCC <atlas@ripe.net>
  *
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  *

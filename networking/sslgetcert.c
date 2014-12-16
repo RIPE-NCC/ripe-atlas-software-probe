@@ -1,4 +1,6 @@
-/* Simple SSL client to get server certificates */
+/* Simple SSL client to get server certificates 
+ * Copyright (c) 2014 RIPE NCC <atlas@ripe.net>
+ */
 
 #include "libbb.h"
 

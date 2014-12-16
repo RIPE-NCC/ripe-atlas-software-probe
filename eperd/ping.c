@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
+ * Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
  * Copyright (c) 2009 Rocco Carbone
  * This includes code  Copyright (c) 2009 Rocco Carbone
  * taken from the libevent-based ping.

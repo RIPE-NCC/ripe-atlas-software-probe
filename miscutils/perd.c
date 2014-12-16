@@ -7,6 +7,7 @@
  * run as root, but NOT setuid root
  *
  * Copyright 1994 Matthew Dillon (dillon@apollo.west.oic.com)
+ * Copyright (c) 2014 RIPE NCC <atlas@ripe.net>
  * (version 2.3.2)
  * Vladimir Oleynik <dzo@simtreas.ru> (C) 2002
  *

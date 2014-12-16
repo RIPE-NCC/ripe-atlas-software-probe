@@ -1,8 +1,7 @@
 /*
-ooqd.c 
-
-One-off queue daemon
-*/
+ * ooqd.c One-off queue daemon
+ * Copyright (c) 2011-2014 RIPE NCC <atlas@ripe.net>
+ */
 
 #include <stdio.h>
 #include <string.h>

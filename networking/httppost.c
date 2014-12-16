@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 RIPE NCC <atlas@ripe.net>
+ * Copyright (c) 2011-2014 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * httppost.c -- Simple program that uses the HTTP POST command
 */

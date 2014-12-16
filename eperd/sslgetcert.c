@@ -1,6 +1,6 @@
 /*
 sslgetcert.c -- libevent-based version of sslgetcert
-
+Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
 Created:	April 2013 by Philip Homburg for RIPE NCC
 */
 
