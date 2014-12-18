@@ -475,7 +475,9 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	/* The ICMP header (no checksum here until user data has been filled in) */
 	icmp->icmp_type = ICMP_ECHO;             /* type of message */
 	icmp->icmp_code = 0;                     /* type sub code */
-	icmp->icmp_id   = 0xffff & pid;          /* unique process identifier */
+
+	/* Keep the high nibble clear for traceroute */
+	icmp->icmp_id   = 0x0fff & pid;          /* unique process identifier */
 	icmp->icmp_seq  = htons(seq);            /* message identifier */
 
 	/* User data */

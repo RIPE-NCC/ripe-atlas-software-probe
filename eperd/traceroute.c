@@ -1021,7 +1021,8 @@ static void send_pkt(struct trtstate *state)
 			icmp_hdr->icmp_type= ICMP_ECHO;
 			icmp_hdr->icmp_code= 0;
 			icmp_hdr->icmp_cksum= 0;
-			icmp_hdr->icmp_id= htons(state->index);
+			icmp_hdr->icmp_id= htons(state->index | 
+				(instance_id << TRT_ICMP4_INSTANCE_ID_SHIFT));
 			icmp_hdr->icmp_seq= htons(state->seq);
 			icmp_hdr->icmp_data[0]= '\0';
 			icmp_hdr->icmp_data[1]= '\0';
@@ -1857,6 +1858,12 @@ printf("curpacksize: %d\n", state->curpacksize);
 			}
 
 			ind= ntohs(eicmp->icmp_id);
+			if ((ind >> TRT_ICMP4_INSTANCE_ID_SHIFT) != instance_id)
+			{
+				printf("wrong instance id\n");
+				return;
+			}
+			ind &= ~TRT_ICMP4_INSTANCE_ID_MASK;
 
 			if (ind >= base->tabsiz)
 			{
@@ -2134,6 +2141,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		}
 
 		ind= ntohs(icmp->icmp_id);
+		if ((ind >> TRT_ICMP4_INSTANCE_ID_SHIFT) != instance_id)
+		{
+			printf("wrong instance id\n");
+			return;
+		}
+		ind &= ~TRT_ICMP4_INSTANCE_ID_MASK;
 
 		if (ind >= base->tabsiz)
 		{
