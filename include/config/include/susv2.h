@@ -1,1 +1,0 @@
-#define CONFIG_INCLUDE_SUSv2 1

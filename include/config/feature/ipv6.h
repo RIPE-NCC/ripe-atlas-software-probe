@@ -1,1 +1,0 @@
-#define CONFIG_FEATURE_IPV6 1

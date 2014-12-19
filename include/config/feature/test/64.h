@@ -1,1 +1,0 @@
-#define CONFIG_FEATURE_TEST_64 1

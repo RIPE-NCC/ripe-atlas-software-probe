@@ -1,1 +1,0 @@
-#define CONFIG_BB_SYSCTL 1

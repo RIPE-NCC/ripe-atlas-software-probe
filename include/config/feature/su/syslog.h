@@ -1,1 +1,0 @@
-#define CONFIG_FEATURE_SU_SYSLOG 1

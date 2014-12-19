@@ -1,1 +1,0 @@
-#define CONFIG_SCRIPT 1

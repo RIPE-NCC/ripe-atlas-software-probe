@@ -1,1 +1,0 @@
-#define CONFIG_UNIX2DOS 1

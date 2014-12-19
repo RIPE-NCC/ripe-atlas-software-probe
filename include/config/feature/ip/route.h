@@ -1,1 +1,0 @@
-#define CONFIG_FEATURE_IP_ROUTE 1
