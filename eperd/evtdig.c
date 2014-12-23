@@ -122,9 +122,6 @@
 #define T_DNAME ns_t_dname
 #endif 
 
-
-
-
 #ifndef ns_t_dlv
 #define ns_t_dlv   32769
 #endif
@@ -132,7 +129,6 @@
 #ifndef T_DLV
 #define T_DLV ns_t_dlv
 #endif 
-
 
 #ifndef ns_t_ds
 #define ns_t_ds   43
@@ -264,14 +260,10 @@ struct query_state {
 
 	struct tdig_base *base;
 	char * name;                /* Host identifier as given by the user */
-	char * fqname;              /* Full qualified hostname          */ 
-	char * ipname;              /* Remote address in dot notation   */
 	char * infname;		    /* Bind to this interface (or address) */
 	u_int16_t qryid;            /* query id 16 bit */
 	struct event event;         /* Used to detect read events on udp socket   */
-	int udp_fd;		    /* udp_fd and tcp_fd should be merged */
-	int tcp_fd;
-	FILE *tcp_file;
+	int udp_fd;		    /* udp_fd */
 	int wire_size;
 
 	struct bufferevent *bev_tcp;
@@ -780,7 +772,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 
 
 
-/* Attempt to transmit a UDP DNS Request to a serveri. TCP is else where */
+/* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
 	int fd;
@@ -1296,9 +1288,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->str_Atlas = NULL;
 	qry->out_filename = NULL;
 	qry->opt_proto = 17; 
-	qry->tcp_file = NULL;
 	qry->udp_fd = -1;
-	qry->tcp_fd = -1;
 	qry->server_name = NULL;
 	qry->str_Atlas = NULL;
 	qry->infname = NULL;
