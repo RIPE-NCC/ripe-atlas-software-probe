@@ -76,6 +76,8 @@ struct state
 	char *infname;
 	char only_v4;
 	char only_v6;
+	char major_version;
+	char minor_version;
 
 	/* State */
 	char busy;
@@ -104,6 +106,8 @@ struct state
 	double resptime;
 	FILE *post_fh;
 	char *post_buf;
+	char recv_major;
+	char recv_minor;
 
 	struct buf inbuf;
 	struct msgbuf msginbuf;
@@ -351,7 +355,8 @@ static void msgbuf_add(struct msgbuf *msgbuf, void *buf, size_t size)
 	buf_add(&msgbuf->buffer, buf, size);
 }
 
-static int msgbuf_read(struct msgbuf *msgbuf, int type)
+static int msgbuf_read(struct msgbuf *msgbuf, int type,
+	char *majorp, char *minorp)
 {
 	int r;
 	size_t len;
@@ -378,13 +383,8 @@ static int msgbuf_read(struct msgbuf *msgbuf, int type)
 			fprintf(stderr, "msgbuf_read: got type %d\n", p[0]);
 			return -1;
 		}
-		if (p[1] != 3 || p[2] != 0)
-		{
-			fprintf(stderr,
-				"msgbuf_read: got bad major/minor %d.%d\n",
-				p[1], p[2]);
-			return -1;
-		}
+		*majorp= p[1];
+		*minorp= p[2];
 		len= (p[3] << 8) + p[4];
 		if (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5 + len)
 		{
@@ -601,15 +601,16 @@ static void timeout_callback(int __attribute((unused)) unused,
 static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state))
 {
-	int c, i, only_v4, only_v6;
+	int c, i, only_v4, only_v6, major, minor;
 	size_t newsiz;
-	char *hostname, *str_port, *infname;
+	char *hostname, *str_port, *infname, *version_str;
 	char *output_file, *A_arg;
 	struct state *state;
 	FILE *fh;
 
 	/* Arguments */
 	output_file= NULL;
+	version_str= NULL;
 	A_arg= NULL;
 	infname= NULL;
 	str_port= NULL;
@@ -626,7 +627,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "A:O:i:p:46", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "A:O:V:i:p:46", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -635,6 +636,9 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'O':
 			output_file= optarg;
+			break;
+		case 'V':
+			version_str= optarg;
 			break;
 		case 'i':
 			infname= optarg;
@@ -689,12 +693,40 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+	if (version_str == NULL || strcasecmp(version_str, "TLS1.2") == 0)
+	{
+		major= 3;	/* TLS 1.2 */
+		minor= 3;	
+	}
+	else if (strcasecmp(version_str, "TLS1.1") == 0)
+	{
+		major= 3;
+		minor= 2;	
+	}
+	else if (strcasecmp(version_str, "TLS1.0") == 0)
+	{
+		major= 3;
+		minor= 1;	
+	}
+	else if (strcasecmp(version_str, "SSL3.0") == 0)
+	{
+		major= 3;
+		minor= 0;	
+	}
+	else 
+	{
+		crondlog(LVL8 "bad protocol version '%s'", version_str);
+		return NULL;
+	}
+
 	state= xzalloc(sizeof(*state));
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
 	state->output_file= output_file ? strdup(output_file) : NULL;
 	state->infname= infname ? strdup(infname) : NULL;
 	state->hostname= strdup(hostname);
+	state->major_version= major;
+	state->minor_version= minor;
 	if (str_port)
 		state->portname= strdup(str_port);
 	else
@@ -879,7 +911,8 @@ static int eat_server_hello(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE);
+			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				fprintf(stderr,
@@ -899,7 +932,8 @@ static int eat_server_hello(struct state *state)
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE);
+			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				fprintf(stderr,
@@ -916,8 +950,9 @@ static int eat_server_hello(struct state *state)
 
 static int eat_certificate(struct state *state)
 {
-	int i, n, r, first, slen, need_nl;
+	int i, n, r, first, slen, need_nl, major, minor;
 	size_t o, len;
+	const char *method;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
 	FILE *fh;
@@ -932,7 +967,8 @@ static int eat_certificate(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE);
+			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				if (errno != EAGAIN)
@@ -954,7 +990,8 @@ static int eat_certificate(struct state *state)
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE);
+			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				fprintf(stderr,
@@ -996,8 +1033,39 @@ static int eat_certificate(struct state *state)
 			DBQ(dst_port) ":" DBQ(%s),
 			state->hostname, state->portname);
 
-		fprintf(fh, ", " DBQ(method) ":" DBQ(SSL) ", "
-			DBQ(ver) ":" DBQ(3.0));
+		if (state->recv_major == 3 && state->recv_minor == 3)
+		{
+			method= "TLS";
+			major= 1;
+			minor= 2;
+		}
+		else if (state->recv_major == 3 && state->recv_minor == 2)
+		{
+			method= "TLS";
+			major= 1;
+			minor= 1;
+		}
+		else if (state->recv_major == 3 && state->recv_minor == 1)
+		{
+			method= "TLS";
+			major= 1;
+			minor= 0;
+		}
+		else if (state->recv_major == 3 && state->recv_minor == 0)
+		{
+			method= "SSL";
+			major= 3;
+			minor= 0;
+		}
+		else
+		{
+			method= "(unknown)";
+			major= state->recv_major;
+			minor= state->recv_minor;
+		}
+
+		fprintf(fh, ", " DBQ(method) ":" DBQ(%s) ", "
+			DBQ(ver) ":" DBQ(%d.%d), method, major, minor);
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
 			hostbuf, sizeof(hostbuf), NULL, 0,
 			NI_NUMERICHOST);
@@ -1077,6 +1145,7 @@ static int eat_certificate(struct state *state)
 
 static void writecb(struct bufferevent *bev, void *ptr)
 {
+	char c;
 	struct state *state;
 	struct buf outbuf;
 	struct msgbuf msgoutbuf;
@@ -1096,8 +1165,11 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			hsbuf_init(&hsbuf);
 
 			/* Major/minor */
-			hsbuf_add(&hsbuf, "\3", 1);
-			hsbuf_add(&hsbuf, "\0", 1);
+			c= state->major_version;
+			hsbuf_add(&hsbuf, &c, 1);
+
+			c= state->minor_version;
+			hsbuf_add(&hsbuf, &c, 1);
 			add_random(&hsbuf);
 			add_sessionid(&hsbuf);
 			add_ciphers(&hsbuf);
