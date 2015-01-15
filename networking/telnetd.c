@@ -1268,7 +1268,7 @@ static void end_crontab(struct tsession *ts)
 	strlcpy(filename1, atlas_dirname, sizeof(filename1));
 	strlcat(filename1, CRONUPDATE, sizeof(filename1));
 
-	while (fd= open(filename1, O_WRONLY|O_CREAT|O_TRUNC, 0600), fd >= 0)
+	while (fd= open(filename1, O_WRONLY|O_CREAT|O_TRUNC, 0644), fd >= 0)
 	{
 		len= strlen(UPDATELINE);
 		if (write(fd, UPDATELINE, len) != len)
