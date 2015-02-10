@@ -90,7 +90,11 @@ void tu_restart_connect(struct tu_env *env)
 		}
 
 		/* Immediate error? */
-		printf("connect error\n");
+		if (!env->dns_curr)
+		{
+			/* Callback cleaned up */
+			return;
+		}
 		env->dns_curr= env->dns_curr->ai_next;
 	}
 
