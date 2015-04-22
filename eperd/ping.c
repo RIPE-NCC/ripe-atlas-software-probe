@@ -709,11 +709,11 @@ printf("ready_callback4: too short\n");
 	icmp = (struct icmphdr *) (base->packet + hlen);
 
 	/* Check the ICMP header to drop unexpected packets due to unrecognized id */
-	if (icmp->un.echo.id != base->pid)
+	if (icmp->un.echo.id != (base->pid & 0x0fff))
 	  {
 #if 0
 		printf("ready_callback4: bad pid: got %d, expect %d\n",
-			icmp->un.echo.id, base->pid);
+			icmp->un.echo.id, base->pid & 0x0fff);
 #endif
 	    goto done;
 	  }
