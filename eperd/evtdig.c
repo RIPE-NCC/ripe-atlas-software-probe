@@ -1164,7 +1164,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	int nrecv;
 	struct timeval rectime;
 
-	printf("in ready_callback\n");
+	// printf("in ready_callback\n");
 
 	qry = arg;
 	
