@@ -91,14 +91,14 @@ struct CronLine {
 
 
 enum {
-	OPT_l = (1 << 0),
-	OPT_L = (1 << 1),
-	OPT_f = (1 << 2),
-	OPT_b = (1 << 3),
-	OPT_S = (1 << 4),
-	OPT_c = (1 << 5),
-	OPT_A = (1 << 6),
-	OPT_D = (1 << 7),
+	OPT_i = (1 << 0),
+	OPT_l = (1 << 1),
+	OPT_L = (1 << 2),
+	OPT_f = (1 << 3),
+	OPT_c = (1 << 4),
+	OPT_A = (1 << 5),
+	OPT_D = (1 << 6),
+	OPT_P = (1 << 7),
 	OPT_d = (1 << 8) * ENABLE_FEATURE_CROND_D,
 };
 #if ENABLE_FEATURE_CROND_D
@@ -196,8 +196,11 @@ static void kick_watchdog(void)
 	if(do_kick_watchdog) 
 	{
 		int fdwatchdog = open("/dev/watchdog", O_RDWR);
-		write(fdwatchdog, "1", 1);
-		close(fdwatchdog);
+		if (fdwatchdog != -1)
+		{
+			write(fdwatchdog, "1", 1);
+			close(fdwatchdog);
+		}
 	}
 }
 
@@ -263,7 +266,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			"i:+:l+:d+"; /* -i, -l and -d have numeric param */
-	opt = getopt32(argv, "i:l:L:fbSc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
+	opt = getopt32(argv, "i:l:L:fc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
 			&instance_id, &LogLevel, &LogFile, &CDir,
 			&atlas_id, &PidFileName
 			USE_FEATURE_PERD_D(,&LogLevel), &out_filename);
