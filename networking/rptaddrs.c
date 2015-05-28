@@ -285,6 +285,14 @@ static int setup_dhcpv4(FILE *of)
 	in_file= fopen(NETWORK_INFO, "r");
 	if (in_file == NULL)
 	{
+		if (errno == ENOENT)
+		{
+			/* Probe is configure for DHCP but didn't get a 
+			 * DHCP lease.
+			 */
+			fprintf(of, ", " DBQ(inet-dhcp) ": true");
+			return 0;
+		}
 		report_err("unable to open '%s'", NETWORK_INFO);
 		return -1;
 	}
