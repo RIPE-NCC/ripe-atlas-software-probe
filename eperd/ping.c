@@ -475,7 +475,9 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	/* The ICMP header (no checksum here until user data has been filled in) */
 	icmp->icmp_type = ICMP_ECHO;             /* type of message */
 	icmp->icmp_code = 0;                     /* type sub code */
-	icmp->icmp_id   = 0xffff & pid;          /* unique process identifier */
+
+	/* Keep the high nibble clear for traceroute */
+	icmp->icmp_id   = 0x0fff & pid;          /* unique process identifier */
 	icmp->icmp_seq  = htons(seq);            /* message identifier */
 
 	/* User data */
@@ -707,11 +709,11 @@ printf("ready_callback4: too short\n");
 	icmp = (struct icmphdr *) (base->packet + hlen);
 
 	/* Check the ICMP header to drop unexpected packets due to unrecognized id */
-	if (icmp->un.echo.id != base->pid)
+	if (icmp->un.echo.id != (base->pid & 0x0fff))
 	  {
 #if 0
 		printf("ready_callback4: bad pid: got %d, expect %d\n",
-			icmp->un.echo.id, base->pid);
+			icmp->un.echo.id, base->pid & 0x0fff);
 #endif
 	    goto done;
 	  }

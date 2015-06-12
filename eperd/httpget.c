@@ -310,6 +310,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	struct hgstate *state;
+	char errline[256];
 
 	state= ENV2STATE(s);
 
@@ -349,7 +350,16 @@ static void timeout_callback(int __attribute((unused)) unused,
 		if (state->max_body)
 			add_str(s, " ]");
 #endif
+#if 1
+		snprintf(errline, sizeof(errline), 
+			DBQ(err) ":"
+	DBQ(timeout reading chunk: state %d linelen %d lineoffset %d)
+			", ",
+			state->readstate, state->linelen, state->lineoffset);
+		add_str(state, errline);
+#else
 		add_str(state, DBQ(err) ":" DBQ(timeout reading chunk) ", ");
+#endif
 		report(state);
 		break;
 	default:

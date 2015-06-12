@@ -88,22 +88,36 @@ int eooqd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int eooqd_main(int argc, char *argv[])
 {
 	int r;
-	char *pid_file_name;
+	char *pid_file_name, *instance_id_str;
+	char *check;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
 	struct rlimit limit;
 
 	atlas_id= NULL;
+	instance_id_str= NULL;
 	pid_file_name= NULL;
 	queue_id= "";
 
-	(void)getopt32(argv, "A:P:q:", &atlas_id, &pid_file_name,
-		&queue_id);
+	(void)getopt32(argv, "A:i:P:q:", &atlas_id, &instance_id_str,
+		&pid_file_name, &queue_id);
 
 	if (argc != optind+1)
 	{
 		bb_show_usage();
 		return 1;
+	}
+
+	instance_id= 0;
+	if (instance_id_str)
+	{
+		instance_id= strtoul(instance_id_str, &check, 0);
+		if (check[0] != '\0')
+		{
+			report("unable to parse instance id '%s'",
+				instance_id_str);
+			return 1;
+		}
 	}
 
 	if(pid_file_name)

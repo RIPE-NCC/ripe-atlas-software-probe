@@ -12,6 +12,7 @@ struct globals {
 	const char *CDir; /* = CRONTABS; */
 	CronLine *LineBase;
 	CronLine *oldLine;
+	unsigned instance_id;
 	struct event_base *EventBase;
 	struct evdns_base *DnsBase;
 };
@@ -22,8 +23,12 @@ extern struct globals G;
 #define LineBase           (G.LineBase               )
 #define FileBase           (G.FileBase               )
 #define oldLine            (G.oldLine                )
+#define instance_id        (G.instance_id                )
 #define EventBase          (G.EventBase              )
 #define DnsBase            (G.DnsBase                )
+
+#define TRT_ICMP4_INSTANCE_ID_SHIFT	    12
+#define TRT_ICMP4_INSTANCE_ID_MASK	0xf000
 
 #define LVL5  "\x05"
 #define LVL7  "\x07"
