@@ -193,6 +193,20 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 
 	if (!state->curr_file)
 	{
+		/* Remove curr_qfile. Renaming queue_file to curr_qfile 
+		 * will silently fail to delete queue_file if queue_file and
+		 * curr_qfile are hard links.
+		 */
+		if (unlink(state->curr_qfile) == -1)
+		{
+			/* Expect ENOENT */
+			if (errno != ENOENT)
+			{
+				report_err("unlink failed");
+				return;
+			}
+		}
+
 		/* Try to move queue_file to curr_qfile. This provides at most
 		 * once behavior and allows producers to create a new
 		 * queue_file while we process the old one.

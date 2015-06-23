@@ -50,6 +50,20 @@ int ooqd_main(int argc, char *argv[])
 
 	for(;;)
 	{
+		/* Remove curr_qfile. Renaming queue_file to curr_qfile 
+		 * will silently fail to delete queue_file if queue_file and
+		 * curr_qfile are hard links.
+		 */
+		if (unlink(curr_qfile) == -1)
+		{
+			/* Expect ENOENT */
+			if (errno != ENOENT)
+			{
+				report_err("unlink failed");
+				return 1;
+			}
+		}
+
 		/* Try to move queue_file to curr_qfile. This provide at most
 		 * once behavior and allows producers to create a new
 		 * queue_file while we process the old one.
