@@ -2278,12 +2278,52 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	}
 }
 
+static void report_hdropts(struct trtstate *state, unsigned char *s, 
+	unsigned char *e)
+{
+	int o, len, mss;
+	unsigned char *orig_s;
+	char line[80];
+
+	add_str(state, ", " DBQ(hdropts) ": [ ");
+	orig_s= s;
+	while (s<e)
+	{
+		o= *s;
+		switch(o)
+		{
+		case 2:
+			len= s[1];
+			if (len < 4 || s+len > e)
+			{
+				printf("report_hdropts: bad option\n");
+				break;
+			}
+			mss= (s[2] << 8) | s[3];
+			snprintf(line, sizeof(line),
+				"%s{ " DBQ(mss) ":%d }",
+				s != orig_s ? ", " : "", mss);
+			add_str(state, line);
+			s += len;
+			continue;
+		default:
+			snprintf(line, sizeof(line),
+				"%s{ " DBQ(unknown-opt) ":%d }",
+				s != orig_s ? ", " : "", o);
+			add_str(state, line);
+			break;
+		}
+		break;
+	}
+	add_str(state, " ]");
+}
+
 static void ready_tcp4(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	uint16_t myport;
 	socklen_t slen;
-	int hlen, late, isDup;
+	int hlen, late, isDup, tcp_hlen;
 	unsigned ind, seq;
 	ssize_t nrecv;
 	struct trtbase *base;
@@ -2291,6 +2331,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	struct ip *ip;
 	double ms;
 	struct tcphdr *tcphdr;
+	unsigned char *e, *p;
 	struct sockaddr_in remote;
 	struct timeval now;
 	struct timeval interval;
@@ -2322,6 +2363,14 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	}
 
 	tcphdr= (struct tcphdr *)(base->packet+hlen);
+
+	tcp_hlen= tcphdr->doff * 4;
+	if (nrecv < hlen + tcp_hlen || tcphdr->doff < 5)
+	{
+		/* Short packet */
+		printf("ready_tcp4: too short %d\n", (int)nrecv);
+		return;
+	}
 
 	/* Quick check if the port is in range */
 	myport= ntohs(tcphdr->dest);
@@ -2407,6 +2456,13 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		(tcphdr->urg ? "U" : ""));
 	add_str(state, line);
 
+	if (tcp_hlen > sizeof(*tcphdr))
+	{
+		p= (unsigned char *)&tcphdr[1];
+		e= ((unsigned char *)tcphdr) + tcp_hlen;
+		report_hdropts(state, p, e);
+	}
+
 	if (!late)
 	{
 		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
@@ -2446,12 +2502,13 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	uint16_t myport;
-	int late, isDup, rcvdttl;
+	int late, isDup, rcvdttl, tcp_hlen;
 	unsigned ind, seq;
 	ssize_t nrecv;
 	struct trtbase *base;
 	struct trtstate *state;
 	double ms;
+	unsigned char *e, *p;
 	struct tcphdr *tcphdr;
 	struct cmsghdr *cmsgptr;
 	struct msghdr msg;
@@ -2508,6 +2565,14 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	}
 
 	tcphdr= (struct tcphdr *)(base->packet);
+
+	tcp_hlen= tcphdr->doff * 4;
+	if (nrecv < tcp_hlen || tcphdr->doff < 5)
+	{
+		/* Short packet */
+		printf("ready_tcp6: too short %d\n", (int)nrecv);
+		return;
+	}
 
 	/* Quick check if the port is in range */
 	myport= ntohs(tcphdr->dest);
@@ -2590,6 +2655,14 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 		(tcphdr->ack ? "A" : ""),
 		(tcphdr->urg ? "U" : ""));
 	add_str(state, line);
+
+	if (tcp_hlen > sizeof(*tcphdr))
+	{
+		p= (unsigned char *)&tcphdr[1];
+		e= ((unsigned char *)tcphdr) + tcp_hlen;
+		report_hdropts(state, p, e);
+	}
+
 	if (!late)
 	{
 		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
