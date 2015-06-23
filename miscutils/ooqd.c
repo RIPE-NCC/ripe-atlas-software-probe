@@ -29,6 +29,7 @@ int ooqd_main(int argc, char *argv[])
 {
 	char *queue_file;
 	FILE *file;
+	struct stat sb;
 	char curr_qfile[256];
 
 	if (argc != 2)
@@ -50,6 +51,17 @@ int ooqd_main(int argc, char *argv[])
 
 	for(;;)
 	{
+		if (stat(queue_file, &sb) == -1)
+		{
+			if (errno == ENOENT)
+			{
+				sleep(WAIT_TIME);
+				continue;
+			}
+			report_err("stat failed");
+			return 1;
+		}
+
 		/* Remove curr_qfile. Renaming queue_file to curr_qfile 
 		 * will silently fail to delete queue_file if queue_file and
 		 * curr_qfile are hard links.
@@ -70,11 +82,6 @@ int ooqd_main(int argc, char *argv[])
 		 */
 		if (rename(queue_file, curr_qfile) == -1)
 		{
-			if (errno == ENOENT)
-			{
-				sleep(WAIT_TIME);
-				continue;
-			}
 			report_err("rename failed");
 			return 1;
 		}
