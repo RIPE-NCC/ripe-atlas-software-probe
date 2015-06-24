@@ -142,7 +142,7 @@ struct trtstate
 	struct evutil_addrinfo *dns_curr;
 
 	time_t starttime;
-	struct timeval xmit_time;
+	struct timespec xmit_time;
 
 	struct event timer;
 
@@ -185,7 +185,7 @@ struct v6info
 	uint32_t pid;
 	uint32_t id;
 	uint32_t seq;
-	struct timeval tv;
+	struct timespec tv;
 };
 
 static int create_socket(struct trtstate *state, int do_tcp);
@@ -520,7 +520,7 @@ static void send_pkt(struct trtstate *state)
 	}
 	state->seq++;
 
-	gettimeofday(&state->xmit_time, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &state->xmit_time);
 
 	if (state->sin6.sin6_family == AF_INET6)
 	{
@@ -1362,11 +1362,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 	struct tcphdr *etcp;
 	struct udphdr *eudp;
 	double ms;
-	struct timeval now, interval;
+	struct timespec now;
+	struct timeval interval;
 	struct sockaddr_in remote;
 	char line[80];
 
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	state= s;
 	base= state->base;
@@ -1510,7 +1511,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				state->last_response_hop= state->hop;
 
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 				(late || isDup) ? ", " : "",
@@ -1724,7 +1725,7 @@ printf("curpacksize: %d\n", state->curpacksize);
 				state->last_response_hop= state->hop;
 
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 				(late || isDup) ? ", " : "",
@@ -1952,7 +1953,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 				state->last_response_hop= state->hop;
 
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-				(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 				(late || isDup) ? ", " : "",
@@ -2223,7 +2224,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		}
 
 		ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-			(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+			(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 			(late || isDup) ? ", " : "",
@@ -2333,11 +2334,11 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	struct tcphdr *tcphdr;
 	unsigned char *e, *p;
 	struct sockaddr_in remote;
-	struct timeval now;
+	struct timespec now;
 	struct timeval interval;
 	char line[80];
 
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	state= s;
 	base= state->base;
@@ -2438,7 +2439,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	}
 
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-		(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+		(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 	snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 		(late || isDup) ? ", " : "",
@@ -2515,13 +2516,13 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	struct iovec iov[1];
 	struct sockaddr_in6 remote;
 	struct in6_addr dstaddr;
-	struct timeval now;
+	struct timespec now;
 	struct timeval interval;
 	char buf[INET6_ADDRSTRLEN];
 	char line[80];
 	char cmsgbuf[256];
 
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	state= s;
 	base= state->base;
@@ -2638,7 +2639,7 @@ printf("got seq %d, expected %d\n", seq, state->seq);
 	}
 
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-		(now.tv_usec-state->xmit_time.tv_usec)/1e3;
+		(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
 	snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
 		(late || isDup) ? ", " : "",
@@ -2717,7 +2718,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	struct cmsghdr *cmsgptr;
 	void *ptr;
 	double ms;
-	struct timeval now;
+	struct timespec now;
 	struct sockaddr_in6 remote;
 	struct in6_addr dstaddr;
 	struct msghdr msg;
@@ -2727,7 +2728,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	char line[80];
 	char cmsgbuf[256];
 
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	state= s;
 	base= state->base;
@@ -3088,14 +3089,13 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			if (!late)
 			{
 				ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-					(now.tv_usec-state->xmit_time.tv_usec)/
-					1e3;
+					(now.tv_nsec-state->xmit_time.tv_nsec)/
+					1e6;
 			}
 			else if (v6info)
 			{
 				ms= (now.tv_sec-v6info->tv.tv_sec)*1000 +
-					(now.tv_usec-v6info->tv.tv_usec)/
-					1e3;
+					(now.tv_nsec-v6info->tv.tv_nsec)/1e6;
 			}
 
 			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
@@ -3368,14 +3368,12 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 		if (!late)
 		{
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
-				(now.tv_usec-state->xmit_time.tv_usec)/
-				1e3;
+				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 		}
 		else
 		{
 			ms= (now.tv_sec-v6info->tv.tv_sec)*1000 +
-				(now.tv_usec-v6info->tv.tv_usec)/
-				1e3;
+				(now.tv_nsec-v6info->tv.tv_nsec)/1e6;
 		}
 
 		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
