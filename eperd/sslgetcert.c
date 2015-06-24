@@ -101,8 +101,8 @@ struct state
 	int subid;
 	int submax;
 	time_t gstart;
-	struct timeval start;
-	struct timeval t_connect;
+	struct timespec start;
+	struct timespec t_connect;
 	double resptime;
 	FILE *post_fh;
 	char *post_buf;
@@ -912,10 +912,10 @@ static FILE *report_head(struct state *state)
 	const char *method;
 	FILE *fh;
 	double resptime;
-	struct timeval endtime;
+	struct timespec endtime;
 	char hostbuf[NI_MAXHOST];
 
-	gettimeofday(&endtime, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
 
 	fh= NULL;
 	if (state->output_file)
@@ -993,11 +993,11 @@ static FILE *report_head(struct state *state)
 	fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), hostbuf);
 
 	resptime= (state->t_connect.tv_sec- state->start.tv_sec)*1e3 +
-		(state->t_connect.tv_usec-state->start.tv_usec)/1e3;
+		(state->t_connect.tv_nsec-state->start.tv_nsec)/1e6;
 	fprintf(fh, ", " DBQ(ttc) ": %f", resptime);
 
 	resptime= (endtime.tv_sec- state->start.tv_sec)*1e3 +
-		(endtime.tv_usec-state->start.tv_usec)/1e3;
+		(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 	fprintf(fh, ", " DBQ(rt) ": %f", resptime);
 
 	return fh;
@@ -1274,7 +1274,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 		switch(state->writestate)
 		{
 		case WRITE_HELLO:
-			gettimeofday(&state->t_connect, NULL);
+			clock_gettime(CLOCK_MONOTONIC_RAW, &state->t_connect);
 
 			buf_init(&outbuf, bev);
 			msgbuf_init(&msgoutbuf, NULL, &outbuf);
@@ -1358,7 +1358,7 @@ static void beforeconnect(struct tu_env *env,
 	//if (!state->do_all || !state->do_combine)
 	state->reslen= 0;
 
-	gettimeofday(&state->start, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &state->start);
 }
 
 
