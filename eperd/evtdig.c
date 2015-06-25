@@ -317,6 +317,7 @@ struct query_state {
 	struct event done_qry_timer;  /* Timer event to call done */
 
 	struct timeval xmit_time;	
+	struct timespec xmit_time_ts;	
 	double triptime;
 
 	//tdig_callback_type user_callback;
@@ -462,8 +463,8 @@ static struct option longopts[]=
 	{ "tsig", required_argument, NULL, (100000 + T_TSIG) },
 	{ "txt", required_argument, NULL, (100000 + T_TXT) },
 
-	{ "type", required_argument, NULL, 'O_TYPE' },
-	{ "class", required_argument, NULL, 'O_CLASS' },
+	{ "type", required_argument, NULL, O_TYPE },
+	{ "class", required_argument, NULL, O_CLASS },
 	{ "query", required_argument, NULL, O_QUERY},
 
 	// clas CHAOS
@@ -476,7 +477,7 @@ static struct option longopts[]=
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
 	{ "do", no_argument, NULL, 'd' },
-	{ "cd", no_argument, NULL, 'O_CD'},
+	{ "cd", no_argument, NULL, O_CD},
  	
 	{ "retry",  required_argument, NULL, O_RETRY },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
@@ -501,7 +502,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
-static void process_reply(void * arg, int nrecv, struct timeval now);
+static void process_reply(void * arg, int nrecv, struct timespec now);
 static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b);
 static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, void *arg);
@@ -709,7 +710,10 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 
 
 		lookup_prepend = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(qry->lookupname));
-		snprintf(lookup_prepend, (sizeof(qry->lookupname) + DEFAULT_LINE_LENGTH - 1),  "%d.%lu.%s", probe_id, qry->xmit_time.tv_sec, qry->lookupname);
+		snprintf(lookup_prepend, (sizeof(qry->lookupname) +
+			DEFAULT_LINE_LENGTH - 1),
+			 "%d.%lu.%s", probe_id, qry->xmit_time.tv_sec,
+			qry->lookupname);
 
 		ChangetoDnsNameFormat(qname, lookup_prepend); // fill the query portion.
 
@@ -799,6 +803,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
 	gettimeofday(&qry->xmit_time, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	mk_dns_buff(qry, outbuff);
 	do {
 		if (qry->udp_fd != -1)
@@ -1001,7 +1006,8 @@ static void tcp_beforeconnect(struct tu_env *env,
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
-	gettimeofday(&qry->xmit_time, NULL); 
+	gettimeofday(&qry->xmit_time, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->dst_ai_family = addr->sa_family;
 	BLURT(LVL5 "time : %d",  qry->xmit_time.tv_sec);
 	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
@@ -1045,7 +1051,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct query_state *qry = ptr;
         int n;
         u_char b2[2];
-        struct timeval rectime;
+        struct timespec rectime;
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
@@ -1062,7 +1068,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		return;
 	}
 
-        gettimeofday(&rectime, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
         bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
         input = bufferevent_get_input(bev);
@@ -1086,7 +1092,10 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
 			dnsR = (struct DNS_HEADER*) qry->packet.buf;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
-				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;
+				qry->triptime = (rectime.tv_sec -
+					qry->xmit_time_ts.tv_sec)*1000 +
+					(rectime.tv_nsec -
+					qry->xmit_time_ts.tv_nsec)/1e6;
 				printReply (qry, qry->packet.size, (unsigned char *)qry->packet.buf);
 			}
 			else {
@@ -1121,7 +1130,7 @@ static void tcp_writecb(struct bufferevent *bev UNUSED_PARAM, void *ptr UNUSED_P
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct timeval now)
+static void process_reply(void * arg, int nrecv, struct timespec now)
 {
 	struct DNS_HEADER *dnsR = NULL;
 	struct tdig_base * base;
@@ -1149,8 +1158,9 @@ static void process_reply(void * arg, int nrecv, struct timeval now)
 	}
 
 	qry->base->recvbytes += nrecv;
-	gettimeofday(&now, NULL);  // lave this till fix now from ready_callback6 corruption; ghoost
-	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 + (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now); // lave this till fix now from ready_callback6 corruption; ghoost
+	qry->triptime = (now.tv_sec-qry->xmit_time_ts.tv_sec)*1000 +
+		(now.tv_nsec-qry->xmit_time_ts.tv_nsec)/1e6;
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -1162,7 +1172,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 {
 	struct query_state * qry;
 	int nrecv;
-	struct timeval rectime;
+	struct timespec rectime;
 
 	// printf("in ready_callback\n");
 
@@ -1171,7 +1181,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 	/* Time the packet has been received */
 
-	gettimeofday(&rectime, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
 	/* Receive data from the network */
 	nrecv = recv(qry->udp_fd, qry->base->packet,
 		sizeof(qry->base->packet), MSG_DONTWAIT);
@@ -1189,7 +1199,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 {
 	struct query_state * qry;
 	int nrecv; 
-	struct timeval rectime;
+	struct timespec rectime;
 	struct msghdr msg;
 	struct iovec iov[1];
 	//char buf[INET6_ADDRSTRLEN];
@@ -1429,7 +1439,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_abuf = 0;
 				break;
 
-			case 'O_TYPE':
+			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
 				if ((qry->qtype >= 0 ) && 
 						(qry->qclass < 65536)) {
@@ -1448,11 +1458,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				}
 				break;
 
-			case 'O_CD':
+			case O_CD:
 				qry->opt_cd = 1;
 				break;
 
-			case 'O_CLASS':
+			case O_CLASS:
 				qry->qclass = strtoul(optarg, &check, 10);
 				if ((qry->qclass  >= 0 ) && 
 						(qry->qclass < 65536)) {
@@ -1839,6 +1849,7 @@ void tdig_start (void *arg)
 	hints.ai_flags = 0;
 
 	gettimeofday(&qry->xmit_time, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
@@ -1915,6 +1926,7 @@ int tdig_base_count_queries(struct tdig_base *base)
 static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
 	struct timeval now;
+	struct timeval interval;
 	FILE *fh;	
 	struct tdig_base *base;
 	struct query_state *qry_h;
@@ -1932,9 +1944,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 
 
 	if(qry_h->base->done) {
-		now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
-		now.tv_usec =  0;
-		event_add(&tdig_base->statsReportEvent, &now);
+		interval.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+		interval.tv_usec =  0;
+		event_add(&tdig_base->statsReportEvent, &interval);
 		return;
 	}
 
@@ -1954,7 +1966,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JS(id, "9201" ); 
 	fw = get_atlas_fw_version();
 	JU(fw, fw);
-	gettimeofday(&now, NULL); 
+	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
 	JU(sok , base->sentok);
 	JU(rok , base->recvok);
@@ -1975,10 +1987,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	buf_cleanup(&qry->result);
 	free(qry);
 
-	// reuse timeval now
-	now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
-	now.tv_usec =  0;
-	event_add(&tdig_base->statsReportEvent, &now);
+	interval.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+	interval.tv_usec =  0;
+	event_add(&tdig_base->statsReportEvent, &interval);
 }
 
 
