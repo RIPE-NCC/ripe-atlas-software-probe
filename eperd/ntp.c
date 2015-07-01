@@ -280,10 +280,33 @@ static void format_short_ts(char *line, size_t size, const char *label,
 static void format_ref_id(char *line, size_t size, uint32_t value,
 	uint8_t stratum)
 {
+	int i;
+	size_t offset;
+	unsigned char *p;
+	char line2[40];
+
 	if (stratum == 0 || stratum == 1)
 	{
-		snprintf(line, size, DBQ(ref-id) ": " DBQ(%.4s),
-			(char *)&value);
+		line2[0]= '\0';
+		for (i= 0, p= (unsigned char *)&value;
+			i<sizeof(value) && *p != '\0'; i++, p++)
+		{
+			offset= strlen(line2);
+			if (*p < 32 || *p == '"' || *p == '\\' ||
+				*p >= 127)
+			{
+				snprintf(line2+offset, sizeof(line2)-offset,
+					"\\\\x%02x", *p);
+			}
+			else
+			{
+				snprintf(line2+offset, sizeof(line2)-offset,
+					"%c", *p);
+			}
+				
+		}
+		snprintf(line, size, DBQ(ref-id) ": " DBQ(%s),
+			line2);
 	}
 	else
 	{
@@ -1763,6 +1786,9 @@ static int create_socket(struct ntpstate *state)
 	protocol= 0;
 
 	state->socket= xsocket(af, type, protocol);
+#if 0
+ { errno= ENOSYS; state->socket= -1; }
+#endif
 	if (state->socket == -1)
 	{
 		serrno= errno;
@@ -1799,7 +1825,7 @@ static int create_socket(struct ntpstate *state)
 		serrno= errno;
 
 		snprintf(line, sizeof(line),
-	", " DBQ(error) ":" DBQ(connect failed: %s) " }",
+			"{ " DBQ(error) ":" DBQ(connect failed: %s) " }",
 			strerror(serrno));
 		add_str(state, line);
 		report(state);
