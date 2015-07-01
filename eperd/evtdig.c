@@ -316,7 +316,7 @@ struct query_state {
 	struct event next_qry_timer;  /* Timer event to start next query */
 	struct event done_qry_timer;  /* Timer event to call done */
 
-	struct timeval xmit_time;	
+	time_t xmit_time;	
 	struct timespec xmit_time_ts;	
 	double triptime;
 
@@ -712,7 +712,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 		lookup_prepend = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(qry->lookupname));
 		snprintf(lookup_prepend, (sizeof(qry->lookupname) +
 			DEFAULT_LINE_LENGTH - 1),
-			 "%d.%lu.%s", probe_id, qry->xmit_time.tv_sec,
+			 "%d.%lu.%s", probe_id, qry->xmit_time,
 			qry->lookupname);
 
 		ChangetoDnsNameFormat(qname, lookup_prepend); // fill the query portion.
@@ -802,7 +802,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
-	gettimeofday(&qry->xmit_time, NULL);
+	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	mk_dns_buff(qry, outbuff);
 	do {
@@ -1006,10 +1006,10 @@ static void tcp_beforeconnect(struct tu_env *env,
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
-	gettimeofday(&qry->xmit_time, NULL);
+	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->dst_ai_family = addr->sa_family;
-	BLURT(LVL5 "time : %d",  qry->xmit_time.tv_sec);
+	BLURT(LVL5 "time : %d",  qry->xmit_time);
 	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
 }
 
@@ -1813,6 +1813,8 @@ void tdig_start (void *arg)
 	switch(qry->qst)
 	{
 		case STATUS_FREE :
+			/* Get time in case we don't send any packet */
+			qry->xmit_time= time(NULL);
 			qry->resolv_i = 0;
 			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  tdig_base->resolv_max);
 			if( qry->opt_resolv_conf) {
@@ -1848,7 +1850,7 @@ void tdig_start (void *arg)
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 
-	gettimeofday(&qry->xmit_time, NULL);
+	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->qst =  STATUS_DNS_RESOLV;
 
@@ -2182,7 +2184,7 @@ void printErrorQuick (struct query_state *qry)
 	{
 		fprintf(fh, ",{");
 		fprintf(fh, "\"id\" : \"%s\"",  qry->str_Atlas);
-		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time.tv_sec);
+		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time);
 		if(qry->retry) {
 			fprintf(fh, ",\"retry\": %d",  qry->retry);
 			
@@ -2229,7 +2231,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 		JD(fw, fw);
 		if (qry->opt_rset){
-			JS1(time, %ld,  qry->xmit_time.tv_sec);
+			JS1(time, %ld,  qry->xmit_time);
 			JD(lts,lts);
 			AS("\"resultset\" : [ {");
 		}
@@ -2239,7 +2241,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		AS (",{");
 	}
 
-	JS1(time, %ld,  qry->xmit_time.tv_sec);
+	JS1(time, %ld,  qry->xmit_time);
 	JD(lts,lts);
 
 	if ( qry->opt_resolv_conf ) {
