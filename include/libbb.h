@@ -316,6 +316,7 @@ extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);
 extern int bind_interface(int socket, int af, char *name);
+extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;

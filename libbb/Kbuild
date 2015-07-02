@@ -11,6 +11,7 @@ lib-y += ask_confirmation.o
 lib-y += atlas_bb64.o
 lib-y += atlas_probe.o
 lib-y += atlas_timesync.o
+lib-y += atlas_check_addr.o
 lib-y += bb_askpass.o
 lib-y += bb_basename.o
 lib-y += bb_do_delay.o

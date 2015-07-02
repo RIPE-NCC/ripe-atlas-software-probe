@@ -58,6 +58,7 @@ enum
 #define PING_ERR_SENDTO    4       /* Sendto system call failed */
 #define PING_ERR_DNS	   5       /* DNS error */
 #define PING_ERR_DNS_NO_ADDR 6     /* DNS no suitable addresses */
+#define PING_ERR_BAD_ADDR  7       /* Addresses is not allowed */
 #define PING_ERR_SHUTDOWN 10       /* The request was canceled because the PING subsystem was shut down */
 #define PING_ERR_CANCEL   12       /* The request was canceled via a call to evping_cancel_request */
 #define PING_ERR_UNKNOWN  16       /* An unknown error occurred */
@@ -400,6 +401,16 @@ static void ping_cb(int result, int bytes, int psize,
 		snprintf(line, sizeof(line),
 			"%s{ " DBQ(error) ":" DBQ(dns resolution failed: %s) " }",
 			pingstate->first ? "" : ", ", (char *)sa);
+		add_str(pingstate, line);
+		report(pingstate);
+	}
+	if (result == PING_ERR_BAD_ADDR)
+	{
+		pingstate->size= bytes;
+		pingstate->psize= psize;
+		snprintf(line, sizeof(line),
+			"%s{ " DBQ(error) ":" DBQ(address not allowed) " }",
+			pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
 		report(pingstate);
 	}
@@ -1067,6 +1078,12 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 			free(lsa);
 			return NULL;
 		}
+
+		if (atlas_check_addr(&lsa->u.sa, lsa->len) == -1)
+		{
+			free(lsa);
+			return NULL;
+		}
 	}
 
 	state= xzalloc(sizeof(*state));
@@ -1245,7 +1262,7 @@ static void ping_start2(void *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct pingstate *env;
 	struct evutil_addrinfo *cur;
 
@@ -1286,8 +1303,6 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	for (cur= res; cur; cur= cur->ai_next)
 		count++;
 
-	// env->reportcount(env, count);
-
 	while (env->dns_curr)
 	{
 		env->socklen= env->dns_curr->ai_addrlen;
@@ -1295,6 +1310,25 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			continue;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
+
+		r= atlas_check_addr((struct sockaddr *)&env->sin6,
+			env->socklen);
+		if (r == -1)
+		{
+			ping_cb(PING_ERR_BAD_ADDR, env->maxsize, -1,
+				NULL, 0,
+				(struct sockaddr *)NULL, 0,
+				0, 0, NULL,
+				env);
+			ping_cb(PING_ERR_DONE, env->maxsize, -1,
+				(struct sockaddr *)NULL, 0,
+				(struct sockaddr *)NULL, 0,
+				0, 0, NULL,
+				env);
+			if (env->base->done)
+				env->base->done(env);
+			return;
+		}
 
 		ping_start2(env);
 
