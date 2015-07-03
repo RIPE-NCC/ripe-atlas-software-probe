@@ -557,26 +557,39 @@ int evtdig_main(int argc, char **argv)
 
 void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry)
 {
-        int i;
+        int i, len;
 
-        AS("\"RDATA\" : \"");
+        AS("\"RDATA\" : [ \"");
+	len= -1;
         for(i = 0; i < txt_len; i++) {
+		if (len == 0)
+		{
+			AS("\", \"");
+			len= -1;
+		}
+		if (len == -1)
+		{
+			len= *rdata;
+			rdata++;
+			continue;
+		}
                 if( (*rdata == 34  ) || (*rdata == 92  ))  {
-                        snprintf(line, DEFAULT_LINE_LENGTH, "\\%c", *(char *)rdata  );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\\\%03d", *(char *)rdata  );
 			buf_add(&qry->result, line, strlen (line));
                 }
-                // Space - DEL
-                else if ((*rdata > 31  ) && (*rdata < 128)) {
+                // Space - ~
+                else if ((*rdata >= ' '  ) && (*rdata <= '~')) {
                         snprintf(line, DEFAULT_LINE_LENGTH, "%c", *(char *)rdata );
 			buf_add(&qry->result, line, strlen (line));
                 }
                 else {
-                        snprintf(line, DEFAULT_LINE_LENGTH, "\\u00%02X", *rdata   );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\\\%03d", *rdata   );
 			buf_add(&qry->result, line, strlen (line));
                 }
+		len--;
                 rdata++;
         }
-        AS("\"");
+        AS("\" ] ");
 }
 
 static void local_exit(void *state UNUSED_PARAM)
@@ -2353,7 +2366,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
-					data_len = ntohs(answers[i].resource->data_len) - 1;
+					data_len = ntohs(answers[i].resource->data_len);
 					if(flagAnswer == 0) {
 						AS(",\"answers\" : [ {");
 						flagAnswer++;
@@ -2364,7 +2377,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					flagAnswer++;
 					JS (TYPE, "TXT");
 					JS (NAME, answers[i].name);
-					print_txt_json(&result[reader-result+1], data_len, qry);
+					print_txt_json(&result[reader-result], data_len, qry);
 					reader = reader + ntohs(answers[i].resource->data_len);
 					AS("}");
 
