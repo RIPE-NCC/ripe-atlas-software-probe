@@ -5,6 +5,7 @@
  */
 
 #include "libbb.h"
+#include <math.h>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -260,14 +261,13 @@ static void format_stratum(char *line, size_t size, uint8_t stratum)
 static void format_8bit(char *line, size_t size, const char *label, 
 	int8_t value)
 {
-	if (value >= 0)
+	if (value >= 0 && value < 32)
 	{
-		snprintf(line, size, DBQ(%s) ": %d", label, 1 << value);
+		snprintf(line, size, DBQ(%s) ": %u", label, 1U << value);
 	}
 	else
 	{
-		snprintf(line, size, DBQ(%s) ": %g", label,
-			1.0 / (1 << -value));
+		snprintf(line, size, DBQ(%s) ": %g", label, pow(2, value));
 	}
 }
 
