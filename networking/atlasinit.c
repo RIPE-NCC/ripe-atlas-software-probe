@@ -702,6 +702,7 @@ static int reg_init_main( int argc, char *argv[] )
 		if (do_rm_dns_static_info)
 		{
 			// unlink(atlas_network_dns_static_info);
+			unlink(atlas_resolv_conf);
 			unlink(atlas_network_dns_static_info_json);
 		}
 	}
