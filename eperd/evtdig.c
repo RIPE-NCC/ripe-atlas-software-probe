@@ -1832,6 +1832,7 @@ void tdig_start (void *arg)
 					snprintf(line, DEFAULT_LINE_LENGTH, "\"nameserver\": \"no local resolvers found\"");
 					buf_add(&qry->err, line, strlen(line));
 					printReply (qry, 0, NULL);
+					return;
 				}
 			}
 			break;
