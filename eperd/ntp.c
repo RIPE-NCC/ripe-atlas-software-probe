@@ -383,7 +383,7 @@ static void report(struct ntpstate *state)
 		state->dnsip ? (state->do_v6 ? 6 : 4) :
 		(state->sin6.sin6_family == AF_INET6 ? 6 : 4));
 
-	if (!state->first)
+	if (!state->first && !state->dnsip)
 	{
 		format_li(line, sizeof(line), state->ntp_flags);
 		fprintf(fh, ", %s", line);
@@ -1858,7 +1858,7 @@ static int create_socket(struct ntpstate *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct ntpstate *env;
 	struct evutil_addrinfo *cur;
 	char line[160];
@@ -1909,6 +1909,19 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			continue;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
+
+		r= atlas_check_addr((struct sockaddr *)&env->sin6,
+			env->socklen);
+		if (r == -1)
+		{
+			env->starttime= time(NULL);
+			snprintf(line, sizeof(line),
+			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
+			add_str(env, line);
+			env->dnsip= 1;
+			report(env);
+			return;
+		}
 
 		traceroute_start2(env);
 

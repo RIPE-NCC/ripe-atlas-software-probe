@@ -3581,6 +3581,12 @@ for (i= 0; argv[i] != NULL; i++)
 			free(lsa);
 			return NULL;
 		}
+
+		if (atlas_check_addr(&lsa->u.sa, lsa->len) == -1)
+		{
+			free(lsa);
+			return NULL;
+		}
 	}
 	else
 	{
@@ -3934,7 +3940,7 @@ static int create_socket(struct trtstate *state, int do_tcp)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct trtstate *env;
 	struct evutil_addrinfo *cur;
 	char line[160];
@@ -3985,6 +3991,18 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			continue;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
+
+		r= atlas_check_addr((struct sockaddr *)&env->sin6,
+			env->socklen);
+		if (r == -1)
+		{
+			env->starttime= time(NULL);
+			snprintf(line, sizeof(line),
+			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
+			add_str(env, line);
+			report(env);
+			return;
+		}
 
 		traceroute_start2(env);
 

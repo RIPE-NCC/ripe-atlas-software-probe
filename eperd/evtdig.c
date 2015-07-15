@@ -800,7 +800,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 /* Attempt to transmit a UDP DNS Request to a serveri. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	int fd;
+	int r, fd;
 	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
@@ -857,6 +857,16 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			}
 		}
 
+		r= atlas_check_addr(qry->res->ai_addr, qry->res->ai_addrlen);
+		if (r == -1)
+		{
+			snprintf(line, DEFAULT_LINE_LENGTH,
+				"%s \"reason\" : \"address not allowed\"",
+				qry->err.size ? ", " : "");
+			buf_add(&qry->err, line, strlen(line));
+			printReply (qry, 0, NULL);
+			return;
+		}
 		qry->loc_socklen = sizeof(qry->loc_sin6);
 		if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
 		{
@@ -988,6 +998,11 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
 
         case TU_OUT_OF_ADDRS:
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_OUT_OF_ADDRESS\" : \"%s\"", qry->err.size ? ", " : "", str );
+		buf_add(&qry->err, line, strlen(line));
+                break;
+
+        case TU_BAD_ADDR:
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_BAD_ADDR\" : True", qry->err.size ? ", " : "");
 		buf_add(&qry->err, line, strlen(line));
                 break;
 

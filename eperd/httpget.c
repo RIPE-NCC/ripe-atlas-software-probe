@@ -1868,6 +1868,12 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		report(state);
 		break;
 
+	case TU_BAD_ADDR:
+		add_str(state, "{ " DBQ(error) ": " DBQ(bad address) " }");
+		state->dnserr= 1;
+		report(state);
+		break;
+
 	default:
 		crondlog(DIE9 "reporterr: bad cause %d", cause);
 	}

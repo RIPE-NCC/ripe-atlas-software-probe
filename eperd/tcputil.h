@@ -7,7 +7,7 @@
 #include <event2/event_struct.h>
 
 enum tu_err { TU_DNS_ERR, TU_READ_ERR, TU_SOCKET_ERR, TU_CONNECT_ERR,
-	TU_OUT_OF_ADDRS };
+	TU_OUT_OF_ADDRS, TU_BAD_ADDR };
 struct tu_env
 {
 	char dnsip;
