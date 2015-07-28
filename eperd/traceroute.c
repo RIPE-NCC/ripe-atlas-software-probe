@@ -4000,6 +4000,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			snprintf(line, sizeof(line),
 			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
 			add_str(env, line);
+			env->dnsip= 1;
 			report(env);
 			return;
 		}
