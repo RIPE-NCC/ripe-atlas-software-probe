@@ -1914,6 +1914,11 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			env->socklen);
 		if (r == -1)
 		{
+			if (env->result) free(env->result);
+			env->resmax= 80;
+			env->result= xmalloc(env->resmax);
+			env->reslen= 0;
+
 			env->starttime= time(NULL);
 			snprintf(line, sizeof(line),
 			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
