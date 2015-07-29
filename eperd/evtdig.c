@@ -1002,7 +1002,7 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
                 break;
 
         case TU_BAD_ADDR:
-		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_BAD_ADDR\" : True", qry->err.size ? ", " : "");
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_BAD_ADDR\" : true", qry->err.size ? ", " : "");
 		buf_add(&qry->err, line, strlen(line));
                 break;
 
