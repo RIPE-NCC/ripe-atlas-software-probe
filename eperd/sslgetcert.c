@@ -1409,7 +1409,7 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		break;
 
 	case TU_BAD_ADDR:
-		add_str(state, DBQ(error) ": " DBQ(bad address));
+		add_str(state, DBQ(error) ": " DBQ(address not allowed));
 		state->dnserr= 1;
 		report(state);
 		break;
