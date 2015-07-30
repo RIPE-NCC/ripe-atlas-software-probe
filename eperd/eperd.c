@@ -84,6 +84,8 @@ struct CronLine {
 
 	/* For debugging */
 	time_t lasttime;
+	time_t nexttime;
+	time_t waittime;
 };
 
 
@@ -712,6 +714,9 @@ static void set_timeout(CronLine *line, int init_next_cycle)
 		line->start_time,
 		line->distr_offset.tv_sec + line->distr_offset.tv_usec/1e6,
 		now.tv_sec, tv.tv_sec);
+	line->nexttime= line->nextcycle*line->interval + line->start_time +
+                line->distr_offset.tv_sec;
+	line->waittime= tv.tv_sec;
 	event_add(&line->event, &tv);
 }
 
@@ -1199,6 +1204,12 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 
 	crondlog(LVL7 "RubJob, now %d, end_time %d\n", now.tv_sec,
 		line->end_time);
+	if (now.tv_sec < line->nexttime-10 || now.tv_sec > line->nexttime+10)
+	{
+		crondlog(
+		DIE9 "RunJob: weird, now %d, nexttime %d, waittime %d\n",
+			now.tv_sec, line->nexttime, line->waittime);
+	}
 	
 	if (now.tv_sec > line->end_time)
 	{
