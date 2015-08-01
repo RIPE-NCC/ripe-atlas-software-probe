@@ -805,7 +805,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
 	uint32_t nsent = 0;
-	u_char *outbuff;
+	u_char *outbuff= NULL;
 	int err = 0; 
 
 	/* Clean the no reply timer (if any was previously set) */
@@ -833,6 +833,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"socket failed %s\"", qry->err.size ? ", " : "", strerror(errno));
 			buf_add(&qry->err, line, strlen(line));
 			printReply (qry, 0, NULL);
+			free (outbuff);
+			outbuff = NULL;
 			return;
 		} 
 
@@ -853,6 +855,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					qry->err.size ? ", " : "");
 				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
+				free (outbuff);
+				outbuff = NULL;
 				return;
 			}
 		}
@@ -876,6 +880,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					strerror(errno));
 				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
+				free (outbuff);
+				outbuff = NULL;
 				return;
 		}
 
