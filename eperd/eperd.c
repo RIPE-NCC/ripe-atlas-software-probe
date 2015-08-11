@@ -700,9 +700,6 @@ static void set_timeout(CronLine *line, int init_next_cycle)
 		}
 		do_distr(line);
 	}
-	else
-	{
-	}
 
 	tv.tv_sec= line->nextcycle*line->interval + line->start_time +
 		line->distr_offset.tv_sec - now.tv_sec;
@@ -1253,6 +1250,9 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 		crondlog(
 		LVL7 "RunJob: weird, now %d, nexttime %d, waittime %d\n",
 			now.tv_sec, line->nexttime, line->waittime);
+
+		/* Recompute nextcycle */
+		set_timeout(line, 1 /*init_next_cycle*/);
 		return;
 	}
 	
