@@ -269,7 +269,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
-			"i:+:l+:d+"; /* -i, -l and -d have numeric param */
+			":i+:l+:d+"; /* -i, -l and -d have numeric param */
 	opt = getopt32(argv, "i:l:L:fc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
 			&instance_id, &LogLevel, &LogFile, &CDir,
 			&atlas_id, &PidFileName

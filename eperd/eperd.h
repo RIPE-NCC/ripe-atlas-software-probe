@@ -23,7 +23,7 @@ extern struct globals G;
 #define LineBase           (G.LineBase               )
 #define FileBase           (G.FileBase               )
 #define oldLine            (G.oldLine                )
-#define instance_id        (G.instance_id                )
+#define instance_id        (G.instance_id            )
 #define EventBase          (G.EventBase              )
 #define DnsBase            (G.DnsBase                )
 
