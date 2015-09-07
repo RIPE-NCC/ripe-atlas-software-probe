@@ -861,15 +861,21 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			}
 		}
 
-		r= atlas_check_addr(qry->res->ai_addr, qry->res->ai_addrlen);
-		if (r == -1)
+		if (!qry->opt_resolv_conf)
 		{
-			snprintf(line, DEFAULT_LINE_LENGTH,
+			r= atlas_check_addr(qry->res->ai_addr,
+				qry->res->ai_addrlen);
+			if (r == -1)
+			{
+				free (outbuff);
+				outbuff = NULL;
+				snprintf(line, DEFAULT_LINE_LENGTH,
 				"%s \"reason\" : \"address not allowed\"",
-				qry->err.size ? ", " : "");
-			buf_add(&qry->err, line, strlen(line));
-			printReply (qry, 0, NULL);
-			return;
+					qry->err.size ? ", " : "");
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				return;
+			}
 		}
 		qry->loc_socklen = sizeof(qry->loc_sin6);
 		if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
