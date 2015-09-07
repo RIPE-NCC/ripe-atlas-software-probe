@@ -3624,6 +3624,8 @@ for (i= 0; argv[i] != NULL; i++)
 	state->result= NULL;
 	state->reslen= 0;
 	state->resmax= 0;
+	state->socket_icmp= -1;
+	state->socket_tcp= -1;
 
 	for (i= 0; i<trt_base->tabsiz; i++)
 	{
