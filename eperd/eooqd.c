@@ -189,20 +189,44 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 	short what UNUSED_PARAM, void *arg UNUSED_PARAM)
 {
 	int r;
+	struct stat sb;
 	char filename[80];
 
 	if (!state->curr_file)
 	{
+		if (stat(state->queue_file, &sb) == -1)
+		{
+			if (errno == ENOENT)
+			{
+				return;
+			}
+			report_err("stat failed");
+			return;
+		}
+
+		/* Remove curr_qfile. Renaming queue_file to curr_qfile 
+		 * will silently fail to delete queue_file if queue_file and
+		 * curr_qfile are hard links.
+		 */
+		if (unlink(state->curr_qfile) == -1)
+		{
+			/* Expect ENOENT */
+			if (errno != ENOENT)
+			{
+				report_err("unlink failed");
+				return;
+			}
+		}
+
 		/* Try to move queue_file to curr_qfile. This provides at most
 		 * once behavior and allows producers to create a new
 		 * queue_file while we process the old one.
 		 */
 		if (rename(state->queue_file, state->curr_qfile) == -1)
 		{
-			if (errno == ENOENT)
-			{
-				return;
-			}
+			/* We verified queue_file is there so any failure is
+			 * fatal.
+			 */
 			report_err("rename failed");
 			return;
 		}

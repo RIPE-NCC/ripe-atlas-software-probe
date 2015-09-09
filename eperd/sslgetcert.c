@@ -101,8 +101,8 @@ struct state
 	int subid;
 	int submax;
 	time_t gstart;
-	struct timeval start;
-	struct timeval t_connect;
+	struct timespec start;
+	struct timespec t_connect;
 	double resptime;
 	FILE *post_fh;
 	char *post_buf;
@@ -133,6 +133,7 @@ struct state
 
 #define BUF_CHUNK	4096
 
+#define MSG_ALERT	21
 #define MSG_HANDSHAKE	22
 #define HS_CLIENT_HELLO	 1
 #define HS_SERVER_HELLO	 2
@@ -355,7 +356,7 @@ static void msgbuf_add(struct msgbuf *msgbuf, void *buf, size_t size)
 	buf_add(&msgbuf->buffer, buf, size);
 }
 
-static int msgbuf_read(struct msgbuf *msgbuf, int type,
+static int msgbuf_read(struct msgbuf *msgbuf, int *typep,
 	char *majorp, char *minorp)
 {
 	int r;
@@ -377,12 +378,7 @@ static int msgbuf_read(struct msgbuf *msgbuf, int type,
 			continue;
 		}
 		p= (uint8_t *)msgbuf->inbuf->buf+msgbuf->inbuf->offset;
-		type= p[0];
-		if (p[0] != type)
-		{
-			fprintf(stderr, "msgbuf_read: got type %d\n", p[0]);
-			return -1;
-		}
+		*typep= p[0];
 		*majorp= p[1];
 		*minorp= p[2];
 		len= (p[3] << 8) + p[4];
@@ -522,10 +518,17 @@ static void add_ciphers(struct hsbuf *hsbuf)
 {
 	uint8_t c;
 	size_t len;
-	uint8_t ciphers[]= { 0x0,0xff, 0x0,0x88, 0x0,0x87, 0x0,0x39, 0x0,0x38,
-		0x0,0x84, 0x0,0x35, 0x0,0x45, 0x0,0x44, 0x0,0x33, 0x0,0x32,
-		0x0,0x96, 0x0,0x41, 0x0,0x4, 0x0,0x5, 0x0,0x2f, 0x0,0x16,
-		0x0,0x13, 0xfe,0xff, 0x0,0xa };
+	uint8_t ciphers[]= {
+		0xc0,0x0a,	/* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA */
+		0xc0,0x09,	/* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA */
+		0xc0,0x13,	/* TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA */
+		0xc0,0x14,	/* TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA */
+		0x00,0x33,	/* TLS_DHE_RSA_WITH_AES_128_CBC_SHA */
+		0x00,0x39,	/* TLS_DHE_RSA_WITH_AES_256_CBC_SHA */
+		0x00,0x2f,	/* TLS_RSA_WITH_AES_128_CBC_SHA */
+		0x00,0x35,	/* TLS_RSA_WITH_AES_256_CBC_SHA */
+		0x00,0x0a,	/* TLS_RSA_WITH_3DES_EDE_CBC_SHA */
+	 };
 
 	len= sizeof(ciphers);
 
@@ -872,6 +875,11 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			r= eat_server_hello(state);
 			if (r == -1)
 				return;
+			if (r == 1)
+			{
+				state->readstate= READ_DONE;
+				continue;
+			}
 			state->readstate= READ_CERTS;
 			continue;
 
@@ -898,9 +906,164 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	}
 }
 
+static FILE *report_head(struct state *state)
+{
+	int major, minor;
+	const char *method;
+	FILE *fh;
+	double resptime;
+	struct timespec endtime;
+	char hostbuf[NI_MAXHOST];
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+
+	fh= NULL;
+	if (state->output_file)
+	{
+		fh= fopen(state->output_file, "a");
+		if (!fh)
+		{
+			crondlog(DIE9 "unable to append to '%s'",
+				state->output_file);
+			return NULL;
+		}
+	}
+	else
+		fh= stdout;
+
+	fprintf(fh, "RESULT { ");
+	if (state->atlas)
+	{
+		fprintf(fh, DBQ(id) ":" DBQ(%s)
+			", " DBQ(fw) ":%d"
+			", " DBQ(lts) ":%d",
+			state->atlas, get_atlas_fw_version(),
+			get_timesync());
+	}
+
+	fprintf(fh, "%s" DBQ(time) ":%ld",
+		state->atlas ? ", " : "", time(NULL));
+	fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
+		DBQ(dst_port) ":" DBQ(%s),
+		state->hostname, state->portname);
+
+	if (state->recv_major == 3 && state->recv_minor == 3)
+	{
+		method= "TLS";
+		major= 1;
+		minor= 2;
+	}
+	else if (state->recv_major == 3 && state->recv_minor == 2)
+	{
+		method= "TLS";
+		major= 1;
+		minor= 1;
+	}
+	else if (state->recv_major == 3 && state->recv_minor == 1)
+	{
+		method= "TLS";
+		major= 1;
+		minor= 0;
+	}
+	else if (state->recv_major == 3 && state->recv_minor == 0)
+	{
+		method= "SSL";
+		major= 3;
+		minor= 0;
+	}
+	else
+	{
+		method= "(unknown)";
+		major= state->recv_major;
+		minor= state->recv_minor;
+	}
+
+	fprintf(fh, ", " DBQ(method) ":" DBQ(%s) ", "
+		DBQ(ver) ":" DBQ(%d.%d), method, major, minor);
+	getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
+		hostbuf, sizeof(hostbuf), NULL, 0,
+		NI_NUMERICHOST);
+	fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), hostbuf);
+	fprintf(fh, ", " DBQ(af) ": %d",
+		state->sin6.sin6_family == AF_INET6 ? 6 : 4);
+
+	getnameinfo((struct sockaddr *)&state->loc_sin6,
+		state->loc_socklen, hostbuf, sizeof(hostbuf), NULL, 0,
+		NI_NUMERICHOST);
+	fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), hostbuf);
+
+	resptime= (state->t_connect.tv_sec- state->start.tv_sec)*1e3 +
+		(state->t_connect.tv_nsec-state->start.tv_nsec)/1e6;
+	fprintf(fh, ", " DBQ(ttc) ": %f", resptime);
+
+	resptime= (endtime.tv_sec- state->start.tv_sec)*1e3 +
+		(endtime.tv_nsec-state->start.tv_nsec)/1e6;
+	fprintf(fh, ", " DBQ(rt) ": %f", resptime);
+
+	return fh;
+}
+
+static int eat_alert(struct state *state)
+{
+	int r, type, level, descr;
+	uint8_t *p;
+	struct msgbuf *msgbuf;
+	FILE *fh;
+
+	msgbuf= &state->msginbuf;
+
+	for (;;)
+	{
+		if (msgbuf->buffer.size - msgbuf->buffer.offset < 2)
+		{
+			r= msgbuf_read(msgbuf, &type,
+				&state->recv_major, &state->recv_minor);
+			if (r < 0)
+			{
+				if (errno != EAGAIN)
+				{
+					fprintf(stderr,
+				"eat_alert: msgbuf_read failed: %s\n",
+						strerror(errno));
+				}
+				return -1;
+			}
+			if (type != MSG_ALERT)
+			{
+				fprintf(stderr,
+			"eat_alert: got bad type %d from msgbuf_read\n",
+					type);
+				return -1;
+			}
+			continue;
+		}
+		p= (uint8_t *)msgbuf->buffer.buf+msgbuf->buffer.offset;
+		level= p[0];
+		descr= p[1];
+
+		fh= report_head(state);
+		if (!fh)
+			return -1;
+
+		fprintf(fh, ", " DBQ(alert) ": { " DBQ(level) ": %d, "
+			DBQ(decription) ": %d }",
+			level, descr);
+
+		msgbuf->buffer.offset += 2;
+		break;
+	}
+
+	fprintf(fh, " }\n");
+
+	if (state->output_file)
+		fclose(fh);
+
+	return 1;
+}
+
 static int eat_server_hello(struct state *state)
 {
-	int r;
+	int r, type;
 	size_t len;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
@@ -911,7 +1074,7 @@ static int eat_server_hello(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+			r= msgbuf_read(msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -919,6 +1082,20 @@ static int eat_server_hello(struct state *state)
 				"eat_server_hello: msgbuf_read failed\n");
 				return -1;
 
+			}
+			if (type == MSG_ALERT)
+			{
+				r= eat_alert(state);
+				if (r == 0)
+					continue;
+				return r;	/* No need to continue */
+			}
+			if (type != MSG_HANDSHAKE)
+			{
+				fprintf(stderr,
+			"eat_server_hello: got bad type %d from msgbuf_read\n",
+					type);
+				return -1;
 			}
 			continue;
 		}
@@ -932,12 +1109,19 @@ static int eat_server_hello(struct state *state)
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+			r= msgbuf_read(msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				fprintf(stderr,
 				"eat_server_hello: msgbuf_read failed\n");
+				return -1;
+			}
+			if (type != MSG_HANDSHAKE)
+			{
+				fprintf(stderr,
+			"eat_server_hello: got bad type %d from msgbuf_read\n",
+					type);
 				return -1;
 			}
 			continue;
@@ -950,16 +1134,12 @@ static int eat_server_hello(struct state *state)
 
 static int eat_certificate(struct state *state)
 {
-	int i, n, r, first, slen, need_nl, major, minor;
+	int i, n, r, first, slen, need_nl, type;
 	size_t o, len;
-	const char *method;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
 	FILE *fh;
-	double resptime;
-	struct timeval endtime;
 	struct buf tmpbuf;
-	char hostbuf[NI_MAXHOST];
 
 	msgbuf= &state->msginbuf;
 
@@ -967,7 +1147,7 @@ static int eat_certificate(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+			r= msgbuf_read(msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -977,6 +1157,13 @@ static int eat_certificate(struct state *state)
 				"eat_certificate: msgbuf_read failed: %s\n",
 						strerror(errno));
 				}
+				return -1;
+			}
+			if (type != MSG_HANDSHAKE)
+			{
+				fprintf(stderr,
+			"eat_certificate: got bad type %d from msgbuf_read\n",
+					type);
 				return -1;
 			}
 			continue;
@@ -990,12 +1177,19 @@ static int eat_certificate(struct state *state)
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, MSG_HANDSHAKE,
+			r= msgbuf_read(msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
 				fprintf(stderr,
 				"eat_certificate: msgbuf_read failed\n");
+				return -1;
+			}
+			if (type != MSG_HANDSHAKE)
+			{
+				fprintf(stderr,
+			"eat_certificate: got bad type %d from msgbuf_read\n",
+					type);
 				return -1;
 			}
 			continue;
@@ -1004,87 +1198,9 @@ static int eat_certificate(struct state *state)
 		n= (p[0] << 16) + (p[1] << 8) + p[2];
 		o= 3;
 
-		gettimeofday(&endtime, NULL);
-
-		fh= NULL;
-		if (state->output_file)
-		{
-			fh= fopen(state->output_file, "a");
-			if (!fh)
-				crondlog(DIE9 "unable to append to '%s'",
-					state->output_file);
-		}
-		else
-			fh= stdout;
-
-		fprintf(fh, "RESULT { ");
-		if (state->atlas)
-		{
-			fprintf(fh, DBQ(id) ":" DBQ(%s)
-				", " DBQ(fw) ":%d"
-				", " DBQ(lts) ":%d",
-				state->atlas, get_atlas_fw_version(),
-				get_timesync());
-		}
-
-		fprintf(fh, "%s" DBQ(time) ":%ld",
-			state->atlas ? ", " : "", time(NULL));
-		fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
-			DBQ(dst_port) ":" DBQ(%s),
-			state->hostname, state->portname);
-
-		if (state->recv_major == 3 && state->recv_minor == 3)
-		{
-			method= "TLS";
-			major= 1;
-			minor= 2;
-		}
-		else if (state->recv_major == 3 && state->recv_minor == 2)
-		{
-			method= "TLS";
-			major= 1;
-			minor= 1;
-		}
-		else if (state->recv_major == 3 && state->recv_minor == 1)
-		{
-			method= "TLS";
-			major= 1;
-			minor= 0;
-		}
-		else if (state->recv_major == 3 && state->recv_minor == 0)
-		{
-			method= "SSL";
-			major= 3;
-			minor= 0;
-		}
-		else
-		{
-			method= "(unknown)";
-			major= state->recv_major;
-			minor= state->recv_minor;
-		}
-
-		fprintf(fh, ", " DBQ(method) ":" DBQ(%s) ", "
-			DBQ(ver) ":" DBQ(%d.%d), method, major, minor);
-		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
-			hostbuf, sizeof(hostbuf), NULL, 0,
-			NI_NUMERICHOST);
-		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), hostbuf);
-		fprintf(fh, ", " DBQ(af) ": %d",
-			state->sin6.sin6_family == AF_INET6 ? 6 : 4);
-
-		getnameinfo((struct sockaddr *)&state->loc_sin6,
-			state->loc_socklen, hostbuf, sizeof(hostbuf), NULL, 0,
-			NI_NUMERICHOST);
-		fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), hostbuf);
-
-		resptime= (state->t_connect.tv_sec- state->start.tv_sec)*1e3 +
-			(state->t_connect.tv_usec-state->start.tv_usec)/1e3;
-		fprintf(fh, ", " DBQ(ttc) ": %f", resptime);
-
-		resptime= (endtime.tv_sec- state->start.tv_sec)*1e3 +
-			(endtime.tv_usec-state->start.tv_usec)/1e3;
-		fprintf(fh, ", " DBQ(rt) ": %f", resptime);
+		fh= report_head(state);
+		if (fh == NULL)
+			return -1;
 
 		first= 1;
 		fprintf(fh, ", " DBQ(cert) ":[ ");
@@ -1158,7 +1274,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 		switch(state->writestate)
 		{
 		case WRITE_HELLO:
-			gettimeofday(&state->t_connect, NULL);
+			clock_gettime(CLOCK_MONOTONIC_RAW, &state->t_connect);
 
 			buf_init(&outbuf, bev);
 			msgbuf_init(&msgoutbuf, NULL, &outbuf);
@@ -1242,7 +1358,7 @@ static void beforeconnect(struct tu_env *env,
 	//if (!state->do_all || !state->do_combine)
 	state->reslen= 0;
 
-	gettimeofday(&state->start, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &state->start);
 }
 
 
@@ -1289,6 +1405,12 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		break;
 
 	case TU_OUT_OF_ADDRS:
+		report(state);
+		break;
+
+	case TU_BAD_ADDR:
+		add_str(state, DBQ(error) ": " DBQ(address not allowed));
+		state->dnserr= 1;
 		report(state);
 		break;
 

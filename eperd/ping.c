@@ -58,6 +58,7 @@ enum
 #define PING_ERR_SENDTO    4       /* Sendto system call failed */
 #define PING_ERR_DNS	   5       /* DNS error */
 #define PING_ERR_DNS_NO_ADDR 6     /* DNS no suitable addresses */
+#define PING_ERR_BAD_ADDR  7       /* Addresses is not allowed */
 #define PING_ERR_SHUTDOWN 10       /* The request was canceled because the PING subsystem was shut down */
 #define PING_ERR_CANCEL   12       /* The request was canceled via a call to evping_cancel_request */
 #define PING_ERR_UNKNOWN  16       /* An unknown error occurred */
@@ -158,7 +159,7 @@ struct pingstate
  * and it is used to relate each response with the corresponding request
  */
 struct evdata {
-	struct timeval ts;
+	struct timespec ts;
 	uint32_t index;
 	struct cookie cookie;
 };
@@ -271,10 +272,10 @@ static void ping_cb(int result, int bytes, int psize,
 	struct sockaddr *sa, socklen_t socklen,
 	struct sockaddr *loc_sa, socklen_t loc_socklen,
 	int seq, int ttl,
-	struct timeval * elapsed, void * arg)
+	struct timespec * elapsed, void * arg)
 {
 	struct pingstate *pingstate;
-	unsigned long usecs;
+	double nsecs;
 	char namebuf1[NI_MAXHOST], namebuf2[NI_MAXHOST];
 	char line[256];
 
@@ -304,7 +305,7 @@ static void ping_cb(int result, int bytes, int psize,
 	if (result == PING_ERR_NONE || result == PING_ERR_DUP)
 	{
 		/* Got a ping reply */
-		usecs= (elapsed->tv_sec * 1000000 + elapsed->tv_usec);
+		nsecs= (elapsed->tv_sec * 1e9 + elapsed->tv_nsec);
 
 		snprintf(line, sizeof(line),
 			"%s{ ", pingstate->first ? "" : ", ");
@@ -317,7 +318,7 @@ static void ping_cb(int result, int bytes, int psize,
 
 		snprintf(line, sizeof(line),
 			DBQ(rtt) ":%f",
-			usecs/1000.);
+			nsecs/1e6);
 		add_str(pingstate, line);
 
 		if (!pingstate->got_reply && result != PING_ERR_DUP)
@@ -403,6 +404,16 @@ static void ping_cb(int result, int bytes, int psize,
 		add_str(pingstate, line);
 		report(pingstate);
 	}
+	if (result == PING_ERR_BAD_ADDR)
+	{
+		pingstate->size= bytes;
+		pingstate->psize= psize;
+		snprintf(line, sizeof(line),
+			"%s{ " DBQ(error) ":" DBQ(address not allowed) " }",
+			pingstate->first ? "" : ", ");
+		add_str(pingstate, line);
+		report(pingstate);
+	}
 	if (result == PING_ERR_DONE)
 	{
 		report(pingstate);
@@ -462,7 +473,7 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	struct icmp *icmp = (struct icmp *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + ICMP_MINLEN);
 
-	struct timeval now;
+	struct timespec now;
 
 	minlen= sizeof(*data);
 	if (*sizep < minlen)
@@ -481,8 +492,8 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	icmp->icmp_seq  = htons(seq);            /* message identifier */
 
 	/* User data */
-	gettimeofday(&now, NULL);
-	data->ts    = now;                       /* current time */
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	data->ts    = now;                       /* current uptime time */
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
 
@@ -514,7 +525,7 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 	struct icmp6_hdr *icmp = (struct icmp6_hdr *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + ICMP6_HDRSIZE);
 
-	struct timeval now;
+	struct timespec now;
 
 	minlen= sizeof(*data);
 	if (*sizep < minlen)
@@ -531,8 +542,8 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 	icmp->icmp6_seq  = htons(seq);           /* message identifier */
 
 	/* User data */
-	gettimeofday(&now, NULL);
-	data->ts    = now;                       /* current time */
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	data->ts    = now;                       /* current uptime time */
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
 
@@ -666,7 +677,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	struct icmphdr * icmp;
 	struct evdata * data;
 	int hlen = 0;
-	struct timeval now;
+	struct timespec now;
 	state= arg;
 	base = state->base;
 
@@ -676,7 +687,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	data = (struct evdata *) (base->packet + IPHDR + ICMP_MINLEN);
 
 	/* Time the packet has been received */
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	/* Receive data from the network */
 	nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
@@ -743,10 +754,16 @@ printf("ready_callback4: too short\n");
 	else if (icmp->type == ICMP_ECHOREPLY)
 	  {
 	    /* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
-	    struct timeval elapsed;             /* response time */
+	    struct timespec elapsed;             /* response time */
 
 	    /* Compute time difference to calculate the round trip */
-	    evutil_timersub (&now, &data->ts, &elapsed);
+	    elapsed.tv_sec= now.tv_sec - data->ts.tv_sec;
+	    if (now.tv_nsec < data->ts.tv_sec)
+	    {
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	    }
+	    elapsed.tv_nsec= now.tv_nsec - data->ts.tv_nsec;
 
 	    /* Set destination address of packet as local address */
 	    sin4p= &loc_sin4;
@@ -809,7 +826,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	struct icmp6_hdr *icmp;
 	struct evdata * data;
 
-	struct timeval now;
+	struct timespec now;
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
 	struct msghdr msg;
@@ -827,7 +844,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 		offsetof(struct icmp6_hdr, icmp6_data16[2]));
 
 	/* Time the packet has been received */
-	gettimeofday(&now, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	iov[0].iov_base= base->packet;
 	iov[0].iov_len= sizeof(base->packet);
@@ -879,10 +896,16 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	else if (icmp->icmp6_type == ICMP6_ECHO_REPLY)
 	{
 	    /* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
-	    struct timeval elapsed;             /* response time */
+	    struct timespec elapsed;             /* response time */
 
 	    /* Compute time difference to calculate the round trip */
-	    evutil_timersub (&now, &data->ts, &elapsed);
+	    elapsed.tv_sec= now.tv_sec - data->ts.tv_sec;
+	    if (now.tv_nsec < data->ts.tv_sec)
+	    {
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	    }
+	    elapsed.tv_nsec= now.tv_nsec - data->ts.tv_nsec;
 
 	    /* Set destination address of packet as local address */
 	    memset(&loc_sin6, '\0', sizeof(loc_sin6));
@@ -1051,6 +1074,12 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 			return NULL;
 
 		if (lsa->len > sizeof(state->sin6))
+		{
+			free(lsa);
+			return NULL;
+		}
+
+		if (atlas_check_addr(&lsa->u.sa, lsa->len) == -1)
 		{
 			free(lsa);
 			return NULL;
@@ -1233,7 +1262,7 @@ static void ping_start2(void *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct pingstate *env;
 	struct evutil_addrinfo *cur;
 
@@ -1274,8 +1303,6 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	for (cur= res; cur; cur= cur->ai_next)
 		count++;
 
-	// env->reportcount(env, count);
-
 	while (env->dns_curr)
 	{
 		env->socklen= env->dns_curr->ai_addrlen;
@@ -1283,6 +1310,25 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			continue;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
+
+		r= atlas_check_addr((struct sockaddr *)&env->sin6,
+			env->socklen);
+		if (r == -1)
+		{
+			ping_cb(PING_ERR_BAD_ADDR, env->maxsize, -1,
+				NULL, 0,
+				(struct sockaddr *)NULL, 0,
+				0, 0, NULL,
+				env);
+			ping_cb(PING_ERR_DONE, env->maxsize, -1,
+				(struct sockaddr *)NULL, 0,
+				(struct sockaddr *)NULL, 0,
+				0, 0, NULL,
+				env);
+			if (env->base->done)
+				env->base->done(env);
+			return;
+		}
 
 		ping_start2(env);
 

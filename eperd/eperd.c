@@ -84,6 +84,10 @@ struct CronLine {
 
 	/* For debugging */
 	time_t lasttime;
+	time_t nexttime;
+	time_t waittime;
+	time_t debug_cycle;
+	time_t debug_generated;
 };
 
 
@@ -712,6 +716,11 @@ static void set_timeout(CronLine *line, int init_next_cycle)
 		line->start_time,
 		line->distr_offset.tv_sec + line->distr_offset.tv_usec/1e6,
 		now.tv_sec, tv.tv_sec);
+	line->debug_cycle= line->nextcycle;
+	line->debug_generated= now.tv_sec;
+	line->nexttime= line->nextcycle*line->interval + line->start_time +
+                line->distr_offset.tv_sec;
+	line->waittime= tv.tv_sec;
 	event_add(&line->event, &tv);
 }
 
@@ -1182,8 +1191,11 @@ static void EndJob(const char *user, CronLine *line)
 static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 	short __attribute__ ((unused)) what, void *arg)
 {
+	char c;
+	char *p;
 	CronLine *line;
 	struct timeval now;
+	FILE *fn;
 
 	line= arg;
 
@@ -1199,6 +1211,50 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 
 	crondlog(LVL7 "RubJob, now %d, end_time %d\n", now.tv_sec,
 		line->end_time);
+	if (now.tv_sec < line->nexttime-10 || now.tv_sec > line->nexttime+10)
+	{
+		if (out_filename)
+		{
+			fn= fopen(out_filename, "a");
+			if (!fn)
+			{
+				crondlog(DIE9 "unable to append to '%s'",
+					out_filename);
+			}
+			fprintf(fn, "RESULT { ");
+			if (atlas_id)
+				fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
+			fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
+				get_atlas_fw_version(), (long)time(NULL));
+			fprintf(fn, DBQ(reason) ": "
+		DBQ(inconsistent time; now %d; nexttime %d; waittime %d; cycle %d; generated %d) ", ",
+				(int)now.tv_sec, (int)line->nexttime,
+				(int)line->waittime, (int)line->debug_cycle,
+				(int)line->debug_generated);
+
+			fprintf(fn, DBQ(cmd) ": \"");
+			for (p= line->cl_Shell; *p; p++)
+			{
+				c= *p;
+				if (c == '"' || c == '\\')
+					fprintf(fn, "\\%c", c);
+				else if (isprint((unsigned char)c))
+					fputc(c, fn);
+				else
+					fprintf(fn, "\\u%04x", (unsigned char)c);
+			}
+			fprintf(fn, "\"");
+			fprintf(fn, " }\n");
+			fclose(fn);
+		}
+		crondlog(
+		LVL7 "RunJob: weird, now %d, nexttime %d, waittime %d\n",
+			now.tv_sec, line->nexttime, line->waittime);
+
+		/* Recompute nextcycle */
+		set_timeout(line, 1 /*init_next_cycle*/);
+		return;
+	}
 	
 	if (now.tv_sec > line->end_time)
 	{

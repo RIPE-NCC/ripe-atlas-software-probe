@@ -5,6 +5,7 @@
  */
 
 #include "libbb.h"
+#include <math.h>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -260,14 +261,13 @@ static void format_stratum(char *line, size_t size, uint8_t stratum)
 static void format_8bit(char *line, size_t size, const char *label, 
 	int8_t value)
 {
-	if (value >= 0)
+	if (value >= 0 && value < 32)
 	{
-		snprintf(line, size, DBQ(%s) ": %d", label, 1 << value);
+		snprintf(line, size, DBQ(%s) ": %u", label, 1U << value);
 	}
 	else
 	{
-		snprintf(line, size, DBQ(%s) ": %g", label,
-			1.0 / (1 << -value));
+		snprintf(line, size, DBQ(%s) ": %g", label, pow(2, value));
 	}
 }
 
@@ -280,10 +280,33 @@ static void format_short_ts(char *line, size_t size, const char *label,
 static void format_ref_id(char *line, size_t size, uint32_t value,
 	uint8_t stratum)
 {
+	int i;
+	size_t offset;
+	unsigned char *p;
+	char line2[40];
+
 	if (stratum == 0 || stratum == 1)
 	{
-		snprintf(line, size, DBQ(ref-id) ": " DBQ(%.4s),
-			(char *)&value);
+		line2[0]= '\0';
+		for (i= 0, p= (unsigned char *)&value;
+			i<sizeof(value) && *p != '\0'; i++, p++)
+		{
+			offset= strlen(line2);
+			if (*p < 32 || *p == '"' || *p == '\\' ||
+				*p >= 127)
+			{
+				snprintf(line2+offset, sizeof(line2)-offset,
+					"\\\\x%02x", *p);
+			}
+			else
+			{
+				snprintf(line2+offset, sizeof(line2)-offset,
+					"%c", *p);
+			}
+				
+		}
+		snprintf(line, size, DBQ(ref-id) ": " DBQ(%s),
+			line2);
 	}
 	else
 	{
@@ -360,7 +383,7 @@ static void report(struct ntpstate *state)
 		state->dnsip ? (state->do_v6 ? 6 : 4) :
 		(state->sin6.sin6_family == AF_INET6 ? 6 : 4));
 
-	if (!state->first)
+	if (!state->first && !state->dnsip)
 	{
 		format_li(line, sizeof(line), state->ntp_flags);
 		fprintf(fh, ", %s", line);
@@ -1763,6 +1786,9 @@ static int create_socket(struct ntpstate *state)
 	protocol= 0;
 
 	state->socket= xsocket(af, type, protocol);
+#if 0
+ { errno= ENOSYS; state->socket= -1; }
+#endif
 	if (state->socket == -1)
 	{
 		serrno= errno;
@@ -1799,7 +1825,7 @@ static int create_socket(struct ntpstate *state)
 		serrno= errno;
 
 		snprintf(line, sizeof(line),
-	", " DBQ(error) ":" DBQ(connect failed: %s) " }",
+			"{ " DBQ(error) ":" DBQ(connect failed: %s) " }",
 			strerror(serrno));
 		add_str(state, line);
 		report(state);
@@ -1832,7 +1858,7 @@ static int create_socket(struct ntpstate *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int count;
+	int r, count;
 	struct ntpstate *env;
 	struct evutil_addrinfo *cur;
 	char line[160];
@@ -1883,6 +1909,24 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			continue;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
+
+		r= atlas_check_addr((struct sockaddr *)&env->sin6,
+			env->socklen);
+		if (r == -1)
+		{
+			if (env->result) free(env->result);
+			env->resmax= 80;
+			env->result= xmalloc(env->resmax);
+			env->reslen= 0;
+
+			env->starttime= time(NULL);
+			snprintf(line, sizeof(line),
+			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
+			add_str(env, line);
+			env->dnsip= 1;
+			report(env);
+			return;
+		}
 
 		traceroute_start2(env);
 

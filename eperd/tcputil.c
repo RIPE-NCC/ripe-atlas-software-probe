@@ -63,6 +63,14 @@ void tu_restart_connect(struct tu_env *env)
 	{
 		evtimer_add(&env->timer, &env->interval);
 
+		r= atlas_check_addr(env->dns_curr->ai_addr,
+			env->dns_curr->ai_addrlen);
+		if (r == -1)
+		{
+			env->reporterr(env, TU_BAD_ADDR, "");
+			return;
+		}
+
 		env->beforeconnect(env,
 			env->dns_curr->ai_addr, env->dns_curr->ai_addrlen);
 
@@ -165,6 +173,14 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	while (env->dns_curr)
 	{
 		evtimer_add(&env->timer, &env->interval);
+
+		r= atlas_check_addr(env->dns_curr->ai_addr,
+			env->dns_curr->ai_addrlen);
+		if (r == -1)
+		{
+			env->reporterr(env, TU_BAD_ADDR, "");
+			return;
+		}
 
 		env->beforeconnect(env,
 			env->dns_curr->ai_addr, env->dns_curr->ai_addrlen);

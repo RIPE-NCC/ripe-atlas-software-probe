@@ -308,7 +308,8 @@ struct query_state {
 	struct event next_qry_timer;  /* Timer event to start next query */
 	struct event done_qry_timer;  /* Timer event to call done */
 
-	struct timeval xmit_time;	
+	time_t xmit_time;	
+	struct timespec xmit_time_ts;	
 	double triptime;
 
 	//tdig_callback_type user_callback;
@@ -454,8 +455,8 @@ static struct option longopts[]=
 	{ "tsig", required_argument, NULL, (100000 + T_TSIG) },
 	{ "txt", required_argument, NULL, (100000 + T_TXT) },
 
-	{ "type", required_argument, NULL, 'O_TYPE' },
-	{ "class", required_argument, NULL, 'O_CLASS' },
+	{ "type", required_argument, NULL, O_TYPE },
+	{ "class", required_argument, NULL, O_CLASS },
 	{ "query", required_argument, NULL, O_QUERY},
 
 	// clas CHAOS
@@ -468,7 +469,7 @@ static struct option longopts[]=
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
 	{ "do", no_argument, NULL, 'd' },
-	{ "cd", no_argument, NULL, 'O_CD'},
+	{ "cd", no_argument, NULL, O_CD},
  	
 	{ "retry",  required_argument, NULL, O_RETRY },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
@@ -493,7 +494,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
-static void process_reply(void * arg, int nrecv, struct timeval now);
+static void process_reply(void * arg, int nrecv, struct timespec now);
 static void mk_dns_buff(struct query_state *qry,  u_char *packet);
 int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b);
 static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, void *arg);
@@ -548,26 +549,39 @@ int evtdig_main(int argc, char **argv)
 
 void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry)
 {
-        int i;
+        int i, len;
 
-        AS("\"RDATA\" : \"");
+        AS("\"RDATA\" : [ \"");
+	len= -1;
         for(i = 0; i < txt_len; i++) {
+		if (len == 0)
+		{
+			AS("\", \"");
+			len= -1;
+		}
+		if (len == -1)
+		{
+			len= *rdata;
+			rdata++;
+			continue;
+		}
                 if( (*rdata == 34  ) || (*rdata == 92  ))  {
-                        snprintf(line, DEFAULT_LINE_LENGTH, "\\%c", *(char *)rdata  );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\\\%03d", *(char *)rdata  );
 			buf_add(&qry->result, line, strlen (line));
                 }
-                // Space - DEL
-                else if ((*rdata > 31  ) && (*rdata < 128)) {
+                // Space - ~
+                else if ((*rdata >= ' '  ) && (*rdata <= '~')) {
                         snprintf(line, DEFAULT_LINE_LENGTH, "%c", *(char *)rdata );
 			buf_add(&qry->result, line, strlen (line));
                 }
                 else {
-                        snprintf(line, DEFAULT_LINE_LENGTH, "\\u00%02X", *rdata   );
+                        snprintf(line, DEFAULT_LINE_LENGTH, "\\\\%03d", *rdata   );
 			buf_add(&qry->result, line, strlen (line));
                 }
+		len--;
                 rdata++;
         }
-        AS("\"");
+        AS("\" ] ");
 }
 
 static void local_exit(void *state UNUSED_PARAM)
@@ -701,7 +715,10 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 
 
 		lookup_prepend = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(qry->lookupname));
-		snprintf(lookup_prepend, (sizeof(qry->lookupname) + DEFAULT_LINE_LENGTH - 1),  "%d.%lu.%s", probe_id, qry->xmit_time.tv_sec, qry->lookupname);
+		snprintf(lookup_prepend, (sizeof(qry->lookupname) +
+			DEFAULT_LINE_LENGTH - 1),
+			 "%d.%lu.%s", probe_id, qry->xmit_time,
+			qry->lookupname);
 
 		ChangetoDnsNameFormat(qname, lookup_prepend); // fill the query portion.
 
@@ -775,12 +792,12 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet)
 /* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	int fd;
+	int r, fd;
 	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
 	uint32_t nsent = 0;
-	u_char *outbuff;
+	u_char *outbuff= NULL;
 	int err = 0; 
 
 	/* Clean the no reply timer (if any was previously set) */
@@ -790,7 +807,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
-	gettimeofday(&qry->xmit_time, NULL);
+	qry->xmit_time= time(NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	mk_dns_buff(qry, outbuff);
 	do {
 		if (qry->udp_fd != -1)
@@ -807,6 +825,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"socket failed %s\"", qry->err.size ? ", " : "", strerror(errno));
 			buf_add(&qry->err, line, strlen(line));
 			printReply (qry, 0, NULL);
+			free (outbuff);
+			outbuff = NULL;
 			return;
 		} 
 
@@ -827,10 +847,28 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					qry->err.size ? ", " : "");
 				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
+				free (outbuff);
+				outbuff = NULL;
 				return;
 			}
 		}
 
+		if (!qry->opt_resolv_conf)
+		{
+			r= atlas_check_addr(qry->res->ai_addr,
+				qry->res->ai_addrlen);
+			if (r == -1)
+			{
+				free (outbuff);
+				outbuff = NULL;
+				snprintf(line, DEFAULT_LINE_LENGTH,
+				"%s \"reason\" : \"address not allowed\"",
+					qry->err.size ? ", " : "");
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				return;
+			}
+		}
 		qry->loc_socklen = sizeof(qry->loc_sin6);
 		if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
 		{
@@ -840,6 +878,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					strerror(errno));
 				buf_add(&qry->err, line, strlen(line));
 				printReply (qry, 0, NULL);
+				free (outbuff);
+				outbuff = NULL;
 				return;
 		}
 
@@ -965,6 +1005,11 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
 		buf_add(&qry->err, line, strlen(line));
                 break;
 
+        case TU_BAD_ADDR:
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_BAD_ADDR\" : true", qry->err.size ? ", " : "");
+		buf_add(&qry->err, line, strlen(line));
+                break;
+
         default:
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_UNKNOWN\" : \"%d %s\"", qry->err.size ? ", " : "", cause, str );
                 crondlog(DIE9 "reporterr: bad cause %d", cause);
@@ -993,9 +1038,10 @@ static void tcp_beforeconnect(struct tu_env *env,
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
-	gettimeofday(&qry->xmit_time, NULL); 
+	qry->xmit_time= time(NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->dst_ai_family = addr->sa_family;
-	BLURT(LVL5 "time : %d",  qry->xmit_time.tv_sec);
+	BLURT(LVL5 "time : %d",  qry->xmit_time);
 	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
 }
 
@@ -1037,7 +1083,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct query_state *qry = ptr;
         int n;
         u_char b2[2];
-        struct timeval rectime;
+        struct timespec rectime;
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
@@ -1054,7 +1100,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		return;
 	}
 
-        gettimeofday(&rectime, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
         bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
         input = bufferevent_get_input(bev);
@@ -1078,7 +1124,10 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
 			dnsR = (struct DNS_HEADER*) qry->packet.buf;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
-				qry->triptime = (rectime.tv_sec - qry->xmit_time.tv_sec)*1000 + (rectime.tv_usec-qry->xmit_time.tv_usec)/1e3;
+				qry->triptime = (rectime.tv_sec -
+					qry->xmit_time_ts.tv_sec)*1000 +
+					(rectime.tv_nsec -
+					qry->xmit_time_ts.tv_nsec)/1e6;
 				printReply (qry, qry->packet.size, (unsigned char *)qry->packet.buf);
 			}
 			else {
@@ -1113,7 +1162,7 @@ static void tcp_writecb(struct bufferevent *bev UNUSED_PARAM, void *ptr UNUSED_P
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct timeval now)
+static void process_reply(void * arg, int nrecv, struct timespec now)
 {
 	struct DNS_HEADER *dnsR = NULL;
 	struct tdig_base * base;
@@ -1141,8 +1190,9 @@ static void process_reply(void * arg, int nrecv, struct timeval now)
 	}
 
 	qry->base->recvbytes += nrecv;
-	gettimeofday(&now, NULL);  // lave this till fix now from ready_callback6 corruption; ghoost
-	qry->triptime = (now.tv_sec-qry->xmit_time.tv_sec)*1000 + (now.tv_usec-qry->xmit_time.tv_usec)/1e3;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now); // lave this till fix now from ready_callback6 corruption; ghoost
+	qry->triptime = (now.tv_sec-qry->xmit_time_ts.tv_sec)*1000 +
+		(now.tv_nsec-qry->xmit_time_ts.tv_nsec)/1e6;
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -1154,7 +1204,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 {
 	struct query_state * qry;
 	int nrecv;
-	struct timeval rectime;
+	struct timespec rectime;
 
 	// printf("in ready_callback\n");
 
@@ -1163,7 +1213,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 	/* Time the packet has been received */
 
-	gettimeofday(&rectime, NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
 	/* Receive data from the network */
 	nrecv = recv(qry->udp_fd, qry->base->packet,
 		sizeof(qry->base->packet), MSG_DONTWAIT);
@@ -1181,7 +1231,7 @@ static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_P
 {
 	struct query_state * qry;
 	int nrecv; 
-	struct timeval rectime;
+	struct timespec rectime;
 	struct msghdr msg;
 	struct iovec iov[1];
 	//char buf[INET6_ADDRSTRLEN];
@@ -1419,7 +1469,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_abuf = 0;
 				break;
 
-			case 'O_TYPE':
+			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
 				if ((qry->qtype >= 0 ) && 
 						(qry->qclass < 65536)) {
@@ -1438,11 +1488,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				}
 				break;
 
-			case 'O_CD':
+			case O_CD:
 				qry->opt_cd = 1;
 				break;
 
-			case 'O_CLASS':
+			case O_CLASS:
 				qry->qclass = strtoul(optarg, &check, 10);
 				if ((qry->qclass  >= 0 ) && 
 						(qry->qclass < 65536)) {
@@ -1793,6 +1843,8 @@ void tdig_start (void *arg)
 	switch(qry->qst)
 	{
 		case STATUS_FREE :
+			/* Get time in case we don't send any packet */
+			qry->xmit_time= time(NULL);
 			qry->resolv_i = 0;
 			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  tdig_base->resolv_max);
 			if( qry->opt_resolv_conf) {
@@ -1810,6 +1862,7 @@ void tdig_start (void *arg)
 					snprintf(line, DEFAULT_LINE_LENGTH, "\"nameserver\": \"no local resolvers found\"");
 					buf_add(&qry->err, line, strlen(line));
 					printReply (qry, 0, NULL);
+					return;
 				}
 			}
 			break;
@@ -1828,7 +1881,8 @@ void tdig_start (void *arg)
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 
-	gettimeofday(&qry->xmit_time, NULL);
+	qry->xmit_time= time(NULL);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
@@ -1905,6 +1959,7 @@ int tdig_base_count_queries(struct tdig_base *base)
 static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
 	struct timeval now;
+	struct timeval interval;
 	FILE *fh;	
 	struct tdig_base *base;
 	struct query_state *qry_h;
@@ -1922,9 +1977,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 
 
 	if(qry_h->base->done) {
-		now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
-		now.tv_usec =  0;
-		event_add(&tdig_base->statsReportEvent, &now);
+		interval.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+		interval.tv_usec =  0;
+		event_add(&tdig_base->statsReportEvent, &interval);
 		return;
 	}
 
@@ -1944,7 +1999,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	JS(id, "9201" ); 
 	fw = get_atlas_fw_version();
 	JU(fw, fw);
-	gettimeofday(&now, NULL); 
+	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
 	JU(sok , base->sentok);
 	JU(rok , base->recvok);
@@ -1965,10 +2020,9 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	buf_cleanup(&qry->result);
 	free(qry);
 
-	// reuse timeval now
-	now.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
-	now.tv_usec =  0;
-	event_add(&tdig_base->statsReportEvent, &now);
+	interval.tv_sec =  DEFAULT_STATS_REPORT_INTERVEL;
+	interval.tv_usec =  0;
+	event_add(&tdig_base->statsReportEvent, &interval);
 }
 
 
@@ -2161,7 +2215,7 @@ void printErrorQuick (struct query_state *qry)
 	{
 		fprintf(fh, ",{");
 		fprintf(fh, "\"id\" : \"%s\"",  qry->str_Atlas);
-		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time.tv_sec);
+		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time);
 		if(qry->retry) {
 			fprintf(fh, ",\"retry\": %d",  qry->retry);
 			
@@ -2208,7 +2262,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 		JD(fw, fw);
 		if (qry->opt_rset){
-			JS1(time, %ld,  qry->xmit_time.tv_sec);
+			JS1(time, %ld,  qry->xmit_time);
 			JD(lts,lts);
 			AS("\"resultset\" : [ {");
 		}
@@ -2218,7 +2272,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		AS (",{");
 	}
 
-	JS1(time, %ld,  qry->xmit_time.tv_sec);
+	JS1(time, %ld,  qry->xmit_time);
 	JD(lts,lts);
 
 	if ( qry->opt_resolv_conf ) {
@@ -2329,7 +2383,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
-					data_len = ntohs(answers[i].resource->data_len) - 1;
+					data_len = ntohs(answers[i].resource->data_len);
 					if(flagAnswer == 0) {
 						AS(",\"answers\" : [ {");
 						flagAnswer++;
@@ -2340,7 +2394,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					flagAnswer++;
 					JS (TYPE, "TXT");
 					JS (NAME, answers[i].name);
-					print_txt_json(&result[reader-result+1], data_len, qry);
+					print_txt_json(&result[reader-result], data_len, qry);
 					reader = reader + ntohs(answers[i].resource->data_len);
 					AS("}");
 
