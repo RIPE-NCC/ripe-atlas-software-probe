@@ -480,7 +480,7 @@ static struct option longopts[]=
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
-	
+
 	{ NULL, }
 };
 static char line[(DEFAULT_LINE_LENGTH+1)];
@@ -888,7 +888,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 
 		if (nsent == qry->pktsize) {
 			if (getsockname(qry->udp_fd, (struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
-				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getscokname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
+				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getsockname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
 				buf_add(&qry->err, line, strlen(line));
 			}
 
@@ -2244,7 +2244,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	u_int32_t serial;
 	int iMax ;
 	int flagAnswer = 0;
-	int data_len;
+	int data_len, offset;
 	int write_out = FALSE;
 
 	int fw = get_atlas_fw_version();
@@ -2376,6 +2376,13 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					reader-result,&stop);
 				reader = reader + stop;
 
+				if (reader + sizeof(answers[i].resource) > 
+					result + wire_size)
+				{
+					/* Report error? */
+					break;
+				}
+
 				answers[i].resource = (struct R_DATA*)(reader);
 				reader = reader + sizeof(struct R_DATA);
 
@@ -2394,7 +2401,11 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					flagAnswer++;
 					JS (TYPE, "TXT");
 					JS (NAME, answers[i].name);
-					print_txt_json(&result[reader-result], data_len, qry);
+					offset= reader-result;
+					if (offset+data_len > wire_size)
+						data_len= wire_size-offset;
+					print_txt_json(reader,
+						data_len, qry);
 					reader = reader + ntohs(answers[i].resource->data_len);
 					AS("}");
 
@@ -2505,6 +2516,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 {
 	unsigned char *name;
 	unsigned int p=0,jumped=0, len;
+	size_t noffset;
 
 	*count = 0;
 	name = (unsigned char*)malloc(256);
@@ -2512,28 +2524,30 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 	name[0]= '\0';
 
 	//read the names in 3www6google3com format
-	while(len= base[offset], len !=0)
+	while(offset < size && (len= base[offset], len !=0))
 	{
 		if (len & 0xc0)
 		{
 			if ((len & 0xc0) != 0xc0)
 			{
 				/* Bad format */
-				strcpy((char *)name, "format-error");
-				printf("format-error: len = %d\n",
-					len);
-				abort();
+				snprintf((char *)name, sizeof(name),
+					"format-error at %lu: value 0x%x",
+					offset, len);
+				//abort();
 				return name;
 			}
 
-			offset= ((len & ~0xc0) << 8) | base[offset+1];
-			if (offset >= size)
+			noffset= ((len & ~0xc0) << 8) | base[offset+1];
+			if (noffset >= size)
 			{
-				strcpy((char *)name, "offset-error");
-				printf("offset-error\n");
-				abort();
+				snprintf((char *)name, sizeof(name),
+					"offset-error at %lu: offset %lu",
+					offset, noffset);
+				//abort();
 				return name;
 			}
+			offset= noffset;
 			if(jumped==0)
 			{
 				/* if we havent jumped to another location
@@ -2546,17 +2560,19 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		}
 		if (offset+len+1 > size)
 		{
-			strcpy((char *)name, "buf-bounds-error");
-			printf("buf-bounds-error\n");
-			abort();
+			snprintf((char *)name, sizeof(name),
+				"buf-bounds-error at %lu: len %d",
+					offset, len);
+			//abort();
 			return name;
 		}
 
 		if (p+len+1 > 255)
 		{
-			strcpy((char *)name, "name-length-error");
-			printf("name-length-error\n");
-			abort();
+			snprintf((char *)name, sizeof(name),
+					"name-length-error at %lu: len %d",
+					offset, p+len+1);
+			//abort();
 			return name;
 		}
 		memcpy(name+p, base+offset+1, len);
