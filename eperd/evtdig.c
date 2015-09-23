@@ -297,6 +297,10 @@ struct query_state {
 	char * server_name;
 	char *out_filename ;
 
+	/* For fuzzing */
+	char *response_out;
+	char *response_in;
+
 	uint32_t pktsize;              /* Packet size in bytes */
 	struct addrinfo *res, *ressave, *ressent;
 
@@ -480,6 +484,9 @@ static struct option longopts[]=
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
+
+	{ "write-response", required_argument, NULL, 200000 + 'W'},
+	{ "read-response", required_argument, NULL, 200000 + 'R'},
 
 	{ NULL, }
 };
@@ -820,7 +827,16 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 
 		af = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
 
-		if ((fd = socket(af, SOCK_DGRAM, 0) ) < 0 )
+		if (qry->response_in)
+		{
+			fd= open(qry->response_in, O_RDONLY);
+			if (fd == -1)
+			{
+				crondlog(DIE9 "unable to open '%s': %s",
+				qry->response_in, strerror(errno));
+			}
+		}
+		else if ((fd = socket(af, SOCK_DGRAM, 0) ) < 0 )
 		{
 			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"socket failed %s\"", qry->err.size ? ", " : "", strerror(errno));
 			buf_add(&qry->err, line, strlen(line));
@@ -870,7 +886,9 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			}
 		}
 		qry->loc_socklen = sizeof(qry->loc_sin6);
-		if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
+		if (qry->response_in)
+			;	/* No need to connect */
+		else if (connect(qry->udp_fd, qry->res->ai_addr, qry->res->ai_addrlen) == -1)
 		{
 				snprintf(line, DEFAULT_LINE_LENGTH,
 					"%s \"socket\" : \"connect failed %s\"",
@@ -883,7 +901,13 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				return;
 		}
 
-		nsent = send(qry->udp_fd, outbuff,qry->pktsize, MSG_DONTWAIT);
+		if (qry->response_in)
+			nsent= qry->pktsize;
+		else
+		{
+			nsent = send(qry->udp_fd, outbuff,qry->pktsize,
+				MSG_DONTWAIT);
+		}
 		qry->ressent = qry->res;
 
 		if (nsent == qry->pktsize) {
@@ -897,6 +921,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			base->sentbytes += nsent;
 			err  = 0;
 			/* Add the timer to handle no reply condition in the given timeout */
+			if (qry->response_in)
+				msecstotv(1, &base->tv_noreply);
 			evtimer_add(&qry->noreply_timer, &base->tv_noreply);
 			if(qry->opt_qbuf) {
 				buf_init(&qry->qbuf, -1);
@@ -911,6 +937,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					, strerror(errno) ,  qry->res->ai_family == AF_INET ? "AF_INET" :"NOT AF_INET"); 
 			buf_add(&qry->err, line, strlen(line));
 		}
+		if (qry->response_in)
+			ready_callback(0, 0, qry);
 	} while ((qry->res = qry->res->ai_next) != NULL);
 	free (outbuff);
 	outbuff = NULL;
@@ -1205,6 +1233,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	struct query_state * qry;
 	int nrecv;
 	struct timespec rectime;
+	FILE *fh;
 
 	// printf("in ready_callback\n");
 
@@ -1215,12 +1244,29 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 
 	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
 	/* Receive data from the network */
-	nrecv = recv(qry->udp_fd, qry->base->packet,
-		sizeof(qry->base->packet), MSG_DONTWAIT);
+	if (qry->response_in)
+	{
+		nrecv= read(qry->udp_fd, qry->base->packet,
+			sizeof(qry->base->packet));
+	}
+	else
+	{
+		nrecv = recv(qry->udp_fd, qry->base->packet,
+			sizeof(qry->base->packet), MSG_DONTWAIT);
+	}
 	if (nrecv < 0) {
 		/* One more failure */
 		qry->base->recvfail++;
 		return ;
+	}
+	if (qry->response_out)
+	{
+		fh= fopen(qry->response_out, "w");
+		if (fh)
+		{
+			fwrite(qry->base->packet, nrecv, 1, fh);
+			fclose(fh);
+		}
 	}
 	process_reply(arg, nrecv, rectime);
 	return;
@@ -1721,6 +1767,18 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->qtype = T_TXT;
 				qry->qclass = C_IN;
 				qry->lookupname =  strdup(optarg);
+				break;
+
+			case 200000 + 'W':
+				printf("write-response: to %s\n", optarg);
+				if (qry->response_out) free(qry->response_out);
+				qry->response_out= strdup(optarg);
+				break;
+
+			case 200000 + 'R':
+				printf("read-response: from %s\n", optarg);
+				if (qry->response_in) free(qry->response_in);
+				qry->response_in= strdup(optarg);
 				break;
 
 			default:
