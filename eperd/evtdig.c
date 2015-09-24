@@ -966,6 +966,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 {
 	struct timeval asap = { 1, 1 };
 	struct query_state *qry = h;
+
 	qry->base->timeout++;
 	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", DEFAULT_NOREPLY_TIMEOUT);
 	buf_add(&qry->err, line, strlen(line));
@@ -2108,6 +2109,12 @@ static void free_qry_inst(struct query_state *qry)
 {
 	struct timeval asap = { 1, 0 };
 	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
+
+	if (qry->response_in)
+	{
+		asap.tv_sec= 0;
+		asap.tv_usec= 1;
+	}
 
 	if(qry->err.size) 
 	{
