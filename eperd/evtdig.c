@@ -2435,6 +2435,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		{
 			iMax = MIN(2, ntohs(dnsR->ans_count));
 
+			memset(answers, '\0', sizeof(answers));
+
 			for(i=0;i<iMax;i++)
 			{
 				answers[i].name=ReadName(result,wire_size,
@@ -2580,7 +2582,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 	int* count)
 {
 	unsigned char *name;
-	unsigned int p=0,jumped=0, len;
+	unsigned int p=0,jumped=0, jump_count=0, len;
 	size_t noffset;
 
 	*count = 0;
@@ -2612,6 +2614,17 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				//abort();
 				return name;
 			}
+
+			if (jump_count > 256)
+			{
+				/* Too many */
+				snprintf((char *)name, sizeof(name),
+					"too many redirects at %lu",
+						offset);
+				//abort();
+				return name;
+			}
+
 			offset= noffset;
 			if(jumped==0)
 			{
@@ -2621,6 +2634,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				*count += 2;
 			}
 			jumped= 1;
+			jump_count++;
 			continue;
 		}
 		if (offset+len+1 > size)
