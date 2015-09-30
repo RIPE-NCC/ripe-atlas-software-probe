@@ -911,7 +911,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		qry->ressent = qry->res;
 
 		if (nsent == qry->pktsize) {
-			if (getsockname(qry->udp_fd, (struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
+			if (!qry->response_in && getsockname(qry->udp_fd, (struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
 				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getsockname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
 				buf_add(&qry->err, line, strlen(line));
 			}
