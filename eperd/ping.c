@@ -26,7 +26,7 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46rc:s:A:O:i:I:")
+#define PING_OPT_STRING ("!46rc:s:A:O:i:I:R:W:")
 
 enum 
 {
@@ -148,6 +148,11 @@ struct pingstate
 	/* Packets Counters */
 	size_t cursize;
 	counter_t sentpkts;            /* Total # of ICMP Echo Requests sent */
+
+	/* For fuzzing */
+	char *response_in;
+	char *response_out;
+	FILE *resp_file_out;
 };
 
 /* User Data added to the ICMP header
@@ -165,6 +170,10 @@ struct evdata {
 };
 
 
+static void ready_callback4(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void * arg);
+static void ready_callback6(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void * arg);
 
 /* Initialize a struct timeval by converting milliseconds */
 static void
@@ -587,10 +596,18 @@ static void ping_xmit(struct pingstate *host)
 		host->loc_socklen= sizeof(host->loc_sin6);
 		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
 
-		nsent = sendto(host->socket, base->packet,
-			host->cursize+ICMP6_HDRSIZE,
-			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
-			host->socklen);
+		if (host->response_in)
+		{
+			/* Assume the send succeeded */
+			nsent= host->cursize+ICMP6_HDRSIZE;
+		}
+		else
+		{
+			nsent = sendto(host->socket, base->packet,
+				host->cursize+ICMP6_HDRSIZE,
+				MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
+				host->socklen);
+		}
 
 	}
 	else
@@ -602,10 +619,18 @@ static void ping_xmit(struct pingstate *host)
 		host->loc_socklen= sizeof(host->loc_sin6);
 		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
 
-		nsent = sendto(host->socket, base->packet,
-			host->cursize+ICMP_MINLEN,
-			MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
-			host->socklen);
+		if (host->response_in)
+		{
+			/* Assume the send succeeded */
+			nsent= host->cursize+ICMP_MINLEN;
+		}
+		else
+		{
+			nsent = sendto(host->socket, base->packet,
+				host->cursize+ICMP_MINLEN,
+				MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
+				host->socklen);
+		}
 	}
 
 	if (nsent > 0)
@@ -631,6 +656,14 @@ static void ping_xmit(struct pingstate *host)
 	/* Add the timer to handle no reply condition in the given timeout */
 	msecstotv(host->interval, &tv_interval);
 	evtimer_add(&host->ping_timer, &tv_interval);
+
+	if (host->response_in)
+	{
+		if (host->sin6.sin6_family == AF_INET6)
+			ready_callback6(0, 0, host);
+		else
+			ready_callback4(0, 0, host);
+	}
 }
 
 
@@ -690,11 +723,57 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
 	/* Receive data from the network */
-	nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
+	if (state->response_in)
+	{
+		uint32_t len;
+		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_callback4: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_callback4: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket, base->packet, len) != len)
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		nrecv= len;
+	}
+	else nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
 	  {
 	    goto done;
 	  }
+
+	if (state->resp_file_out)
+	{
+		uint32_t len= nrecv;
+
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+	}
 
 #if 0
 		{ int i;
@@ -731,9 +810,7 @@ printf("ready_callback4: too short\n");
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
 	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
-	  {
 	    goto done;
-	  }
 
 	/* Get the pointer to the host descriptor in our internal table */
 	if (state != base->table[data->index])
@@ -857,11 +934,74 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	msg.msg_flags= 0;			/* Not really needed */
 
 	/* Receive data from the network */
-	nrecv= recvmsg(state->socket, &msg, MSG_DONTWAIT);
+	if (state->response_in)
+	{
+		uint32_t len;
+		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_callback6: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_callback6: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket, base->packet, len) != len)
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+
+		nrecv= len;
+
+		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+
+		/* Do try to fuzz the cmsgbuf. We assume stuff returned by
+		 * the kernel can be trusted.
+		 */
+		memset(cmsgbuf, '\0', sizeof(cmsgbuf));
+	}
+	else
+		nrecv= recvmsg(state->socket, &msg, MSG_DONTWAIT);
+
 	if (nrecv < 0)
 	  {
 	    goto done;
 	  }
+
+	if (state->resp_file_out)
+	{
+		uint32_t len= nrecv;
+
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+	}
 
 	/* Check the ICMP header to drop unexpected packets due to
 	 * unrecognized id
@@ -970,6 +1110,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	char *str_Atlas;
 	char *out_filename;
 	char *interface;
+	char *response_in, *response_out;
 	struct pingstate *state;
 	len_and_sockaddr *lsa;
 	FILE *fh;
@@ -1016,10 +1157,13 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	out_filename= NULL;
 	interval= DEFAULT_PING_INTERVAL;
 	interface= NULL;
+	response_in= NULL;
+	response_out= NULL;
 	/* exactly one argument needed; -c NUM */
 	opt_complementary = "=1:c+:s+:i+";
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
-		&str_Atlas, &out_filename, &interval, &interface);
+		&str_Atlas, &out_filename, &interval, &interface,
+		&response_in, &response_out);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -1103,6 +1247,14 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->interval= interval;
 	state->interface= interface;
 	state->socket= -1;
+	state->response_in= response_in ? strdup(response_in) : NULL;
+	state->response_out= response_out ? strdup(response_out) : NULL;
+
+	if (state->response_in || state->response_out)
+	{
+		ping_base->pid= 42;
+		memset(&cookie, 42, sizeof(cookie));
+	}
 
 	state->seq = 1;
 
@@ -1166,9 +1318,18 @@ static void ping_start2(void *state)
 		/* Check if the ICMP protocol is available on this system */
 		p_proto= IPPROTO_ICMP;
 
-		/* Create an endpoint for communication using raw socket for
-		 * ICMP calls */
-		if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
+		if (pingstate->response_in)
+		{
+			fd= open(pingstate->response_in, O_RDONLY);
+			if (fd == -1)
+			{
+				crondlog(DIE9 "unable to open '%s'",
+					pingstate->response_in);
+			}
+		}
+		else if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
+			/* Create an endpoint for communication using raw	
+			 * socket for ICMP calls */
 			snprintf(line, sizeof(line),
 				"{ " DBQ(error) ":" DBQ(socket failed: %s)
 				" }", strerror(errno));
@@ -1191,7 +1352,16 @@ static void ping_start2(void *state)
 		/* Check if the ICMP6 protocol is available on this system */
 		p_proto= IPPROTO_ICMPV6;
 
-		if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
+		if (pingstate->response_in)
+		{
+			fd= open(pingstate->response_in, O_RDONLY);
+			if (fd == -1)
+			{
+				crondlog(DIE9 "unable to open '%s'",
+					pingstate->response_in);
+			}
+		}
+		else if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
 			snprintf(line, sizeof(line),
 				"{ " DBQ(error) ":" DBQ(socket failed: %s)
 				" }", strerror(errno));
@@ -1238,7 +1408,8 @@ static void ping_start2(void *state)
 		}
 	}
 
-	if (connect(pingstate->socket, &pingstate->sin6, 
+	if (!pingstate->response_in && 
+		connect(pingstate->socket, &pingstate->sin6, 
 		pingstate->socklen) == -1)
 	{
 		snprintf(line, sizeof(line),
@@ -1362,6 +1533,7 @@ static void ping_start(void *state)
 	pingstate->resmax= 80;
 	pingstate->result= xmalloc(pingstate->resmax);
 	pingstate->reslen= 0;
+	pingstate->resp_file_out= NULL;
 
 	pingstate->first= 1;
 	pingstate->got_reply= 0;
@@ -1369,6 +1541,16 @@ static void ping_start(void *state)
 	pingstate->busy= 1;
 
 	pingstate->maxpkts= pingstate->pingcount;
+
+	if (pingstate->response_out)
+	{
+		pingstate->resp_file_out= fopen(pingstate->response_out, "w");
+		if (!pingstate->resp_file_out)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				pingstate->response_out);
+		}
+	}
 
 	if (!pingstate->delay_name_res)
 	{
