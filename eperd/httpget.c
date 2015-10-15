@@ -336,7 +336,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 		break;
 	case READ_HEADER:
 		if (state->max_headers)
-			add_str(s, " ], ");
+			add_str(state, " ], ");
 		add_str(state, ", " DBQ(err) ":" DBQ(timeout reading headers));
 		report(state);
 		break;
