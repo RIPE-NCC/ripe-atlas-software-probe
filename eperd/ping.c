@@ -791,7 +791,6 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	if (nrecv < hlen + ICMP_MINLEN || ip->ip_hl < 5)
 	  {
 	    /* One more too short packet */
-printf("ready_callback4: too short\n");
 	    goto done;
 	  }
 
@@ -871,7 +870,6 @@ printf("ready_callback4: too short\n");
 	  }
 	else
 	{
-printf("ready_callback4: not an echo reply\n");
 	  /* Handle this condition exactly as the request has expired */
 	  noreply_callback (-1, -1, state);
 	}
@@ -972,16 +970,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 		nrecv= len;
 
-		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
-		{
-			//printf("ready_callback6: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback6: error reading from '%s'",
-				state->response_in);
-		}
-
-		/* Do try to fuzz the cmsgbuf. We assume stuff returned by
+		/* Do not try to fuzz the cmsgbuf. We assume stuff returned by
 		 * the kernel can be trusted.
 		 */
 		memset(cmsgbuf, '\0', sizeof(cmsgbuf));
