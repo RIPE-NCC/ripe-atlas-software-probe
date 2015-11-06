@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:O:S:H:D:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:O:S:H:D:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -103,6 +103,9 @@ struct trtstate
 	unsigned duptimeout;
 	unsigned timeout;
 
+	char *response_in;	/* Fuzzing */
+	char *response_out;
+
 	/* Base and index in table */
 	struct trtbase *base;
 	int index;
@@ -157,6 +160,8 @@ struct trtstate
 	size_t reslen;
 	size_t resmax;
 	char open_result;
+
+	FILE *resp_file_out;	/* Fuzzing */
 };
 
 static struct trtbase *trt_base;
@@ -189,6 +194,12 @@ struct v6info
 };
 
 static int create_socket(struct trtstate *state, int do_tcp);
+static void ready_callback4(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
+static void ready_tcp4(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
+static void ready_callback6(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
 
 #define OPT_PAD1 0
 #define OPT_PADN 1
@@ -528,7 +539,12 @@ static void send_pkt(struct trtstate *state)
 
 		if (state->do_tcp)
 		{
-			sock= socket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
+			if (state->response_in)
+				sock= open("/dev/null", O_RDWR);
+			else
+			{
+				sock= socket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
+			}
 			if (sock == -1)
 			{
 				crondlog(DIE9 "socket failed");
@@ -552,9 +568,14 @@ static void send_pkt(struct trtstate *state)
 #endif
 
 			/* Bind to source addr/port */
-			r= bind(sock,
-				(struct sockaddr *)&state->loc_sin6,
-				state->loc_socklen);
+			if (state->response_in)
+				r= 0;	/* No need to bind */
+			else
+			{
+				r= bind(sock,
+					(struct sockaddr *)&state->loc_sin6,
+					state->loc_socklen);
+			}
 			if (r == -1)
 			{
 				serrno= errno;
@@ -618,9 +639,14 @@ static void send_pkt(struct trtstate *state)
 
 			sin6copy= state->sin6;
 			sin6copy.sin6_port= 0;
-			r= sendto(sock, base->packet, len, 0,
-				(struct sockaddr *)&sin6copy,
-				state->socklen);
+			if (state->response_in)
+				r= 0;	/* No need to send anything */
+			else
+			{
+				r= sendto(sock, base->packet, len, 0,
+					(struct sockaddr *)&sin6copy,
+					state->socklen);
+			}
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -725,9 +751,15 @@ static void send_pkt(struct trtstate *state)
 			memset(&sin6copy, '\0', sizeof(sin6copy));
 			sin6copy.sin6_family= AF_INET6;
 			sin6copy.sin6_addr= state->sin6.sin6_addr;
-			r= sendto(state->socket_icmp, base->packet, len, 0,
-				(struct sockaddr *)&sin6copy,
-				sizeof(sin6copy));
+
+			if (state->response_in)
+				r= 0;
+			else
+			{
+				r= sendto(state->socket_icmp, base->packet,
+					len, 0, (struct sockaddr *)&sin6copy,
+					sizeof(sin6copy));
+			}
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -752,7 +784,12 @@ static void send_pkt(struct trtstate *state)
 		}
 		else if (state->do_udp)
 		{
-			sock= socket(AF_INET6, SOCK_DGRAM, 0);
+			if (state->response_in)
+				sock= open("/dev/null", O_RDWR);
+			else
+			{
+				sock= socket(AF_INET6, SOCK_DGRAM, 0);
+			}
 			if (sock == -1)
 			{
 				crondlog(DIE9 "socket failed");
@@ -774,9 +811,14 @@ static void send_pkt(struct trtstate *state)
 			}
 
 			/* Bind to source addr/port */
-			r= bind(sock,
-				(struct sockaddr *)&state->loc_sin6,
-				state->loc_socklen);
+			if (state->response_in)
+				r= 0;	/* No need to bind */
+			else
+			{
+				r= bind(sock,
+					(struct sockaddr *)&state->loc_sin6,
+					state->loc_socklen);
+			}
 			if (r == -1)
 			{
 				serrno= errno;
@@ -840,9 +882,14 @@ static void send_pkt(struct trtstate *state)
 				len= state->curpacksize;
 			}
 
-			r= sendto(sock, base->packet, len, 0,
-				(struct sockaddr *)&state->sin6,
-				state->socklen);
+			if (state->response_in)
+				r= 0;	/* No need to bind */
+			else
+			{
+				r= sendto(sock, base->packet, len, 0,
+					(struct sockaddr *)&state->sin6,
+					state->socklen);
+			}
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -878,7 +925,12 @@ static void send_pkt(struct trtstate *state)
 
 		if (state->do_tcp)
 		{
-			sock= socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+			if (state->response_in)
+				sock= open("/dev/null", O_RDWR);
+			else
+			{
+				sock= socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+			}
 			if (sock == -1)
 			{
 				crondlog(DIE9 "socket failed");
@@ -889,9 +941,14 @@ static void send_pkt(struct trtstate *state)
 				sizeof(on));
 
 			/* Bind to source addr/port */
-			r= bind(sock,
-				(struct sockaddr *)&state->loc_sin6,
-				state->loc_socklen);
+			if (state->response_in)
+				r= 0;
+			else
+			{
+				r= bind(sock,
+					(struct sockaddr *)&state->loc_sin6,
+					state->loc_socklen);
+			}
 #if 0
  { static int doit=1; if (doit && r != -1)
  { errno= ENOSYS; r= -1; } doit= !doit; }
@@ -986,9 +1043,14 @@ static void send_pkt(struct trtstate *state)
 			setsockopt(sock, IPPROTO_IP,
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
-			r= sendto(sock, base->packet, len, 0,
-				(struct sockaddr *)&state->sin6,
-				state->socklen);
+			if (state->response_in)
+				r= 0;	/* No need to send */
+			else
+			{
+				r= sendto(sock, base->packet, len, 0,
+					(struct sockaddr *)&state->sin6,
+					state->socklen);
+			}
 
 #if 0
  { static int doit=0; if (doit && r != -1)
@@ -1071,9 +1133,14 @@ static void send_pkt(struct trtstate *state)
 			setsockopt(state->socket_icmp, IPPROTO_IP,
 				IP_MTU_DISCOVER, &on, sizeof(on));
 
-			r= sendto(state->socket_icmp, base->packet, len, 0,
-				(struct sockaddr *)&state->sin6,
-				state->socklen);
+			if (state->response_in)
+				r= 0;	/* No need to send packet */
+			else
+			{
+				r= sendto(state->socket_icmp, base->packet, len, 0,
+					(struct sockaddr *)&state->sin6,
+					state->socklen);
+			}
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -1254,6 +1321,13 @@ static void send_pkt(struct trtstate *state)
 	interval.tv_usec= state->timeout % 1000000;
 	evtimer_add(&state->timer, &interval);
 
+	if (state->response_in)
+	{
+		if (state->sin6.sin6_family == AF_INET6)
+			ready_callback6(0, 0, state);
+		else
+			ready_callback4(0, 0, state);
+	}
 }
 
 static void do_mpls(struct trtstate *state, unsigned char *packet,
@@ -1373,8 +1447,75 @@ static void ready_callback4(int __attribute((unused)) unused,
 	base= state->base;
 
 	slen= sizeof(remote);
-	nrecv= recvfrom(state->socket_icmp, base->packet, sizeof(base->packet),
-		MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+	if (state->response_in)
+	{
+		uint8_t proto;
+		uint32_t len;
+
+		if (read(state->socket_icmp, &proto, sizeof(proto)) != sizeof(proto))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (proto == 0)
+		{
+			printf("ready_callback4: proto 0 -> timeout\n");
+			return;	/* Timeout */
+		}
+		if (proto == 6)
+		{
+			printf("ready_callback4: proto 6 -> TCP\n");
+			ready_tcp4(0, 0, s);
+			return;
+		}
+		if (proto != 1)
+		{
+			printf("ready_callback4: proto != 1\n");
+			return;
+		}
+
+		if (read(state->socket_icmp, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_callback4: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_callback4: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket_icmp, base->packet, len) != len)
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket_icmp, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		nrecv= len;
+	}
+	else
+	{
+		nrecv= recvfrom(state->socket_icmp, base->packet, sizeof(base->packet),
+			MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+	}
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
@@ -1382,6 +1523,17 @@ static void ready_callback4(int __attribute((unused)) unused,
 		return;
 	}
 	// printf("ready_callback4: got packet\n");
+
+	if (state->resp_file_out)
+	{
+		uint8_t proto= 1;
+		uint32_t len= nrecv;
+
+		fwrite(&proto, sizeof(proto), 1, state->resp_file_out);
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+	}
 
 	ip= (struct ip *)base->packet;
 	hlen= ip->ip_hl*4;
@@ -1541,6 +1693,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 				printf("ready_callback4: changed source %s\n",
 					inet_ntoa(eip->ip_src));
+				printf("ready_callback4: expected %s\n",
+					inet_ntoa(((struct sockaddr_in *)&state->loc_sin6)->sin_addr));
 			}
 			if (memcmp(&eip->ip_dst,
 				&((struct sockaddr_in *)&state->sin6)->
@@ -1607,7 +1761,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 								nextmtu;
 						}
 					}
-printf("curpacksize: %d\n", state->curpacksize);
 					if (!late)
 						state->not_done= 1;
 					break;
@@ -1820,7 +1973,6 @@ printf("curpacksize: %d\n", state->curpacksize);
 								nextmtu;
 						}
 					}
-printf("curpacksize: %d\n", state->curpacksize);
 					if (!late)
 						state->not_done= 1;
 					break;
@@ -1903,7 +2055,6 @@ printf("curpacksize: %d\n", state->curpacksize);
 			}
 			if (!state->busy)
 			{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 				printf(
 			"ready_callback4: index (%d) is not busy\n",
 					ind);
@@ -1983,6 +2134,8 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 			{
 				printf("ready_callback4: changed source %s\n",
 					inet_ntoa(eip->ip_src));
+				printf("ready_callback4: expected %s\n",
+					inet_ntoa(((struct sockaddr_in *)&state->loc_sin6)->sin_addr));
 			}
 			if (memcmp(&eip->ip_dst,
 				&((struct sockaddr_in *)&state->sin6)->
@@ -2179,7 +2332,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 		if (!state->busy)
 		{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 			printf(
 		"ready_callback4: index (%d) is not busy\n",
 				ind);
@@ -2344,13 +2496,67 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	base= state->base;
 
 	slen= sizeof(remote);
-	nrecv= recvfrom(state->socket_tcp, base->packet, sizeof(base->packet),
-		MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+
+	if (state->response_in)
+	{
+		uint32_t len;
+
+		/* Proto is eaten by ready_callback4 */
+		if (read(state->socket_icmp, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_tcp4: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket_icmp, base->packet, len) != len)
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket_icmp, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		nrecv= len;
+	}
+	else
+	{
+		nrecv= recvfrom(state->socket_tcp, base->packet, sizeof(base->packet),
+			MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+	}
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
 		printf("ready_tcp4: read error '%s'\n", strerror(errno));
 		return;
+	}
+
+	if (state->resp_file_out)
+	{
+		uint8_t proto= 6;
+		uint32_t len= nrecv;
+
+		fwrite(&proto, sizeof(proto), 1, state->resp_file_out);
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
 	}
 
 	ip= (struct ip *)base->packet;
@@ -2399,7 +2605,6 @@ static void ready_tcp4(int __attribute((unused)) unused,
 
 	if (!state->busy)
 	{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 		printf(
 	"ready_callback4: index (%d) is not busy\n",
 			ind);
@@ -2416,7 +2621,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	seq= ntohl(tcphdr->ack_seq) & 0xffff;
 	if (seq-state->seq > 0x2000)
 	{
-printf("got seq %d, expected %d\n", seq, state->seq);
 		if (seq > state->seq)
 		{
 #if 0
@@ -2537,12 +2741,63 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	msg.msg_controllen= sizeof(cmsgbuf);
 	msg.msg_flags= 0;			/* Not really needed */
 
-	nrecv= recvmsg(state->socket_tcp, &msg, MSG_DONTWAIT);
+	if (state->response_in)
+	{
+		uint32_t len;
+
+		/* Proto is eaten by ready_callback4 */
+		if (read(state->socket_icmp, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_tcp4: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket_icmp, base->packet, len) != len)
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket_icmp, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_tcp4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_tcp4: error reading from '%s'",
+				state->response_in);
+		}
+		nrecv= len;
+	}
+	else
+		nrecv= recvmsg(state->socket_tcp, &msg, MSG_DONTWAIT);
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
 		printf("ready_tcp6: read error '%s'\n", strerror(errno));
 		return;
+	}
+
+	if (state->resp_file_out)
+	{
+		uint8_t proto= 6;
+		uint32_t len= nrecv;
+
+		fwrite(&proto, sizeof(proto), 1, state->resp_file_out);
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
 	}
 
 	rcvdttl= -42;	/* To spot problems */
@@ -2601,7 +2856,6 @@ static void ready_tcp6(int __attribute((unused)) unused,
 
 	if (!state->busy)
 	{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 		printf("ready_tcp6: index (%d) is not busy\n", ind);
 		return;
 	}
@@ -2616,7 +2870,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	seq= ntohl(tcphdr->ack_seq) & 0xffff;
 	if (seq-state->seq > 0x2000)
 	{
-printf("got seq %d, expected %d\n", seq, state->seq);
 		if (seq > state->seq)
 		{
 #if 0
@@ -2717,7 +2970,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	struct v6info *v6info;
 	struct cmsghdr *cmsgptr;
 	void *ptr;
-	double ms;
+	double ms= -42;	/* lint, to spot problems */
 	struct timespec now;
 	struct sockaddr_in6 remote;
 	struct in6_addr dstaddr;
@@ -2743,12 +2996,92 @@ static void ready_callback6(int __attribute((unused)) unused,
 	msg.msg_controllen= sizeof(cmsgbuf);
 	msg.msg_flags= 0;			/* Not really needed */
 
-	nrecv= recvmsg(state->socket_icmp, &msg, MSG_DONTWAIT);
+	/* Receive data from the network */
+	if (state->response_in)
+	{
+		uint8_t proto;
+		uint32_t len;
+
+		if (read(state->socket_icmp, &proto, sizeof(proto)) != sizeof(proto))
+		{
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+		if (proto == 0)
+		{
+			printf("ready_callback6: proto 0 -> timeout\n");
+			return;	/* Timeout */
+		}
+		if (proto == 6)
+		{
+			printf("ready_callback6: proto 6 -> TCP\n");
+			ready_tcp6(0, 0, s);
+			return;
+		}
+		if (proto != 1)
+		{
+			printf("ready_callback6: proto != 1\n");
+			return;
+		}
+
+		if (read(state->socket_icmp, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_callback6: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_callback6: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket_icmp, base->packet, len) != len)
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket_icmp, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_callback6: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback6: error reading from '%s'",
+				state->response_in);
+		}
+
+		nrecv= len;
+
+		/* Do not try to fuzz the cmsgbuf. We assume stuff returned by
+		 * the kernel can be trusted.
+		 */
+		memset(cmsgbuf, '\0', sizeof(cmsgbuf));
+	}
+	else
+		nrecv= recvmsg(state->socket_icmp, &msg, MSG_DONTWAIT);
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
 		printf("ready_callback6: read error '%s'\n", strerror(errno));
 		return;
+	}
+
+	if (state->response_out)
+	{
+		uint8_t proto= 1;
+		uint32_t len= nrecv;
+
+		fwrite(&proto, sizeof(proto), 1, state->resp_file_out);
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
 	}
 
 	rcvdttl= -42;	/* To spot problems */
@@ -3003,7 +3336,6 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 			if (!state->busy)
 			{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 				printf(
 			"ready_callback6: index (%d) is not busy\n",
 					ind);
@@ -3316,7 +3648,6 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 		if (!state->busy)
 		{
-printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family);
 			printf(
 		"ready_callback6: index (%d) is not busy\n",
 				ind);
@@ -3452,8 +3783,7 @@ static void noreply_callback(int __attribute((unused)) unused,
 	state= s;
 
 #if 0
-	printf("noreply_callback: gotresp = %d\n",
-		state->gotresp);
+	printf("noreply_callback: gotresp = %d\n", state->gotresp);
 #endif
 
 	if (!state->gotresp)
@@ -3462,6 +3792,14 @@ static void noreply_callback(int __attribute((unused)) unused,
 			add_str(state, " }, { ");
 		add_str(state, DBQ(x) ":" DBQ(*));
 		state->open_result= 1;
+
+		if (state->resp_file_out)
+		{
+			uint32_t len= 0;
+
+			/* Use a zero length packet to signal a timeout */
+			fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		}
 	}
 
 	send_pkt(state);
@@ -3481,6 +3819,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	const char *hostname;
 	char *out_filename;
 	const char *destportstr;
+	char *response_in, *response_out;
 	char *interface;
 	char *check;
 	struct trtstate *state;
@@ -3511,6 +3850,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	destoptsize= 0;
 	str_Atlas= NULL;
 	out_filename= NULL;
+	response_in= NULL;
+	response_out= NULL;
 	opt_complementary = "=1:4--6:i--u:a+:b+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
 
 for (i= 0; argv[i] != NULL; i++)
@@ -3521,7 +3862,7 @@ for (i= 0; argv[i] != NULL; i++)
 		&firsthop, &gaplimit, &interface, &maxhops, &destportstr,
 		&timeout,
 		&duptimeout, &str_Atlas, &out_filename, &maxpacksize,
-		&hbhoptsize, &destoptsize);
+		&hbhoptsize, &destoptsize, &response_in, &response_out);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -3621,6 +3962,8 @@ for (i= 0; argv[i] != NULL; i++)
 	state->hbhoptsize= hbhoptsize;
 	state->destoptsize= destoptsize;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
+	state->response_in= response_in;
+	state->response_out= response_out;
 	state->base= trt_base;
 	state->paris= 0;
 	state->busy= 0;
@@ -3629,6 +3972,9 @@ for (i= 0; argv[i] != NULL; i++)
 	state->resmax= 0;
 	state->socket_icmp= -1;
 	state->socket_tcp= -1;
+
+	if (response_in || response_out)
+		trt_base->my_pid= 42;
 
 	for (i= 0; i<trt_base->tabsiz; i++)
 	{
@@ -3775,7 +4121,17 @@ static int create_socket(struct trtstate *state, int do_tcp)
 	type= SOCK_RAW;
 	protocol= (af == AF_INET6 ? IPPROTO_ICMPV6 : IPPROTO_ICMP);
 
-	state->socket_icmp= xsocket(af, type, protocol);
+	if (state->response_in)
+	{
+		state->socket_icmp= open(state->response_in, O_RDONLY);
+		if (state->socket_icmp == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				state->response_in);
+		}
+	}
+	else
+		state->socket_icmp= xsocket(af, type, protocol);
 	if (state->socket_icmp == -1)
 	{
 		serrno= errno;
@@ -3801,9 +4157,14 @@ static int create_socket(struct trtstate *state, int do_tcp)
 		}
 	}
 
-	r= connect(state->socket_icmp,
-		(struct sockaddr *)&state->sin6,
-		state->socklen);
+	if (state->response_in)
+		r= 0;	/* Don't try to connect when reading from a file */
+	else
+	{
+		r= connect(state->socket_icmp,
+			(struct sockaddr *)&state->sin6,
+			state->socklen);
+	}
 #if 0
  { errno= ENOSYS; r= -1; }
 #endif
@@ -3819,7 +4180,7 @@ static int create_socket(struct trtstate *state, int do_tcp)
 		return -1;
 	}
 	state->loc_socklen= sizeof(state->loc_sin6);
-	if (getsockname(state->socket_icmp,
+	if (!state->response_in && getsockname(state->socket_icmp,
 		&state->loc_sin6,
 		&state->loc_socklen) == -1)
 	{
@@ -3832,9 +4193,12 @@ static int create_socket(struct trtstate *state, int do_tcp)
 		buf, sizeof(buf)));
 #endif
 
-	close(state->socket_icmp);
-	state->socket_icmp= xsocket(af, type,
-		protocol);
+	if (!state->response_in)
+	{
+		close(state->socket_icmp);
+		state->socket_icmp= xsocket(af, type,
+			protocol);
+	}
 	if (state->socket_icmp == -1)
 	{
 		serrno= errno;
@@ -3880,8 +4244,10 @@ static int create_socket(struct trtstate *state, int do_tcp)
 
 	if (do_tcp)
 	{
-		state->socket_tcp= xsocket(af, SOCK_RAW,
-			IPPROTO_TCP);
+		if (state->response_in)
+			state->socket_tcp= open("/dev/null", O_RDWR);
+		else
+			state->socket_tcp= xsocket(af, SOCK_RAW, IPPROTO_TCP);
 		if (state->socket_tcp == -1)
 		{
 			serrno= errno;
@@ -3914,9 +4280,14 @@ static int create_socket(struct trtstate *state, int do_tcp)
 			}
 		}
 
-		r= connect(state->socket_tcp,
-			(struct sockaddr *)&state->sin6,
-			state->socklen);
+		if (state->response_in)
+			r= 0;	/* No need to connect */
+		else
+		{
+			r= connect(state->socket_tcp,
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
+		}
 #if 0
  { errno= ENOSYS; r= -1; }
 #endif
@@ -4040,6 +4411,17 @@ static void traceroute_start(void *state)
 	struct evutil_addrinfo hints;
 
 	trtstate= state;
+
+	if (trtstate->response_out)
+	{
+		trtstate->resp_file_out= fopen(trtstate->response_out, "w");
+		if (!trtstate->resp_file_out)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				trtstate->response_out);
+		}
+	}
+
 
 	if (!trtstate->delay_name_res)
 	{
