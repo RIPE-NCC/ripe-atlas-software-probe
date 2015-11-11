@@ -31,15 +31,10 @@
 
 #define NTP_PORT	123
 
-#define NTP_OPT_STRING ("!46c:i:w:A:O:")
+#define NTP_OPT_STRING ("!46c:i:w:A:O:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
-#define OPT_I	(1 << 2)
-#define OPT_U	(1 << 3)
-#define OPT_F	(1 << 4)
-#define OPT_r	(1 << 5)
-#define OPT_T	(1 << 6)
 
 #define IPHDR              20
 
@@ -83,6 +78,8 @@ struct ntpstate
 	char do_v6;
 	char count;
 	unsigned timeout;
+	char *response_in;	/* Fuzzing */
+	char *response_out;
 
 	/* Base and index in table */
 	struct ntpbase *base;
@@ -135,6 +132,8 @@ struct ntpstate
 	size_t reslen;
 	size_t resmax;
 	char open_result;
+
+	FILE *resp_file_out;	/* Fuzzing */
 };
 
 static struct ntpbase *ntp_base;
@@ -182,6 +181,8 @@ struct ntphdr
 #define NTP_4G		4294967296.0
 
 
+static void ready_callback(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
 static int create_socket(struct ntpstate *state);
 
 static void add_str(struct ntpstate *state, const char *str)
@@ -523,9 +524,14 @@ static void send_pkt(struct ntpstate *state)
 		((struct sockaddr_in *)&state->sin6)->sin_port=
 			htons(NTP_PORT);
 
-		r= sendto(state->socket, base->packet, len, 0,
-			(struct sockaddr *)&state->sin6,
-			state->socklen);
+		if (state->response_in)
+			r= 0;	/* No need to send */
+		else
+		{
+			r= sendto(state->socket, base->packet, len, 0,
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
+		}
 
 #if 0
 { static int doit=0; if (doit && r != -1)
@@ -563,6 +569,13 @@ static void send_pkt(struct ntpstate *state)
 	interval.tv_usec= state->timeout % 1000000;
 	evtimer_add(&state->timer, &interval);
 
+	if (state->response_in)
+	{
+		if (state->sin6.sin6_family == AF_INET6)
+			ready_callback(0, 0, state);
+		else
+			ready_callback(0, 0, state);
+	}
 }
 
 static void ready_callback(int __attribute((unused)) unused,
@@ -586,8 +599,49 @@ static void ready_callback(int __attribute((unused)) unused,
 	base= state->base;
 
 	slen= sizeof(remote);
-	nrecv= recvfrom(state->socket, base->packet, sizeof(base->packet),
-		MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+	if (state->response_in)
+	{
+		uint32_t len;
+		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (len > sizeof(base->packet))
+		{
+			//printf("ready_callback4: bad value for len: %u\n", len);
+			//abort();
+			crondlog(DIE9 "ready_callback4: bad value for len: %u",
+				 len);
+		}
+		if (read(state->socket, base->packet, len) != len)
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		if (read(state->socket, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			//printf("ready_callback4: error reading from '%s'\n",
+			//	state->response_in);
+			//abort();
+			crondlog(DIE9 "ready_callback4: error reading from '%s'",
+				state->response_in);
+		}
+		nrecv= len;
+	}
+	else
+	{
+		nrecv= recvfrom(state->socket, base->packet,
+			sizeof(base->packet),
+			MSG_DONTWAIT, (struct sockaddr *)&remote, &slen);
+	}
 	if (nrecv == -1)
 	{
 		/* Strange, read error */
@@ -595,6 +649,16 @@ static void ready_callback(int __attribute((unused)) unused,
 		return;
 	}
 	// printf("ready_callback: got packet\n");
+
+	if (state->resp_file_out)
+	{
+		uint32_t len= nrecv;
+
+		fwrite(&len, sizeof(len), 1, state->resp_file_out);
+		fwrite(base->packet, len, 1, state->resp_file_out);
+		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+	}
+
 
 	if (nrecv < sizeof(*ntphdr))
 	{
@@ -1622,6 +1686,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	char *out_filename;
 	const char *destportstr;
 	char *interface;
+	char *response_in, *response_out;
 	struct ntpstate *state;
 	FILE *fh;
 
@@ -1638,10 +1703,12 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	timeout= 1000;
 	str_Atlas= NULL;
 	out_filename= NULL;
+	response_in= NULL;
+	response_out= NULL;
 	opt_complementary = "=1:4--6:i--u:c+:w+:";
 
 	opt = getopt32(argv, NTP_OPT_STRING, &count,
-		&interface, &timeout, &str_Atlas, &out_filename);
+		&interface, &timeout, &str_Atlas, &out_filename, &response_in, &response_out);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
@@ -1689,6 +1756,8 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	state->hostname= strdup(hostname);
 	state->do_v6= do_v6;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
+	state->response_in= response_in ? strdup(response_in) : NULL;
+	state->response_out= response_out ? strdup(response_out) : NULL;
 	state->base= ntp_base;
 	state->busy= 0;
 	state->result= NULL;
@@ -1785,7 +1854,17 @@ static int create_socket(struct ntpstate *state)
 	type= SOCK_DGRAM;
 	protocol= 0;
 
-	state->socket= xsocket(af, type, protocol);
+	if (state->response_in)
+	{
+		state->socket= open(state->response_in, O_RDONLY);
+		if (state->socket == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				state->response_in);
+		}
+	}
+	else
+		state->socket= xsocket(af, type, protocol);
 #if 0
  { errno= ENOSYS; state->socket= -1; }
 #endif
@@ -1814,9 +1893,14 @@ static int create_socket(struct ntpstate *state)
 		}
 	}
 
-	r= connect(state->socket,
-		(struct sockaddr *)&state->sin6,
-		state->socklen);
+	if (state->response_in)
+		r= 0;	/* No need to connect */
+	else
+	{
+		r= connect(state->socket,
+			(struct sockaddr *)&state->sin6,
+			state->socklen);
+	}
 #if 0
  { errno= ENOSYS; r= -1; }
 #endif
@@ -1832,7 +1916,7 @@ static int create_socket(struct ntpstate *state)
 		return -1;
 	}
 	state->loc_socklen= sizeof(state->loc_sin6);
-	if (getsockname(state->socket,
+	if (!state->response_in && getsockname(state->socket,
 		&state->loc_sin6,
 		&state->loc_socklen) == -1)
 	{
@@ -1953,6 +2037,17 @@ static void ntp_start(void *state)
 	struct evutil_addrinfo hints;
 
 	ntpstate= state;
+
+	if (ntpstate->response_out)
+	{
+		ntpstate->resp_file_out= fopen(ntpstate->response_out, "w");
+		if (!ntpstate->resp_file_out)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				ntpstate->response_out);
+		}
+	}
+
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_DGRAM;
