@@ -1708,7 +1708,8 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	opt_complementary = "=1:4--6:i--u:c+:w+:";
 
 	opt = getopt32(argv, NTP_OPT_STRING, &count,
-		&interface, &timeout, &str_Atlas, &out_filename, &response_in, &response_out);
+		&interface, &timeout, &str_Atlas, &out_filename,
+		&response_in, &response_out);
 	hostname = argv[optind];
 
 	if (opt == 0xffffffff)
