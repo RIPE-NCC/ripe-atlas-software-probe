@@ -92,6 +92,8 @@ struct hgstate
 	size_t read_limit;
 	unsigned timeout;
 	char *infname;
+	char *response_in;	/* Fuzzing */
+	char *response_out;
 
 	/* State */
 	char busy;
@@ -150,6 +152,8 @@ struct hgstate
 	char *result2;
 	size_t reslen2;
 	size_t resmax2;
+
+	FILE *resp_file;	/* Fuzzing */
 };
 
 static struct hgbase *hg_base;
@@ -381,7 +385,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body, *read_limit_str,
-		*timeout_str, *infname;
+		*timeout_str, *infname, *response_in, *response_out;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
@@ -404,6 +408,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	timeout_str= NULL;
 	A_arg= NULL;
 	infname= NULL;
+	response_in= NULL;
+	response_out= NULL;
 	only_v4= 0;
 	only_v6= 0;
 	do_etim= 0;
@@ -420,7 +426,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "01aA:cI:O:46", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "01aA:cI:O:R:W:46", longopts, NULL),
+		c != -1)
 	{
 		switch(c)
 		{
@@ -440,6 +447,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'A':
 			A_arg= optarg;
+			break;
+		case 'R':
+			response_in= optarg;
+			break;
+		case 'W':
+			response_out= optarg;
 			break;
 		case 'a':				/* --all */
 			do_all= 1;
@@ -621,6 +634,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
 	state->output_file= output_file ? strdup(output_file) : NULL;
+	state->response_in= response_in ? strdup(response_in) : NULL;
+	state->response_out= response_out ? strdup(response_out) : NULL;
 	state->host= host;
 	state->port= port;
 	state->hostport= hostport;
@@ -859,6 +874,12 @@ static void report(struct hgstate *state)
 
 	tu_cleanup(&state->tu_env);
 
+	if (state->resp_file)
+	{
+		fclose(state->resp_file);
+		state->resp_file= NULL;
+	}
+
 	state->busy= 0;
 	if (state->base->done)
 		state->base->done(state);
@@ -914,11 +935,33 @@ static int get_input(struct hgstate *state)
 		state->report_roffset= 0;
 	}
 
-	n= bufferevent_read(state->bev,
-		&state->line[state->linelen],
-		state->linemax-state->linelen);
+	if (state->response_in)
+	{
+		if (!state->resp_file)
+			abort();
+		n= fread(&state->line[state->linelen], 1, 1, state->resp_file);
+		if (n == -1 || n == 0)
+		{
+			fclose(state->resp_file);
+			state->resp_file= NULL;
+			timeout_callback(0, 0, &state->tu_env);
+			report(state);
+			return -1;
+		}
+	}
+	else
+	{
+		n= bufferevent_read(state->bev,
+			&state->line[state->linelen],
+			state->linemax-state->linelen);
+	}
 	if (n < 0)
 		return -1;
+	if (state->response_out)
+	{
+		fwrite(&state->line[state->linelen], n, 1, 
+			state->resp_file);
+	}
 	state->linelen += n;
 	state->roffset += n;
 	return 0;
@@ -1556,7 +1599,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			continue;
 
 		case READ_DONE:
-			if (state->bev)
+			if (state->bev || state->response_in)
 			{
 				state->bev= NULL;
 				clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
@@ -1637,6 +1680,11 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			state->writestate= WRITE_HEADER;
 			continue;
 		case WRITE_HEADER:
+			if (state->response_in)
+			{
+				state->writestate = WRITE_DONE;
+				continue;
+			}
 			output= bufferevent_get_output(bev);
 			evbuffer_add_printf(output, "%s %s HTTP/1.%c\r\n",
 				state->do_get ? "GET" :
@@ -1892,8 +1940,11 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	state->bev= bev;
 
 	state->loc_socklen= sizeof(state->loc_sin6);
-	getsockname(bufferevent_getfd(bev),	
-		&state->loc_sin6, &state->loc_socklen);
+	if (!state->response_in)
+	{
+		getsockname(bufferevent_getfd(bev),	
+			&state->loc_sin6, &state->loc_socklen);
+	}
 }
 
 static void httpget_start(void *state)
@@ -1919,6 +1970,16 @@ static void httpget_start(void *state)
 	clock_gettime(CLOCK_MONOTONIC_RAW, &hgstate->start);
 	hgstate->first_connect= 1;
 
+	if (hgstate->response_out)
+	{
+		hgstate->resp_file= fopen(hgstate->response_out, "w");
+		if (!hgstate->resp_file)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				hgstate->response_out);
+		}
+	}
+
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	if (hgstate->only_v4)
@@ -1927,10 +1988,29 @@ static void httpget_start(void *state)
 		hints.ai_family= AF_INET6;
 	interval.tv_sec= hgstate->timeout / 1000;
 	interval.tv_usec= (hgstate->timeout % 1000) * 1000;
-	tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->port,
-		&interval, &hints, hgstate->infname, timeout_callback,
-		reporterr, dnscount, beforeconnect,
-		connected, readcb, writecb);
+
+	if (hgstate->response_in)
+	{
+		hgstate->resp_file= fopen(hgstate->response_in, "r");
+		if (!hgstate->resp_file)
+		{
+			crondlog(DIE9 "unable to read from '%s'",
+				hgstate->response_in);
+		}
+		connected(&hgstate->tu_env, NULL);
+		writecb(NULL, &hgstate->tu_env);
+		while(hgstate->resp_file != NULL)
+			readcb(NULL, &hgstate->tu_env);
+		report(hgstate);
+	}
+	else
+	{
+		tu_connect_to_name(&hgstate->tu_env, hgstate->host,
+			hgstate->port,
+			&interval, &hints, hgstate->infname, timeout_callback,
+			reporterr, dnscount, beforeconnect,
+			connected, readcb, writecb);
+	}
 }
 
 static int httpget_delete(void *state)
