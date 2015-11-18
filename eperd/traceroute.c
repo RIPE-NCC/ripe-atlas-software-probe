@@ -3534,6 +3534,9 @@ for (i= 0; argv[i] != NULL; i++)
 	do_v6= !!(opt & OPT_6);
 	dont_fragment= !!(opt & OPT_F);
 	delay_name_res= !!(opt & OPT_r);
+	delay_name_res= 1;	/* Always enabled, leave the old code in
+				 * place for now.
+				 */
 	do_tcp= !!(opt & OPT_T);
 	do_udp= !(do_icmp || do_tcp);
 	if (maxpacksize > sizeof(trt_base->packet))

@@ -1209,6 +1209,9 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	else
 		af= AF_INET6;
 	delay_name_res= !!(opt & opt_r);
+	delay_name_res= 1;	/* Always enabled, leave the old code in
+				 * place for now.
+				 */
 
 	if (!delay_name_res)
 	{

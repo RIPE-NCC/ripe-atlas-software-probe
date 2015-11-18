@@ -1793,6 +1793,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	if(argProcess(argc, argv, qry))
 			return NULL;
 
+	qry->opt_evdns = 1;	/* Always enabled, leave the old code in
+				 * place for now.
+				 */
+
 	qry->base = tdig_base;
 
 	/* insert this qry into the list of queries */
