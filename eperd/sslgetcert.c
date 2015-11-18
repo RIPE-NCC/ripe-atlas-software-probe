@@ -74,6 +74,8 @@ struct state
 	char *output_file;
 	char *atlas;
 	char *infname;
+	char *response_in;	/* Fuzzing */
+	char *response_out;
 	char only_v4;
 	char only_v6;
 	char major_version;
@@ -129,6 +131,8 @@ struct state
 	char *result;
 	size_t reslen;
 	size_t resmax;
+
+	FILE *resp_file;	/* Fuzzing */
 };
 
 #define BUF_CHUNK	4096
@@ -152,6 +156,8 @@ static int eat_server_hello(struct state *state);
 static int eat_certificate(struct state *state);
 static void report(struct state *state);
 static void add_str(struct state *state, const char *str);
+static void timeout_callback(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
 
 static void buf_init(struct buf *buf, struct bufferevent *bev)
 {
@@ -253,10 +259,10 @@ static void buf_add_b64(struct buf *buf, void *data, size_t len)
 	}
 }
 
-static int buf_read(struct buf *buf)
+static int buf_read(struct state *state, struct buf *buf)
 {
 	int r;
-	size_t maxsize;
+	size_t len, maxsize;
 	void *newbuf;
 
 	if (buf->size >= buf->maxsize)
@@ -264,9 +270,14 @@ static int buf_read(struct buf *buf)
 		if (buf->size-buf->offset + BUF_CHUNK <= buf->maxsize)
 		{
 			/* The buffer is big enough, just need to compact */
-			fprintf(stderr, "buf_read: should compact");
-			errno= ENOSYS;
-			return -1;
+			len= buf->size-buf->offset;
+			if (len != 0)
+			{
+				memmove(buf->buf, &buf->buf[buf->offset],
+					len);
+			}
+			buf->size -= buf->offset;
+			buf->offset= 0;
 		}
 		else
 		{
@@ -297,10 +308,27 @@ static int buf_read(struct buf *buf)
 		}
 	}
 
-	r= bufferevent_read(buf->bev,
-		buf->buf+buf->size, buf->maxsize-buf->size);
+	if (state->response_in)
+	{
+		r= fread(buf->buf+buf->size, 1, 1, state->resp_file);
+		if (r == -1 || r == 0)
+		{
+			timeout_callback(0, 0, &state->tu_env);
+			return -1;
+		}
+	}
+	else
+	{
+		r= bufferevent_read(buf->bev,
+			buf->buf+buf->size, buf->maxsize-buf->size);
+	}
 	if (r > 0)
 	{
+		if (state->response_out)
+		{
+			fwrite(buf->buf+buf->size, r, 1, 
+				state->resp_file);
+		}
 		buf->size += r;
 		return 0;
 	}
@@ -356,7 +384,7 @@ static void msgbuf_add(struct msgbuf *msgbuf, void *buf, size_t size)
 	buf_add(&msgbuf->buffer, buf, size);
 }
 
-static int msgbuf_read(struct msgbuf *msgbuf, int *typep,
+static int msgbuf_read(struct state *state, struct msgbuf *msgbuf, int *typep,
 	char *majorp, char *minorp)
 {
 	int r;
@@ -367,12 +395,11 @@ static int msgbuf_read(struct msgbuf *msgbuf, int *typep,
 	{
 		if (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5)
 		{
-			r= buf_read(msgbuf->inbuf);
+			r= buf_read(state, msgbuf->inbuf);
 			if (r < 0)
 			{
 				fprintf(stderr,
-					"msgbuf_read: buf_read failed: %s\n",
-					strerror(errno));
+					"msgbuf_read: buf_read failed\n");
 				return -1;
 			}
 			continue;
@@ -384,7 +411,7 @@ static int msgbuf_read(struct msgbuf *msgbuf, int *typep,
 		len= (p[3] << 8) + p[4];
 		if (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5 + len)
 		{
-			r= buf_read(msgbuf->inbuf);
+			r= buf_read(state, msgbuf->inbuf);
 			if (r < 0)
 			{
 				if (errno != EAGAIN)
@@ -608,6 +635,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	size_t newsiz;
 	char *hostname, *str_port, *infname, *version_str;
 	char *output_file, *A_arg;
+	char *response_in, *response_out;
 	struct state *state;
 	FILE *fh;
 
@@ -617,6 +645,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	A_arg= NULL;
 	infname= NULL;
 	str_port= NULL;
+	response_in= NULL;
+	response_out= NULL;
 	only_v4= 0;
 	only_v6= 0;
 
@@ -630,7 +660,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "A:O:V:i:p:46", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "A:O:R:V:W:i:p:46", longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -640,8 +670,14 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		case 'O':
 			output_file= optarg;
 			break;
+		case 'R':
+			response_in= optarg;
+			break;
 		case 'V':
 			version_str= optarg;
+			break;
+		case 'W':
+			response_out= optarg;
 			break;
 		case 'i':
 			infname= optarg;
@@ -726,6 +762,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
 	state->output_file= output_file ? strdup(output_file) : NULL;
+	state->response_in= response_in ? strdup(response_in) : NULL;
+	state->response_out= response_out ? strdup(response_out) : NULL;
 	state->infname= infname ? strdup(infname) : NULL;
 	state->hostname= strdup(hostname);
 	state->major_version= major;
@@ -838,6 +876,12 @@ static void report(struct state *state)
 	state->bev= NULL;
 
 	tu_cleanup(&state->tu_env);
+
+	if (state->resp_file)
+	{
+		fclose(state->resp_file);
+		state->resp_file= NULL;
+	}
 
 	state->busy= 0;
 	if (state->base->done)
@@ -1016,7 +1060,7 @@ static int eat_alert(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 2)
 		{
-			r= msgbuf_read(msgbuf, &type,
+			r= msgbuf_read(state, msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -1074,7 +1118,7 @@ static int eat_server_hello(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, &type,
+			r= msgbuf_read(state, msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -1095,6 +1139,8 @@ static int eat_server_hello(struct state *state)
 				fprintf(stderr,
 			"eat_server_hello: got bad type %d from msgbuf_read\n",
 					type);
+				add_str(state, DBQ(err) ":" DBQ(bad type));
+				report(state);
 				return -1;
 			}
 			continue;
@@ -1104,12 +1150,14 @@ static int eat_server_hello(struct state *state)
 		{
 			fprintf(stderr, "eat_server_hello: got type %d\n",
 				p[0]);
+			add_str(state, DBQ(err) ":" DBQ(bad type));
+			report(state);
 			return -1;
 		}
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, &type,
+			r= msgbuf_read(state, msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -1122,6 +1170,8 @@ static int eat_server_hello(struct state *state)
 				fprintf(stderr,
 			"eat_server_hello: got bad type %d from msgbuf_read\n",
 					type);
+				add_str(state, DBQ(err) ":" DBQ(bad type));
+				report(state);
 				return -1;
 			}
 			continue;
@@ -1147,7 +1197,7 @@ static int eat_certificate(struct state *state)
 	{
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4)
 		{
-			r= msgbuf_read(msgbuf, &type,
+			r= msgbuf_read(state, msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -1164,6 +1214,8 @@ static int eat_certificate(struct state *state)
 				fprintf(stderr,
 			"eat_certificate: got bad type %d from msgbuf_read\n",
 					type);
+				add_str(state, DBQ(err) ":" DBQ(bad type));
+				report(state);
 				return -1;
 			}
 			continue;
@@ -1172,12 +1224,14 @@ static int eat_certificate(struct state *state)
 		if (p[0] != HS_CERTIFICATE)
 		{
 			fprintf(stderr, "eat_certificate: got type %d\n", p[0]);
+			add_str(state, DBQ(err) ":" DBQ(bad type));
+			report(state);
 			return -1;
 		}
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
-			r= msgbuf_read(msgbuf, &type,
+			r= msgbuf_read(state, msgbuf, &type,
 				&state->recv_major, &state->recv_minor);
 			if (r < 0)
 			{
@@ -1190,6 +1244,8 @@ static int eat_certificate(struct state *state)
 				fprintf(stderr,
 			"eat_certificate: got bad type %d from msgbuf_read\n",
 					type);
+				add_str(state, DBQ(err) ":" DBQ(bad type));
+				report(state);
 				return -1;
 			}
 			continue;
@@ -1209,6 +1265,17 @@ static int eat_certificate(struct state *state)
 		while (o < 3+n)
 		{
 			slen= (p[o] << 16) + (p[o+1] << 8) + p[o+2];
+			if (o+3+slen > len)
+			{
+				fprintf(stderr,
+					"eat_certificate: got bad len %d\n",
+					slen);
+				msgbuf->buffer.offset= 
+					msgbuf->buffer.size;
+				add_str(state, DBQ(err) ":" DBQ(bad len));
+				report(state);
+				return -1;
+			}
 			buf_add_b64(&tmpbuf, p+o+3, slen);
 			fprintf(fh, "%s\"-----BEGIN CERTIFICATE-----\\n",
 				!first ? ", " : "");
@@ -1239,12 +1306,18 @@ static int eat_certificate(struct state *state)
 		{
 			fprintf(stderr,
 				"do_certificate: bad amount of cert data\n");
+			add_str(state, DBQ(err) ":"
+				DBQ(bad amount of cert data));
+			report(state);
 			return -1;
 		}
 		if (o != len)
 		{
 			fprintf(stderr,
 				"do_certificate: bad amount of cert data\n");
+			add_str(state, DBQ(err) ":"
+				DBQ(bad amount of cert data));
+			report(state);
 			return -1;
 		}
 		msgbuf->buffer.offset += 4+len;
@@ -1295,7 +1368,8 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			msgbuf_final(&msgoutbuf, MSG_HANDSHAKE);
 
 			/* Ignore error */
-			(void) buf_write(&outbuf);
+			if (!state->response_in)
+				(void) buf_write(&outbuf);
 
 			hsbuf_cleanup(&hsbuf);
 			msgbuf_cleanup(&msgoutbuf);
@@ -1434,8 +1508,11 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	msgbuf_init(&state->msginbuf, &state->inbuf, NULL);
 
 	state->loc_socklen= sizeof(state->loc_sin6);
-	getsockname(bufferevent_getfd(bev),	
-		&state->loc_sin6, &state->loc_socklen);
+	if (!state->response_in)
+	{
+		getsockname(bufferevent_getfd(bev),	
+			&state->loc_sin6, &state->loc_socklen);
+	}
 }
 
 static void sslgetcert_start(void *vstate)
@@ -1459,6 +1536,17 @@ static void sslgetcert_start(void *vstate)
 	state->writestate= WRITE_HELLO;
 	state->gstart= time(NULL);
 
+	if (state->response_out)
+	{
+		state->resp_file= fopen(state->response_out, "w");
+		if (!state->resp_file)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				state->response_out);
+		}
+	}
+
+
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_STREAM;
 	if (state->only_v4)
@@ -1468,11 +1556,28 @@ static void sslgetcert_start(void *vstate)
 	interval.tv_sec= CONN_TO;
 	interval.tv_usec= 0;
 
-	tu_connect_to_name(&state->tu_env, state->hostname,
-		state->portname,
-		&interval, &hints, state->infname, timeout_callback,
-		reporterr, dnscount, beforeconnect,
-		connected, readcb, writecb);
+	if (state->response_in)
+	{
+		state->resp_file= fopen(state->response_in, "r");
+		if (!state->resp_file)
+		{
+			crondlog(DIE9 "unable to read from '%s'",
+				state->response_in);
+		}
+		connected(&state->tu_env, NULL);
+		writecb(NULL, &state->tu_env);
+		while(state->resp_file != NULL)
+			readcb(NULL, &state->tu_env);
+		report(state);
+	}
+	else
+	{
+		tu_connect_to_name(&state->tu_env, state->hostname,
+			state->portname,
+			&interval, &hints, state->infname, timeout_callback,
+			reporterr, dnscount, beforeconnect,
+			connected, readcb, writecb);
+	}
 }
 
 static int sslgetcert_delete(void *vstate)
