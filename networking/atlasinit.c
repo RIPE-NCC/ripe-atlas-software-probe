@@ -441,6 +441,12 @@ static int reg_init_main( int argc, char *argv[] )
 			{ 
 				unsigned root_fs_ver = 0;
 				token = strtok (line+16, search);  // version
+				if (!token)
+				{
+		         		atlas_log( ERROR,
+						"Bad input (kernel fw version)\n");
+					return 1;
+				}
 				sscanf (token, "%u", &root_fs_ver);
 				printf("FIRMWARE_KERNEL_VERSION=%u\n",
 					root_fs_ver);
@@ -461,6 +467,12 @@ static int reg_init_main( int argc, char *argv[] )
 			{ 
 				unsigned root_fs_ver = 0;
 				token = strtok (line+14, search);  // version
+				if (!token)
+				{
+		         		atlas_log( ERROR,
+						"Bad input app fw version)\n");
+					return 1;
+				}
 				sscanf (token, "%u", &root_fs_ver);
 				printf("FIRMWARE_APPS_VERSION=%u\n",
 					root_fs_ver); 
@@ -515,6 +527,11 @@ static int reg_init_main( int argc, char *argv[] )
 				token = strtok(NULL, search);      // 
 			 	fprintf (f, "/sbin/route add default gw %s\n", token); 
 				ipv4_gw = token;
+				if (!ipv4_gw)
+				{
+		         		atlas_log( ERROR, "Bad input (ipv4_gw)\n");
+					return 1;
+				}
 				ipv4_gw[(strlen(ipv4_gw) - 1)] = '\0';
 		
 				// put parts in the shell script to make network info file
@@ -588,6 +605,11 @@ static int reg_init_main( int argc, char *argv[] )
 				token = strtok(NULL, search);      // IPV6GATEWAY
 				token = strtok(NULL, search);      // 
 				ipv6_gw = token;
+				if (!ipv6_gw)
+				{
+		         		atlas_log( ERROR, "Bad input (ipv6_gw)\n");
+					return 1;
+				}
 				ipv6_gw[(strlen(ipv6_gw) - 1)] = '\0';
 				///sbin/route -A inet6 add default gw fe80::13:0:0:1 dev eth0
 			 	fprintf (f,
