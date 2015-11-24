@@ -334,9 +334,10 @@ struct query_state {
 	unsigned short loc_ai_family ;
 	struct sockaddr_in6 loc_sin6;
         socklen_t loc_socklen;
-	
 
 	u_char *outbuff;
+
+	FILE *resp_file;	/* Fuzzing */
 };
 //DNS header structure
 struct DNS_HEADER
@@ -1083,7 +1084,8 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	qry = ENV2QRY(env); 
 
 	qry->loc_socklen= sizeof(qry->loc_sin6);
-        getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
+	if (!qry->response_in)
+		getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
 
 	qry->bev_tcp =  bev;
 	outbuff = xzalloc(MAX_DNS_BUF_SIZE);
@@ -1093,7 +1095,11 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	wire = xzalloc (payload_len + 4);
 	ldns_write_uint16(wire, qry->pktsize);
 	memcpy(wire + 2, outbuff, qry->pktsize);
-	evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire, (qry->pktsize +2));
+	if (!qry->response_in)
+	{
+		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire,
+			(qry->pktsize +2));
+	}
 	qry->base->sentok++;
 	qry->base->sentbytes+= (qry->pktsize +2);
 	BLURT(LVL5 "send %u bytes", payload_len );
@@ -1132,10 +1138,17 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
         bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
-        input = bufferevent_get_input(bev);
+	if (!qry->response_in)
+		input = bufferevent_get_input(bev);
         if(qry->wire_size == 0) {
-                n = evbuffer_remove(input, b2, 2 );
+		if (qry->response_in)
+			n= fread(b2, 1, 2, qry->resp_file);
+		else
+			n = evbuffer_remove(input, b2, 2 );
+		printf("got %d bytes for response size\n", n);
 		if(n == 2){
+			if (qry->response_out)
+				fwrite(b2, 2, 1, qry->resp_file);
 			qry->wire_size = ldns_read_uint16(b2);
 			buf_init(&qry->packet, -1);
 		}
@@ -1145,7 +1158,20 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			buf_add(&qry->err, line, strlen(line));	
 		}
 	} 
-	while ((n = evbuffer_remove(input,line , DEFAULT_LINE_LENGTH )) > 0) {
+	for (;;) {
+		if (qry->response_in)
+			n= fread(line, 1, 1, qry->resp_file);
+		else
+			n = evbuffer_remove(input,line , DEFAULT_LINE_LENGTH );
+		printf("got %d bytes for data size\n", n);
+		if (n <= 0)
+		{
+			if (qry->response_in)
+				noreply_callback(0,0,qry);
+			break;
+		}
+		if (qry->response_out)
+			fwrite(line, n, 1, qry->resp_file);
 		buf_add(&qry->packet, line, n);
 		if(qry->wire_size == qry->packet.size) {
 			crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
@@ -1986,15 +2012,44 @@ void tdig_start (void *arg)
 	}
 	else { // TCP Query
 
+		if (qry->response_out)
+		{
+			qry->resp_file= fopen(qry->response_out, "w");
+			if (!qry->resp_file)
+			{
+				crondlog(DIE9 "unable to write to '%s'",
+					qry->response_out);
+			}
+		}
+
 		qry->wire_size =  0;
 		crondlog(LVL5 "TCP QUERY %s", qry->server_name);
 		interval.tv_sec = CONN_TO;
 		interval.tv_usec= 0;
-		tu_connect_to_name (&qry->tu_env,   qry->server_name, port_as_char,
-				&interval, &hints, qry->infname,
-				tcp_timeout_callback, tcp_reporterr,
-				tcp_dnscount, tcp_beforeconnect,
-				tcp_connected, tcp_readcb, tcp_writecb);
+
+		if (qry->response_in)
+		{
+			qry->resp_file= fopen(qry->response_in, "r");
+			if (!qry->resp_file)
+			{
+				crondlog(DIE9 "unable to read from '%s'",
+					qry->response_in);
+			}
+			tcp_connected(&qry->tu_env, NULL);
+			tcp_writecb(NULL, &qry->tu_env);
+			while(qry->resp_file != NULL)
+				tcp_readcb(NULL, &qry->tu_env);
+			// report(qry);
+		}
+		else
+		{
+			tu_connect_to_name (&qry->tu_env,   qry->server_name,
+					port_as_char,
+					&interval, &hints, qry->infname,
+					tcp_timeout_callback, tcp_reporterr,
+					tcp_dnscount, tcp_beforeconnect,
+					tcp_connected, tcp_readcb, tcp_writecb);
+		}
 
 	}
 	return ;
@@ -2178,6 +2233,11 @@ static void free_qry_inst(struct query_state *qry)
 			qry->qst =  STATUS_FREE;
 			if(qry->base->done) {
 				evtimer_add(&qry->done_qry_timer, &asap);
+			}
+			if (qry->response_in && qry->resp_file)
+			{
+				fclose(qry->resp_file);
+				qry->resp_file= NULL;
 			}
 			break;
 	}
