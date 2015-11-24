@@ -27,8 +27,8 @@ enum
 {
 	OPT_REG_INIT	= (1 << 0),  /* r */
 	OPT_CNT_INIT	= (1 << 1),  /* c */
-	OPT_CNT_HELLO	= (1 << 2),  /* d */
-	OPT_SINCELAST   = (1 << 3),  /* s */
+	OPT_CNT_HELLO	= (1 << 2),  /* d */	/* Should be removed */
+	OPT_SINCELAST   = (1 << 3),  /* s */	/* Should be removed */
 	OPT_P_TO_R_INIT = (1 << 4),  /* i */
 };
 
@@ -49,7 +49,7 @@ const int atlas_log_level=INFO;
 
 const char atlas_contr_known_hosts[]="./known_hosts_controllers";
 const char atlas_rereg_timestamp[]="./rereg_time.sh";
-const char atlas_con_hello[]="./con_hello.txt";
+// const char atlas_con_hello[]="./con_hello.txt";
 const char atlas_con_session_id[]="./con_session_id.txt";
 const char atlas_force_reg[] = "./force_reg.sh";
 const char atlas_netconfig_v4[] = "./netconfig_v4.vol";
@@ -101,19 +101,23 @@ int atlasinit_main( int argc, char *argv[] )
 	{	
 		reg_init_main( argc, argv);
 	} 
+#if 0
 	else if(opt & OPT_CNT_HELLO)
 	{
 		con_hello_main(argc, argv);
 	}
+#endif
 	else if ( opt & OPT_CNT_INIT) 
 	{
 		con_init_main(argc, argv);
 		
 	}
+#if 0
 	else if (opt & OPT_SINCELAST)
 	{
 		since_last_main(argc, argv);
 	}
+#endif
 	else if(opt & OPT_P_TO_R_INIT)
 	{
 		print_token_ver(stdout, 1);
@@ -149,6 +153,7 @@ if(fpv)
 	fclose(fp);
 }
 
+#if 0
 static void since_last_main (int argc, char *argv[])
 {
 	FILE *thenfile;
@@ -170,7 +175,9 @@ static void since_last_main (int argc, char *argv[])
                 }
         }
 }
+#endif
 
+#if 0
 static int con_hello_main( int argc, char *argv[] )
 {
 	/* read response from P_TO_C_HELLO  */
@@ -227,6 +234,8 @@ static int con_hello_main( int argc, char *argv[] )
 		fclose (read_from);
 	return ret;
 } 
+#endif
+
 static int con_init_main( int argc, char *argv[] )
 {
 	FILE *read_from = stdin;
@@ -255,13 +264,13 @@ static int con_init_main( int argc, char *argv[] )
 			}
 			else if ( strncmp(line,"SESSION_ID", 10)==0 ) 
 			{
-				FILE *f = fopen( atlas_con_hello, "wt" );
+				// FILE *f = fopen( atlas_con_hello, "wt" );
 			        FILE *f1  = fopen( atlas_con_session_id, "wt" );
 
-				fprintf  (f, "P_TO_C_HELLO\nSESSION_ID %s", line+11);
+				// fprintf  (f, "P_TO_C_HELLO\nSESSION_ID %s", line+11);
 				fprintf  (f1, "\nSESSION_ID %s\n", line+11);
-				print_token_ver (f, 0 );
-				fclose (f);
+				// print_token_ver (f, 0 );
+				// fclose (f);
 				fclose (f1);
 	
 			}
@@ -278,7 +287,7 @@ static int con_init_main( int argc, char *argv[] )
 	{
 		FILE *f = fopen( atlas_force_reg, "wt" );
 
-		unlink(atlas_con_hello);
+		// unlink(atlas_con_hello);
 		bzero( line, ATLAS_BUF_SIZE );
         	fgets( line, MAX_READ, read_from );
 		fprintf (f,"REASON=%s\n", line+8);
