@@ -1720,6 +1720,23 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	do_v6= !!(opt & OPT_6);
 
+	if (response_in)
+	{
+		if (!validate_filename(response_in, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", response_in);
+			return NULL;
+		}
+	}
+	if (response_out)
+	{
+		if (!validate_filename(response_out, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", response_out);
+			return NULL;
+		}
+	}
+
 	if (out_filename)
 	{
 		if (!validate_filename(out_filename, SAFE_PREFIX))

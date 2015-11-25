@@ -3883,6 +3883,23 @@ for (i= 0; argv[i] != NULL; i++)
 	if (maxpacksize > sizeof(trt_base->packet))
 		maxpacksize= sizeof(trt_base->packet);
 
+	if (response_in)
+	{
+		if (!validate_filename(response_in, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", response_in);
+			return NULL;
+		}
+	}
+	if (response_out)
+	{
+		if (!validate_filename(response_out, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", response_out);
+			return NULL;
+		}
+	}
+
 	if (out_filename)
 	{
 		if (!validate_filename(out_filename, SAFE_PREFIX))

@@ -1374,6 +1374,25 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 		tdig_delete(qry);
 		return TRUE;
 	}
+	if (qry->response_in)
+	{
+		if (!validate_filename(qry->response_in, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", qry->response_in);
+			tdig_delete(qry);
+			return TRUE;
+		}
+	}
+	if (qry->response_out)
+	{
+		if (!validate_filename(qry->response_out, ATLAS_FUZZING))
+		{
+			crondlog(LVL8 "insecure fuzzing file '%s'", qry->response_out);
+			tdig_delete(qry);
+			return TRUE;
+		}
+	}
+
 
 
 	if(qry->opt_v6_only  == 0)

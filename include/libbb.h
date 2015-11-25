@@ -310,6 +310,7 @@ extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 #define ATLAS_DATA_OOQ_OUT	ATLAS_HOME "/data/ooq.out"
 #define ATLAS_DATA_NEW		ATLAS_HOME "/data/new"
 #define ATLAS_TIMESYNC_FILE	ATLAS_DATA_NEW "/timesync.vol"
+#define ATLAS_FUZZING		ATLAS_HOME "/data"
 
 extern int validate_filename(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
