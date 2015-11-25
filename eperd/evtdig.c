@@ -227,8 +227,6 @@ typedef uint32_t counter_t;
 struct tdig_base {
 	struct event_base *event_base;
 
-	struct timeval tv_noreply;     /* DNS query Reply timeout                    */
-
 	/* A circular list of user queries */
 	struct query_state *qry_head;
 
@@ -286,6 +284,7 @@ struct query_state {
 	int opt_rset;
 	int opt_retry_max;
 	int opt_query_arg;
+	unsigned opt_timeout;
 	int retry;
 	int resolv_i;
 
@@ -480,6 +479,7 @@ static struct option longopts[]=
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
 	{ "qbuf", no_argument, NULL, 1001 },
 	{ "noabuf", no_argument, NULL, 1002 },
+	{ "timeout", required_argument, NULL, 'T' },
 
 	{ "evdns", no_argument, NULL, O_EVDNS },
 	{ "out-file", required_argument, NULL, 'O' },
@@ -807,6 +807,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	uint32_t nsent = 0;
 	u_char *outbuff= NULL;
 	int err = 0; 
+	struct timeval tv_noreply;
 
 	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
@@ -922,9 +923,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			base->sentbytes += nsent;
 			err  = 0;
 			/* Add the timer to handle no reply condition in the given timeout */
-			if (qry->response_in)
-				msecstotv(1, &base->tv_noreply);
-			evtimer_add(&qry->noreply_timer, &base->tv_noreply);
+			msecstotv(qry->opt_timeout, &tv_noreply);
+			evtimer_add(&qry->noreply_timer, &tv_noreply);
 			if(qry->opt_qbuf) {
 				buf_init(&qry->qbuf, -1);
 				buf_add_b64(&qry->qbuf, outbuff, qry->pktsize, 0);
@@ -969,7 +969,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 	struct query_state *qry = h;
 
 	qry->base->timeout++;
-	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", DEFAULT_NOREPLY_TIMEOUT);
+	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", qry->opt_timeout);
 	buf_add(&qry->err, line, strlen(line));
 
 	BLURT(LVL5 "AAA timeout for %s retry %d/%d ", qry->server_name, qry->retry,  qry->opt_retry_max);
@@ -1463,6 +1463,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
 	qry->opt_query_arg = 0;
+	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -1551,6 +1552,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			case 't':
 				qry->opt_proto = 6;
+				break;
+
+			case 'T' :
+				qry->opt_timeout = strtoul(optarg, NULL, 10);
 				break;
 
 			case 1001:
@@ -1902,8 +1907,6 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	//tdig_base-->loc_socklen= 0;
 
 	evtimer_assign(&tdig_base->statsReportEvent, tdig_base->event_base, tdig_stats, tdig_base);
-
-	msecstotv(DEFAULT_NOREPLY_TIMEOUT, &tdig_base->tv_noreply);
 
 	// Define the callback to handle UDP Reply 
 	// add the raw file descriptor to those monitored for read events 
