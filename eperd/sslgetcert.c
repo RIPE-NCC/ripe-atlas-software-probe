@@ -1107,7 +1107,7 @@ static int eat_alert(struct state *state)
 			return -1;
 
 		fprintf(fh, ", " DBQ(alert) ": { " DBQ(level) ": %d, "
-			DBQ(decription) ": %d }",
+			DBQ(description) ": %d }",
 			level, descr);
 
 		msgbuf->buffer.offset += 2;
