@@ -12,11 +12,18 @@
 
 #include "tcputil.h"
 
+/* struct common for all quries */
+struct ssl_base {
+	        struct event_base *event_base;
+};
+static struct ssl_base *ssl_base = NULL;
+
+static void ssl_base_new(struct event_base *event_base);
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
 static int create_bev(struct tu_env *env);
 static void eventcb(struct bufferevent *bev, short events, void *ptr);
 
-void tu_connect_to_name(struct tu_env *env, char *host, char *port,
+void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	struct timeval *interval,
 	struct evutil_addrinfo *hints,
 	char *infname,
@@ -44,6 +51,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	env->writecb= writecb;
 	env->dns_res= NULL;
 	env->bev= NULL;
+	env->do_tls = do_tls;
 
 	evtimer_assign(&env->timer, EventBase,
 		timeout_callback, env);
@@ -105,7 +113,6 @@ void tu_restart_connect(struct tu_env *env)
 			return;
 		}
 		bev= env->bev;
-
 		if (bufferevent_socket_connect(bev,
 			env->dns_curr->ai_addr,
 			env->dns_curr->ai_addrlen) == 0)
@@ -269,9 +276,45 @@ static int create_bev(struct tu_env *env)
 
 	af= env->dns_curr->ai_addr->sa_family;
 
-	bev= bufferevent_socket_new(EventBase, -1,
-		BEV_OPT_CLOSE_ON_FREE);
-	if (!bev)
+#if ENABLE_FEATURE_EVHTTPGET_HTTPS
+	if(env->do_tls)
+	{
+		if (ssl_base == NULL) {
+			ssl_base_new(EventBase);
+			RAND_poll();
+			SSL_library_init(); /* call only once this is not reentrant. */
+			ERR_load_crypto_strings();
+			SSL_load_error_strings();
+			OpenSSL_add_all_algorithms();
+		}
+		/* fancy ssl options yet. just what is default in lib */
+		if ((env->tls_ctx = SSL_CTX_new(SSLv23_client_method())) == NULL)
+		{
+			env->reporterr(env, TU_SSL_CTX_INIT_ERR,
+				"SSL_CTX_new call failed");
+				return -1;
+		}
+		if ((env->tls = SSL_new(env->tls_ctx)) == NULL) {
+			env->reporterr(env, TU_SSL_OBJ_INIT_ERR,
+				"SSL_new call failed");
+				return -1;
+		}
+		bev = bufferevent_openssl_socket_new(EventBase, -1, env->tls,
+				BUFFEREVENT_SSL_CONNECTING,
+				BEV_OPT_CLOSE_ON_FREE);
+		if (bev == NULL) 
+		{
+			env->reporterr(env, TU_SSL_INIT_ERR,
+				"bufferevent_openssl_socket_new call failed");
+				return -1;
+		}
+	} 
+	else if 
+#else 
+	if
+#endif
+		((bev= bufferevent_socket_new(EventBase, -1,
+			BEV_OPT_CLOSE_ON_FREE)) == NULL)
 	{
 		crondlog(DIE9 "bufferevent_socket_new failed");
 	}
@@ -351,3 +394,8 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 		printf("events = 0x%x\n", events);
 }
 
+/* called only once. Initialize ssl_base variables here */
+static void ssl_base_new(struct event_base *event_base)
+{
+	        ssl_base = xzalloc(sizeof( struct ssl_base));
+}

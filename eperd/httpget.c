@@ -82,6 +82,7 @@ struct hgstate
 	char do_get;
 	char do_head;
 	char do_post;
+	bool do_tls;
 	char do_http10;
 	char *user_agent;
 	char *post_header;
@@ -179,21 +180,41 @@ static struct hgbase *httpget_base_new(struct event_base *event_base)
 }
 
 static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
-	char **pathp)
+	char **pathp, bool *do_tls)
 {
 	char *item;
 	const char *cp, *np, *prefix;
 	size_t len;
+#if ENABLE_FEATURE_EVHTTPGET_HTTPS
+	const char *prefixs;
+       	size_t lens;
+#endif
 
 	*hostp= NULL;
 	*portp= NULL;
 	*hostportp= NULL;
 	*pathp= NULL;
+	*do_tls = TU_DONOT_TLS;
 
 	/* the url must start with 'http://' */
 	prefix= "http://";
+#if ENABLE_FEATURE_EVHTTPGET_HTTPS
+	prefixs = "https://";
+	lens= strlen(prefixs);
+#endif
 	len= strlen(prefix);
-	if (strncasecmp(prefix, url, len) != 0)
+	if (strncasecmp(prefix, url, len) == 0) 
+	{
+		*do_tls = TU_DONOT_TLS;
+	}
+#if ENABLE_FEATURE_EVHTTPGET_HTTPS	
+	else if (strncasecmp(prefixs, url, lens) == 0)
+	{
+		len = lens;
+		*do_tls = TU_DO_TLS;
+	}
+#endif
+	else
 	{
 		crondlog(LVL8 "bad prefix in url '%s'", url);
 		goto fail;
@@ -275,7 +296,9 @@ static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 
 	/* Port */
 	cp= np;
-	if (cp[0] == '\0')
+	if ((cp[0] == '\0') && *do_tls)
+		cp= "443";
+	else if ((cp[0] == '\0') && !*do_tls)
 		cp= "80";
 	else
 		cp++;
@@ -381,6 +404,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	int c, i, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
 		do_all, do_http10, do_etim, do_eetim;
+	bool do_tls;
 	size_t newsiz, read_limit;
 	unsigned timeout;
 	char *url, *check;
@@ -399,6 +423,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	do_get= 1;
 	do_head= 0;
 	do_post= 0;
+	do_tls = TU_DONOT_TLS;
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
@@ -649,7 +674,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
-	if (!parse_url(url, &host, &port, &hostport, &path))
+	if (!parse_url(url, &host, &port, &hostport, &path, &do_tls))
 	{
 		/* Do we need to report an error? */
 		return NULL;
@@ -676,6 +701,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->do_get= do_get;
 	state->do_head= do_head;
 	state->do_post= do_post;
+	state->do_tls= do_tls;
 	state->post_header= post_header ? strdup(post_header) : NULL;
 	state->post_file= post_file ? strdup(post_file) : NULL;
 	state->post_footer= post_footer ? strdup(post_footer) : NULL;
@@ -2057,7 +2083,7 @@ static void httpget_start(void *state)
 	}
 	else
 	{
-		tu_connect_to_name(&hgstate->tu_env, hgstate->host,
+		tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->do_tls,
 			hgstate->port,
 			&interval, &hints, hgstate->infname, timeout_callback,
 			reporterr, dnscount, beforeconnect,

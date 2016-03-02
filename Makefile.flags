@@ -165,7 +165,21 @@ ifeq ($(CONFIG_DMALLOC),y)
 LDLIBS += dmalloc
 endif
 
-LDLIBS += event
+LDLIBS += event 
+ifeq ($(CONFIG_FEATURE_EVHTTPGET_HTTPS),y)
+LINK_EV_TLS = y
+endif 
+
+ifeq ($(CONFIG_EVTLSSCAN),y)
+LINK_EV_TLS = y
+endif 
+
+ifeq ($(LINK_EV_TLS),y)
+LDLIBS += crypto 
+LDLIBS += ssl
+LDLIBS += event_openssl
+LDLIBS += pthread
+endif
 
 LDFLAGS += -Llibevent-2.0.20-stable/.libs -Wl,-rpath,/usr/local/atlas/lib -Wl,-rpath,/home/atlas/busybox-1.13.3/libevent-2.0.20-stable/.libs
 
