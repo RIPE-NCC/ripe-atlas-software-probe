@@ -31,7 +31,7 @@
 
 #define NTP_PORT	123
 
-#define NTP_OPT_STRING ("!46c:i:w:A:O:R:W:")
+#define NTP_OPT_STRING ("!46c:i:w:A:B:O:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -71,6 +71,7 @@ struct ntpstate
 {
 	/* Parameters */
 	char *atlas;
+	char *bundle;
 	char *hostname;
 	char *destportstr;
 	char *out_filename;
@@ -354,6 +355,8 @@ static void report(struct ntpstate *state)
 			state->atlas, get_atlas_fw_version(),
 			get_timesync(),
 			state->starttime);
+		if (state->bundle)
+			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
@@ -1682,6 +1685,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
+	char *str_bundle;
 	const char *hostname;
 	char *out_filename;
 	const char *destportstr;
@@ -1702,13 +1706,14 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	interface= NULL;
 	timeout= 1000;
 	str_Atlas= NULL;
+	str_bundle= NULL;
 	out_filename= NULL;
 	response_in= NULL;
 	response_out= NULL;
 	opt_complementary = "=1:4--6:i--u:c+:w+:";
 
 	opt = getopt32(argv, NTP_OPT_STRING, &count,
-		&interface, &timeout, &str_Atlas, &out_filename,
+		&interface, &timeout, &str_Atlas, &str_bundle, &out_filename,
 		&response_in, &response_out);
 	hostname = argv[optind];
 
@@ -1762,6 +1767,14 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 			return NULL;
 		}
 	}
+	if (str_bundle)
+	{
+		if (!validate_atlas_id(str_bundle))
+		{
+			crondlog(LVL8 "bad bundle ID '%s'", str_bundle);
+			return NULL;
+		}
+	}
 
 	destportstr= "123";
 
@@ -1771,6 +1784,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	state->destportstr= strdup(destportstr);
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
+	state->bundle= str_bundle ? strdup(str_bundle) : NULL;
 	state->hostname= strdup(hostname);
 	state->do_v6= do_v6;
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
@@ -2100,6 +2114,8 @@ static int ntp_delete(void *state)
 
 	free(ntpstate->atlas);
 	ntpstate->atlas= NULL;
+	free(ntpstate->bundle);
+	ntpstate->bundle= NULL;
 	free(ntpstate->hostname);
 	ntpstate->hostname= NULL;
 	free(ntpstate->destportstr);

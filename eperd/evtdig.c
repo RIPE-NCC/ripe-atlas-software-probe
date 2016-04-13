@@ -289,6 +289,7 @@ struct query_state {
 	int resolv_i;
 
 	char * str_Atlas; 
+	char * str_bundle; 
 	u_int16_t qtype;
 	u_int16_t qclass;
 
@@ -1428,11 +1429,11 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_v4_only = 0; 
 	qry->opt_v6_only = 0; 
 	qry->str_Atlas = NULL;
+	qry->str_bundle = NULL;
 	qry->out_filename = NULL;
 	qry->opt_proto = 17; 
 	qry->udp_fd = -1;
 	qry->server_name = NULL;
-	qry->str_Atlas = NULL;
 	qry->infname = NULL;
 	tdig_base->activeqry++;
 	qry->qst = STATUS_FREE;
@@ -1478,7 +1479,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	evtimer_assign(&qry->done_qry_timer, tdig_base->event_base, done_qry_cb, qry);
 
 	optind = 0;
-	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:I:?", longopts, NULL), c != -1) {
+	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:B:I:?", longopts, NULL), c != -1) {
 		switch(c) {
 			case '4':
 				qry->opt_v4_only = 1;
@@ -1504,6 +1505,18 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				}
 				qry->str_Atlas = strdup(optarg);
 				break;
+
+			case 'B':
+				if (!validate_atlas_id(optarg))
+				{
+					crondlog(LVL8 "bad bundle ID '%s'",
+						optarg);
+					tdig_delete(qry);
+					return NULL;
+				}
+				qry->str_bundle= strdup(optarg);
+				break;
+
 			case 'I':
 				free(qry->infname);
 				qry->infname= strdup(optarg);
@@ -2320,6 +2333,11 @@ static int tdig_delete(void *state)
 		free( qry->str_Atlas);
 		qry->str_Atlas = NULL;
 	}
+	if( qry->str_bundle) 
+	{
+		free( qry->str_bundle);
+		qry->str_bundle = NULL;
+	}
 	if(qry->server_name)
 	{
 		free(qry->server_name);
@@ -2366,6 +2384,8 @@ void printErrorQuick (struct query_state *qry)
 	{
 		fprintf(fh, ",{");
 		fprintf(fh, "\"id\" : \"%s\"",  qry->str_Atlas);
+		if (qry->str_bundle)
+			fprintf(fh, ",\"bundle\" : %s",  qry->str_bundle);
 		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time);
 		if(qry->retry) {
 			fprintf(fh, ",\"retry\": %d",  qry->retry);
@@ -2409,6 +2429,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		if(qry->str_Atlas) 
 		{
 			JS(id,  qry->str_Atlas);
+			if (qry->str_bundle) {
+				JS1(bundle, %s, qry->str_bundle);
+			}
 		}
 
 		JD(fw, fw);

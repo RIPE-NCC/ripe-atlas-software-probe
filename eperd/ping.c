@@ -26,7 +26,7 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46rc:s:A:O:i:I:R:W:")
+#define PING_OPT_STRING ("!46rc:s:A:B:O:i:I:R:W:")
 
 enum 
 {
@@ -94,6 +94,7 @@ struct pingstate
 {
 	/* Parameters */
 	char *atlas;
+	char *bundle_id;
 	char *hostname;
 	char *interface;
 	int pingcount;
@@ -222,6 +223,8 @@ static void report(struct pingstate *state)
 			", " DBQ(time) ":%ld, ",
 			state->atlas, get_atlas_fw_version(), get_timesync(),
 			(long)time(NULL));
+		if (state->bundle_id)
+			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle_id);
 	}
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
@@ -1097,6 +1100,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	sa_family_t af;
 	const char *hostname;
 	char *str_Atlas;
+	char *str_bundle;
 	char *out_filename;
 	char *interface;
 	char *response_in, *response_out;
@@ -1143,6 +1147,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	pingcount= 3;
 	size= 0;
 	str_Atlas= NULL;
+	str_bundle= NULL;
 	out_filename= NULL;
 	interval= DEFAULT_PING_INTERVAL;
 	interface= NULL;
@@ -1151,7 +1156,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	/* exactly one argument needed; -c NUM */
 	opt_complementary = "=1:c+:s+:i+";
 	opt = getopt32(argv, PING_OPT_STRING, &pingcount, &size,
-		&str_Atlas, &out_filename, &interval, &interface,
+		&str_Atlas, &str_bundle, &out_filename, &interval, &interface,
 		&response_in, &response_out);
 	hostname = argv[optind];
 
@@ -1206,6 +1211,14 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(str_Atlas))
 		{
 			crondlog(LVL8 "bad atlas ID '%s'", str_Atlas);
+			return NULL;
+		}
+	}
+	if (str_bundle)
+	{
+		if (!validate_atlas_id(str_bundle))
+		{
+			crondlog(LVL8 "bad bundle ID '%s'", str_bundle);
 			return NULL;
 		}
 	}
@@ -1293,6 +1306,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 	state->pingcount= pingcount;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
+	state->bundle_id= str_bundle ? strdup(str_bundle) : NULL;
 	state->hostname= strdup(hostname);
 	state->out_filename= out_filename ? strdup(out_filename) : NULL;
 
@@ -1599,6 +1613,8 @@ static int ping_delete(void *state)
 
 	free(pingstate->atlas);
 	pingstate->atlas= NULL;
+	free(pingstate->bundle_id);
+	pingstate->bundle_id= NULL;
 	free(pingstate->hostname);
 	pingstate->hostname= NULL;
 	free(pingstate->out_filename);

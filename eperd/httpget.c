@@ -74,6 +74,7 @@ struct hgstate
 	/* Parameters */
 	char *output_file;
 	char *atlas;
+	char *bundle;
 	char do_all;
 	char do_combine;
 	char only_v4;
@@ -384,7 +385,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	unsigned timeout;
 	char *url, *check;
 	char *post_file, *output_file, *post_footer, *post_header,
-		*A_arg, *store_headers, *store_body, *read_limit_str,
+		*A_arg, *b_arg, *store_headers, *store_body, *read_limit_str,
 		*timeout_str, *infname, *response_in, *response_out;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
@@ -407,6 +408,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	read_limit_str= NULL;
 	timeout_str= NULL;
 	A_arg= NULL;
+	b_arg= NULL;
 	infname= NULL;
 	response_in= NULL;
 	response_out= NULL;
@@ -426,7 +428,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "01aA:cI:O:R:W:46", longopts, NULL),
+	while (c= getopt_long(argc, argv, "01ab:A:cI:O:R:W:46", longopts, NULL),
 		c != -1)
 	{
 		switch(c)
@@ -456,6 +458,9 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'a':				/* --all */
 			do_all= 1;
+			break;
+		case 'b':
+			b_arg= optarg;
 			break;
 		case 'B':				/* --store-body */
 			store_body= optarg;
@@ -566,6 +571,14 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			return NULL;
 		}
 	}
+	if (b_arg)
+	{
+		if (!validate_atlas_id(b_arg))
+		{
+			crondlog(LVL8 "bad bundle ID '%s'", b_arg);
+			return NULL;
+		}
+	}
 
 	if (post_header && !validate_filename(post_header, SAFE_PREFIX_IN))
 	{
@@ -650,6 +663,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state= xzalloc(sizeof(*state));
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
+	state->bundle= b_arg ? strdup(b_arg) : NULL;
 	state->output_file= output_file ? strdup(output_file) : NULL;
 	state->response_in= response_in ? strdup(response_in) : NULL;
 	state->response_out= response_out ? strdup(response_out) : NULL;
@@ -756,6 +770,11 @@ static void report(struct hgstate *state)
 				state->atlas, get_atlas_fw_version(),
 				get_timesync(),
 				state->gstart);
+			if (state->bundle)
+			{
+				fprintf(fh, DBQ(bundle) ":%s, ",
+					state->bundle);
+			}
 		}
 		fprintf(fh, DBQ(result) ":[ ");
 	}
@@ -2058,6 +2077,8 @@ static int httpget_delete(void *state)
 
 	free(hgstate->atlas);
 	hgstate->atlas= NULL;
+	free(hgstate->bundle);
+	hgstate->bundle= NULL;
 	free(hgstate->output_file);
 	hgstate->output_file= NULL;
 	free(hgstate->infname);

@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:O:S:H:D:R:W:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:B:O:S:H:D:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -81,6 +81,7 @@ struct trtstate
 {
 	/* Parameters */
 	char *atlas;
+	char *bundle_id;
 	char *hostname;
 	char *destportstr;
 	char *out_filename;
@@ -404,6 +405,8 @@ static void report(struct trtstate *state)
 			get_timesync(),
 			state->starttime,
 			(long)time(NULL));
+		if (state->bundle_id)
+			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle_id);
 	}
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
@@ -3816,6 +3819,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
+	char *str_bundle;
 	const char *hostname;
 	char *out_filename;
 	const char *destportstr;
@@ -3849,6 +3853,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	hbhoptsize= 0;
 	destoptsize= 0;
 	str_Atlas= NULL;
+	str_bundle= NULL;
 	out_filename= NULL;
 	response_in= NULL;
 	response_out= NULL;
@@ -3861,7 +3866,7 @@ for (i= 0; argv[i] != NULL; i++)
 		&count,
 		&firsthop, &gaplimit, &interface, &maxhops, &destportstr,
 		&timeout,
-		&duptimeout, &str_Atlas, &out_filename, &maxpacksize,
+		&duptimeout, &str_Atlas, &str_bundle, &out_filename, &maxpacksize,
 		&hbhoptsize, &destoptsize, &response_in, &response_out);
 	hostname = argv[optind];
 
@@ -3925,6 +3930,14 @@ for (i= 0; argv[i] != NULL; i++)
 			return NULL;
 		}
 	}
+	if (str_bundle)
+	{
+		if (!validate_atlas_id(str_bundle))
+		{
+			crondlog(LVL8 "bad bundle ID '%s'", str_bundle);
+			return NULL;
+		}
+	}
 
 	if (!delay_name_res)
 	{
@@ -3969,6 +3982,7 @@ for (i= 0; argv[i] != NULL; i++)
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
+	state->bundle_id= str_bundle ? strdup(str_bundle) : NULL;
 	state->hostname= strdup(hostname);
 	state->do_icmp= do_icmp;
 	state->do_tcp= do_tcp;
@@ -4479,6 +4493,8 @@ static int traceroute_delete(void *state)
 
 	free(trtstate->atlas);
 	trtstate->atlas= NULL;
+	free(trtstate->bundle_id);
+	trtstate->bundle_id= NULL;
 	free(trtstate->hostname);
 	trtstate->hostname= NULL;
 	free(trtstate->destportstr);
