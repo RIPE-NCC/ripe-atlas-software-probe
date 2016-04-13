@@ -1267,7 +1267,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	state->af= af;
 	state->delay_name_res= delay_name_res;
 	state->interval= interval;
-	state->interface= interface;
+	state->interface= interface ? strdup(interface) : NULL;
 	state->socket= -1;
 	state->response_in= response_in ? strdup(response_in) : NULL;
 	state->response_out= response_out ? strdup(response_out) : NULL;
@@ -1615,6 +1615,8 @@ static int ping_delete(void *state)
 	pingstate->atlas= NULL;
 	free(pingstate->bundle_id);
 	pingstate->bundle_id= NULL;
+	free(pingstate->interface);
+	pingstate->interface= NULL;
 	free(pingstate->hostname);
 	pingstate->hostname= NULL;
 	free(pingstate->out_filename);
