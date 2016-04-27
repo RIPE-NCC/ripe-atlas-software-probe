@@ -642,12 +642,10 @@ static int check_cache(char *cache_name)
 	need_report= 0;
 
 	if (stat(cache_name, &sb) == 0 &&
-		sb.st_mtime < time(NULL) - 30 * 24 * 3600)
+		sb.st_mtime < time(NULL) - 3600)
 	{
 		/* This basically makes sure that this information gets
-		 * reported again when the clock is set for the first time.
-		 * A side effect is that it gets reported once a month if
-		 * nothing changes.
+		 * reported regularly.
 		 */
 		need_report= 1;
 	}
