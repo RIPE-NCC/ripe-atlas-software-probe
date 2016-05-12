@@ -1167,9 +1167,9 @@ static void skip_nonspace(char *cp, char **ncpp)
 	*ncpp= cp;
 }
 
-static void find_eos(char *cp, char **ncpp)
+static void find_eos(char *cp, char **ncpp, char quote_char)
 {
-	while (cp[0] != '\0' && cp[0] != '"')
+	while (cp[0] != '\0' && cp[0] != quote_char)
 		cp++;
 	*ncpp= cp;
 }
@@ -1301,8 +1301,26 @@ static int atlas_run(char *cmdline)
 		if (cp[0] == '"')
 		{
 			/* Special code for strings */
-			find_eos(cp+1, &ncp);
+			find_eos(cp+1, &ncp, '"');
 			if (ncp[0] != '"')
+			{
+				crondlog(
+		LVL8 "atlas_run: command line '%s', end of string not found",
+					cmdline);
+				r= -1;
+				reason="end of string not found";
+				goto error;
+			}
+			argv[argc]= cp+1;
+			cp= ncp;
+			cp[0]= '\0';
+			cp++;
+		}
+		else if (cp[0] == '\'')
+		{
+			/* Also try single quotes */
+			find_eos(cp+1, &ncp, '\'');
+			if (ncp[0] != '\'')
 			{
 				crondlog(
 		LVL8 "atlas_run: command line '%s', end of string not found",
