@@ -21,6 +21,9 @@
 #define SAFE_PREFIX_DATA_NEW ATLAS_DATA_NEW
 #define SAFE_PREFIX_STATUS ATLAS_STATUS
 
+/* Maximum number of files to post in one go with post-dir */
+#define MAX_FILES	1000
+
 struct option longopts[]=
 {
 	{ "delete-file", no_argument, NULL, 'd' },
@@ -939,6 +942,7 @@ static int connect_to_name(char *host, char *port)
 
 char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 {
+	int file_count;
 	size_t currsize, allocsize, dirlen, len;
 	char *list, *tmplist, *path;
 	DIR *dir;
@@ -952,6 +956,7 @@ char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 	*lenp= 0;
 	currsize= 0;
 	allocsize= 0;
+	file_count= 0;
 	list= NULL;
 	dir= opendir(dir_name);
 	if (dir == NULL)
@@ -1012,6 +1017,11 @@ char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 		currsize += len;
 		curr_tot_size += sb.st_size;
 		*lenp += sb.st_size;
+
+		file_count++;
+
+		if (file_count >= MAX_FILES)
+			break;
 	}
 	closedir(dir);
 
