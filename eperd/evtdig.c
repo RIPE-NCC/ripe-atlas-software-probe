@@ -231,8 +231,6 @@ struct tdig_base {
 	struct query_state *qry_head;
 
 	struct event statsReportEvent;
-	int resolv_max;
-	char nslist[MAXNS][INET6_ADDRSTRLEN * 2];
 
 	counter_t sendfail;            /* # of failed sendto()                       */
 	counter_t sentok;              /* # of successful sendto()                   */
@@ -296,6 +294,10 @@ struct query_state {
 	char *lookupname;
 	char * server_name;
 	char *out_filename ;
+
+	/* Contents of resolv.conf during a measurement */
+	int resolv_max;
+	char *nslist[MAXNS];
 
 	/* For fuzzing */
 	char *response_out;
@@ -1343,10 +1345,6 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 {
 	if( qry->opt_resolv_conf) {
 		qry->resolv_i = 0;
-		get_local_resolvers(tdig_base->nslist, &tdig_base->resolv_max);
-		if(tdig_base->resolv_max ) {
-			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
-		}
 	}
 	else if (optind != argc-1)  {
 		crondlog(LVL9 "ERROR no server IP address in input");
@@ -1911,7 +1909,6 @@ struct tdig_base * tdig_base_new(struct event_base *event_base)
 	tdig_base->recvbytes = 0;
 	tdig_base->timeout = 0;
 	tdig_base->activeqry = 0;
-	tdig_base->resolv_max = 0;
 
 	memset(tdig_base, 0, sizeof(struct tdig_base));
 	tdig_base->event_base = event_base;
@@ -1970,17 +1967,19 @@ void tdig_start (void *arg)
 			/* Get time in case we don't send any packet */
 			qry->xmit_time= time(NULL);
 			qry->resolv_i = 0;
-			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  tdig_base->resolv_max);
+			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  qry->resolv_max);
 			if( qry->opt_resolv_conf) {
-				get_local_resolvers (tdig_base->nslist, &tdig_base->resolv_max);
-				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
-				if(tdig_base->resolv_max ) {
+				get_local_resolvers (qry->nslist,
+					&qry->resolv_max,
+					qry->infname);
+				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
+				if(qry->resolv_max ) {
 					free(qry->server_name);
 					qry->server_name = NULL;
-					qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+					qry->server_name = strdup(qry->nslist[qry->resolv_i]);
 				}
 				else {
-					crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max is zero %d i %d", qry->server_name,  tdig_base->resolv_max, qry->resolv_i);
+					crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max is zero %d i %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
 					free(qry->server_name);
 					qry->server_name = NULL;
 					snprintf(line, DEFAULT_LINE_LENGTH, "\"nameserver\": \"no local resolvers found\"");
@@ -2248,12 +2247,12 @@ static void free_qry_inst(struct query_state *qry)
 	if ( qry->opt_resolv_conf) {
 		// this loop goes over servers in /etc/resolv.conf
 		// select the next server and restart
-		if(qry->resolv_i < tdig_base->resolv_max) {
+		if(qry->resolv_i < qry->resolv_max) {
 			if(qry->server_name) {
 				free (qry->server_name);
 				qry->server_name = NULL;
 			}
-			qry->server_name = strdup(tdig_base->nslist[qry->resolv_i]);
+			qry->server_name = strdup(qry->nslist[qry->resolv_i]);
 			qry->qst = STATUS_NEXT_QUERY;
 			evtimer_add(&qry->next_qry_timer, &asap);
 			return;
@@ -2451,7 +2450,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 	if ( qry->opt_resolv_conf ) {
 		JD (subid, (qry->resolv_i+1));
-		JD (submax, qry->base->resolv_max);
+		JD (submax, qry->resolv_max);
 	}
 
 	if( qry->ressent && qry->server_name)
@@ -2655,7 +2654,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	if(qry->opt_resolv_conf){
 		qry->resolv_i++;
 
-		if(qry->resolv_i >= tdig_base->resolv_max) {
+		if(qry->resolv_i >= qry->resolv_max) {
 			write_out = TRUE;
 			if(qry->opt_rset) {
 				AS ("]"); /* reseultset : [{}] */
