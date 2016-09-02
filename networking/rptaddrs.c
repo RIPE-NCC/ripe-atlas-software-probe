@@ -549,11 +549,11 @@ static int setup_ipv6_rpt(FILE *of)
 static int setup_dns(FILE *of)
 {
 	int i, resolv_max;
-	char nslist[MAXNS][INET6_ADDRSTRLEN * 2];
+	char *nslist[MAXNS];
 
 	resolv_max= 0;
 
-	get_local_resolvers_nocache(nslist, &resolv_max);
+	get_local_resolvers(nslist, &resolv_max, NULL);
 
 	fprintf(of, ", " DBQ(dns) ": [ ");
 	for (i= 0; i<resolv_max; i++)
@@ -561,6 +561,7 @@ static int setup_dns(FILE *of)
 		fprintf(of, "%s{ " DBQ(nameserver) ": " DBQ(%s) " }",
 			i == 0 ? "" : ", ", 
 			nslist[i]);
+		free(nslist[i]); nslist[i]= NULL;
 	}
 	
 	fprintf(of, " ]");
