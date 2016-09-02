@@ -28,6 +28,9 @@
 
 #define BARRIER_CMD "barrier"
 #define POST_CMD "post"
+#define RELOAD_RESOLV_CONF_CMD "reload_resolv_conf"
+
+#define RESOLV_CONF	"/etc/resolv.conf"
 
 struct slot
 {
@@ -68,6 +71,9 @@ static struct builtin
 static const char *atlas_id;
 static const char *queue_id;
 
+static char *resolv_conf;
+static char output_filename[80];
+
 static void report(const char *fmt, ...);
 static void report_err(const char *fmt, ...);
 
@@ -88,18 +94,22 @@ int eooqd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int eooqd_main(int argc, char *argv[])
 {
 	int r;
-	char *pid_file_name, *instance_id_str;
+	size_t len;
+	char *pid_file_name, *interface_name, *instance_id_str;
 	char *check;
 	struct event *checkQueueEvent, *rePostEvent;
 	struct timeval tv;
 	struct rlimit limit;
+	struct stat sb;
 
 	atlas_id= NULL;
+	interface_name= NULL;
 	instance_id_str= NULL;
 	pid_file_name= NULL;
 	queue_id= "";
 
-	(void)getopt32(argv, "A:i:P:q:", &atlas_id, &instance_id_str,
+	(void)getopt32(argv, "A:I:i:P:q:", &atlas_id, 
+		&interface_name, &instance_id_str,
 		&pid_file_name, &queue_id);
 
 	if (argc != optind+1)
@@ -118,6 +128,28 @@ int eooqd_main(int argc, char *argv[])
 				instance_id_str);
 			return 1;
 		}
+	}
+
+	if (interface_name)
+	{
+		len= strlen(RESOLV_CONF) + 1 +
+			strlen(interface_name) + 1;
+		resolv_conf= malloc(len);
+		snprintf(resolv_conf, len, "%s.%s",
+			RESOLV_CONF, interface_name);
+
+		/* Check if this resolv.conf exists. If it doen't, switch
+		 * to the standard one.
+		 */
+		if (stat(resolv_conf, &sb) == -1)
+		{
+			free(resolv_conf);
+			resolv_conf= strdup(RESOLV_CONF);
+		}
+	}
+	else
+	{
+		resolv_conf= strdup(RESOLV_CONF);
 	}
 
 	if(pid_file_name)
@@ -145,6 +177,9 @@ int eooqd_main(int argc, char *argv[])
 		sizeof(state->curr_qfile));
 	strlcat(state->curr_qfile, SUFFIX, sizeof(state->curr_qfile));
 
+	snprintf(output_filename, sizeof(output_filename),
+		OOQD_OUT_PREFIX "%s/ooq.out", queue_id);
+
 	signal(SIGQUIT, SIG_DFL);
 	limit.rlim_cur= RLIM_INFINITY;
 	limit.rlim_max= RLIM_INFINITY;
@@ -156,11 +191,30 @@ int eooqd_main(int argc, char *argv[])
 	{
 		crondlog(DIE9 "event_base_new failed"); /* exits */
 	}
-	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
+	DnsBase= evdns_base_new(EventBase, 0 /*initialize*/);
 	if (!DnsBase)
 	{
 		event_base_free(EventBase);
 		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+	}
+
+	if (interface_name)
+	{
+		r= evdns_base_set_interface(DnsBase, interface_name);
+		if (r == -1)
+		{
+			event_base_free(EventBase);
+			crondlog(DIE9 "evdns_base_set_interface failed");
+							 /* exits */
+		}
+	}
+
+	r = evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
+		resolv_conf);
+	if (r == -1)
+	{
+		event_base_free(EventBase);
+		crondlog(DIE9 "evdns_base_resolv_conf_parse failed"); /* exits */
 	}
 
 	checkQueueEvent= event_new(EventBase, -1, EV_TIMEOUT|EV_PERSIST,
@@ -190,7 +244,6 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 {
 	int r;
 	struct stat sb;
-	char filename[80];
 
 	if (!state->curr_file)
 	{
@@ -246,9 +299,7 @@ static void checkQueue(evutil_socket_t fd UNUSED_PARAM,
 			break;	/* Wait for barrier to complete */
 	}
 
-	snprintf(filename, sizeof(filename),
-		OOQD_OUT_PREFIX "%s/ooq.out", queue_id);
-	check_resolv_conf2(filename, atlas_id);
+	check_resolv_conf2(output_filename, atlas_id);
 }
 
 static int add_line(void)
@@ -326,6 +377,14 @@ static int add_line(void)
 		state->barrier= 1;
 		state->barrier_file= strdup(p);
 		return 0;
+	}
+
+	/* Check for the reload resolv.conf command */
+	if (strcmp(cmdline, RELOAD_RESOLV_CONF_CMD) == 0)
+	{
+		/* Trigger a reload */
+		check_resolv_conf2(output_filename, atlas_id);
+		return 0;	/* Done */
 	}
 
 	cmdstate= NULL;
@@ -555,7 +614,6 @@ static void cmddone(void *cmdstate)
 	}
 }
 
-#define RESOLV_CONF	"/etc/resolv.conf"
 static void check_resolv_conf2(const char *out_file, const char *atlasid)
 {
 	static time_t last_time= -1;
@@ -564,7 +622,7 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 	FILE *fn;
 	struct stat sb;
 
-	r= stat(RESOLV_CONF, &sb);
+	r= stat(resolv_conf, &sb);
 	if (r == -1)
 	{
 		crondlog(LVL8 "error accessing resolv.conf: %s",
@@ -573,10 +631,14 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 	}
 
 	if (sb.st_mtime == last_time)
+	{
+		crondlog(LVL7 "check_resolv_conf2: no change (time %d)",
+			sb.st_mtime);
 		return;	/* resolv.conf did not change */
+	}
 	evdns_base_clear_nameservers_and_suspend(DnsBase);
 	r= evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
-		RESOLV_CONF);
+		resolv_conf);
 	evdns_base_resume(DnsBase);
 
 	if ((r != 0 || last_time != -1) && out_file != NULL)

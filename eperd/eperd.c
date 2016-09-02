@@ -57,6 +57,8 @@
 #define URANDOM_DEV	"/dev/urandom"
 #define ATLAS_FW_VERSION	"/home/atlas/state/FIRMWARE_APPS_VERSION"
 
+#define RESOLV_CONF	"/etc/resolv.conf"
+
 struct CronLine {
 	struct CronLine *cl_Next;
 	char *cl_Shell;         /* shell command                        */
@@ -121,6 +123,7 @@ struct globals G;
 static int do_kick_watchdog;
 static char *out_filename= NULL;
 static char *atlas_id= NULL;
+static char *resolv_conf;
 
 static void CheckUpdates(evutil_socket_t fd, short what, void *arg);
 static void CheckUpdatesHour(evutil_socket_t fd, short what, void *arg);
@@ -257,11 +260,14 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned opt;
 	int r, fd;
 	unsigned seed;
+	size_t len;
 	struct event *updateEventMin, *updateEventHour;
 	struct timeval tv;
 	struct rlimit limit;
+	struct stat sb;
 
 	const char *PidFileName = NULL;
+	char *interface_name= NULL;
 
 	atexit(my_exit);
 
@@ -270,8 +276,9 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	/* "-b after -f is ignored", and so on for every pair a-b */
 	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
 			":i+:l+:d+"; /* -i, -l and -d have numeric param */
-	opt = getopt32(argv, "i:l:L:fc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
-			&instance_id, &LogLevel, &LogFile, &CDir,
+	opt = getopt32(argv, "I:i:l:L:fc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
+			&interface_name, &instance_id, &LogLevel,
+			&LogFile, &CDir,
 			&atlas_id, &PidFileName
 			USE_FEATURE_PERD_D(,&LogLevel), &out_filename);
 	/* both -d N and -l N set the same variable: LogLevel */
@@ -294,6 +301,29 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 		logmode = LOGMODE_SYSLOG;
 	}
 
+	if (interface_name)
+	{
+		len= strlen(RESOLV_CONF) + 1 +
+			strlen(interface_name) + 1;
+		resolv_conf= malloc(len);
+		snprintf(resolv_conf, len, "%s.%s",
+			RESOLV_CONF, interface_name);
+
+		/* Check if this resolv.conf exists. If it doen't, switch
+		 * to the standard one.
+		 */
+		if (stat(resolv_conf, &sb) == -1)
+		{
+			free(resolv_conf);
+			resolv_conf= strdup(RESOLV_CONF);
+		}
+	}
+	else
+	{
+		resolv_conf= strdup(RESOLV_CONF);
+	}
+
+
 	do_kick_watchdog= !!(opt & OPT_D);
 
 	xchdir(CDir);
@@ -312,10 +342,29 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	{
 		crondlog(DIE9 "event_base_new failed"); /* exits */
 	}
-	DnsBase= evdns_base_new(EventBase, 1 /*initialize*/);
+	DnsBase= evdns_base_new(EventBase, 0 /*!initialize*/);
 	if (!DnsBase)
 	{
 		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+	}
+
+	if (interface_name)
+	{
+		r= evdns_base_set_interface(DnsBase, interface_name);
+		if (r == -1)
+		{
+			event_base_free(EventBase);
+			crondlog(DIE9 "evdns_base_set_interface failed");
+							 /* exits */
+		}
+	}
+
+	r = evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
+		resolv_conf);
+	if (r == -1)
+	{
+		event_base_free(EventBase);
+		crondlog(DIE9 "evdns_base_resolv_conf_parse failed"); /* exits */
 	}
 
 	fd= open(URANDOM_DEV, O_RDONLY);
@@ -591,7 +640,6 @@ static void SynchronizeFile(const char *fileName)
 	DeleteFile();
 }
 
-#define RESOLV_CONF	"/etc/resolv.conf"
 static void check_resolv_conf(void)
 {
 	static time_t last_time= -1;
@@ -600,7 +648,7 @@ static void check_resolv_conf(void)
 	FILE *fn;
 	struct stat sb;
 
-	r= stat(RESOLV_CONF, &sb);
+	r= stat(resolv_conf, &sb);
 	if (r == -1)
 	{
 		crondlog(LVL8 "error accessing resolv.conf: %s",
@@ -612,7 +660,7 @@ static void check_resolv_conf(void)
 		return;	/* resolv.conf did not change */
 	evdns_base_clear_nameservers_and_suspend(DnsBase);
 	r= evdns_base_resolv_conf_parse(DnsBase, DNS_OPTIONS_ALL,
-		RESOLV_CONF);
+		resolv_conf);
 	evdns_base_resume(DnsBase);
 
 	if ((r != 0 || last_time != -1) && out_filename)
