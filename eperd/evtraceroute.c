@@ -8,6 +8,7 @@
 #include <syslog.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
+#include <event2/dns.h>
 
 #include "eperd.h"
 
