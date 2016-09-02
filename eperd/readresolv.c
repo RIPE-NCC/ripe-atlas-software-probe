@@ -7,18 +7,15 @@
 #include "libbb.h"
 #include "resolv.h"
 #include "eperd.h"
+#include "readresolv.h"
 #include <math.h>
 
-static  void nameserver_ip_add (char *nsentry, char *ip_as_string) 
+static  void nameserver_ip_add (char **nsentry, char *ip_as_string) 
 {
-
-	strncpy (nsentry, ip_as_string, LINEL);
-	// printf("AA added nameserver %s\n", ip_as_string);
-	// printf("AA added nameserver to ns %s\n", nsentry);
-	return;
+	*nsentry= strdup(ip_as_string);
 }
 
-static int resolv_conf_parse_line (char *nsentry, char *line)  
+static int resolv_conf_parse_line (char **nsentry, char *line)  
 {
 
 #define NEXT_TOKEN strtok_r(NULL, delims, &strtok_state)
@@ -32,7 +29,7 @@ static int resolv_conf_parse_line (char *nsentry, char *line)
 		char *const nameserver = NEXT_TOKEN;
 		if (nameserver) {
 			if(nameserver[(strlen(nameserver) - 1)] == '\n')
-			nameserver[(strlen(nameserver) - 1)] = NULL;
+			nameserver[(strlen(nameserver) - 1)] = '\0';
 			nameserver_ip_add(nsentry, nameserver);
 		        //printf("AA added nameserver %s\n", nsentry);
 			return 1;
@@ -41,108 +38,51 @@ static int resolv_conf_parse_line (char *nsentry, char *line)
 	return 0;
 } 
 
-void get_local_resolvers(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
-		int *resolv_max)
+void get_local_resolvers(char *nslist[MAXNS], int *resolv_max, char *ifname)
 {
 
 #ifndef RESOLV_CONF 
 #define RESOLV_CONF     "/etc/resolv.conf"
 #endif 	
 	char buf[LINEL]; 
+	char filename[80];
 	char *buf_start;
 	int  i = 0;
-	time_t now;
-	int r;
 	struct stat sb;
-
-	static resolv_last_check = -1;
-	static time_t last_time= -1;
-
-	now = time(NULL);
-
-	if(*resolv_max){
-		if ( pow (resolv_last_check - now, 2) > 3) {
-			crondlog(LVL5 "check the %s", RESOLV_CONF);
-		}
-		else {
-			return;
-		}
-
-	}
-
-
-	r = stat(RESOLV_CONF, &sb);
-	if (r == -1)
-	{
-		crondlog(LVL8 "error accessing resolv.conf: %s",
-				strerror(errno));
-		return;
-	}
-
-	resolv_last_check = now;
-
-	if (last_time  == sb.st_mtime) 
-	{
-		/* nothing changed */
-		crondlog(LVL5 "re-read %s. not reading this time", RESOLV_CONF);
-		return;
-	}
-	else {
-		crondlog(LVL5 "re-read %s . it has changed", RESOLV_CONF);
-	}
-
-	FILE *R = fopen (RESOLV_CONF, "r");
-	if (R != NULL) {
-		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
-			buf_start = buf;
-			if(resolv_conf_parse_line(nslist[i], buf) ) {
-				crondlog(LVL5 "parsed file %s , line %s i=%d", RESOLV_CONF, buf_start, i);
-				i++;
-			}
-			else 
-				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", RESOLV_CONF, i, buf_start);
-		}
-		fclose (R);
-	}
-
-	last_time = sb.st_mtime;
-
-	*resolv_max = i;
-	return;
-}
-
-void get_local_resolvers_nocache(char  nslist[MAXNS][INET6_ADDRSTRLEN * 2], 
-		int *resolv_max)
-{
-
-#ifndef RESOLV_CONF 
-#define RESOLV_CONF     "/etc/resolv.conf"
-#endif 	
 	FILE *R;
-	char buf[LINEL]; 
-	char *buf_start;
-	int  i = 0;
-	int r;
-	struct stat sb;
 
-	r = stat(RESOLV_CONF, &sb);
-	if (r == -1)
+	if (ifname)
 	{
-		crondlog(LVL8 "error accessing resolv.conf: %s",
-				strerror(errno));
-		return;
+		snprintf(filename, sizeof(filename), "%s.%s",
+			RESOLV_CONF, ifname);
+		
+		/* Check if it exists */
+		if (stat(filename, &sb) == -1)
+		{
+			crondlog(LVL8 "get_local_resolvers: stat of %s failed: %s",
+				filename, strerror(errno));
+			/* Fall back to resolv.conf */
+			strlcpy(filename, RESOLV_CONF, sizeof(filename));
+		}
+	}
+	else
+	{
+		/* Just use resolv.conf */
+		strlcpy(filename, RESOLV_CONF, sizeof(filename));
 	}
 
-	R = fopen (RESOLV_CONF, "r");
+	crondlog(LVL8 "get_local_resolvers: using %s", filename);
+
+	R = fopen (filename, "r");
 	if (R != NULL) {
 		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
 			buf_start = buf;
-			if(resolv_conf_parse_line(nslist[i], buf) ) {
-				crondlog(LVL5 "parsed file %s , line %s i=%d", RESOLV_CONF, buf_start, i);
+			if(resolv_conf_parse_line(&nslist[i], buf) ) {
+				crondlog(LVL5 "parsed file %s , line %s i=%d", filename, buf_start, i);
 				i++;
 			}
 			else 
-				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", RESOLV_CONF, i, buf_start);
+				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", filename, i, buf_start);
 		}
 		fclose (R);
 	}
