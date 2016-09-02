@@ -231,6 +231,14 @@ struct evdns_base * evdns_base_new(struct event_base *event_base, int initialize
 void evdns_base_free(struct evdns_base *base, int fail_requests);
 
 /**
+  Set the outging interface to be used for DNS queries
+
+  @param base the evdns base to modify
+  @param interface_name the name of the interface to be used
+ */
+int evdns_base_set_interface(struct evdns_base *base, char *interface_name);
+
+/**
   Convert a DNS error code to a string.
 
   @param err the DNS error code
