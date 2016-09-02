@@ -8,10 +8,11 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 
-#define OPT_STRING	"lP:r:"
+#define OPT_STRING	"lsI:P:r:u:"
 
 enum {
         OPT_l = (1 << 0),
+        OPT_s = (1 << 1),
 };
 
 #define DBQ(str) "\"" #str "\""
@@ -27,6 +28,10 @@ struct in6_addr in6addr_all_nodes = IN6ADDR_ALL_NODES_INIT;        /* ff02::1 */
 #define RA_PREF_HIGH	0x08
 #define RA_PREF_LOW	0x18
 
+/* RFC-4861 */
+#define MAX_RTR_SOLICITATIONS 3
+#define RTR_SOLICITATION_INTERVAL 4
+
 struct opt_rdnss             /* RDNSS option */
 {
 	uint8_t   nd_opt_rdnss_type;
@@ -34,6 +39,10 @@ struct opt_rdnss             /* RDNSS option */
 	uint16_t  nd_opt_rdnss_reserved;
 	uint32_t  nd_opt_rdnss_lifetime;
 };
+
+static int solicit_retries;
+static int solicit_sock;
+static char *update_cmd;
 
 static void usage(void)
 {
@@ -132,6 +141,8 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 				}
 				fclose(f);
 				rename(str_resolv_new, str_resolv);
+				if (update_cmd)
+					system(update_cmd);
 			}
 			if (lifetime)
 				*dnsexpires= time(NULL) + lifetime;
@@ -390,29 +401,64 @@ static void log_ra(char *out_name, char *new_name,
 	exit(1);
 }
 
+static int send_sol(int sock)
+{
+	struct icmp6_hdr pkt;
+	struct sockaddr_in6 sin6;
+
+	if (solicit_retries <= 0)
+		return 0;	/* Done */
+	solicit_retries--;
+
+	pkt.icmp6_type= ND_ROUTER_SOLICIT;
+	pkt.icmp6_code= 0;
+	pkt.icmp6_data32[0]= 0;
+
+	memset(&sin6, '\0', sizeof(sin6));
+	inet_pton(AF_INET6, "FF02::2", &sin6.sin6_addr);
+	sin6.sin6_family= AF_INET6;
+
+	sendto(sock, &pkt, sizeof(pkt), 0, &sin6, sizeof(sin6));
+
+	alarm(RTR_SOLICITATION_INTERVAL);
+
+	return 0;
+}
+
+static void solicit_alarm(int sig UNUSED_PARAM)
+{
+	send_sol(solicit_sock);
+}
+
 int rptra6_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
 int rptra6_main(int argc, char *argv[])
 {
-	int i, sock, on, nrecv, do_log;
+	int i, sock, hlim, on, nrecv, do_log, do_solicit;
 	unsigned opts;
 	size_t len;
 	time_t dnsexpires;
-	char *new_name, *out_name, *str_resolv, *str_resolv_new;
+	char *new_name, *out_name,
+		*str_interface, *str_resolv, *str_resolv_new, *str_update;
 	struct icmp6_hdr * icmp;
 	FILE *of;
 	char *str_pidfile;
 	struct sockaddr_in6 remote;          /* responding internet address */
 	struct msghdr msg;
+	struct sigaction sa;
 	struct iovec iov[1];
 	char dnscurr[N_DNS][INET6_ADDRSTRLEN];
 	char cmsgbuf[256];
 	char packet[4096];
 
+	str_interface= NULL;
 	str_pidfile= NULL;
 	str_resolv= NULL;
-	opts= getopt32(argv, OPT_STRING, &str_pidfile, &str_resolv);
+	str_update= NULL;
+	opts= getopt32(argv, OPT_STRING, &str_interface, &str_pidfile,
+		&str_resolv, &str_update);
 
 	do_log= !!(opts & OPT_l);
+	do_solicit= !!(opts & OPT_s);
 	
 	if (do_log)
 	{
@@ -440,6 +486,8 @@ int rptra6_main(int argc, char *argv[])
 		}
 	}
 
+	update_cmd= str_update;
+
 	str_resolv_new= NULL;
 	if (str_resolv)
 	{
@@ -457,12 +505,35 @@ int rptra6_main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (str_interface)
+	{
+		if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE,
+			str_interface, strlen(str_interface)+1) == -1)
+		{
+			close(sock);
+			return 1;
+		}
+	}
+
 	on = 1;
 	setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
 
 	on = 1;
 	setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on));
 
+	if (do_solicit)
+	{
+		hlim= 255;
+		setsockopt(sock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+			&hlim, sizeof(hlim));
+		solicit_sock= sock;
+		solicit_retries= MAX_RTR_SOLICITATIONS;
+		sa.sa_handler= solicit_alarm;
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags= 0;
+		sigaction(SIGALRM, &sa, NULL);
+		send_sol(sock);
+	}
 
 	icmp = (struct icmp6_hdr *) packet;
 
@@ -489,6 +560,8 @@ int rptra6_main(int argc, char *argv[])
 		nrecv= recvmsg(sock, &msg, 0);
 		if (nrecv < 0)
 		{
+			if (errno == EINTR)
+				continue;
 			printf("recvmsg failed: %s\n", strerror(errno));
 			break;
 		}
@@ -503,6 +576,7 @@ int rptra6_main(int argc, char *argv[])
 			case ICMP6_TIME_EXCEEDED:	/*   3 */
 			case ICMP6_ECHO_REQUEST:	/* 128 */
 			case ICMP6_ECHO_REPLY:		/* 129 */
+			case MLD_LISTENER_QUERY:	/* 130 */
 			case ND_NEIGHBOR_SOLICIT:	/* 135 */
 			case ND_NEIGHBOR_ADVERT:	/* 136 */
 			case ND_REDIRECT:		/* 137 */
