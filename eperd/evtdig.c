@@ -1976,7 +1976,8 @@ void tdig_start (void *arg)
 				if(qry->resolv_max ) {
 					free(qry->server_name);
 					qry->server_name = NULL;
-					qry->server_name = strdup(qry->nslist[qry->resolv_i]);
+					qry->server_name = qry->nslist[qry->resolv_i];
+					qry->nslist[qry->resolv_i]= NULL;
 				}
 				else {
 					crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max is zero %d i %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
@@ -2200,6 +2201,7 @@ static void ChangetoDnsNameFormat(u_char *  dns, char* qry)
 
 static void free_qry_inst(struct query_state *qry)
 {
+	int i;
 	struct timeval asap = { 1, 0 };
 	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
 
@@ -2259,6 +2261,15 @@ static void free_qry_inst(struct query_state *qry)
 		}
 	}
 
+	for (i= 0; i<MAXNS; i++)
+	{
+		if (qry->nslist[i])
+		{
+			free(qry->nslist[i]);
+			qry->nslist[i]= NULL;
+		}
+	}
+
 	switch(qry->qst){
 		case STATUS_RETRANSMIT_QUERY:
 			break;
@@ -2280,6 +2291,7 @@ static void free_qry_inst(struct query_state *qry)
 
 static int tdig_delete(void *state)
 {
+	int i;
 	struct query_state *qry;
 
 	qry = state;
@@ -2342,6 +2354,14 @@ static int tdig_delete(void *state)
 		free(qry->server_name);
 		qry->server_name = NULL;
 	} 
+	for (i= 0; i<MAXNS; i++)
+	{
+		if (qry->nslist[i])
+		{
+			free(qry->nslist[i]);
+			qry->nslist[i]= NULL;
+		}
+	}
 	if (qry->udp_fd != -1)
 	{
 		event_del(&qry->event);
