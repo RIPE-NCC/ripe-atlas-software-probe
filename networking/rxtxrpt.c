@@ -32,12 +32,11 @@ static void report_err(const char *fmt, ...);
 int rxtxrpt_main(int argc, char *argv[])
 {
 	int r, need_report;
-	unsigned opt;
 	char *opt_atlas, *cache_name;
 
 	opt_atlas= NULL;
 	opt_complementary= NULL;
-	opt= getopt32(argv, "A:", &opt_atlas);
+	getopt32(argv, "A:", &opt_atlas);
 
 	do_atlas= (opt_atlas != NULL);
 
@@ -53,7 +52,7 @@ int rxtxrpt_main(int argc, char *argv[])
 #ifdef NEW_FORMAT
 		printf("RESULT { " DBQ(id) ": " DBQ(%s) ", ", opt_atlas);
 		printf(DBQ(fw) ": %d, ", get_atlas_fw_version());
-		printf(DBQ(time) ": %d, ", time(NULL));
+		printf(DBQ(time) ": %lld, ", (long long)time(NULL));
 		printf(DBQ(lts) ": %d, ", get_timesync());
 		printf(DBQ(interfaces) ": [");
 #else /* !NEW_FORMWAT */
@@ -95,10 +94,10 @@ int rxtxrpt_main(int argc, char *argv[])
 static int rpt_rxtx(void)
 {
 	int i;
-	unsigned long long rx_bytes, rx_packets, rx_errs, rx_drop,
-		rx_fifo, rx_frame, rx_compressed, rx_multicast,
-		tx_bytes, tx_packets, tx_errs, tx_drop,
-		tx_fifo, tx_colls, tx_carrier, tx_compressed;
+	unsigned long long bytes_recv, pkt_recv, errors_recv, dropped_recv,
+		fifo_recv, framing_recv, compressed_recv, multicast_recv,
+		bytes_sent, pkt_sent, errors_sent, dropped_sent,
+		fifo_sent, collisions_sent, carr_lost_sent, compressed_sent;
 	char *cp, *infname;
 	FILE *file;
 	char buf[256];
@@ -145,10 +144,12 @@ static int rpt_rxtx(void)
 
 		/* Get all the values */
 		if (sscanf(cp+1, "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
-			&rx_bytes, &rx_packets, &rx_errs, &rx_drop,
-			&rx_fifo, &rx_frame, &rx_compressed, &rx_multicast,
-			&tx_bytes, &tx_packets, &tx_errs, &tx_drop,
-			&tx_fifo, &tx_colls, &tx_carrier, &tx_compressed) != 16)
+			&bytes_recv, &pkt_recv, &errors_recv, &dropped_recv,
+			&fifo_recv, &framing_recv, &compressed_recv,
+			&multicast_recv,
+			&bytes_sent, &pkt_sent, &errors_sent, &dropped_sent,
+			&fifo_sent, &collisions_sent, &carr_lost_sent,
+			&compressed_sent) != 16)
 		{
 			report_err("format error in '%s'", DEV_FILE);
 			fclose(file);
@@ -157,25 +158,25 @@ static int rpt_rxtx(void)
 
 		*cp= '\0';
 
-		printf("%s { " DBQ(infname) ": " DBQ(%s) ", ",
+		printf("%s { " DBQ(name) ": " DBQ(%s) ", ",
 			i == 0 ? "" : ",", infname);
 	
-		printf(DBQ(rx-bytes) ": %llu, ", rx_bytes);
-		printf(DBQ(rx-packets) ": %llu, ", rx_packets);
-		printf(DBQ(rx-errs) ": %llu, ", rx_errs);
-		printf(DBQ(rx-drop) ": %llu, ", rx_drop);
-		printf(DBQ(rx-fifo) ": %llu, ", rx_fifo);
-		printf(DBQ(rx-frame) ": %llu, ", rx_frame);
-		printf(DBQ(rx-compressed) ": %llu, ", rx_compressed);
-		printf(DBQ(rx-multicast) ": %llu, ", rx_multicast);
-		printf(DBQ(tx-bytes) ": %llu, ", tx_bytes);
-		printf(DBQ(tx-packets) ": %llu, ", tx_packets);
-		printf(DBQ(tx-errs) ": %llu, ", tx_errs);
-		printf(DBQ(tx-drop) ": %llu, ", tx_drop);
-		printf(DBQ(tx-fifo) ": %llu, ", tx_fifo);
-		printf(DBQ(tx-colls) ": %llu, ", tx_colls);
-		printf(DBQ(tx-carrier) ": %llu, ", tx_carrier);
-		printf(DBQ(tx-compressed) ": %llu", tx_compressed);
+		printf(DBQ(bytes_recv) ": %llu, ", bytes_recv);
+		printf(DBQ(pkt_recv) ": %llu, ", pkt_recv);
+		printf(DBQ(errors_recv) ": %llu, ", errors_recv);
+		printf(DBQ(dropped_recv) ": %llu, ", dropped_recv);
+		printf(DBQ(fifo_recv) ": %llu, ", fifo_recv);
+		printf(DBQ(framing_recv) ": %llu, ", framing_recv);
+		printf(DBQ(compressed_recv) ": %llu, ", compressed_recv);
+		printf(DBQ(multicast_recv) ": %llu, ", multicast_recv);
+		printf(DBQ(bytes_sent) ": %llu, ", bytes_sent);
+		printf(DBQ(pkt_sent) ": %llu, ", pkt_sent);
+		printf(DBQ(errors_sent) ": %llu, ", errors_sent);
+		printf(DBQ(dropped_sent) ": %llu, ", dropped_sent);
+		printf(DBQ(fifo_sent) ": %llu, ", fifo_sent);
+		printf(DBQ(collisions_sent) ": %llu, ", collisions_sent);
+		printf(DBQ(carr_lost_sent) ": %llu, ", carr_lost_sent);
+		printf(DBQ(compressed_sent) ": %llu", compressed_sent);
 		printf(" }");
 	}
 	fclose(file);
