@@ -118,8 +118,7 @@ static int rpt_rxtx(void)
 		return 1;
 	}
 
-	/* Copy two line */
-	for (i= 0; i<2; i++)
+	for (i= 0; i<4; i++)
 	{
 		if (fgets(buf, sizeof(buf), file) == NULL)
 		{
