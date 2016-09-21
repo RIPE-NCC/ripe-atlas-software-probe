@@ -122,6 +122,8 @@ static int rpt_rxtx(void)
 	{
 		if (fgets(buf, sizeof(buf), file) == NULL)
 		{
+			if (feof(file))
+				break;
 			report_err("unable to read from '%s'", DEV_FILE);
 			fclose(file);
 			return 1;
