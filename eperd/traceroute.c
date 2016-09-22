@@ -4057,9 +4057,9 @@ static void traceroute_start2(void *state)
 
 	trtstate= state;
 
-	if (trtstate->busy)
+	if (!trtstate->busy)
 	{
-		printf("traceroute_start: busy, can't start\n");
+		printf("traceroute_start: not busy, can't continue\n");
 		return;
 	}
 	trtstate->busy= 1;
@@ -4444,6 +4444,13 @@ static void traceroute_start(void *state)
 	struct evutil_addrinfo hints;
 
 	trtstate= state;
+
+	if (trtstate->busy)
+	{
+		printf("traceroute_start: busy, can't start\n");
+		return;
+	}
+	trtstate->busy= 1;
 
 	if (trtstate->response_out)
 	{

@@ -1830,12 +1830,11 @@ static void traceroute_start2(void *state)
 
 	ntpstate= state;
 
-	if (ntpstate->busy)
+	if (!ntpstate->busy)
 	{
-		printf("ntp_start: busy, can't start\n");
+		printf("ntp_start: not busy, can't continue\n");
 		return;
 	}
-	ntpstate->busy= 1;
 
 	ntpstate->min= ULONG_MAX;
 	ntpstate->max= 0;
@@ -2069,6 +2068,13 @@ static void ntp_start(void *state)
 	struct evutil_addrinfo hints;
 
 	ntpstate= state;
+
+	if (ntpstate->busy)
+	{
+		printf("ntp_start: busy, can't start\n");
+		return;
+	}
+	ntpstate->busy= 1;
 
 	if (ntpstate->response_out)
 	{
