@@ -773,6 +773,7 @@ static int builtin_dfrm(char **argv);
 static int builtin_rxtxrpt(char **argv);
 static int builtin_rptaddrs(char **argv);
 static int builtin_rptuptime(char **argv);
+static int builtin_onlyuptime(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -834,6 +835,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("rxtxrpt"  , builtin_rxtxrpt, "report RX and TX"),
 	BLTIN("rptaddrs"  , builtin_rptaddrs, "report address(es), route(s), and dns"),
 	BLTIN("rptuptime"  , builtin_rptuptime, "report uptime"),
+	BLTIN("onlyuptime"  , builtin_onlyuptime, "report uptime in seconds"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -4781,6 +4783,16 @@ static int builtin_rptuptime(char **argv __attribute((unused)))
 	printf(DBQ(lts) ": %d, ", get_timesync());
 	sysinfo(&info);
 	printf(DBQ(uptime) ": %ld }\n", (long)info.uptime);
+
+	return 0;
+}
+
+static int builtin_onlyuptime(char **argv __attribute((unused))) 
+{
+	struct sysinfo info; 
+
+	sysinfo(&info);
+	printf("%ld\n", (long)info.uptime);
 
 	return 0;
 }
