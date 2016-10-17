@@ -87,7 +87,7 @@ struct pingbase
 
 	void (*done)(void *state);	/* Called when a ping is done */
 
-	u_char packet [MAX_DATA_SIZE];
+	u_char packet[MAX_DATA_SIZE];
 };
 
 struct pingstate
@@ -720,7 +720,6 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* Pointer to relevant portions of the packet (IP, ICMP and user
 	 * data) */
 	ip = (struct ip *) base->packet;
-	data = (struct evdata *) (base->packet + IPHDR + ICMP_MINLEN);
 
 	/* Time the packet has been received */
 	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
@@ -791,7 +790,8 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	hlen = ip->ip_hl * 4;
 
 	/* Check the IP header */
-	if (nrecv < hlen + ICMP_MINLEN || ip->ip_hl < 5)
+	if (nrecv < hlen + ICMP_MINLEN + sizeof (struct evdata) ||
+		ip->ip_hl < 5)
 	  {
 	    /* One more too short packet */
 	    goto done;
@@ -811,8 +811,15 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
+	data = (struct evdata *) (base->packet + hlen + ICMP_MINLEN);
 	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
+	{
+#if 0
+		printf("ready_callback4: bad index: got %d\n",
+			data->index);
+#endif
 	    goto done;
+	}
 
 	/* Get the pointer to the host descriptor in our internal table */
 	if (state != base->table[data->index])
@@ -899,6 +906,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	struct pingstate *state;
 
 	int nrecv, isDup;
+	size_t icmp_len;
 	struct sockaddr_in6 remote;           /* responding internet address */
 
 	struct icmp6_hdr *icmp;
@@ -918,8 +926,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	/* Pointer to relevant portions of the packet (IP, ICMP and user
 	 * data) */
 	icmp = (struct icmp6_hdr *) base->packet;
-	data = (struct evdata *) (base->packet +
-		offsetof(struct icmp6_hdr, icmp6_data16[2]));
+	icmp_len= offsetof(struct icmp6_hdr, icmp6_data16[2]);
+	data = (struct evdata *) (base->packet + icmp_len);
 
 	/* Time the packet has been received */
 	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
@@ -993,6 +1001,12 @@ static void ready_callback6 (int __attribute((unused)) unused,
 		fwrite(&len, sizeof(len), 1, state->resp_file_out);
 		fwrite(base->packet, len, 1, state->resp_file_out);
 		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+	}
+
+	if (nrecv < icmp_len+sizeof(struct evdata))
+	{
+		// printf("ready_callback6: short packet\n");
+		goto done;
 	}
 
 	/* Check the ICMP header to drop unexpected packets due to
