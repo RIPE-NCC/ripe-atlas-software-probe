@@ -514,13 +514,12 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 static void free_qry_inst(struct query_state *qry);
 static void ready_callback (int unused, const short event, void * arg);
 
-/* move the next functions from tdig.c */
 u_int32_t get32b (char *p);
 void ldns_write_uint16(void *dst, uint16_t data);
 uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
         int* count);
-/* from tdig.c */
+int dns_namelen(unsigned char *base, size_t offset, size_t size);
 
 void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry);
 
@@ -1181,6 +1180,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			if (qry->response_out)
 				fwrite(b2, 2, 1, qry->resp_file);
 			qry->wire_size = ldns_read_uint16(b2);
+qry->wire_size= sizeof(struct DNS_HEADER);
 			buf_init(&qry->packet, -1);
 		}
 		else {
@@ -1189,6 +1189,18 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			buf_add(&qry->err, line, strlen(line));	
 		}
 	} 
+
+	/* We need at least a header */
+	if (qry->wire_size < sizeof(struct DNS_HEADER))
+	{
+		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
+				" \"reply too small, got %zu\""
+				, qry->err.size ? ", " : ""
+				, (size_t)qry->wire_size);
+		buf_add(&qry->err, line, strlen(line));	
+		printReply (qry, 0, NULL);
+		return;
+	}
 	for (;;) {
 		if (qry->response_in)
 			n= fread(line, 1, 1, qry->resp_file);
@@ -2498,7 +2510,6 @@ void printErrorQuick (struct query_state *qry)
 void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 {
 	int i, stop=0;
-	unsigned char *qname, *reader;
 	struct DNS_HEADER *dnsR = NULL;
 	struct RES_RECORD answers[20]; //the replies from the DNS server
 	void *ptr = NULL;
@@ -2507,8 +2518,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	u_int32_t serial;
 	int iMax ;
 	int flagAnswer = 0;
-	int data_len, offset;
+	int data_len, len;
 	int write_out = FALSE;
+	unsigned offset;
+	unsigned char *name1= NULL, *name2= NULL;
 
 	int fw = get_atlas_fw_version();
 	int lts = get_timesync();
@@ -2599,19 +2612,26 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 	if(result)
 	{
-		dnsR = (struct DNS_HEADER*) result;
-
-		//point to the query portion
-		qname =(unsigned char*)&result[sizeof(struct DNS_HEADER)];
-
-		//move ahead of the dns header and the query field
-		reader = &result[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
-
 		snprintf(line, DEFAULT_LINE_LENGTH, ",\"result\" : { \"rt\" : %.3f,", qry->triptime);
 		buf_add(&qry->result,line, strlen(line));
 
 		JD (size,  wire_size);
+
+		if(qry->opt_abuf) {
+			snprintf(line, DEFAULT_LINE_LENGTH, "\"abuf\" : \"");
+			buf_add(&qry->result,line, strlen(line));
+			buf_add_b64(&qry->result, result, wire_size, 0);
+			AS("\"");
+		}
+
+		if (wire_size < sizeof(struct DNS_HEADER))
+			goto truncated;
+
+		dnsR = (struct DNS_HEADER*) result;
+
+		buf_add(&qry->result, ",", 1);
 		JU (ID, ntohs(dnsR->id));
+
 		/*
 		fprintf (fh, " , \"RCODE\" : %d",  dnsR->rcode);
 		fprintf (fh, " , \"AA\" : %d",  dnsR->aa);
@@ -2622,12 +2642,17 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		JU (NSCOUNT, ntohs(dnsR->ns_count));
 		JU_NC (ARCOUNT, ntohs(dnsR->add_count));
 
-		if(qry->opt_abuf) {
-			snprintf(line, DEFAULT_LINE_LENGTH, ",\"abuf\" : \"");
-			buf_add(&qry->result,line, strlen(line));
-			buf_add_b64(&qry->result, result, wire_size, 0);
-			AS("\"");
-		}
+		/* Start just after header */
+		offset= sizeof(struct DNS_HEADER);
+
+		len= dns_namelen(result, offset, wire_size);
+		if (len == -1)
+			goto truncated;
+
+		offset += len + sizeof(struct QUESTION);
+
+		if (offset > wire_size)
+			goto truncated;
 
 		stop=0;  
 		iMax = 0;
@@ -2641,24 +2666,31 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			for(i=0;i<iMax;i++)
 			{
 				answers[i].name=ReadName(result,wire_size,
-					reader-result,&stop);
-				reader = reader + stop;
+					offset,&stop);
+				if (stop == -1)
+					goto truncated;
+				offset += stop;
 
-				if (reader + sizeof(answers[i].resource) > 
-					result + wire_size)
+				if (offset + sizeof(struct R_DATA) > 
+					wire_size)
 				{
 					/* Report error? */
-					break;
+					goto truncated;
 				}
 
-				answers[i].resource = (struct R_DATA*)(reader);
-				reader = reader + sizeof(struct R_DATA);
+				answers[i].resource =
+					(struct R_DATA*)(result+offset);
+				offset += sizeof(struct R_DATA);
 
 				answers[i].rdata  = NULL;
 
 				if(ntohs(answers[i].resource->type)==T_TXT) //txt
 				{
 					data_len = ntohs(answers[i].resource->data_len);
+
+					if (offset+data_len > wire_size)
+						goto truncated;
+
 					if(flagAnswer == 0) {
 						AS(",\"answers\" : [ {");
 						flagAnswer++;
@@ -2669,17 +2701,37 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					flagAnswer++;
 					JS (TYPE, "TXT");
 					JS (NAME, answers[i].name);
-					offset= reader-result;
-					if (offset+data_len > wire_size)
-						data_len= wire_size-offset;
-					print_txt_json(reader,
+					print_txt_json(result+offset,
 						data_len, qry);
-					reader = reader + ntohs(answers[i].resource->data_len);
+					offset += data_len;
 					AS("}");
 
 				}
 				else if (ntohs(answers[i].resource->type)== T_SOA)
 				{
+					name1= name2= NULL;
+					name1 = ReadName(
+						result,wire_size,
+						offset,&stop);
+					if (stop == -1)
+						goto truncated;
+					offset += stop;
+					name2 = ReadName(
+						result,wire_size,
+						offset,&stop);
+					if (stop == -1)
+					{
+						free(name1); name1= NULL;
+						goto truncated;
+					}
+					offset += stop;
+					if (offset+5*4 > wire_size)
+					{
+						free(name1); name1= NULL;
+						free(name2); name2= NULL;
+						goto truncated;
+					}
+
 					if(flagAnswer == 0) {
 						AS(",\"answers\" : [ { ");
 					}
@@ -2691,26 +2743,27 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					JS(TYPE, "SOA");
 					JSDOT(NAME, answers[i].name);
 					JU(TTL, ntohl(answers[i].resource->ttl));
-					answers[i].rdata = ReadName(
-						result,wire_size,
-						reader-result,&stop);
-					JSDOT( MNAME, answers[i].rdata);
-					reader =  reader + stop;
-					free(answers[i].rdata);
-					answers[i].rdata = ReadName(
-						result,wire_size,
-						reader-result,&stop);
-					JSDOT( RNAME, answers[i].rdata);
-					reader =  reader + stop;
-					serial = get32b((char *)reader);
+					JSDOT( MNAME, name1);
+					free(name1); name1= NULL;
+					JSDOT( RNAME, name2);
+					free(name2); name2= NULL;
+
+					serial = get32b(result+offset);
 					JU_NC(SERIAL, serial);
-					reader =  reader + 4;
-					reader =  reader + 16; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
+					offset += 4;
+
+					offset += 4*4; // skip REFRESH, RETRY, EXIPIRE, and MINIMUM
 						AS(" } ");
 				}
 				else  
 				{
-					reader =  reader + ntohs(answers[i].resource->data_len);
+					data_len = ntohs(answers[i].
+						resource->data_len);
+
+					if (offset+data_len > wire_size)
+						goto truncated;
+
+					offset += data_len;
 				}
 	
 				// free mem 
@@ -2726,6 +2779,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			free(answers[i].name);
 		}
 
+truncated:
 		AS (" }"); //result {
 	} 
 	if(qry->err.size) 
@@ -2802,7 +2856,8 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				snprintf((char *)name, sizeof(name),
 					"format-error at %lu: value 0x%x",
 					offset, len);
-				//abort();
+				*count= -1;
+				free(name); name= NULL;
 				return name;
 			}
 
@@ -2812,7 +2867,8 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				snprintf((char *)name, sizeof(name),
 					"offset-error at %lu: offset %lu",
 					offset, noffset);
-				//abort();
+				*count= -1;
+				free(name); name= NULL;
 				return name;
 			}
 
@@ -2822,7 +2878,8 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				snprintf((char *)name, sizeof(name),
 					"too many redirects at %lu",
 						offset);
-				//abort();
+				*count= -1;
+				free(name); name= NULL;
 				return name;
 			}
 
@@ -2843,7 +2900,8 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			snprintf((char *)name, sizeof(name),
 				"buf-bounds-error at %lu: len %d",
 					offset, len);
-			//abort();
+			*count= -1;
+			free(name); name= NULL;
 			return name;
 		}
 
@@ -2852,7 +2910,8 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			snprintf((char *)name, sizeof(name),
 					"name-length-error at %lu: len %d",
 					offset, p+len+1);
-			//abort();
+			*count= -1;
+			free(name); name= NULL;
 			return name;
 		}
 		memcpy(name+p, base+offset+1, len);
@@ -2877,6 +2936,42 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 	if(p >  0)
 		name[p-1]= '\0'; //remove the last dot
 	return name;
+}
+
+int dns_namelen(unsigned char *base, size_t offset, size_t size)
+{
+	size_t start_offset;
+	unsigned int len;
+
+	start_offset= offset;
+
+	//figure out the length of a name in 3www6google3com format
+	while(offset < size)
+	{
+		len= base[offset];
+		if (len & 0xc0)
+		{
+			if ((len & 0xc0) != 0xc0)
+			{
+				/* Bad format */
+				return -1;
+			}
+
+			offset++;
+			break;
+		}
+		if (offset+len+1 > size)
+		{
+			return -1;
+		}
+
+		offset += len+1;
+
+		if (len == 0)
+			break;
+	}
+
+	return offset-start_offset;
 }
 
 /* get 4 bytes from memory
