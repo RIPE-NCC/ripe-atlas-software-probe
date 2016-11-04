@@ -1094,14 +1094,19 @@ static void send_pkt(struct trtstate *state)
 
 			len= offsetof(struct icmp, icmp_data[2]);
 
-			if (state->curpacksize+ICMP_MINLEN < len)
+			/* currpacksize is the amount of data after the
+			 * ICMP header. len is the minimal amount of data
+			 * including the ICMP header. Later len becomes
+			 * the packet size including ICMP header.
+			 */
+			if (ICMP_MINLEN+state->curpacksize < len)
 				state->curpacksize= len-ICMP_MINLEN;
-			if (state->curpacksize+ICMP_MINLEN > len)
+			if (ICMP_MINLEN+state->curpacksize > len)
 			{
 				memset(&base->packet[len], '\0',
-					state->curpacksize-ICMP_MINLEN-len);
+					ICMP_MINLEN+state->curpacksize-len);
 				strcpy((char *)&base->packet[len], id);
-				len= state->curpacksize+ICMP_MINLEN;
+				len= ICMP_MINLEN+state->curpacksize;
 			}
 
 			if (state->parismod)
