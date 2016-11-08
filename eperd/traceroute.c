@@ -74,7 +74,10 @@ struct trtbase
 	 */
 	void (*done)(void *state);
 
-	u_char packet[MAX_DATA_SIZE];
+	/* Leave some space for headers. The various traceroute variations
+	 * have to check that it fits.
+	 */
+	u_char packet[MAX_DATA_SIZE+128];
 };
 
 struct trtstate
@@ -602,6 +605,12 @@ static void send_pkt(struct trtstate *state)
 			tcphdr->doff= len / 4;
 			tcphdr->syn= 1;
 
+			if (len+state->curpacksize > sizeof(base->packet))
+			{
+				crondlog(
+			DIE9 "base->packet too small, need at least %d",
+					len+state->curpacksize);
+			}
 			if (state->curpacksize > 0)
 			{
 				memset(&base->packet[len], '\0',
@@ -709,6 +718,14 @@ static void send_pkt(struct trtstate *state)
 
 			if (state->curpacksize < len)
 				state->curpacksize= len;
+			if (ICMP6_HDR+state->curpacksize >
+				sizeof(base->packet))
+			{
+				crondlog(
+			DIE9 "base->packet too small, need at least %d",
+					ICMP6_HDR+state->curpacksize);
+			}
+
 			if (state->curpacksize > len)
 			{
 				memset(&base->packet[ICMP6_HDR+len], '\0',
@@ -981,6 +998,12 @@ static void send_pkt(struct trtstate *state)
 			tcphdr->doff= len / 4;
 			tcphdr->syn= 1;
 
+			if (len+state->curpacksize > sizeof(base->packet))
+			{
+				crondlog(
+			DIE9 "base->packet too small, need at least %d",
+					len+state->curpacksize);
+			}
 			if (state->curpacksize > 0)
 			{
 				memset(&base->packet[len], '\0',
@@ -1101,6 +1124,13 @@ static void send_pkt(struct trtstate *state)
 			 */
 			if (ICMP_MINLEN+state->curpacksize < len)
 				state->curpacksize= len-ICMP_MINLEN;
+			if (ICMP_MINLEN+state->curpacksize >
+				sizeof(base->packet))
+			{
+				crondlog(
+			DIE9 "base->packet too small, need at least %d",
+					ICMP_MINLEN+state->curpacksize);
+			}
 			if (ICMP_MINLEN+state->curpacksize > len)
 			{
 				memset(&base->packet[len], '\0',
@@ -3890,8 +3920,11 @@ for (i= 0; argv[i] != NULL; i++)
 				 */
 	do_tcp= !!(opt & OPT_T);
 	do_udp= !(do_icmp || do_tcp);
-	if (maxpacksize > sizeof(trt_base->packet))
-		maxpacksize= sizeof(trt_base->packet);
+	if (maxpacksize > MAX_DATA_SIZE)
+	{
+		crondlog(LVL8 "max. packet size too big");
+		return NULL;
+	}
 
 	if (response_in)
 	{
