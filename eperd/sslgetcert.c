@@ -410,6 +410,11 @@ static int msgbuf_read(struct state *state, struct msgbuf *msgbuf, int *typep,
 		*majorp= p[1];
 		*minorp= p[2];
 		len= (p[3] << 8) + p[4];
+		/* Note that buf_read may reallocate msgbuf->inbuf->buf,
+		 * which invalidates p. For this reason, after buf_read
+		 * either return to the caller, or use 'continue' to
+		 * restart at the top of the loop.
+		 */
 		if (msgbuf->inbuf->size - msgbuf->inbuf->offset < 5 + len)
 		{
 			r= buf_read(state, msgbuf->inbuf);
@@ -1264,6 +1269,13 @@ static int eat_certificate(struct state *state)
 			return -1;
 		}
 		len= (p[1] << 16) + (p[2] << 8) + p[3];
+
+		/* Note that msgbuf_read may cause the buffer
+		 * (msgbuf->buffer.buf) to be reallocated. This will make
+		 * p a wild pointer. To counter that, after msgbuf_read,
+		 * either return an error to the caller or use 'continue'
+		 * to restart at the top of the loop.
+		 */
 		if (msgbuf->buffer.size - msgbuf->buffer.offset < 4+len)
 		{
 			r= msgbuf_read(state, msgbuf, &type,
