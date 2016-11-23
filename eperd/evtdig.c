@@ -2016,8 +2016,9 @@ void tdig_start (void *arg)
 				if(qry->resolv_max ) {
 					free(qry->server_name);
 					qry->server_name = NULL;
-					qry->server_name = qry->nslist[qry->resolv_i];
-					qry->nslist[qry->resolv_i]= NULL;
+					qry->server_name =
+						strdup(qry->nslist
+						[qry->resolv_i]);
 				}
 				else {
 					crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max is zero %d i %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
@@ -2338,6 +2339,10 @@ static void free_qry_inst(struct query_state *qry)
 			if(qry->server_name) {
 				free (qry->server_name);
 				qry->server_name = NULL;
+			}
+			if (qry->nslist[qry->resolv_i] == NULL)
+			{
+				crondlog(DIE9 "free_qry_inst: qry %p, no resolver at index %d, max %d", qry, qry->resolv_i, qry->resolv_max);
 			}
 			qry->server_name = strdup(qry->nslist[qry->resolv_i]);
 			qry->qst = STATUS_NEXT_QUERY;
