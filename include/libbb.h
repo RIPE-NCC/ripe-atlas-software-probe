@@ -309,6 +309,7 @@ extern char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 #define ATLAS_DATA_OUT		ATLAS_HOME "/data/out"
 #define ATLAS_DATA_OOQ_OUT	ATLAS_HOME "/data/ooq.out"
 #define ATLAS_DATA_NEW		ATLAS_HOME "/data/new"
+#define ATLAS_DATA_STORAGE	ATLAS_HOME "/data/storage"
 #define ATLAS_TIMESYNC_FILE	ATLAS_DATA_NEW "/timesync.vol"
 #define ATLAS_FUZZING		ATLAS_HOME "/data"
 

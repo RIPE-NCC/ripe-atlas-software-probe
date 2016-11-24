@@ -6,8 +6,10 @@
 
 #include "libbb.h"
 
-#define SAFE_PREFIX_FROM ATLAS_DATA_NEW
-#define SAFE_PREFIX_TO ATLAS_DATA_OUT
+#define SAFE_PREFIX_FROM1 ATLAS_DATA_NEW
+#define SAFE_PREFIX_FROM2 ATLAS_DATA_OUT
+#define SAFE_PREFIX_TO1 ATLAS_DATA_OUT
+#define SAFE_PREFIX_TO2 ATLAS_DATA_STORAGE
 
 #define A_FLAG	(1 << 0)
 #define a_FLAG	(1 << 1)
@@ -50,13 +52,15 @@ int condmv_main(int argc, char *argv[])
 	from= argv[optind];
 	to= argv[optind+1];
 
-	if (!validate_filename(from, SAFE_PREFIX_FROM))
+	if (!validate_filename(from, SAFE_PREFIX_FROM1) &&
+		!validate_filename(from, SAFE_PREFIX_FROM2))
 	{
 		fprintf(stderr, "insecure from file '%s'\n", from);
 		return 1;
 	}
-	if (!validate_filename(to, SAFE_PREFIX_TO) &&
-		!validate_filename(to, SAFE_PREFIX_FROM))
+	if (!validate_filename(to, SAFE_PREFIX_TO1) &&
+		!validate_filename(to, SAFE_PREFIX_TO2) &&
+		!validate_filename(to, SAFE_PREFIX_FROM1))
 	{
 		fprintf(stderr, "insecure to file '%s'\n", to);
 		return 1;
