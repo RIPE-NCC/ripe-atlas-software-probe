@@ -19,6 +19,7 @@
 #define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
 #define SAFE_PREFIX_DATA_OOQ_OUT ATLAS_DATA_OOQ_OUT
 #define SAFE_PREFIX_DATA_NEW ATLAS_DATA_NEW
+#define SAFE_PREFIX_DATA_STORAGE ATLAS_DATA_STORAGE
 #define SAFE_PREFIX_STATUS ATLAS_STATUS
 
 /* Maximum number of files to post in one go with post-dir */
@@ -372,7 +373,10 @@ int httppost_main(int argc, char *argv[])
 		{
 			fprintf(stderr, "posting file '%s'\n", p);
 			if (!validate_filename(p, SAFE_PREFIX_DATA_OUT) &&
-				!validate_filename(p, SAFE_PREFIX_DATA_OOQ_OUT))
+				!validate_filename(p,
+					SAFE_PREFIX_DATA_OOQ_OUT) &&
+				!validate_filename(p,
+					SAFE_PREFIX_DATA_STORAGE))
 			{
 				report("protected file (post dir) '%s'", p);
 				goto err;
