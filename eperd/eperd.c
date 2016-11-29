@@ -336,6 +336,9 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	limit.rlim_max= RLIM_INFINITY;
 	setrlimit(RLIMIT_CORE, &limit);
 
+	/* Ignore SIGPIPE, broken TCP sessions may trigger them */
+	signal(SIGPIPE, SIG_IGN);
+
 	/* Create libevent event base */
 	EventBase= event_base_new();
 	if (!EventBase)
