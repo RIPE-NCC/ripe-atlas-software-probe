@@ -71,7 +71,7 @@
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified) */
 #define DEFAULT_NOREPLY_TIMEOUT 5000           /* 5000 msec - 0 is illegal      */
-#define DEFAULT_LINE_LENGTH 80 
+#define DEFAULT_LINE_LENGTH 256 
 #define DEFAULT_STATS_REPORT_INTERVEL 180 		/* in seconds */
 #define CONN_TO            5  /* TCP connection time out in seconds */
 #define DEFAULT_RETRY_MAX 0 
