@@ -275,7 +275,7 @@ static int con_init_main( int argc, char *argv[] )
 					atlas_log( ERROR, "missing port\n");
 					goto fail;
 				}
-				printf ("REMOTE_PORT=%s\n", cp);
+				printf ("REMOTE_PORT %s\n", cp);
 
 				if (ecp+1 < line+len)
 				{
@@ -419,10 +419,10 @@ static int process_wait (const char *type, int delay)
                	delay = max_rereg_time;
         }
 	if(delay <  min_rereg_time ) {
-               	atlas_log( ERROR, "Reregister time %d is too high\n", delay );
+               	atlas_log( ERROR, "Reregister time %d is too low\n", delay );
                	delay = min_rereg_time;
         }
-	printf ("%s=%u\n", type, (uint)(mytime + delay));
+	printf ("%s %u\n", type, (uint)(mytime + delay));
 	return (delay);
 }
 
@@ -1125,7 +1125,7 @@ static int reg_init_main( int argc, char *argv[] )
 				}
 
 				host_name = cp;
-				printf ("CONTROLLER_%d_HOST=%s\n",
+				printf ("CONTROLLER_%d_HOST %s\n",
 					n_controller, host_name);
 
 				cp= skip_spaces(ecp+1);
@@ -1135,7 +1135,7 @@ static int reg_init_main( int argc, char *argv[] )
 					atlas_log( ERROR, "missing port\n");
 					goto fail;
 				}
-				printf ("CONTROLLER_%d_PORT=%s\n",
+				printf ("CONTROLLER_%d_PORT %s\n",
 					n_controller, cp);
 
 				cp= skip_spaces(ecp+1);
