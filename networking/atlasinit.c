@@ -982,7 +982,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_KERNEL_VERSION=%u\n",
+				printf("FIRMWARE_KERNEL_VERSION %u\n",
 					(unsigned)root_fs_ver);
 
 				cp= skip_spaces(ecp+1);
@@ -992,7 +992,7 @@ static int reg_init_main( int argc, char *argv[] )
 					atlas_log(ERROR, "missing hash alg.\n");
 					goto fail;
 				}
-				printf("FIRMWARE_KERNEL_CS_ALG=%s\n", cp);
+				printf("FIRMWARE_KERNEL_CS_ALG %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_hash(cp);
@@ -1002,7 +1002,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_KERNEL_CS_COMP=%s\n", cp);
+				printf("FIRMWARE_KERNEL_CS_COMP %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_hash(cp);
@@ -1012,7 +1012,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_KERNEL_CS_UNCOMP=%s\n", cp);
+				printf("FIRMWARE_KERNEL_CS_UNCOMP %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_filename(cp);
@@ -1022,7 +1022,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf( "FIRMWARE_KERNEL=%s\n", cp) ;
+				printf( "FIRMWARE_KERNEL %s\n", cp) ;
 
 				if (ecp+1 < line+len)
 				{
@@ -1057,7 +1057,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_APPS_VERSION=%lu\n",
+				printf("FIRMWARE_APPS_VERSION %lu\n",
 					root_fs_ver);
 
 				cp= skip_spaces(ecp+1);
@@ -1067,7 +1067,7 @@ static int reg_init_main( int argc, char *argv[] )
 					atlas_log(ERROR, "missing hash alg.\n");
 					goto fail;
 				}
-				printf("FIRMWARE_APPS_CS_ALG=%s\n", cp);
+				printf("FIRMWARE_APPS_CS_ALG %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_hash(cp);
@@ -1077,7 +1077,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_APPS_CS_COMP=%s\n", cp);
+				printf("FIRMWARE_APPS_CS_COMP %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_hash(cp);
@@ -1087,7 +1087,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf("FIRMWARE_APPS_CS_UNCOMP=%s\n", cp);
+				printf("FIRMWARE_APPS_CS_UNCOMP %s\n", cp);
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_filename(cp);
@@ -1097,7 +1097,7 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				printf( "FIRMWARE_APPS=%s\n", cp) ;
+				printf( "FIRMWARE_APPS %s\n", cp) ;
 
 				if (ecp+1 < line+len)
 				{
