@@ -89,6 +89,7 @@ struct state
 	char connecting;
 	char *hostname;
 	char *portname;
+	char *sni;
 	struct bufferevent *bev;
 	enum readstate readstate;
 	enum writestate writestate;
@@ -488,6 +489,17 @@ static void hsbuf_add(struct hsbuf *hsbuf, const void *buf, size_t len)
 	buf_add(&hsbuf->buffer, buf, len);
 }
 
+static void hsbuf_add_u16(struct hsbuf *hsbuf, unsigned u16)
+{
+	uint8_t c;
+	
+	c= (u16 >> 8);
+	buf_add(&hsbuf->buffer, &c, 1);
+
+	c= u16;
+	buf_add(&hsbuf->buffer, &c, 1);
+}
+
 static void hsbuf_cleanup(struct hsbuf *hsbuf)
 {
 	buf_cleanup(&hsbuf->buffer);
@@ -549,7 +561,6 @@ static void add_sessionid(struct hsbuf *hsbuf)
 
 static void add_ciphers(struct hsbuf *hsbuf)
 {
-	uint8_t c;
 	size_t len;
 	uint8_t ciphers[]= {
 		0xc0,0x0a,	/* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA */
@@ -565,11 +576,7 @@ static void add_ciphers(struct hsbuf *hsbuf)
 
 	len= sizeof(ciphers);
 
-	c= len >> 8;
-	hsbuf_add(hsbuf, &c, 1);
-	c= len;
-	hsbuf_add(hsbuf, &c, 1);
-
+	hsbuf_add_u16(hsbuf, len);
 	hsbuf_add(hsbuf, ciphers, len);
 }
 
@@ -587,6 +594,41 @@ static void add_compression(struct hsbuf *hsbuf)
 	hsbuf_add(hsbuf, compression, len);
 }
 
+static void add_sni(struct hsbuf *hsbuf, const char *server_name)
+{
+	/* Assume there is only a single extension with one hostname.
+	 * Add the following:
+	 *
+	 * size of extensions vector, 16-bit
+	 * extension_type (server_name, 0), 16-bit
+	 * size of extension_data vector, 16-bit
+	 * size of server_name_list, 16-bit
+	 * name_type (host_name, 0), 8-bit
+	 * size of HostName, 16-bit
+	 * actual hostname.
+	 */
+
+	uint8_t c;
+	size_t size_hostname, size_server_name_list, size_extension_data,
+		size_extensions;
+
+	size_hostname= strlen(server_name);
+	size_server_name_list= 1 /*name_type*/ + 2 /*size_hostname*/ +
+		size_hostname;
+	size_extension_data= 2 /*size_server_name_list*/ +
+		size_server_name_list;
+	size_extensions= 2 /*extension_type*/ + 2 /*size_extension_data*/ +
+		size_extension_data;
+
+	hsbuf_add_u16(hsbuf, size_extensions);
+	hsbuf_add_u16(hsbuf, 0 /* server_name */);
+	hsbuf_add_u16(hsbuf, size_extension_data);
+	hsbuf_add_u16(hsbuf, size_server_name_list);
+	c= 0;	/* host_name */
+	hsbuf_add(hsbuf, &c, 1);
+	hsbuf_add_u16(hsbuf, size_hostname);
+	hsbuf_add(hsbuf, server_name, size_hostname);
+}
 
 static struct hgbase *sslgetcert_base_new(struct event_base *event_base)
 {
@@ -640,7 +682,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	int c, i, only_v4, only_v6, major, minor;
 	size_t newsiz;
 	char *hostname, *str_port, *infname, *version_str;
-	char *output_file, *A_arg, *B_arg;
+	char *output_file, *A_arg, *B_arg, *h_arg;
 	char *response_in, *response_out;
 	struct state *state;
 	FILE *fh;
@@ -650,6 +692,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	version_str= NULL;
 	A_arg= NULL;
 	B_arg= NULL;
+	h_arg= NULL;
 	infname= NULL;
 	str_port= NULL;
 	response_in= NULL;
@@ -667,7 +710,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Allow us to be called directly by another program in busybox */
 	optind= 0;
-	while (c= getopt_long(argc, argv, "A:B:O:R:V:W:i:p:46", longopts, NULL), c != -1)
+	while (c= getopt_long(argc, argv, "A:B:h:O:R:V:W:i:p:46",
+		longopts, NULL), c != -1)
 	{
 		switch(c)
 		{
@@ -676,6 +720,9 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'B':
 			B_arg= optarg;
+			break;
+		case 'h':
+			h_arg= optarg;
 			break;
 		case 'O':
 			output_file= optarg;
@@ -802,6 +849,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	state->response_out= response_out ? strdup(response_out) : NULL;
 	state->infname= infname ? strdup(infname) : NULL;
 	state->hostname= strdup(hostname);
+	state->sni= h_arg ? strdup(h_arg) : NULL;
 	state->major_version= major;
 	state->minor_version= minor;
 	if (str_port)
@@ -1410,6 +1458,9 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			add_sessionid(&hsbuf);
 			add_ciphers(&hsbuf);
 			add_compression(&hsbuf);
+
+			if (state->sni)
+				add_sni(&hsbuf, state->sni);
 
 			hsbuf_final(&hsbuf, HS_CLIENT_HELLO, &msgoutbuf);
 			msgbuf_final(&msgoutbuf, MSG_HANDSHAKE);
