@@ -648,6 +648,9 @@ static void timeout_callback(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	struct state *state;
+	double resptime;
+	char hostbuf[NI_MAXHOST];
+	char line[80];
 
 	state= ENV2STATE(s);
 
@@ -660,6 +663,18 @@ static void timeout_callback(int __attribute((unused)) unused,
 			tu_restart_connect(&state->tu_env);
 		return;
 	}
+
+	getnameinfo((struct sockaddr *)&state->loc_sin6,
+		state->loc_socklen, hostbuf, sizeof(hostbuf), NULL, 0,
+		NI_NUMERICHOST);
+	snprintf(line, sizeof(line), DBQ(src_addr) ":" DBQ(%s) ", " , hostbuf);
+	add_str(state, line);
+
+	resptime= (state->t_connect.tv_sec- state->start.tv_sec)*1e3 +
+		(state->t_connect.tv_nsec-state->start.tv_nsec)/1e6;
+	snprintf(line, sizeof(line), DBQ(ttc) ": %f, ", resptime);
+	add_str(state, line);
+
 	switch(state->readstate)
 	{
 	case READ_HELLO:
