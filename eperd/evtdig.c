@@ -1180,7 +1180,6 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			if (qry->response_out)
 				fwrite(b2, 2, 1, qry->resp_file);
 			qry->wire_size = ldns_read_uint16(b2);
-qry->wire_size= sizeof(struct DNS_HEADER);
 			buf_init(&qry->packet, -1);
 		}
 		else {
