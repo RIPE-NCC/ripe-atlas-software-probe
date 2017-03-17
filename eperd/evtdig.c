@@ -1180,7 +1180,6 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			if (qry->response_out)
 				fwrite(b2, 2, 1, qry->resp_file);
 			qry->wire_size = ldns_read_uint16(b2);
-qry->wire_size= sizeof(struct DNS_HEADER);
 			buf_init(&qry->packet, -1);
 		}
 		else {
@@ -1216,6 +1215,7 @@ qry->wire_size= sizeof(struct DNS_HEADER);
 		if (qry->response_out)
 			fwrite(line, n, 1, qry->resp_file);
 		buf_add(&qry->packet, line, n);
+		crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
 		if(qry->wire_size == qry->packet.size) {
 			crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
 			crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
