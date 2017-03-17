@@ -26,13 +26,14 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46rc:s:A:B:O:i:I:R:W:")
+#define PING_OPT_STRING ("!46prc:s:A:B:O:i:I:R:W:")
 
 enum 
 {
 	opt_4 = (1 << 0),
 	opt_6 = (1 << 1),
-	opt_r = (1 << 2),
+	opt_p = (1 << 2),
+	opt_r = (1 << 3),
 };
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified)
@@ -99,6 +100,7 @@ struct pingstate
 	char *interface;
 	int pingcount;
 	char *out_filename;
+	char include_probe_id;
 	char delay_name_res;
 	unsigned interval;
 
@@ -479,13 +481,15 @@ static int mkcksum(u_short *p, int n)
  * ho hosts being monitored
  */
 static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
-	uint32_t idx, pid_t pid, struct cookie *cookiep)
+	uint32_t idx, pid_t pid, struct cookie *cookiep,
+	int include_probe_id)
 {
-	size_t minlen;
+	int probe_id;
+	size_t minlen, len;
 	struct icmp *icmp = (struct icmp *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + ICMP_MINLEN);
-
 	struct timespec now;
+	char probe_id_line[80];
 
 	minlen= sizeof(*data);
 	if (*sizep < minlen)
@@ -509,6 +513,30 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
 
+	if (include_probe_id)
+	{
+		probe_id= get_probe_id();
+		if (probe_id == -1)
+		{
+			snprintf(probe_id_line, sizeof(probe_id_line), 
+				"RIPE Atlas probe <unknown>");
+		}
+		else
+		{
+			snprintf(probe_id_line, sizeof(probe_id_line), 
+				"RIPE Atlas probe %d", probe_id);
+		}
+
+		len= strlen(probe_id_line);
+		if (*sizep < sizeof(*data) + len)
+			len= *sizep - sizeof(*data);
+		if (len)
+		{
+			memcpy(buffer + ICMP_MINLEN + sizeof(*data),
+				probe_id_line, len);
+		}
+	}
+
 	/* Last, compute ICMP checksum */
 	icmp->icmp_cksum = 0;
 	icmp->icmp_cksum = mkcksum((u_short *) icmp, ICMP_MINLEN + *sizep);  /* ones complement checksum of struct */
@@ -531,13 +559,15 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
  * ho hosts being monitored
  */
 static void fmticmp6(u_char *buffer, size_t *sizep,
-	u_int8_t seq, uint32_t idx, pid_t pid, struct cookie *cookiep)
+	u_int8_t seq, uint32_t idx, pid_t pid, struct cookie *cookiep,
+	int include_probe_id)
 {
-	size_t minlen;
+	int probe_id;
+	size_t minlen, len;
 	struct icmp6_hdr *icmp = (struct icmp6_hdr *) buffer;
 	struct evdata *data = (struct evdata *) (buffer + ICMP6_HDRSIZE);
-
 	struct timespec now;
+	char probe_id_line[80];
 
 	minlen= sizeof(*data);
 	if (*sizep < minlen)
@@ -558,6 +588,31 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 	data->ts    = now;                       /* current uptime time */
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
+
+	if (include_probe_id)
+	{
+		probe_id= get_probe_id();
+		if (probe_id == -1)
+		{
+			snprintf(probe_id_line, sizeof(probe_id_line), 
+				"RIPE Atlas probe <unknown>");
+		}
+		else
+		{
+			snprintf(probe_id_line, sizeof(probe_id_line), 
+				"RIPE Atlas probe %d", probe_id);
+		}
+
+		len= strlen(probe_id_line);
+		if (*sizep < sizeof(*data) + len)
+			len= *sizep - sizeof(*data);
+		if (len)
+		{
+			memcpy(buffer + ICMP6_HDRSIZE + sizeof(*data),
+				probe_id_line, len);
+		}
+	}
+
 
 	icmp->icmp6_cksum = 0;
 }
@@ -594,7 +649,7 @@ static void ping_xmit(struct pingstate *host)
 	{
 		/* Format the ICMP Echo Reply packet to send */
 		fmticmp6(base->packet, &host->cursize, host->seq, host->index,
-			base->pid, &host->cookie);
+			base->pid, &host->cookie, host->include_probe_id);
 
 		host->loc_socklen= sizeof(host->loc_sin6);
 		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
@@ -616,8 +671,9 @@ static void ping_xmit(struct pingstate *host)
 	else
 	{
 		/* Format the ICMP Echo Reply packet to send */
-		fmticmp4(base->packet, &host->cursize, host->seq, host->index,
-			base->pid, &host->cookie);
+		fmticmp4(base->packet, &host->cursize, host->seq,
+			host->index, base->pid, &host->cookie,
+			host->include_probe_id);
 
 		host->loc_socklen= sizeof(host->loc_sin6);
 		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
@@ -1107,7 +1163,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 {
 	static struct pingbase *ping_base;
 
-	int i, r, fd, newsiz, delay_name_res;
+	int i, r, fd, newsiz, include_probe_id, delay_name_res;
 	uint32_t opt;
 	unsigned pingcount; /* must be int-sized */
 	unsigned size, interval;
@@ -1241,6 +1297,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		af= AF_INET;
 	else
 		af= AF_INET6;
+	include_probe_id= !!(opt & opt_p);
 	delay_name_res= !!(opt & opt_r);
 	delay_name_res= 1;	/* Always enabled, leave the old code in
 				 * place for now.
@@ -1279,6 +1336,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 
 	state->base = ping_base;
 	state->af= af;
+	state->include_probe_id= include_probe_id;
 	state->delay_name_res= delay_name_res;
 	state->interval= interval;
 	state->interface= interface ? strdup(interface) : NULL;
