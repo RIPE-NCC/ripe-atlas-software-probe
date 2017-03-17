@@ -6,12 +6,16 @@
 #include "libbb.h"
 int get_probe_id(void)
 {
-        int probe_id;
+        static int probe_id= -1;
+
         size_t len;
         char *check;
         const char *key;
         FILE *fp;
         char buf[80];
+
+	if (probe_id > 0)
+		return probe_id;	/* Assume probe ID never changes */
 
         fp= fopen("/home/atlas/status/reg_init_reply.txt", "r");
         if (!fp)
