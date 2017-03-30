@@ -73,6 +73,7 @@
 #if ENABLE_HUSH_CASE
 #include <fnmatch.h>
 #endif
+#include <sys/reboot.h>
 
 #define HUSH_VER_STR "0.91"
 
@@ -774,6 +775,7 @@ static int builtin_rxtxrpt(char **argv);
 static int builtin_rptaddrs(char **argv);
 static int builtin_rptuptime(char **argv);
 static int builtin_onlyuptime(char **argv);
+static int builtin_reboot_probe(char **argv);
 static int builtin_true(char **argv);
 static int builtin_set(char **argv);
 static int builtin_shift(char **argv);
@@ -836,6 +838,7 @@ static const struct built_in_command bltins[] = {
 	BLTIN("rptaddrs"  , builtin_rptaddrs, "report address(es), route(s), and dns"),
 	BLTIN("rptuptime"  , builtin_rptuptime, "report uptime"),
 	BLTIN("onlyuptime"  , builtin_onlyuptime, "report uptime in seconds"),
+	BLTIN("reboot_probe"  , builtin_reboot_probe, "built-in reboot command"),
 	BLTIN("echo"  , builtin_echo, "Write to stdout"),
 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
 	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
@@ -4795,6 +4798,15 @@ static int builtin_onlyuptime(char **argv __attribute((unused)))
 	printf("%ld\n", (long)info.uptime);
 
 	return 0;
+}
+
+static int builtin_reboot_probe(char **argv __attribute((unused))) 
+{
+	int r;
+
+	sync();
+	r= reboot(RB_AUTOBOOT);
+	return r;
 }
 
 static int builtin_rchoose(char **argv)
