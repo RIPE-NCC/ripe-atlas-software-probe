@@ -291,6 +291,7 @@ struct query_state {
 	u_int16_t qtype;
 	u_int16_t qclass;
 
+	char *macro_lookupname;
 	char *lookupname;
 	char * server_name;
 	char *out_filename ;
@@ -506,7 +507,7 @@ void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state);
 static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
 static void process_reply(void * arg, int nrecv, struct timespec now);
-static void mk_dns_buff(struct query_state *qry,  u_char *packet,
+static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	size_t packetlen) ;
 int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b);
 static void udp_dns_cb(int err, struct evutil_addrinfo *ev_res, void *arg);
@@ -514,7 +515,7 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 static void free_qry_inst(struct query_state *qry);
 static void ready_callback (int unused, const short event, void * arg);
 
-u_int32_t get32b (char *p);
+u_int32_t get32b (unsigned char *p);
 void ldns_write_uint16(void *dst, uint16_t data);
 uint16_t ldns_read_uint16(const void *src);
 unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
@@ -673,7 +674,7 @@ int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b)
 	return 1;
 }
 
-static void mk_dns_buff(struct query_state *qry,  u_char *packet,
+static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	size_t packetlen) 
 {
 	struct DNS_HEADER *dns = NULL;
@@ -756,7 +757,7 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet,
 			qry->lookupname); // fill the query portion.
 	}
 	if (qnamelen == -1)
-		return;		/* Do we need to tell anybody? */
+		return -1;
 
 	qinfo =(struct QUESTION*)&packet[sizeof(struct DNS_HEADER) + qnamelen]; 
 
@@ -823,9 +824,9 @@ static void mk_dns_buff(struct query_state *qry,  u_char *packet,
 		crondlog(LVL5 "payload : %s", pbuf.buf);
 		buf_cleanup(&pbuf);
 	}
+
+	return 0;
 } 
-
-
 
 /* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
@@ -848,7 +849,19 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	//AA delete qry->outbuff = outbuff;
 	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
-	mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
+	r= mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
+	if (r == -1)
+	{
+		/* Can't construct a DNS query */
+		free (outbuff);
+		outbuff = NULL;
+		snprintf(line, DEFAULT_LINE_LENGTH,
+			"%s \"err\" : \"unable to format DNS query\"",
+			qry->err.size ? ", " : "");
+		buf_add(&qry->err, line, strlen(line));
+		printReply (qry, 0, NULL);
+		return;
+	}
 	do {
 		if (qry->udp_fd != -1)
 		{
@@ -1394,14 +1407,15 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 	else 
 		qry->server_name = strdup(argv[optind]);
 
-	if (qry->lookupname == NULL) {
+	if (qry->macro_lookupname == NULL) {
 		crondlog(LVL9 "ERROR no query in command line");
 		tdig_delete(qry);
 		return TRUE;
 	}
 
-	if (qry->lookupname[strlen(qry->lookupname) - 1] != '.') {
-		crondlog(LVL9 "ERROR query %s does not end with a dot ", qry->lookupname);
+	if (qry->macro_lookupname[strlen(qry->macro_lookupname) - 1] != '.') {
+		crondlog(LVL9 "ERROR query %s does not end with a dot ",
+			qry->macro_lookupname);
 		tdig_delete(qry);
 		return TRUE;
 	}
@@ -1495,6 +1509,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	buf_init(&qry->err, -1);
 	buf_init(&qry->packet, -1);
 	qry->opt_resolv_conf = 0;
+	qry->macro_lookupname = NULL;
 	qry->lookupname = NULL;
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
@@ -1560,7 +1575,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->infname= strdup(optarg);
 				break;
 			case 'b':
-				qry->lookupname = strdup ("version.bind.");
+				qry->macro_lookupname =
+					strdup ("version.bind.");
 				break;
 		
 			case 'd':
@@ -1572,11 +1588,12 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 
 			case 'h':
-				qry->lookupname = strdup("hostname.bind.");
+				qry->macro_lookupname =
+					strdup("hostname.bind.");
 				break;
 
 			case 'i':
-				qry->lookupname = strdup("id.server.");
+				qry->macro_lookupname = strdup("id.server.");
 				break;
 
 			case 'n':
@@ -1588,7 +1605,8 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				break;
 
 			case 'r':
-				qry->lookupname = strdup("version.server.");
+				qry->macro_lookupname =
+					strdup("version.server.");
 				break;
 
 			case 'R':
@@ -1598,7 +1616,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case 's':
 				qry->qtype = T_SOA;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case 't':
@@ -1661,7 +1679,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 			case O_QUERY:
 				qry->opt_query_arg  = 1;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case O_RESOLV_CONF :
@@ -1682,163 +1700,163 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case (100000 + T_A):
 				qry->qtype = T_A;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_AAAA ):
 				qry->qtype = T_AAAA ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_AFSDB ):
 				qry->qtype = T_AFSDB ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_ANY):
 				qry->qtype = T_ANY ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_APL):
 				qry->qtype = T_APL ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_AXFR ):
 				qry->qtype = T_AXFR ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_CAA):
 				qry->qtype = T_CAA ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_CERT):
 				qry->qtype = T_CERT ;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_CNAME):
 				qry->qtype = T_CNAME;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_DLV):
 				qry->qtype = T_DLV;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break; 
 
 			case (100000 + T_DNAME):
 				qry->qtype = T_DNAME;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_DNSKEY):
 				qry->qtype = T_DNSKEY;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_DS):
 				qry->qtype = T_DS;
 				qry->qclass = C_IN;
-				qry->lookupname  = strdup(optarg);
+				qry->macro_lookupname  = strdup(optarg);
 				break;
 
 			case (100000 + T_IPSECKEY):
 				qry->qtype = T_IPSECKEY;
 				qry->qclass = C_IN;
-				qry->lookupname  = strdup(optarg);
+				qry->macro_lookupname  = strdup(optarg);
 				break;
 
 			case (100000 + T_LOC):
 				qry->qtype = T_LOC;
 				qry->qclass = C_IN;
-				qry->lookupname  = strdup(optarg);
+				qry->macro_lookupname  = strdup(optarg);
 				break;
 
 			case (100000 + T_MX):
 				qry->qtype = T_MX;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NAPTR):
 				qry->qtype = T_NAPTR;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NS):
 				qry->qtype = T_NS;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NSEC):
 				qry->qtype = T_NSEC;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NSEC3):
 				qry->qtype = T_NSEC3;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_NSEC3PARAM):
 				qry->qtype = T_NSEC3PARAM;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_PTR):
 				qry->qtype = T_PTR;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_RRSIG):
 				qry->qtype = T_RRSIG;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_RP):
 				qry->qtype = T_RP;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_SIG):
 				qry->qtype = T_SIG;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_SPF):
 				qry->qtype = T_SPF;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_SRV):
 				qry->qtype = T_SRV;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_SSHFP):
@@ -1850,25 +1868,25 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case (100000 + T_TA):
 				qry->qtype = T_TA;
 				qry->qclass = C_IN;
-				qry->lookupname =  strdup(optarg);
+				qry->macro_lookupname =  strdup(optarg);
 				break;
 
 			case (100000 + T_TLSA):
 				qry->qtype = T_TLSA;
 				qry->qclass = C_IN;
-				qry->lookupname =  strdup(optarg);
+				qry->macro_lookupname =  strdup(optarg);
 				break;
 
 			case (100000 + T_TSIG):
 				qry->qtype = T_TSIG;
 				qry->qclass = C_IN;
-				qry->lookupname =  strdup(optarg);
+				qry->macro_lookupname =  strdup(optarg);
 				break;
 
 			case (100000 + T_TXT):
 				qry->qtype = T_TXT;
 				qry->qclass = C_IN;
-				qry->lookupname =  strdup(optarg);
+				qry->macro_lookupname =  strdup(optarg);
 				break;
 
 			case 200000 + 'W':
@@ -2004,6 +2022,23 @@ void tdig_start (void *arg)
 	switch(qry->qst)
 	{
 		case STATUS_FREE :
+			/* Macro processing */
+			if (qry->lookupname)
+			{
+				free(qry->lookupname);
+				qry->lookupname= NULL;
+			}
+			qry->lookupname=
+				atlas_name_macro(qry->macro_lookupname);
+			if (qry->lookupname == NULL)
+			{
+				snprintf(line, DEFAULT_LINE_LENGTH,
+				"\"err\": \"macro expansion failed\"");
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				return;
+			}
+
 			/* Get time in case we don't send any packet */
 			qry->xmit_time= time(NULL);
 			qry->resolv_i = 0;
@@ -2393,6 +2428,11 @@ static int tdig_delete(void *state)
 	{ 
 		free(qry->out_filename);
 		qry->out_filename = NULL ;
+	}
+	if(qry->macro_lookupname) 
+	{
+		free(qry->macro_lookupname);
+		qry->macro_lookupname = NULL;
 	}
 	if(qry->lookupname) 
 	{
@@ -2983,7 +3023,7 @@ int dns_namelen(unsigned char *base, size_t offset, size_t size)
  * eg.  used to extract serial number from soa packet
  */
 	u_int32_t
-get32b (char *p)
+get32b (unsigned char *p)
 {
 	u_int32_t var;
 
