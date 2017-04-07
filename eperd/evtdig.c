@@ -2660,10 +2660,10 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		snprintf(line, DEFAULT_LINE_LENGTH, ",\"result\" : { \"rt\" : %.3f,", qry->triptime);
 		buf_add(&qry->result,line, strlen(line));
 
-		JD (size,  wire_size);
+		JD_NC (size,  wire_size);
 
 		if(qry->opt_abuf) {
-			snprintf(line, DEFAULT_LINE_LENGTH, "\"abuf\" : \"");
+			snprintf(line, DEFAULT_LINE_LENGTH, ", \"abuf\" : \"");
 			buf_add(&qry->result,line, strlen(line));
 			buf_add_b64(&qry->result, result, wire_size, 0);
 			AS("\"");
