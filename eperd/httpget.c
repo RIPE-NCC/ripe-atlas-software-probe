@@ -965,8 +965,8 @@ static int get_input(struct hgstate *state)
 		if (state->roffset != 0)
 			add_str2(state, ",");
 		snprintf(line, sizeof(line),
-			" { " DBQ(o) ":" DBQ(%d)
-			", " DBQ(t) ": %f }", state->roffset, t);
+			" { " DBQ(o) ": %d, "
+			DBQ(t) ": %f }", state->roffset, t);
 		add_str2(state, line);
 		state->report_roffset= 0;
 	}
