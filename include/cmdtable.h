@@ -31,7 +31,9 @@ static struct builtin
 	{ "sslgetcert", sslgetcert_main },
 	{ "traceroute", traceroute_main },
 #endif
+#if ENABLE_OOQD
 	{ "wifimsm", wifimsm_main },
+#endif
 	{ NULL, 0 }
 };
 
