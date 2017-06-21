@@ -4,7 +4,7 @@
  *
  * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
@@ -12,6 +12,7 @@
 
 #define NOT_DIGIT(a) (((unsigned char)(a-'0')) > 9)
 
+#if 0 // UNUSED
 double FAST_FUNC bb_strtod(const char *arg, char **endp)
 {
 	double v;
@@ -36,6 +37,7 @@ double FAST_FUNC bb_strtod(const char *arg, char **endp)
 	}
 	return v;
 }
+#endif
 
 #if 0
 /* String to timespec: "NNNN[.NNNNN]" -> struct timespec.

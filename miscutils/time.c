@@ -2,14 +2,32 @@
 /* 'time' utility to display resource usage of processes.
    Copyright (C) 1990, 91, 92, 93, 96 Free Software Foundation, Inc.
 
-   Licensed under GPL version 2, see file LICENSE in this tarball for details.
+   Licensed under GPLv2, see file LICENSE in this source tree.
 */
 /* Originally written by David Keppel <pardo@cs.washington.edu>.
    Heavily modified by David MacKenzie <djm@gnu.ai.mit.edu>.
    Heavily modified for busybox by Erik Andersen <andersen@codepoet.org>
 */
+//config:config TIME
+//config:	bool "time"
+//config:	default y
+//config:	help
+//config:	  The time command runs the specified program with the given arguments.
+//config:	  When the command finishes, time writes a message to standard output
+//config:	  giving timing statistics about this program run.
+
+//applet:IF_TIME(APPLET(time, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_TIME) += time.o
+
+//usage:#define time_trivial_usage
+//usage:       "[-v] PROG ARGS"
+//usage:#define time_full_usage "\n\n"
+//usage:       "Run PROG, display resource usage when it exits\n"
+//usage:     "\n	-v	Verbose"
 
 #include "libbb.h"
+#include <sys/resource.h> /* getrusage */
 
 /* Information on the resources used by a child process.  */
 typedef struct {
@@ -63,14 +81,14 @@ static void resuse_end(pid_t pid, resource_t *resp)
 	pid_t caught;
 
 	/* Ignore signals, but don't ignore the children.  When wait3
-	   returns the child process, set the time the command finished. */
+	 * returns the child process, set the time the command finished. */
 	while ((caught = wait3(&resp->waitstatus, 0, &resp->ru)) != pid) {
 		if (caught == -1 && errno != EINTR) {
 			bb_perror_msg("wait");
 			return;
 		}
 	}
-	resp->elapsed_ms = (monotonic_us() / 1000) - resp->elapsed_ms;
+	resp->elapsed_ms = monotonic_ms() - resp->elapsed_ms;
 }
 
 static void printargv(char *const *argv)
@@ -89,7 +107,7 @@ static void printargv(char *const *argv)
    This is funky since the pagesize could be less than 1K.
    Note: Some machines express getrusage statistics in terms of K,
    others in terms of pages.  */
-static unsigned long ptok(unsigned pagesize, unsigned long pages)
+static unsigned long ptok(const unsigned pagesize, const unsigned long pages)
 {
 	unsigned long tmp;
 
@@ -303,7 +321,7 @@ static void summarize(const char *fmt, char **command, resource_t *resp)
 				printf("%lu", ptok(pagesize, (UL) resp->ru.ru_ixrss) / cpu_ticks);
 				break;
 			case 'Z':	/* Page size.  */
-				printf("%u", getpagesize());
+				printf("%u", pagesize);
 				break;
 			case 'c':	/* Involuntary context switches.  */
 				printf("%lu", resp->ru.ru_nivcsw);
@@ -367,20 +385,15 @@ static void summarize(const char *fmt, char **command, resource_t *resp)
    Put the statistics in *RESP.  */
 static void run_command(char *const *cmd, resource_t *resp)
 {
-	pid_t pid;			/* Pid of child.  */
+	pid_t pid;
 	void (*interrupt_signal)(int);
 	void (*quit_signal)(int);
 
-	resp->elapsed_ms = monotonic_us() / 1000;
-	pid = vfork();		/* Run CMD as child process.  */
-	if (pid < 0)
-		bb_perror_msg_and_die("fork");
-	if (pid == 0) {	/* If child.  */
-		/* Don't cast execvp arguments; that causes errors on some systems,
-		   versus merely warnings if the cast is left off.  */
-		BB_EXECVP(cmd[0], cmd);
-		xfunc_error_retval = (errno == ENOENT ? 127 : 126);
-		bb_error_msg_and_die("cannot run %s", cmd[0]);
+	resp->elapsed_ms = monotonic_ms();
+	pid = xvfork();
+	if (pid == 0) {
+		/* Child */
+		BB_EXECVP_or_die((char**)cmd);
 	}
 
 	/* Have signals kill the child but not self (if possible).  */
@@ -414,9 +427,7 @@ int time_main(int argc UNUSED_PARAM, char **argv)
 	run_command(argv, &res);
 
 	/* Cheat. printf's are shorter :) */
-	/* (but see bb_putchar() body for additional wrinkle!) */
-	xdup2(2, 1); /* just in case libc does something silly :( */
-	stdout = stderr;
+	xdup2(STDERR_FILENO, STDOUT_FILENO);
 	summarize(output_format, argv, &res);
 
 	if (WIFSTOPPED(res.waitstatus))

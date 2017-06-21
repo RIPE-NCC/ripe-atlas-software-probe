@@ -1,124 +1,93 @@
 /* vi: set sw=4 ts=4: */
 /*
- * utils.c
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
- *
- * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+ * Authors: Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
  * Changes:
  *
- * Rani Assaf <rani@magic.metawire.com> 980929:	resolve addresses
+ * Rani Assaf <rani@magic.metawire.com> 980929: resolve addresses
  */
 
 #include "libbb.h"
 #include "utils.h"
 #include "inet_common.h"
 
-int get_integer(int *val, char *arg, int base)
+unsigned get_hz(void)
 {
-	long res;
-	char *ptr;
+	static unsigned hz_internal;
+	FILE *fp;
 
-	if (!arg || !*arg)
-		return -1;
-	res = strtol(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > INT_MAX || res < INT_MIN)
-		return -1;
-	*val = res;
-	return 0;
-}
-//XXX: FIXME: use some libbb function instead
-int get_unsigned(unsigned *val, char *arg, int base)
-{
-	unsigned long res;
-	char *ptr;
+	if (hz_internal)
+		return hz_internal;
 
-	if (!arg || !*arg)
-		return -1;
-	res = strtoul(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > UINT_MAX)
-		return -1;
-	*val = res;
-	return 0;
+	fp = fopen_for_read("/proc/net/psched");
+	if (fp) {
+		unsigned nom, denom;
+
+		if (fscanf(fp, "%*08x%*08x%08x%08x", &nom, &denom) == 2)
+			if (nom == 1000000)
+				hz_internal = denom;
+		fclose(fp);
+	}
+	if (!hz_internal)
+		hz_internal = bb_clk_tck();
+	return hz_internal;
 }
 
-int get_u32(uint32_t * val, char *arg, int base)
+unsigned get_unsigned(char *arg, const char *errmsg)
 {
 	unsigned long res;
 	char *ptr;
 
-	if (!arg || !*arg)
-		return -1;
-	res = strtoul(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > 0xFFFFFFFFUL)
-		return -1;
-	*val = res;
-	return 0;
+	if (*arg) {
+		res = strtoul(arg, &ptr, 0);
+//FIXME: "" will be accepted too, is it correct?!
+		if (!*ptr && res <= UINT_MAX) {
+			return res;
+		}
+	}
+	invarg_1_to_2(arg, errmsg); /* does not return */
 }
 
-int get_u16(uint16_t * val, char *arg, int base)
+uint32_t get_u32(char *arg, const char *errmsg)
 {
 	unsigned long res;
 	char *ptr;
 
-	if (!arg || !*arg)
-		return -1;
-	res = strtoul(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > 0xFFFF)
-		return -1;
-	*val = res;
-	return 0;
+	if (*arg) {
+		res = strtoul(arg, &ptr, 0);
+//FIXME: "" will be accepted too, is it correct?!
+		if (!*ptr && res <= 0xFFFFFFFFUL) {
+			return res;
+		}
+	}
+	invarg_1_to_2(arg, errmsg); /* does not return */
 }
 
-int get_u8(uint8_t * val, char *arg, int base)
+uint16_t get_u16(char *arg, const char *errmsg)
 {
 	unsigned long res;
 	char *ptr;
 
-	if (!arg || !*arg)
-		return -1;
-	res = strtoul(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > 0xFF)
-		return -1;
-	*val = res;
-	return 0;
+	if (*arg) {
+		res = strtoul(arg, &ptr, 0);
+//FIXME: "" will be accepted too, is it correct?!
+		if (!*ptr && res <= 0xFFFF) {
+			return res;
+		}
+	}
+	invarg_1_to_2(arg, errmsg); /* does not return */
 }
 
-int get_s16(int16_t * val, char *arg, int base)
-{
-	long res;
-	char *ptr;
-
-	if (!arg || !*arg)
-		return -1;
-	res = strtol(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > 0x7FFF || res < -0x8000)
-		return -1;
-	*val = res;
-	return 0;
-}
-
-int get_s8(int8_t * val, char *arg, int base)
-{
-	long res;
-	char *ptr;
-
-	if (!arg || !*arg)
-		return -1;
-	res = strtol(arg, &ptr, base);
-	if (!ptr || ptr == arg || *ptr || res > 0x7F || res < -0x80)
-		return -1;
-	*val = res;
-	return 0;
-}
-
-int get_addr_1(inet_prefix * addr, char *name, int family)
+int get_addr_1(inet_prefix *addr, char *name, int family)
 {
 	memset(addr, 0, sizeof(*addr));
 
-	if (strcmp(name, bb_str_default) == 0 ||
-		strcmp(name, "all") == 0 || strcmp(name, "any") == 0) {
+	if (strcmp(name, "default") == 0
+	 || strcmp(name, "all") == 0
+	 || strcmp(name, "any") == 0
+	) {
 		addr->family = family;
 		addr->bytelen = (family == AF_INET6 ? 16 : 4);
 		addr->bitlen = -1;
@@ -136,72 +105,101 @@ int get_addr_1(inet_prefix * addr, char *name, int family)
 		return 0;
 	}
 
-	addr->family = AF_INET;
 	if (family != AF_UNSPEC && family != AF_INET)
 		return -1;
+
+	/* Try to parse it as IPv4 */
+	addr->family = AF_INET;
+#if 0 /* Doesn't handle e.g. "10.10", for example, "ip r l root 10.10/16" */
 	if (inet_pton(AF_INET, name, addr->data) <= 0)
 		return -1;
+#else
+	{
+		unsigned i = 0;
+		unsigned n = 0;
+		const char *cp = name - 1;
+		while (*++cp) {
+			if ((unsigned char)(*cp - '0') <= 9) {
+				n = 10 * n + (unsigned char)(*cp - '0');
+				if (n >= 256)
+					return -1;
+				((uint8_t*)addr->data)[i] = n;
+				continue;
+			}
+			if (*cp == '.' && ++i <= 3) {
+				n = 0;
+				continue;
+			}
+			return -1;
+		}
+	}
+#endif
 	addr->bytelen = 4;
 	addr->bitlen = -1;
+
 	return 0;
 }
 
-int get_prefix_1(inet_prefix * dst, char *arg, int family)
+static void get_prefix_1(inet_prefix *dst, char *arg, int family)
 {
-	int err;
-	unsigned plen;
 	char *slash;
 
 	memset(dst, 0, sizeof(*dst));
 
-	if (strcmp(arg, bb_str_default) == 0 || strcmp(arg, "any") == 0) {
+	if (strcmp(arg, "default") == 0
+	 || strcmp(arg, "all") == 0
+	 || strcmp(arg, "any") == 0
+	) {
 		dst->family = family;
-		dst->bytelen = 0;
-		dst->bitlen = 0;
-		return 0;
+		/*dst->bytelen = 0; - done by memset */
+		/*dst->bitlen = 0;*/
+		return;
 	}
 
 	slash = strchr(arg, '/');
 	if (slash)
 		*slash = '\0';
-	err = get_addr_1(dst, arg, family);
-	if (err == 0) {
+
+	if (get_addr_1(dst, arg, family) == 0) {
 		dst->bitlen = (dst->family == AF_INET6) ? 128 : 32;
 		if (slash) {
+			unsigned plen;
 			inet_prefix netmask_pfx;
 
 			netmask_pfx.family = AF_UNSPEC;
-			if ((get_unsigned(&plen, slash + 1, 0) || plen > dst->bitlen)
-				&& (get_addr_1(&netmask_pfx, slash + 1, family)))
-				err = -1;
-			else if (netmask_pfx.family == AF_INET) {
+			plen = bb_strtou(slash + 1, NULL, 0);
+			if ((errno || plen > dst->bitlen)
+			 && get_addr_1(&netmask_pfx, slash + 1, family) != 0
+			) {
+				goto bad;
+			}
+			if (netmask_pfx.family == AF_INET) {
 				/* fill in prefix length of dotted quad */
 				uint32_t mask = ntohl(netmask_pfx.data[0]);
 				uint32_t host = ~mask;
 
 				/* a valid netmask must be 2^n - 1 */
-				if (!(host & (host + 1))) {
-					for (plen = 0; mask; mask <<= 1)
-						++plen;
-					if (plen >= 0 && plen <= dst->bitlen) {
-							dst->bitlen = plen;
-							/* dst->flags |= PREFIXLEN_SPECIFIED; */
-					} else
-						err = -1;
-				} else
-					err = -1;
-			} else {
-				/* plain prefix */
-				dst->bitlen = plen;
+				if (host & (host + 1))
+					goto bad;
+
+				for (plen = 0; mask; mask <<= 1)
+					++plen;
+				if (plen > dst->bitlen)
+					goto bad;
+				/* dst->flags |= PREFIXLEN_SPECIFIED; */
 			}
+			dst->bitlen = plen;
 		}
 	}
+
 	if (slash)
 		*slash = '/';
-	return err;
+	return;
+ bad:
+	bb_error_msg_and_die("an %s %s is expected rather than \"%s\"", "inet", "prefix", arg);
 }
 
-int get_addr(inet_prefix * dst, char *arg, int family)
+int get_addr(inet_prefix *dst, char *arg, int family)
 {
 	if (family == AF_PACKET) {
 		bb_error_msg_and_die("\"%s\" may be inet %s, but it is not allowed in this context", arg, "address");
@@ -212,15 +210,12 @@ int get_addr(inet_prefix * dst, char *arg, int family)
 	return 0;
 }
 
-int get_prefix(inet_prefix * dst, char *arg, int family)
+void get_prefix(inet_prefix *dst, char *arg, int family)
 {
 	if (family == AF_PACKET) {
 		bb_error_msg_and_die("\"%s\" may be inet %s, but it is not allowed in this context", arg, "prefix");
 	}
-	if (get_prefix_1(dst, arg, family)) {
-		bb_error_msg_and_die("an %s %s is expected rather than \"%s\"", "inet", "prefix", arg);
-	}
-	return 0;
+	get_prefix_1(dst, arg, family);
 }
 
 uint32_t get_addr32(char *name)
@@ -235,12 +230,12 @@ uint32_t get_addr32(char *name)
 
 void incomplete_command(void)
 {
-	bb_error_msg_and_die("command line is not complete, try option \"help\"");
+	bb_error_msg_and_die("command line is not complete, try \"help\"");
 }
 
-void invarg(const char *arg, const char *opt)
+void invarg_1_to_2(const char *arg, const char *opt)
 {
-	bb_error_msg_and_die(bb_msg_invalid_arg, arg, opt);
+	bb_error_msg_and_die(bb_msg_invalid_arg_to, arg, opt);
 }
 
 void duparg(const char *key, const char *arg)
@@ -253,11 +248,11 @@ void duparg2(const char *key, const char *arg)
 	bb_error_msg_and_die("either \"%s\" is duplicate, or \"%s\" is garbage", key, arg);
 }
 
-int inet_addr_match(inet_prefix * a, inet_prefix * b, int bits)
+int inet_addr_match(const inet_prefix *a, const inet_prefix *b, int bits)
 {
-	uint32_t *a1 = a->data;
-	uint32_t *a2 = b->data;
-	int words = bits >> 0x05;
+	const uint32_t *a1 = a->data;
+	const uint32_t *a2 = b->data;
+	int words = bits >> 5;
 
 	bits &= 0x1f;
 
@@ -281,22 +276,22 @@ int inet_addr_match(inet_prefix * a, inet_prefix * b, int bits)
 	return 0;
 }
 
-const char *rt_addr_n2a(int af, int UNUSED_PARAM len,
-		void *addr, char *buf, int buflen)
+const char *rt_addr_n2a(int af, void *addr)
 {
 	switch (af) {
 	case AF_INET:
 	case AF_INET6:
-		return inet_ntop(af, addr, buf, buflen);
+		return inet_ntop(af, addr,
+			auto_string(xzalloc(INET6_ADDRSTRLEN)), INET6_ADDRSTRLEN
+		);
 	default:
 		return "???";
 	}
 }
 
-
-const char *format_host(int af, int len, void *addr, char *buf, int buflen)
-{
 #ifdef RESOLVE_HOSTNAMES
+const char *format_host(int af, int len, void *addr)
+{
 	if (resolve_hosts) {
 		struct hostent *h_ent;
 
@@ -314,11 +309,10 @@ const char *format_host(int af, int len, void *addr, char *buf, int buflen)
 		if (len > 0) {
 			h_ent = gethostbyaddr(addr, len, af);
 			if (h_ent != NULL) {
-				safe_strncpy(buf, h_ent->h_name, buflen);
-				return buf;
+				return auto_string(xstrdup(h_ent->h_name));
 			}
 		}
 	}
-#endif
-	return rt_addr_n2a(af, len, addr, buf, buflen);
+	return rt_addr_n2a(af, addr);
 }
+#endif

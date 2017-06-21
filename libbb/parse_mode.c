@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2003  Manuel Novoa III  <mjn3@codepoet.org>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /* http://www.opengroup.org/onlinepubs/007904975/utilities/chmod.html */
@@ -15,7 +15,7 @@
 
 #define FILEMODEBITS (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO)
 
-int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
+int FAST_FUNC bb_parse_mode(const char *s, unsigned current_mode)
 {
 	static const mode_t who_mask[] = {
 		S_ISUID | S_ISGID | S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO, /* a */
@@ -40,25 +40,24 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
 	mode_t new_mode;
 	char op;
 
-	if (((unsigned int)(*s - '0')) < 8) {
+	if ((unsigned char)(*s - '0') < 8) {
 		unsigned long tmp;
 		char *e;
 
 		tmp = strtoul(s, &e, 8);
 		if (*e || (tmp > 07777U)) { /* Check range and trailing chars. */
-			return 0;
+			return -1;
 		}
-		*current_mode = tmp;
-		return 1;
+		return tmp;
 	}
 
-	new_mode = *current_mode;
+	new_mode = current_mode;
 
 	/* Note: we allow empty clauses, and hence empty modes.
 	 * We treat an empty mode as no change to perms. */
 
-	while (*s) {	/* Process clauses. */
-		if (*s == ',') {	/* We allow empty clauses. */
+	while (*s) {  /* Process clauses. */
+		if (*s == ',') {  /* We allow empty clauses. */
 			++s;
 			continue;
 		}
@@ -71,16 +70,16 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
 			if (*p == *s) {
 				wholist |= who_mask[(int)(p-who_chars)];
 				if (!*++s) {
-					return 0;
+					return -1;
 				}
 				goto WHO_LIST;
 			}
 		} while (*++p);
 
-		do {	/* Process action list. */
+		do {    /* Process action list. */
 			if ((*s != '+') && (*s != '-')) {
 				if (*s != '=') {
-					return 0;
+					return -1;
 				}
 				/* Since op is '=', clear all bits corresponding to the
 				 * wholist, or all file bits if wholist is empty. */
@@ -93,7 +92,7 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
 			op = *s++;
 
 			/* Check for permcopy. */
-			p = who_chars + 1;	/* Skip 'a' entry. */
+			p = who_chars + 1;  /* Skip 'a' entry. */
 			do {
 				if (*p == *s) {
 					int i = 0;
@@ -128,7 +127,7 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
 				}
 			} while (*++p);
  GOT_ACTION:
-			if (permlist) {	/* The permlist was nonempty. */
+			if (permlist) { /* The permlist was nonempty. */
 				mode_t tmp = wholist;
 				if (!wholist) {
 					mode_t u_mask = umask(0);
@@ -145,6 +144,5 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
 		} while (*s && (*s != ','));
 	}
 
-	*current_mode = new_mode;
-	return 1;
+	return new_mode;
 }

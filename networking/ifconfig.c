@@ -10,7 +10,7 @@
  * Authors of the original ifconfig was:
  *              Fred N. van Kempen, <waltje@uwalt.nl.mugnet.org>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /*
@@ -25,22 +25,89 @@
  * 2002-04-20
  * IPV6 support added by Bart Visscher <magick@linux-fan.com>
  */
+//config:config IFCONFIG
+//config:	bool "ifconfig"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	help
+//config:	  Ifconfig is used to configure the kernel-resident network interfaces.
+//config:
+//config:config FEATURE_IFCONFIG_STATUS
+//config:	bool "Enable status reporting output (+7k)"
+//config:	default y
+//config:	depends on IFCONFIG
+//config:	help
+//config:	  If ifconfig is called with no arguments it will display the status
+//config:	  of the currently active interfaces.
+//config:
+//config:config FEATURE_IFCONFIG_SLIP
+//config:	bool "Enable slip-specific options \"keepalive\" and \"outfill\""
+//config:	default y
+//config:	depends on IFCONFIG
+//config:	help
+//config:	  Allow "keepalive" and "outfill" support for SLIP. If you're not
+//config:	  planning on using serial lines, leave this unchecked.
+//config:
+//config:config FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ
+//config:	bool "Enable options \"mem_start\", \"io_addr\", and \"irq\""
+//config:	default y
+//config:	depends on IFCONFIG
+//config:	help
+//config:	  Allow the start address for shared memory, start address for I/O,
+//config:	  and/or the interrupt line used by the specified device.
+//config:
+//config:config FEATURE_IFCONFIG_HW
+//config:	bool "Enable option \"hw\" (ether only)"
+//config:	default y
+//config:	depends on IFCONFIG
+//config:	help
+//config:	  Set the hardware address of this interface, if the device driver
+//config:	  supports  this  operation. Currently, we only support the 'ether'
+//config:	  class.
+//config:
+//config:config FEATURE_IFCONFIG_BROADCAST_PLUS
+//config:	bool "Set the broadcast automatically"
+//config:	default y
+//config:	depends on IFCONFIG
+//config:	help
+//config:	  Setting this will make ifconfig attempt to find the broadcast
+//config:	  automatically if the value '+' is used.
 
+//applet:IF_IFCONFIG(APPLET(ifconfig, BB_DIR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_IFCONFIG) += ifconfig.o interface.o
+
+//usage:#define ifconfig_trivial_usage
+//usage:	IF_FEATURE_IFCONFIG_STATUS("[-a]") " interface [address]"
+//usage:#define ifconfig_full_usage "\n\n"
+//usage:       "Configure a network interface\n"
+//usage:     "\n"
+//usage:	IF_FEATURE_IPV6(
+//usage:       "	[add ADDRESS[/PREFIXLEN]]\n")
+//usage:	IF_FEATURE_IPV6(
+//usage:       "	[del ADDRESS[/PREFIXLEN]]\n")
+//usage:       "	[[-]broadcast [ADDRESS]] [[-]pointopoint [ADDRESS]]\n"
+//usage:       "	[netmask ADDRESS] [dstaddr ADDRESS]\n"
+//usage:	IF_FEATURE_IFCONFIG_SLIP(
+//usage:       "	[outfill NN] [keepalive NN]\n")
+//usage:       "	" IF_FEATURE_IFCONFIG_HW("[hw ether" IF_FEATURE_HWIB("|infiniband")" ADDRESS] ") "[metric NN] [mtu NN]\n"
+//usage:       "	[[-]trailers] [[-]arp] [[-]allmulti]\n"
+//usage:       "	[multicast] [[-]promisc] [txqueuelen NN] [[-]dynamic]\n"
+//usage:	IF_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ(
+//usage:       "	[mem_start NN] [io_addr NN] [irq NN]\n")
+//usage:       "	[up|down] ..."
+
+#include "libbb.h"
+#include "inet_common.h"
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
-#if defined(__GLIBC__) && __GLIBC__ >=2 && __GLIBC_MINOR__ >= 1
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#else
-#include <sys/types.h>
-#include <netinet/if_ether.h>
+#ifdef HAVE_NET_ETHERNET_H
+# include <net/ethernet.h>
 #endif
-#include "inet_common.h"
-#include "libbb.h"
 
 #if ENABLE_FEATURE_IFCONFIG_SLIP
-# include <net/if_slip.h>
+# include <linux/if_slip.h>
 #endif
 
 /* I don't know if this is needed for busybox or not.  Anyone? */
@@ -158,10 +225,6 @@ struct in6_ifreq {
 #define ARG_ADD_DEL      (A_CAST_HOST_COPY_RESOLVE | A_SET_AFTER)
 
 
-/*
- * Set up the tables.  Warning!  They must have corresponding order!
- */
-
 struct arg1opt {
 	const char *name;
 	unsigned short selector;
@@ -181,6 +244,10 @@ struct options {
 };
 
 #define ifreq_offsetof(x)  offsetof(struct ifreq, x)
+
+/*
+ * Set up the tables.  Warning!  They must have corresponding order!
+ */
 
 static const struct arg1opt Arg1Opt[] = {
 	{ "SIFMETRIC",  SIOCSIFMETRIC,  ifreq_offsetof(ifr_metric) },
@@ -204,11 +271,11 @@ static const struct arg1opt Arg1Opt[] = {
 	{ "SIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.base_addr) },
 	{ "SIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.irq) },
 #endif
-	/* Last entry if for unmatched (possibly hostname) arg. */
 #if ENABLE_FEATURE_IPV6
 	{ "SIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr) }, /* IPv6 version ignores the offset */
 	{ "DIFADDR",    SIOCDIFADDR,    ifreq_offsetof(ifr_addr) }, /* IPv6 version ignores the offset */
 #endif
+	/* Last entry is for unmatched (assumed to be hostname/address) arg. */
 	{ "SIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr) },
 };
 
@@ -249,18 +316,8 @@ static const struct options OptArray[] = {
 	{ NULL,          0,             ARG_HOSTNAME,    (IFF_UP | IFF_RUNNING) }
 };
 
-/*
- * A couple of prototypes.
- */
-#if ENABLE_FEATURE_IFCONFIG_HW
-static int in_ether(const char *bufp, struct sockaddr *sap);
-#endif
-
-/*
- * Our main function.
- */
 int ifconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int ifconfig_main(int argc, char **argv)
+int ifconfig_main(int argc UNUSED_PARAM, char **argv)
 {
 	struct ifreq ifr;
 	struct sockaddr_in sai;
@@ -291,19 +348,17 @@ int ifconfig_main(int argc, char **argv)
 
 	/* skip argv[0] */
 	++argv;
-	--argc;
 
 #if ENABLE_FEATURE_IFCONFIG_STATUS
-	if (argc > 0 && (argv[0][0] == '-' && argv[0][1] == 'a' && !argv[0][2])) {
+	if (argv[0] && (argv[0][0] == '-' && argv[0][1] == 'a' && !argv[0][2])) {
 		interface_opt_a = 1;
-		--argc;
 		++argv;
 	}
 #endif
 
-	if (argc <= 1) {
+	if (!argv[0] || !argv[1]) { /* one or no args */
 #if ENABLE_FEATURE_IFCONFIG_STATUS
-		return display_interfaces(argc ? *argv : NULL);
+		return display_interfaces(argv[0] /* can be NULL */);
 #else
 		bb_error_msg_and_die("no support for status display");
 #endif
@@ -313,10 +368,10 @@ int ifconfig_main(int argc, char **argv)
 	sockfd = xsocket(AF_INET, SOCK_DGRAM, 0);
 
 	/* get interface name */
-	strncpy(ifr.ifr_name, *argv, IFNAMSIZ);
+	strncpy_IFNAMSIZ(ifr.ifr_name, *argv);
 
 	/* Process the remaining arguments. */
-	while (*++argv != (char *) NULL) {
+	while (*++argv != NULL) {
 		p = *argv;
 		mask = N_MASK;
 		if (*p == '-') {	/* If the arg starts with '-'... */
@@ -342,9 +397,9 @@ int ifconfig_main(int argc, char **argv)
  FOUND_ARG:
 		if (mask & ARG_MASK) {
 			mask = op->arg_flags;
-			a1op = Arg1Opt + (op - OptArray);
 			if (mask & A_NETMASK & did_flags)
 				bb_show_usage();
+			a1op = Arg1Opt + (op - OptArray);
 			if (*++argv == NULL) {
 				if (mask & A_ARG_REQ)
 					bb_show_usage();
@@ -357,27 +412,18 @@ int ifconfig_main(int argc, char **argv)
 #if ENABLE_FEATURE_IFCONFIG_HW
 					if (mask & A_CAST_RESOLVE) {
 #endif
-#if ENABLE_FEATURE_IPV6
-						char *prefix;
-						int prefix_len = 0;
-#endif
-						/*safe_strncpy(host, *argv, (sizeof host));*/
 						host = *argv;
-#if ENABLE_FEATURE_IPV6
-						prefix = strchr(host, '/');
-						if (prefix) {
-							prefix_len = xatou_range(prefix + 1, 0, 128);
-							*prefix = '\0';
-						}
-#endif
+						if (strcmp(host, "inet") == 0)
+							continue; /* compat stuff */
 						sai.sin_family = AF_INET;
 						sai.sin_port = 0;
-						if (!strcmp(host, bb_str_default)) {
+						if (strcmp(host, "default") == 0) {
 							/* Default is special, meaning 0.0.0.0. */
 							sai.sin_addr.s_addr = INADDR_ANY;
 						}
 #if ENABLE_FEATURE_IFCONFIG_BROADCAST_PLUS
-						else if ((host[0] == '+' && !host[1]) && (mask & A_BROADCAST)
+						else if ((host[0] == '+' && !host[1])
+						 && (mask & A_BROADCAST)
 						 && (did_flags & (A_NETMASK|A_HOSTNAME)) == (A_NETMASK|A_HOSTNAME)
 						) {
 							/* + is special, meaning broadcast is derived. */
@@ -386,23 +432,36 @@ int ifconfig_main(int argc, char **argv)
 #endif
 						else {
 							len_and_sockaddr *lsa;
-							if (strcmp(host, "inet") == 0)
-								continue; /* compat stuff */
+#if ENABLE_FEATURE_IPV6
+							char *prefix;
+							int prefix_len = 0;
+							prefix = strchr(host, '/');
+							if (prefix) {
+								prefix_len = xatou_range(prefix + 1, 0, 128);
+								*prefix = '\0';
+							}
+ resolve:
+#endif
 							lsa = xhost2sockaddr(host, 0);
 #if ENABLE_FEATURE_IPV6
+							if (lsa->u.sa.sa_family != AF_INET6 && prefix) {
+/* TODO: we do not support "ifconfig eth0 up 1.2.3.4/17".
+ * For now, just make it fail instead of silently ignoring "/17" part:
+ */
+								*prefix = '/';
+								goto resolve;
+							}
 							if (lsa->u.sa.sa_family == AF_INET6) {
 								int sockfd6;
 								struct in6_ifreq ifr6;
 
-								memcpy((char *) &ifr6.ifr6_addr,
-										(char *) &(lsa->u.sin6.sin6_addr),
-										sizeof(struct in6_addr));
-
-								/* Create a channel to the NET kernel. */
 								sockfd6 = xsocket(AF_INET6, SOCK_DGRAM, 0);
-								xioctl(sockfd6, SIOGIFINDEX, &ifr);
+								xioctl(sockfd6, SIOCGIFINDEX, &ifr);
 								ifr6.ifr6_ifindex = ifr.ifr_ifindex;
 								ifr6.ifr6_prefixlen = prefix_len;
+								memcpy(&ifr6.ifr6_addr,
+										&lsa->u.sin6.sin6_addr,
+										sizeof(struct in6_addr));
 								ioctl_or_perror_and_die(sockfd6, a1op->selector, &ifr6, "SIOC%s", a1op->name);
 								if (ENABLE_FEATURE_CLEAN_UP)
 									free(lsa);
@@ -423,19 +482,18 @@ int ifconfig_main(int argc, char **argv)
 #if ENABLE_FEATURE_IFCONFIG_HW
 					} else {	/* A_CAST_HOST_COPY_IN_ETHER */
 						/* This is the "hw" arg case. */
-						smalluint hw_class= index_in_substrings("ether\0"
-								USE_FEATURE_HWIB("infiniband\0"), *argv) + 1;
+						smalluint hw_class = index_in_substrings("ether\0"
+								IF_FEATURE_HWIB("infiniband\0"), *argv) + 1;
 						if (!hw_class || !*++argv)
 							bb_show_usage();
-						/*safe_strncpy(host, *argv, sizeof(host));*/
 						host = *argv;
 						if (hw_class == 1 ? in_ether(host, &sa) : in_ib(host, &sa))
 							bb_error_msg_and_die("invalid hw-addr %s", host);
 						p = (char *) &sa;
 					}
 #endif
-					memcpy( (((char *)&ifr) + a1op->ifr_offset),
-						   p, sizeof(struct sockaddr));
+					memcpy( ((char *)&ifr) + a1op->ifr_offset,
+						p, sizeof(struct sockaddr));
 				} else {
 					/* FIXME: error check?? */
 					unsigned long i = strtoul(*argv, NULL, 0);
@@ -444,17 +502,17 @@ int ifconfig_main(int argc, char **argv)
 					if (mask & A_MAP_TYPE) {
 						xioctl(sockfd, SIOCGIFMAP, &ifr);
 						if ((mask & A_MAP_UCHAR) == A_MAP_UCHAR)
-							*((unsigned char *) p) = i;
+							*(unsigned char *) p = i;
 						else if (mask & A_MAP_USHORT)
-							*((unsigned short *) p) = i;
+							*(unsigned short *) p = i;
 						else
-							*((unsigned long *) p) = i;
+							*(unsigned long *) p = i;
 					} else
 #endif
 					if (mask & A_CAST_CHAR_PTR)
-						*((caddr_t *) p) = (caddr_t) i;
+						*(caddr_t *) p = (caddr_t) i;
 					else	/* A_CAST_INT */
-						*((int *) p) = i;
+						*(int *) p = i;
 				}
 
 				ioctl_or_perror_and_die(sockfd, a1op->selector, &ifr, "SIOC%s", a1op->name);
@@ -480,7 +538,7 @@ int ifconfig_main(int argc, char **argv)
 			if (!(mask & A_SET_AFTER))
 				continue;
 			mask = N_SET;
-		}
+		} /* if (mask & ARG_MASK) */
 
 		xioctl(sockfd, SIOCGIFFLAGS, &ifr);
 		selector = op->selector;
@@ -495,46 +553,3 @@ int ifconfig_main(int argc, char **argv)
 		close(sockfd);
 	return 0;
 }
-
-#if ENABLE_FEATURE_IFCONFIG_HW
-/* Input an Ethernet address and convert to binary. */
-static int in_ether(const char *bufp, struct sockaddr *sap)
-{
-	char *ptr;
-	int i, j;
-	unsigned char val;
-	unsigned char c;
-
-	sap->sa_family = ARPHRD_ETHER;
-	ptr = (char *) sap->sa_data;
-
-	i = 0;
-	do {
-		j = val = 0;
-
-		/* We might get a semicolon here - not required. */
-		if (i && (*bufp == ':')) {
-			bufp++;
-		}
-
-		do {
-			c = *bufp;
-			if (((unsigned char)(c - '0')) <= 9) {
-				c -= '0';
-			} else if (((unsigned char)((c|0x20) - 'a')) <= 5) {
-				c = (c|0x20) - ('a'-10);
-			} else if (j && (c == ':' || c == 0)) {
-				break;
-			} else {
-				return -1;
-			}
-			++bufp;
-			val <<= 4;
-			val += c;
-		} while (++j < 2);
-		*ptr++ = val;
-	} while (++i < ETH_ALEN);
-
-	return *bufp; /* Error if we don't end at end of string. */
-}
-#endif

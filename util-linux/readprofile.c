@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 1994,1996 Alessandro Rubini (rubini@ipvvis.unipv.it)
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /*
@@ -31,6 +31,30 @@
  * Taken from util-linux and adapted for busybox by
  * Paul Mundt <lethal@linux-sh.org>.
  */
+//config:config READPROFILE
+//config:	bool "readprofile"
+//config:	default y
+//config:	#select PLATFORM_LINUX
+//config:	help
+//config:	  This allows you to parse /proc/profile for basic profiling.
+
+//applet:IF_READPROFILE(APPLET(readprofile, BB_DIR_USR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_READPROFILE) += readprofile.o
+
+//usage:#define readprofile_trivial_usage
+//usage:       "[OPTIONS]"
+//usage:#define readprofile_full_usage "\n\n"
+//usage:       "	-m mapfile	(Default: /boot/System.map)"
+//usage:     "\n	-p profile	(Default: /proc/profile)"
+//usage:     "\n	-M NUM		Set the profiling multiplier to NUM"
+//usage:     "\n	-i		Print only info about the sampling step"
+//usage:     "\n	-v		Verbose"
+//usage:     "\n	-a		Print all symbols, even if count is 0"
+//usage:     "\n	-b		Print individual histogram-bin counts"
+//usage:     "\n	-s		Print individual counters within functions"
+//usage:     "\n	-r		Reset all the counters (root only)"
+//usage:     "\n	-n		Disable byte order auto-detection"
 
 #include "libbb.h"
 #include <sys/utsname.h>
@@ -85,8 +109,7 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 	proFile = defaultpro;
 	mapFile = defaultmap;
 
-	opt_complementary = "M+"; /* -M N */
-	opt = getopt32(argv, "M:m:p:nabsirv", &multiplier, &mapFile, &proFile);
+	opt = getopt32(argv, "M:+m:p:nabsirv", &multiplier, &mapFile, &proFile);
 
 	if (opt & (OPT_M|OPT_r)) { /* mult or reset, or both */
 		int fd, to_write;
@@ -97,7 +120,7 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 		 */
 		to_write = sizeof(int);
 		if (!optMult)
-			to_write = 1;	/* sth different from sizeof(int) */
+			to_write = 1;  /* sth different from sizeof(int) */
 
 		fd = xopen(defaultpro, O_WRONLY);
 		xwrite(fd, &multiplier, to_write);
@@ -138,7 +161,7 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 
 	step = buf[0];
 	if (optInfo) {
-		printf("Sampling_step: %i\n", step);
+		printf("Sampling_step: %u\n", step);
 		return EXIT_SUCCESS;
 	}
 
@@ -149,9 +172,9 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 	while (fgets(mapline, S_LEN, map)) {
 		if (sscanf(mapline, "%llx %s %s", &fn_add, mode, fn_name) != 3)
 			bb_error_msg_and_die("%s(%i): wrong map line",
-					     mapFile, maplineno);
+					mapFile, maplineno);
 
-		if (!strcmp(fn_name, "_stext")) /* only elf works like this */ {
+		if (strcmp(fn_name, "_stext") == 0) /* only elf works like this */ {
 			add0 = fn_add;
 			break;
 		}
@@ -176,13 +199,15 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 		/* ignore any LEADING (before a '[tT]' symbol is found)
 		   Absolute symbols */
 		if ((*mode == 'A' || *mode == '?') && total == 0) continue;
-		if (*mode != 'T' && *mode != 't' &&
-		    *mode != 'W' && *mode != 'w')
-			break;	/* only text is profiled */
+		if (*mode != 'T' && *mode != 't'
+		 && *mode != 'W' && *mode != 'w'
+		) {
+			break;  /* only text is profiled */
+		}
 
 		if (indx >= len / sizeof(*buf))
 			bb_error_msg_and_die("profile address out of range. "
-					     "Wrong map file?");
+					"Wrong map file?");
 
 		while (indx < (next_add-add0)/step) {
 			if (optBins && (buf[indx] || optAll)) {
@@ -199,15 +224,16 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 		if (optBins) {
 			if (optVerbose || this > 0)
 				printf("  total\t\t\t\t%u\n", this);
-		} else if ((this || optAll)
-		        && (fn_len = next_add-fn_add) != 0
+		} else
+		if ((this || optAll)
+		 && (fn_len = next_add-fn_add) != 0
 		) {
 			if (optVerbose)
-				printf("%016llx %-40s %6i %8.4f\n", fn_add,
-				       fn_name, this, this/(double)fn_len);
+				printf("%016llx %-40s %6u %8.4f\n", fn_add,
+					fn_name, this, this/(double)fn_len);
 			else
-				printf("%6i %-40s %8.4f\n",
-				       this, fn_name, this/(double)fn_len);
+				printf("%6u %-40s %8.4f\n",
+					this, fn_name, this/(double)fn_len);
 			if (optSub) {
 				unsigned long long scan;
 
@@ -217,8 +243,8 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 
 					addr = (scan - 1)*step + add0;
 					printf("\t%#llx\t%s+%#llx\t%u\n",
-					       addr, fn_name, addr - fn_add,
-					       buf[scan]);
+						addr, fn_name, addr - fn_add,
+						buf[scan]);
 				}
 			}
 		}
@@ -230,15 +256,15 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	/* clock ticks, out of kernel text - probably modules */
-	printf("%6i %s\n", buf[len/sizeof(*buf)-1], "*unknown*");
+	printf("%6u %s\n", buf[len/sizeof(*buf)-1], "*unknown*");
 
 	/* trailer */
 	if (optVerbose)
-		printf("%016x %-40s %6i %8.4f\n",
-		       0, "total", total, total/(double)(fn_add-add0));
+		printf("%016x %-40s %6u %8.4f\n",
+			0, "total", total, total/(double)(fn_add-add0));
 	else
-		printf("%6i %-40s %8.4f\n",
-		       total, "total", total/(double)(fn_add-add0));
+		printf("%6u %-40s %8.4f\n",
+			total, "total", total/(double)(fn_add-add0));
 
 	fclose(map);
 	free(buf);

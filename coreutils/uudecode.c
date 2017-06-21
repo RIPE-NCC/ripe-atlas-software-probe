@@ -1,26 +1,56 @@
 /* vi: set sw=4 ts=4: */
 /*
- *  Copyright 2003, Glenn McGrath
+ * Copyright 2003, Glenn McGrath
  *
- *  Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
- *  Based on specification from
- *  http://www.opengroup.org/onlinepubs/007904975/utilities/uuencode.html
+ * Based on specification from
+ * http://www.opengroup.org/onlinepubs/007904975/utilities/uuencode.html
  *
- *  Bugs: the spec doesn't mention anything about "`\n`\n" prior to the
- *        "end" line
+ * Bugs: the spec doesn't mention anything about "`\n`\n" prior to the
+ * "end" line
  */
+//config:config UUDECODE
+//config:	bool "uudecode"
+//config:	default y
+//config:	help
+//config:	  uudecode is used to decode a uuencoded file.
 
+//applet:IF_UUDECODE(APPLET(uudecode, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_UUDECODE) += uudecode.o
+
+//usage:#define uudecode_trivial_usage
+//usage:       "[-o OUTFILE] [INFILE]"
+//usage:#define uudecode_full_usage "\n\n"
+//usage:       "Uudecode a file\n"
+//usage:       "Finds OUTFILE in uuencoded source unless -o is given"
+//usage:
+//usage:#define uudecode_example_usage
+//usage:       "$ uudecode -o busybox busybox.uu\n"
+//usage:       "$ ls -l busybox\n"
+//usage:       "-rwxr-xr-x   1 ams      ams        245264 Jun  7 21:35 busybox\n"
 
 #include "libbb.h"
 
-static void read_stduu(FILE *src_stream, FILE *dst_stream)
+#if ENABLE_UUDECODE
+static void FAST_FUNC read_stduu(FILE *src_stream, FILE *dst_stream, int flags UNUSED_PARAM)
 {
 	char *line;
 
-	while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+	for (;;) {
 		int encoded_len, str_len;
 		char *line_ptr, *dst;
+		size_t line_len;
+
+		line_len = 64 * 1024;
+		line = xmalloc_fgets_str_len(src_stream, "\n", &line_len);
+		if (!line)
+			break;
+		/* Handle both Unix and MSDOS text, and stray trailing spaces */
+		str_len = line_len;
+		while (--str_len >= 0 && isspace(line[str_len]))
+			line[str_len] = '\0';
 
 		if (strcmp(line, "end") == 0) {
 			return; /* the only non-error exit */
@@ -35,7 +65,7 @@ static void read_stduu(FILE *src_stream, FILE *dst_stream)
 
 		encoded_len = line[0] * 4 / 3;
 		/* Check that line is not too short. (we tolerate
-		 * overly _long_ line to accomodate possible extra '`').
+		 * overly _long_ line to accommodate possible extra '`').
 		 * Empty line case is also caught here. */
 		if (str_len <= encoded_len) {
 			break; /* go to bb_error_msg_and_die("short file"); */
@@ -74,67 +104,9 @@ static void read_stduu(FILE *src_stream, FILE *dst_stream)
 	}
 	bb_error_msg_and_die("short file");
 }
+#endif
 
-static void read_base64(FILE *src_stream, FILE *dst_stream)
-{
-	int term_count = 1;
-
-	while (1) {
-		char translated[4];
-		int count = 0;
-
-		while (count < 4) {
-			char *table_ptr;
-			int ch;
-
-			/* Get next _valid_ character.
-			 * global vector bb_uuenc_tbl_base64[] contains this string:
-			 * "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n"
-			 */
-			do {
-				ch = fgetc(src_stream);
-				if (ch == EOF) {
-					bb_error_msg_and_die("short file");
-				}
-				table_ptr = strchr(bb_uuenc_tbl_base64, ch);
-			} while (table_ptr == NULL);
-
-			/* Convert encoded character to decimal */
-			ch = table_ptr - bb_uuenc_tbl_base64;
-
-			if (*table_ptr == '=') {
-				if (term_count == 0) {
-					translated[count] = '\0';
-					break;
-				}
-				term_count++;
-			} else if (*table_ptr == '\n') {
-				/* Check for terminating line */
-				if (term_count == 5) {
-					return;
-				}
-				term_count = 1;
-				continue;
-			} else {
-				translated[count] = ch;
-				count++;
-				term_count = 0;
-			}
-		}
-
-		/* Merge 6 bit chars to 8 bit */
-		if (count > 1) {
-			fputc(translated[0] << 2 | translated[1] >> 4, dst_stream);
-		}
-		if (count > 2) {
-			fputc(translated[1] << 4 | translated[2] >> 2, dst_stream);
-		}
-		if (count > 3) {
-			fputc(translated[2] << 6 | translated[3], dst_stream);
-		}
-	}
-}
-
+#if ENABLE_UUDECODE
 int uudecode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int uudecode_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -146,21 +118,21 @@ int uudecode_main(int argc UNUSED_PARAM, char **argv)
 	getopt32(argv, "o:", &outname);
 	argv += optind;
 
-	if (!*argv)
+	if (!argv[0])
 		*--argv = (char*)"-";
-	src_stream = xfopen_stdin(*argv);
+	src_stream = xfopen_stdin(argv[0]);
 
 	/* Search for the start of the encoding */
 	while ((line = xmalloc_fgetline(src_stream)) != NULL) {
-		void (*decode_fn_ptr)(FILE *src, FILE *dst);
+		void FAST_FUNC (*decode_fn_ptr)(FILE *src, FILE *dst, int flags);
 		char *line_ptr;
 		FILE *dst_stream;
 		int mode;
 
-		if (strncmp(line, "begin-base64 ", 13) == 0) {
+		if (is_prefixed_with(line, "begin-base64 ")) {
 			line_ptr = line + 13;
 			decode_fn_ptr = read_base64;
-		} else if (strncmp(line, "begin ", 6) == 0) {
+		} else if (is_prefixed_with(line, "begin ")) {
 			line_ptr = line + 6;
 			decode_fn_ptr = read_stduu;
 		} else {
@@ -172,10 +144,12 @@ int uudecode_main(int argc UNUSED_PARAM, char **argv)
 		mode = bb_strtou(line_ptr, NULL, 8);
 		if (outname == NULL) {
 			outname = strchr(line_ptr, ' ');
-			if ((outname == NULL) || (*outname == '\0')) {
+			if (!outname)
 				break;
-			}
 			outname++;
+			trim(outname); /* remove trailing space (and '\r' for DOS text) */
+			if (!outname[0])
+				break;
 		}
 		dst_stream = stdout;
 		if (NOT_LONE_DASH(outname)) {
@@ -183,12 +157,73 @@ int uudecode_main(int argc UNUSED_PARAM, char **argv)
 			fchmod(fileno(dst_stream), mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 		}
 		free(line);
-		decode_fn_ptr(src_stream, dst_stream);
+		decode_fn_ptr(src_stream, dst_stream, /*flags:*/ BASE64_FLAG_UU_STOP + BASE64_FLAG_NO_STOP_CHAR);
 		/* fclose_if_not_stdin(src_stream); - redundant */
 		return EXIT_SUCCESS;
 	}
 	bb_error_msg_and_die("no 'begin' line");
 }
+#endif
+
+//applet:IF_BASE64(APPLET(base64, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_BASE64) += uudecode.o
+
+//config:config BASE64
+//config:	bool "base64"
+//config:	default y
+//config:	help
+//config:	  Base64 encode and decode
+
+//usage:#define base64_trivial_usage
+//usage:	"[-d] [FILE]"
+//usage:#define base64_full_usage "\n\n"
+//usage:       "Base64 encode or decode FILE to standard output"
+//usage:     "\n	-d	Decode data"
+////usage:     "\n	-w COL	Wrap lines at COL (default 76, 0 disables)"
+////usage:     "\n	-i	When decoding, ignore non-alphabet characters"
+
+#if ENABLE_BASE64
+int base64_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+int base64_main(int argc UNUSED_PARAM, char **argv)
+{
+	FILE *src_stream;
+	unsigned opts;
+
+	opt_complementary = "?1"; /* 1 argument max */
+	opts = getopt32(argv, "d");
+	argv += optind;
+
+	if (!argv[0])
+		*--argv = (char*)"-";
+	src_stream = xfopen_stdin(argv[0]);
+	if (opts) {
+		read_base64(src_stream, stdout, /*flags:*/ (char)EOF);
+	} else {
+		enum {
+			SRC_BUF_SIZE = 76/4*3,  /* This *MUST* be a multiple of 3 */
+			DST_BUF_SIZE = 4 * ((SRC_BUF_SIZE + 2) / 3),
+		};
+		char src_buf[SRC_BUF_SIZE];
+		char dst_buf[DST_BUF_SIZE + 1];
+		int src_fd = fileno(src_stream);
+		while (1) {
+			size_t size = full_read(src_fd, src_buf, SRC_BUF_SIZE);
+			if (!size)
+				break;
+			if ((ssize_t)size < 0)
+				bb_perror_msg_and_die(bb_msg_read_error);
+			/* Encode the buffer we just read in */
+			bb_uuencode(dst_buf, src_buf, size, bb_uuenc_tbl_base64);
+			xwrite(STDOUT_FILENO, dst_buf, 4 * ((size + 2) / 3));
+			bb_putchar('\n');
+			fflush(stdout);
+		}
+	}
+
+	fflush_stdout_and_exit(EXIT_SUCCESS);
+}
+#endif
 
 /* Test script.
 Put this into an empty dir with busybox binary, an run.

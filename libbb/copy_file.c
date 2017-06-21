@@ -5,42 +5,43 @@
  * Copyright (C) 2001 by Matt Kraai <kraai@alumni.carnegiemellon.edu>
  * SELinux support by Yuichi Nakamura <ynakam@hitachisoft.jp>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
- *
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
-
 #include "libbb.h"
 
+// FEATURE_NON_POSIX_CP:
+//
 // POSIX: if exists and -i, ask (w/o -i assume yes).
 // Then open w/o EXCL (yes, not unlink!).
 // If open still fails and -f, try unlink, then try open again.
 // Result: a mess:
-// If dest is a softlink, we overwrite softlink's destination!
+// If dest is a (sym)link, we overwrite link destination!
 // (or fail, if it points to dir/nonexistent location/etc).
 // This is strange, but POSIX-correct.
 // coreutils cp has --remove-destination to override this...
-//
-// NB: we have special code which still allows for "cp file /dev/node"
-// to work POSIX-ly (the only realistic case where it makes sense)
 
-#define DO_POSIX_CP 0  /* 1 - POSIX behavior, 0 - safe behavior */
-
-// errno must be set to relevant value ("why we cannot create dest?")
-// for POSIX mode to give reasonable error message
+/* Called if open of destination, link creation etc fails.
+ * errno must be set to relevant value ("why we cannot create dest?")
+ * to give reasonable error message */
 static int ask_and_unlink(const char *dest, int flags)
 {
 	int e = errno;
-#if DO_POSIX_CP
+
+#if !ENABLE_FEATURE_NON_POSIX_CP
 	if (!(flags & (FILEUTILS_FORCE|FILEUTILS_INTERACTIVE))) {
-		// Either it exists, or the *path* doesnt exist
-		bb_perror_msg("cannot create '%s'", dest);
+		/* Either it exists, or the *path* doesnt exist */
+		bb_perror_msg("can't create '%s'", dest);
 		return -1;
 	}
 #endif
-	// If !DO_POSIX_CP, act as if -f is always in effect - we don't want
-	// "cannot create" msg, we want unlink to be done (silently unless -i).
+	// else: act as if -f is always in effect.
+	// We don't want "can't create" msg, we want unlink to be done
+	// (silently unless -i). Why? POSIX cp usually succeeds with
+	// O_TRUNC open of existing file, and user is left ignorantly happy.
+	// With above block unconditionally enabled, non-POSIX cp
+	// will complain a lot more than POSIX one.
 
-	// TODO: maybe we should do it only if ctty is present?
+	/* TODO: maybe we should do it only if ctty is present? */
 	if (flags & FILEUTILS_INTERACTIVE) {
 		// We would not do POSIX insanity. -i asks,
 		// then _unlinks_ the offender. Presto.
@@ -48,22 +49,27 @@ static int ask_and_unlink(const char *dest, int flags)
 		// Or else we will end up having 3 open()s!
 		fprintf(stderr, "%s: overwrite '%s'? ", applet_name, dest);
 		if (!bb_ask_confirmation())
-			return 0; // not allowed to overwrite
+			return 0; /* not allowed to overwrite */
 	}
 	if (unlink(dest) < 0) {
 #if ENABLE_FEATURE_VERBOSE_CP_MESSAGE
 		if (e == errno && e == ENOENT) {
 			/* e == ENOTDIR is similar: path has non-dir component,
 			 * but in this case we don't even reach copy_file() */
-			bb_error_msg("cannot create '%s': Path does not exist", dest);
-			return -1; // error
+			bb_error_msg("can't create '%s': Path does not exist", dest);
+			return -1; /* error */
 		}
 #endif
-		errno = e;
-		bb_perror_msg("cannot create '%s'", dest);
-		return -1; // error
+		errno = e; /* do not use errno from unlink */
+		bb_perror_msg("can't create '%s'", dest);
+		return -1; /* error */
 	}
-	return 1; // ok (to try again)
+#if ENABLE_FEATURE_CP_LONG_OPTIONS
+	if (flags & FILEUTILS_RMDEST)
+		if (flags & FILEUTILS_VERBOSE)
+			printf("removed '%s'\n", dest);
+#endif
+	return 1; /* ok (to try again) */
 }
 
 /* Return:
@@ -77,25 +83,25 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 	/* NB: each struct stat is ~100 bytes */
 	struct stat source_stat;
 	struct stat dest_stat;
-	signed char retval = 0;
-	signed char dest_exists = 0;
-	signed char ovr;
+	smallint retval = 0;
+	smallint dest_exists = 0;
+	smallint ovr;
 
 /* Inverse of cp -d ("cp without -d") */
-#define FLAGS_DEREF (flags & FILEUTILS_DEREFERENCE)
+#define FLAGS_DEREF (flags & (FILEUTILS_DEREFERENCE + FILEUTILS_DEREFERENCE_L0))
 
 	if ((FLAGS_DEREF ? stat : lstat)(source, &source_stat) < 0) {
-		// This may be a dangling symlink.
-		// Making [sym]links to dangling symlinks works, so...
+		/* This may be a dangling symlink.
+		 * Making [sym]links to dangling symlinks works, so... */
 		if (flags & (FILEUTILS_MAKE_SOFTLINK|FILEUTILS_MAKE_HARDLINK))
 			goto make_links;
-		bb_perror_msg("cannot stat '%s'", source);
+		bb_perror_msg("can't stat '%s'", source);
 		return -1;
 	}
 
 	if (lstat(dest, &dest_stat) < 0) {
 		if (errno != ENOENT) {
-			bb_perror_msg("cannot stat '%s'", dest);
+			bb_perror_msg("can't stat '%s'", dest);
 			return -1;
 		}
 	} else {
@@ -113,14 +119,14 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 		security_context_t con;
 		if (lgetfilecon(source, &con) >= 0) {
 			if (setfscreatecon(con) < 0) {
-				bb_perror_msg("cannot set setfscreatecon %s", con);
+				bb_perror_msg("can't set setfscreatecon %s", con);
 				freecon(con);
 				return -1;
 			}
 		} else if (errno == ENOTSUP || errno == ENODATA) {
 			setfscreatecon_or_die(NULL);
 		} else {
-			bb_perror_msg("cannot lgetfilecon %s", source);
+			bb_perror_msg("can't lgetfilecon %s", source);
 			return -1;
 		}
 	}
@@ -146,7 +152,6 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 			return -1;
 		}
 
-		/* Create DEST */
 		if (dest_exists) {
 			if (!S_ISDIR(dest_stat.st_mode)) {
 				bb_error_msg("target '%s' is not a directory", dest);
@@ -155,6 +160,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 			/* race here: user can substitute a symlink between
 			 * this check and actual creation of files inside dest */
 		} else {
+			/* Create DEST */
 			mode_t mode;
 			saved_umask = umask(0);
 
@@ -165,13 +171,13 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 			mode |= S_IRWXU;
 			if (mkdir(dest, mode) < 0) {
 				umask(saved_umask);
-				bb_perror_msg("cannot create directory '%s'", dest);
+				bb_perror_msg("can't create directory '%s'", dest);
 				return -1;
 			}
 			umask(saved_umask);
 			/* need stat info for add_to_ino_dev_hashtable */
 			if (lstat(dest, &dest_stat) < 0) {
-				bb_perror_msg("cannot stat '%s'", dest);
+				bb_perror_msg("can't stat '%s'", dest);
 				return -1;
 			}
 		}
@@ -193,7 +199,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 			if (new_source == NULL)
 				continue;
 			new_dest = concat_path_file(dest, d->d_name);
-			if (copy_file(new_source, new_dest, flags) < 0)
+			if (copy_file(new_source, new_dest, flags & ~FILEUTILS_DEREFERENCE_L0) < 0)
 				retval = -1;
 			free(new_source);
 			free(new_dest);
@@ -203,30 +209,46 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 		if (!dest_exists
 		 && chmod(dest, source_stat.st_mode & ~saved_umask) < 0
 		) {
-			bb_perror_msg("cannot preserve %s of '%s'", "permissions", dest);
+			bb_perror_msg("can't preserve %s of '%s'", "permissions", dest);
 			/* retval = -1; - WRONG! copy *WAS* made */
 		}
 		goto preserve_mode_ugid_time;
 	}
 
+	if (dest_exists) {
+		if (flags & FILEUTILS_UPDATE) {
+			if (source_stat.st_mtime <= dest_stat.st_mtime) {
+				return 0; /* source file must be newer */
+			}
+		}
+#if ENABLE_FEATURE_CP_LONG_OPTIONS
+		if (flags & FILEUTILS_RMDEST) {
+			ovr = ask_and_unlink(dest, flags);
+			if (ovr <= 0)
+				return ovr;
+			dest_exists = 0;
+		}
+#endif
+	}
+
 	if (flags & (FILEUTILS_MAKE_SOFTLINK|FILEUTILS_MAKE_HARDLINK)) {
 		int (*lf)(const char *oldpath, const char *newpath);
  make_links:
-		// Hmm... maybe
-		// if (DEREF && MAKE_SOFTLINK) source = realpath(source) ?
-		// (but realpath returns NULL on dangling symlinks...)
+		/* Hmm... maybe
+		 * if (DEREF && MAKE_SOFTLINK) source = realpath(source) ?
+		 * (but realpath returns NULL on dangling symlinks...) */
 		lf = (flags & FILEUTILS_MAKE_SOFTLINK) ? symlink : link;
 		if (lf(source, dest) < 0) {
 			ovr = ask_and_unlink(dest, flags);
 			if (ovr <= 0)
 				return ovr;
 			if (lf(source, dest) < 0) {
-				bb_perror_msg("cannot create link '%s'", dest);
+				bb_perror_msg("can't create link '%s'", dest);
 				return -1;
 			}
 		}
 		/* _Not_ jumping to preserve_mode_ugid_time:
-		 * hard/softlinks don't have those */
+		 * (sym)links don't have those */
 		return 0;
 	}
 
@@ -256,7 +278,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 					if (ovr <= 0)
 						return ovr;
 					if (link(link_target, dest) < 0) {
-						bb_perror_msg("cannot create link '%s'", dest);
+						bb_perror_msg("can't create link '%s'", dest);
 						return -1;
 					}
 				}
@@ -274,19 +296,17 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 		if (!S_ISREG(source_stat.st_mode))
 			new_mode = 0666;
 
-		/* POSIX way is a security problem versus symlink attacks,
-		 * we do it only for non-symlinks, and only for non-recursive,
-		 * non-interactive cp. NB: it is still racy
-		 * for "cp file /home/bad_user/file" case
-		 * (user can rm file and create a link to /etc/passwd) */
-		if (DO_POSIX_CP
-		 || (dest_exists
-		     && !(flags & (FILEUTILS_RECUR|FILEUTILS_INTERACTIVE))
-		     && !S_ISLNK(dest_stat.st_mode))
-		) {
-			dst_fd = open(dest, O_WRONLY|O_CREAT|O_TRUNC, new_mode);
-		} else  /* safe way: */
+		if (ENABLE_FEATURE_NON_POSIX_CP || (flags & FILEUTILS_INTERACTIVE)) {
+			/*
+			 * O_CREAT|O_EXCL: require that file did not exist before creation
+			 */
 			dst_fd = open(dest, O_WRONLY|O_CREAT|O_EXCL, new_mode);
+		} else { /* POSIX, and not "cp -i" */
+			/*
+			 * O_CREAT|O_TRUNC: create, or truncate (security problem versus (sym)link attacks)
+			 */
+			dst_fd = open(dest, O_WRONLY|O_CREAT|O_TRUNC, new_mode);
+		}
 		if (dst_fd == -1) {
 			ovr = ask_and_unlink(dest, flags);
 			if (ovr <= 0) {
@@ -322,9 +342,9 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 #endif
 		if (bb_copyfd_eof(src_fd, dst_fd) == -1)
 			retval = -1;
-		/* Ok, writing side I can understand... */
+		/* Careful with writing... */
 		if (close(dst_fd) < 0) {
-			bb_perror_msg("cannot close '%s'", dest);
+			bb_perror_msg("error writing to '%s'", dest);
 			retval = -1;
 		}
 		/* ...but read size is already checked by bb_copyfd_eof */
@@ -351,22 +371,22 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 			int r = symlink(lpath, dest);
 			free(lpath);
 			if (r < 0) {
-				bb_perror_msg("cannot create symlink '%s'", dest);
+				bb_perror_msg("can't create symlink '%s'", dest);
 				return -1;
 			}
 			if (flags & FILEUTILS_PRESERVE_STATUS)
 				if (lchown(dest, source_stat.st_uid, source_stat.st_gid) < 0)
-					bb_perror_msg("cannot preserve %s of '%s'", "ownership", dest);
+					bb_perror_msg("can't preserve %s of '%s'", "ownership", dest);
 		}
 		/* _Not_ jumping to preserve_mode_ugid_time:
 		 * symlinks don't have those */
-		return 0;
+		goto verb_and_exit;
 	}
 	if (S_ISBLK(source_stat.st_mode) || S_ISCHR(source_stat.st_mode)
 	 || S_ISSOCK(source_stat.st_mode) || S_ISFIFO(source_stat.st_mode)
 	) {
 		if (mknod(dest, source_stat.st_mode, source_stat.st_rdev) < 0) {
-			bb_perror_msg("cannot create '%s'", dest);
+			bb_perror_msg("can't create '%s'", dest);
 			return -1;
 		}
 	} else {
@@ -380,19 +400,24 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 	/* Cannot happen: */
 	/* && !(flags & (FILEUTILS_MAKE_SOFTLINK|FILEUTILS_MAKE_HARDLINK)) */
 	) {
-		struct utimbuf times;
+		struct timeval times[2];
 
-		times.actime = source_stat.st_atime;
-		times.modtime = source_stat.st_mtime;
+		times[1].tv_sec = times[0].tv_sec = source_stat.st_mtime;
+		times[1].tv_usec = times[0].tv_usec = 0;
 		/* BTW, utimes sets usec-precision time - just FYI */
-		if (utime(dest, &times) < 0)
-			bb_perror_msg("cannot preserve %s of '%s'", "times", dest);
+		if (utimes(dest, times) < 0)
+			bb_perror_msg("can't preserve %s of '%s'", "times", dest);
 		if (chown(dest, source_stat.st_uid, source_stat.st_gid) < 0) {
 			source_stat.st_mode &= ~(S_ISUID | S_ISGID);
-			bb_perror_msg("cannot preserve %s of '%s'", "ownership", dest);
+			bb_perror_msg("can't preserve %s of '%s'", "ownership", dest);
 		}
 		if (chmod(dest, source_stat.st_mode) < 0)
-			bb_perror_msg("cannot preserve %s of '%s'", "permissions", dest);
+			bb_perror_msg("can't preserve %s of '%s'", "permissions", dest);
+	}
+
+ verb_and_exit:
+	if (flags & FILEUTILS_VERBOSE) {
+		printf("'%s' -> '%s'\n", source, dest);
 	}
 
 	return retval;

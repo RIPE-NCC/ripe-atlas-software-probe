@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_JFS) += jfs.o
+
+//config:
+//config:config FEATURE_VOLUMEID_JFS
+//config:	bool "jfs filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct jfs_super_block {
@@ -31,12 +42,13 @@ struct jfs_super_block {
 	uint8_t		uuid[16];
 	uint8_t		label[16];
 	uint8_t		loguuid[16];
-} __attribute__((__packed__));
+} PACKED;
 
 #define JFS_SUPERBLOCK_OFFSET			0x8000
 
-int volume_id_probe_jfs(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_jfs(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	struct jfs_super_block *js;
 
 	dbg("probing at offset 0x%llx", (unsigned long long) off);
@@ -53,7 +65,7 @@ int volume_id_probe_jfs(struct volume_id *id, uint64_t off)
 	volume_id_set_uuid(id, js->uuid, UUID_DCE);
 
 //	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
-//	id->type = "jfs";
+	IF_FEATURE_BLKID_TYPE(id->type = "jfs";)
 
 	return 0;
 }

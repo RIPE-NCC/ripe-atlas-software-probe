@@ -4,10 +4,11 @@
  *
  * Copyright (C) 2008 by Denys Vlasenko <vda.linux@gmail.com>
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
+#include "common_bufsiz.h"
 #define SYSLOG_NAMES
 #define SYSLOG_NAMES_CONST
 #include <syslog.h>

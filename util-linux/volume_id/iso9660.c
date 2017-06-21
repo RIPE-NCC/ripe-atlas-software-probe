@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_ISO9660) += iso9660.o
+
+//config:
+//config:config FEATURE_VOLUMEID_ISO9660
+//config:	bool "iso9660 filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 #define ISO_SUPERBLOCK_OFFSET		0x8000
@@ -38,17 +49,18 @@ struct iso_volume_descriptor {
 	uint8_t		unused[8];
 	uint8_t		space_size[8];
 	uint8_t		escape_sequences[8];
-} __attribute__((__packed__));
+} PACKED;
 
 struct high_sierra_volume_descriptor {
 	uint8_t		foo[8];
 	uint8_t		type;
 	uint8_t		id[4];
 	uint8_t		version;
-} __attribute__((__packed__));
+} PACKED;
 
-int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	uint8_t *buf;
 	struct iso_volume_descriptor *is;
 	struct high_sierra_volume_descriptor *hs;
@@ -113,7 +125,7 @@ int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
 
  found:
 //	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
-//	id->type = "iso9660";
+	IF_FEATURE_BLKID_TYPE(id->type = "iso9660";)
 
 	return 0;
 }

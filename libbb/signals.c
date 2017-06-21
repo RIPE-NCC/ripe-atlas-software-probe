@@ -6,7 +6,7 @@
  * Copyright (C) 2006 Rob Landley
  * Copyright (C) 2006 Denys Vlasenko
  *
- * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
@@ -39,7 +39,7 @@ void FAST_FUNC bb_signals(int sigs, void (*f)(int))
 
 	while (sigs) {
 		if (sigs & bit) {
-			sigs &= ~bit;
+			sigs -= bit;
 			signal(sig_no, f);
 		}
 		sig_no++;
@@ -47,7 +47,7 @@ void FAST_FUNC bb_signals(int sigs, void (*f)(int))
 	}
 }
 
-void FAST_FUNC bb_signals_recursive(int sigs, void (*f)(int))
+void FAST_FUNC bb_signals_recursive_norestart(int sigs, void (*f)(int))
 {
 	int sig_no = 0;
 	int bit = 1;
@@ -60,7 +60,7 @@ void FAST_FUNC bb_signals_recursive(int sigs, void (*f)(int))
 
 	while (sigs) {
 		if (sigs & bit) {
-			sigs &= ~bit;
+			sigs -= bit;
 			sigaction_set(sig_no, &sa);
 		}
 		sig_no++;
@@ -97,7 +97,7 @@ void FAST_FUNC kill_myself_with_sig(int sig)
 	signal(sig, SIG_DFL);
 	sig_unblock(sig);
 	raise(sig);
-	_exit(EXIT_FAILURE); /* Should not reach it */
+	_exit(sig | 128); /* Should not reach it */
 }
 
 void FAST_FUNC signal_SA_RESTART_empty_mask(int sig, void (*handler)(int))

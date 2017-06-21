@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_LINUXSWAP) += linux_swap.o
+
+//config:
+//config:config FEATURE_VOLUMEID_LINUXSWAP
+//config:	bool "linux swap filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct swap_header_v1_2 {
@@ -27,12 +38,13 @@ struct swap_header_v1_2 {
 	uint32_t	nr_badpages;
 	uint8_t		uuid[16];
 	uint8_t		volume_name[16];
-} __attribute__((__packed__));
+} PACKED;
 
 #define LARGEST_PAGESIZE			0x4000
 
-int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_linux_swap(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	struct swap_header_v1_2 *sw;
 	const uint8_t *buf;
 	unsigned page;
@@ -51,7 +63,11 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
 				goto found;
 			}
 
-			if (memcmp(buf, "SWAPSPACE2", 10) == 0) {
+			if (memcmp(buf, "SWAPSPACE2", 10) == 0
+			 || memcmp(buf, "S1SUSPEND", 9) == 0
+			 || memcmp(buf, "S2SUSPEND", 9) == 0
+			 || memcmp(buf, "ULSUSPEND", 9) == 0
+			) {
 				sw = volume_id_get_buffer(id, off, sizeof(struct swap_header_v1_2));
 				if (sw == NULL)
 					return -1;
@@ -67,7 +83,7 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
 
 found:
 //	volume_id_set_usage(id, VOLUME_ID_OTHER);
-//	id->type = "swap";
+	IF_FEATURE_BLKID_TYPE(id->type = "swap";)
 
 	return 0;
 }

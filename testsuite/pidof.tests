@@ -2,11 +2,11 @@
 
 # pidof tests.
 # Copyright 2005 by Bernhard Reutner-Fischer
-# Licensed under GPL v2, see file LICENSE for details.
+# Licensed under GPLv2, see file LICENSE in this source tree.
 
 # AUDIT:
 
-. testing.sh
+. ./testing.sh
 
 # testing "test name" "options" "expected result" "file input" "stdin"
 
@@ -20,12 +20,14 @@ testing "pidof this" "pidof pidof.tests | grep -o -w $$" "$$\n" "" ""
 
 optional FEATURE_PIDOF_SINGLE
 testing "pidof -s" "pidof -s init" "1\n" "" ""
+SKIP=
 
-optional FEATURE_PIDOF_OMIT
+optional FEATURE_PIDOF_OMIT FEATURE_PIDOF_SINGLE
 # This test fails now because process name matching logic has changed,
 # but new logic is not "wrong" either... see find_pid_by_name.c comments
 #testing "pidof -o %PPID" "pidof -o %PPID pidof.tests | grep -o -w $$" "" "" ""
 testing "pidof -o %PPID NOP" "pidof -o %PPID -s init" "1\n" "" ""
 testing "pidof -o init" "pidof -o 1 init | grep -o -w 1" "" "" ""
+SKIP=
 
 exit $FAILCOUNT

@@ -1,5 +1,3 @@
-=back
-
 =head1 LIBC NSS
 
 GNU Libc (glibc) uses the Name Service Switch (NSS) to configure the behavior
@@ -33,13 +31,13 @@ The following people have contributed code to BusyBox whether they know it or
 not.  If you have written code included in BusyBox, you should probably be
 listed here so you can obtain your bit of eternal glory.  If you should be
 listed here, or the description of what you have done needs more detail, or is
-incorect, please send in an update.
+incorrect, please send in an update.
 
 
 =for html <br>
 
 Emanuele Aina <emanuele.aina@tiscali.it>
-	run-parts
+    run-parts
 
 =for html <br>
 
@@ -97,7 +95,7 @@ Dave Cinege <dcinege@psychosis.com>
 
 Jordan Crouse <jordan@cosmicpenguin.net>
 
-	ipcalc
+    ipcalc
 
 =for html <br>
 
@@ -146,7 +144,7 @@ Matt Kraai <kraai@alumni.cmu.edu>
 
 Stephan Linz <linz@li-pro.net>
 
-	ipcalc, Red Hat equivalence
+    ipcalc, Red Hat equivalence
 
 =for html <br>
 
@@ -158,7 +156,7 @@ John Lombardo <john@deltanet.com>
 
 Glenn McGrath <bug1@iinet.net.au>
 
-    Common unarchving code and unarchiving applets, ifupdown, ftpgetput,
+    Common unarchiving code and unarchiving applets, ifupdown, ftpgetput,
     nameif, sed, patch, fold, install, uudecode.
     Various bugfixes, review and apply numerous patches.
 
@@ -250,7 +248,36 @@ Enrique Zanardi <ezanardi@ull.es>
 
 Tito Ragusa <farmatito@tiscali.it>
 
-	devfsd and size optimizations in strings, openvt and deallocvt.
+    devfsd and size optimizations in strings, openvt and deallocvt.
+
+=for html <br>
+
+Paul Fox <pgf@foxharp.boston.ma.us>
+
+    vi editing mode for ash, various other patches/fixes
+
+=for html <br>
+
+Roberto A. Foglietta <me@roberto.foglietta.name>
+
+    port: dnsd
+
+=for html <br>
+
+Bernhard Reutner-Fischer <rep.dot.nop@gmail.com>
+
+    misc
+
+=for html <br>
+
+Mike Frysinger <vapier@gentoo.org>
+
+    initial e2fsprogs, printenv, setarch, sum, misc
+
+=for html <br>
+
+Jie Zhang <jie.zhang@analog.com>
+
+    fixed two bugs in msh and hush (exitcode of killed processes)
 
 =cut
-

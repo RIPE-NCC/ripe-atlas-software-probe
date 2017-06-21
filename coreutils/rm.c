@@ -4,16 +4,35 @@
  *
  * Copyright (C) 2001 Matt Kraai <kraai@alumni.carnegiemellon.edu>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
-
-/* BB_AUDIT SUSv3 compliant */
-/* http://www.opengroup.org/onlinepubs/007904975/utilities/rm.html */
-
 /* Mar 16, 2003      Manuel Novoa III   (mjn3@codepoet.org)
  *
  * Size reduction.
  */
+//config:config RM
+//config:	bool "rm"
+//config:	default y
+//config:	help
+//config:	  rm is used to remove files or directories.
+
+//applet:IF_RM(APPLET_NOFORK(rm, rm, BB_DIR_BIN, BB_SUID_DROP, rm))
+
+//kbuild:lib-$(CONFIG_RM) += rm.o
+
+/* BB_AUDIT SUSv3 compliant */
+/* http://www.opengroup.org/onlinepubs/007904975/utilities/rm.html */
+
+//usage:#define rm_trivial_usage
+//usage:       "[-irf] FILE..."
+//usage:#define rm_full_usage "\n\n"
+//usage:       "Remove (unlink) FILEs\n"
+//usage:     "\n	-i	Always prompt before removing"
+//usage:     "\n	-f	Never prompt"
+//usage:     "\n	-R,-r	Recurse"
+//usage:
+//usage:#define rm_example_usage
+//usage:       "$ rm -rf /tmp/foo\n"
 
 #include "libbb.h"
 
@@ -27,21 +46,23 @@ int rm_main(int argc UNUSED_PARAM, char **argv)
 	unsigned opt;
 
 	opt_complementary = "f-i:i-f";
-	opt = getopt32(argv, "fiRr");
+	opt = getopt32(argv, "fiRrv");
 	argv += optind;
 	if (opt & 1)
 		flags |= FILEUTILS_FORCE;
 	if (opt & 2)
 		flags |= FILEUTILS_INTERACTIVE;
-	if (opt & 12)
+	if (opt & (8|4))
 		flags |= FILEUTILS_RECUR;
+	if ((opt & 16) && FILEUTILS_VERBOSE)
+		flags |= FILEUTILS_VERBOSE;
 
 	if (*argv != NULL) {
 		do {
 			const char *base = bb_get_last_path_component_strip(*argv);
 
 			if (DOT_OR_DOTDOT(base)) {
-				bb_error_msg("cannot remove '.' or '..'");
+				bb_error_msg("can't remove '.' or '..'");
 			} else if (remove_file(*argv, flags) >= 0) {
 				continue;
 			}

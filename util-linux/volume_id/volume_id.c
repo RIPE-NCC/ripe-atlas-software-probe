@@ -18,6 +18,8 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_VOLUMEID) += volume_id.o util.o
+
 #include "volume_id_internal.h"
 
 
@@ -45,8 +47,8 @@
 #define ENABLE_FEATURE_VOLUMEID_UFS           0
 
 
-typedef int (*raid_probe_fptr)(struct volume_id *id, uint64_t off, uint64_t size);
-typedef int (*probe_fptr)(struct volume_id *id, uint64_t off);
+typedef int FAST_FUNC (*raid_probe_fptr)(struct volume_id *id, /*uint64_t off,*/ uint64_t size);
+typedef int FAST_FUNC (*probe_fptr)(struct volume_id *id /*, uint64_t off*/);
 
 static const raid_probe_fptr raid1[] = {
 #if ENABLE_FEATURE_VOLUMEID_LINUXRAID
@@ -93,11 +95,20 @@ static const probe_fptr fs1[] = {
 #if ENABLE_FEATURE_VOLUMEID_FAT
 	volume_id_probe_vfat,
 #endif
+#if ENABLE_FEATURE_VOLUMEID_EXFAT
+	volume_id_probe_exfat,
+#endif
 #if ENABLE_FEATURE_VOLUMEID_MAC
 	volume_id_probe_mac_partition_map,
 #endif
+#if ENABLE_FEATURE_VOLUMEID_SQUASHFS
+	volume_id_probe_squashfs,
+#endif
 #if ENABLE_FEATURE_VOLUMEID_XFS
 	volume_id_probe_xfs,
+#endif
+#if ENABLE_FEATURE_VOLUMEID_BCACHE
+	volume_id_probe_bcache,
 #endif
 };
 
@@ -108,6 +119,9 @@ static const probe_fptr fs2[] = {
 #endif
 #if ENABLE_FEATURE_VOLUMEID_EXT
 	volume_id_probe_ext,
+#endif
+#if ENABLE_FEATURE_VOLUMEID_BTRFS
+	volume_id_probe_btrfs,
 #endif
 #if ENABLE_FEATURE_VOLUMEID_REISERFS
 	volume_id_probe_reiserfs,
@@ -126,6 +140,12 @@ static const probe_fptr fs2[] = {
 #endif
 #if ENABLE_FEATURE_VOLUMEID_UFS
 	volume_id_probe_ufs,
+#endif
+#if ENABLE_FEATURE_VOLUMEID_F2FS
+	volume_id_probe_f2fs,
+#endif
+#if ENABLE_FEATURE_VOLUMEID_NILFS
+	volume_id_probe_nilfs,
 #endif
 #if ENABLE_FEATURE_VOLUMEID_NTFS
 	volume_id_probe_ntfs,
@@ -148,49 +168,57 @@ static const probe_fptr fs2[] = {
 #if ENABLE_FEATURE_VOLUMEID_OCFS2
 	volume_id_probe_ocfs2,
 #endif
+#if ENABLE_FEATURE_VOLUMEID_UBIFS
+	volume_id_probe_ubifs,
+#endif
 };
 
-int volume_id_probe_all(struct volume_id *id, uint64_t off, uint64_t size)
+int FAST_FUNC volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size)
 {
 	unsigned i;
 
-	if (id == NULL)
-		return -EINVAL;
-
 	/* probe for raid first, cause fs probes may be successful on raid members */
 	if (size) {
-		for (i = 0; i < ARRAY_SIZE(raid1); i++)
-			if (raid1[i](id, off, size) == 0)
+		for (i = 0; i < ARRAY_SIZE(raid1); i++) {
+			if (raid1[i](id, /*off,*/ size) == 0)
 				goto ret;
+			if (id->error)
+				goto ret;
+		}
 	}
 
-	for (i = 0; i < ARRAY_SIZE(raid2); i++)
-		if (raid2[i](id, off) == 0)
+	for (i = 0; i < ARRAY_SIZE(raid2); i++) {
+		if (raid2[i](id /*,off*/) == 0)
 			goto ret;
+		if (id->error)
+			goto ret;
+	}
 
 	/* signature in the first block, only small buffer needed */
-	for (i = 0; i < ARRAY_SIZE(fs1); i++)
-		if (fs1[i](id, off) == 0)
+	for (i = 0; i < ARRAY_SIZE(fs1); i++) {
+		if (fs1[i](id /*,off*/) == 0)
 			goto ret;
+		if (id->error)
+			goto ret;
+	}
 
 	/* fill buffer with maximum */
 	volume_id_get_buffer(id, 0, SB_BUFFER_SIZE);
 
-	for (i = 0; i < ARRAY_SIZE(fs2); i++)
-		if (fs2[i](id, off) == 0)
+	for (i = 0; i < ARRAY_SIZE(fs2); i++) {
+		if (fs2[i](id /*,off*/) == 0)
 			goto ret;
-	return -1;
+		if (id->error)
+			goto ret;
+	}
 
  ret:
-	/* If the filestystem in recognized, we free the allocated buffers,
-	   otherwise they will stay in place for the possible next probe call */
 	volume_id_free_buffer(id);
-
-	return 0;
+	return (- id->error); /* 0 or -1 */
 }
 
 /* open volume by device node */
-struct volume_id *volume_id_open_node(int fd)
+struct volume_id* FAST_FUNC volume_id_open_node(int fd)
 {
 	struct volume_id *id;
 
@@ -203,7 +231,7 @@ struct volume_id *volume_id_open_node(int fd)
 
 #ifdef UNUSED
 /* open volume by major/minor */
-struct volume_id *volume_id_open_dev_t(dev_t devt)
+struct volume_id* FAST_FUNC volume_id_open_dev_t(dev_t devt)
 {
 	struct volume_id *id;
 	char *tmp_node[VOLUME_ID_PATH_MAX];
@@ -214,7 +242,7 @@ struct volume_id *volume_id_open_dev_t(dev_t devt)
 	/* create temporary node to open block device */
 	unlink(tmp_node);
 	if (mknod(tmp_node, (S_IFBLK | 0600), devt) != 0)
-		bb_perror_msg_and_die("cannot mknod(%s)", tmp_node);
+		bb_perror_msg_and_die("can't mknod(%s)", tmp_node);
 
 	id = volume_id_open_node(tmp_node);
 	unlink(tmp_node);
@@ -223,7 +251,7 @@ struct volume_id *volume_id_open_dev_t(dev_t devt)
 }
 #endif
 
-void free_volume_id(struct volume_id *id)
+void FAST_FUNC free_volume_id(struct volume_id *id)
 {
 	if (id == NULL)
 		return;

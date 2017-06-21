@@ -6,6 +6,101 @@
  * Make ranges of device files quickly.
  * known bugs: can't deal with alpha ranges
  */
+//config:config MAKEDEVS
+//config:	bool "makedevs"
+//config:	default y
+//config:	help
+//config:	  'makedevs' is a utility used to create a batch of devices with
+//config:	  one command.
+//config:
+//config:	  There are two choices for command line behaviour, the interface
+//config:	  as used by LEAF/Linux Router Project, or a device table file.
+//config:
+//config:	  'leaf' is traditionally what busybox follows, it allows multiple
+//config:	  devices of a particluar type to be created per command.
+//config:	  e.g. /dev/hda[0-9]
+//config:	  Device properties are passed as command line arguments.
+//config:
+//config:	  'table' reads device properties from a file or stdin, allowing
+//config:	  a batch of unrelated devices to be made with one command.
+//config:	  User/group names are allowed as an alternative to uid/gid.
+//config:
+//config:choice
+//config:	prompt "Choose makedevs behaviour"
+//config:	depends on MAKEDEVS
+//config:	default FEATURE_MAKEDEVS_TABLE
+//config:
+//config:config FEATURE_MAKEDEVS_LEAF
+//config:	bool "leaf"
+//config:
+//config:config FEATURE_MAKEDEVS_TABLE
+//config:	bool "table"
+//config:
+//config:endchoice
+
+//applet:IF_MAKEDEVS(APPLET(makedevs, BB_DIR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_MAKEDEVS) += makedevs.o
+
+//usage:#if ENABLE_FEATURE_MAKEDEVS_LEAF
+//usage:#define makedevs_trivial_usage
+//usage:       "NAME TYPE MAJOR MINOR FIRST LAST [s]"
+//usage:#define makedevs_full_usage "\n\n"
+//usage:       "Create a range of block or character special files"
+//usage:     "\n"
+//usage:     "\nTYPE is:"
+//usage:     "\n	b	Block device"
+//usage:     "\n	c	Character device"
+//usage:     "\n	f	FIFO, MAJOR and MINOR are ignored"
+//usage:     "\n"
+//usage:     "\nFIRST..LAST specify numbers appended to NAME."
+//usage:     "\nIf 's' is the last argument, the base device is created as well."
+//usage:     "\n"
+//usage:     "\nExamples:"
+//usage:     "\n	makedevs /dev/ttyS c 4 66 2 63   ->  ttyS2-ttyS63"
+//usage:     "\n	makedevs /dev/hda b 3 0 0 8 s    ->  hda,hda1-hda8"
+//usage:
+//usage:#define makedevs_example_usage
+//usage:       "# makedevs /dev/ttyS c 4 66 2 63\n"
+//usage:       "[creates ttyS2-ttyS63]\n"
+//usage:       "# makedevs /dev/hda b 3 0 0 8 s\n"
+//usage:       "[creates hda,hda1-hda8]\n"
+//usage:#endif
+//usage:
+//usage:#if ENABLE_FEATURE_MAKEDEVS_TABLE
+//usage:#define makedevs_trivial_usage
+//usage:       "[-d device_table] rootdir"
+//usage:#define makedevs_full_usage "\n\n"
+//usage:       "Create a range of special files as specified in a device table.\n"
+//usage:       "Device table entries take the form of:\n"
+//usage:       "<name> <type> <mode> <uid> <gid> <major> <minor> <start> <inc> <count>\n"
+//usage:       "Where name is the file name, type can be one of:\n"
+//usage:       "	f	Regular file\n"
+//usage:       "	d	Directory\n"
+//usage:       "	c	Character device\n"
+//usage:       "	b	Block device\n"
+//usage:       "	p	Fifo (named pipe)\n"
+//usage:       "uid is the user id for the target file, gid is the group id for the\n"
+//usage:       "target file. The rest of the entries (major, minor, etc) apply to\n"
+//usage:       "to device special files. A '-' may be used for blank entries."
+//usage:
+//usage:#define makedevs_example_usage
+//usage:       "For example:\n"
+//usage:       "<name>    <type> <mode><uid><gid><major><minor><start><inc><count>\n"
+//usage:       "/dev         d   755    0    0    -      -      -      -    -\n"
+//usage:       "/dev/console c   666    0    0    5      1      -      -    -\n"
+//usage:       "/dev/null    c   666    0    0    1      3      0      0    -\n"
+//usage:       "/dev/zero    c   666    0    0    1      5      0      0    -\n"
+//usage:       "/dev/hda     b   640    0    0    3      0      0      0    -\n"
+//usage:       "/dev/hda     b   640    0    0    3      1      1      1    15\n\n"
+//usage:       "Will Produce:\n"
+//usage:       "/dev\n"
+//usage:       "/dev/console\n"
+//usage:       "/dev/null\n"
+//usage:       "/dev/zero\n"
+//usage:       "/dev/hda\n"
+//usage:       "/dev/hda[0-15]\n"
+//usage:#endif
 
 #include "libbb.h"
 
@@ -36,10 +131,10 @@ int makedevs_main(int argc, char **argv)
 	basedev = argv[1];
 	buf = xasprintf("%s%u", argv[1], (unsigned)-1);
 	type = argv[2];
-	Smajor = xatoi_u(argv[3]);
-	Sminor = xatoi_u(argv[4]);
-	S = xatoi_u(argv[5]);
-	E = xatoi_u(argv[6]);
+	Smajor = xatoi_positive(argv[3]);
+	Sminor = xatoi_positive(argv[4]);
+	S = xatoi_positive(argv[5]);
+	E = xatoi_positive(argv[6]);
 	nodname = argv[7] ? basedev : buf;
 
 	mode = 0660;
@@ -62,8 +157,11 @@ int makedevs_main(int argc, char **argv)
 
 		/* if mode != S_IFCHR and != S_IFBLK,
 		 * third param in mknod() ignored */
-		if (mknod(nodname, mode, makedev(Smajor, Sminor)))
-			bb_perror_msg("can't create %s", nodname);
+		if (mknod(nodname, mode, makedev(Smajor, Sminor)) != 0
+		 && errno != EEXIST
+		) {
+			bb_perror_msg("can't create '%s'", nodname);
+		}
 
 		/*if (nodname == basedev)*/ /* ex. /dev/hda - to /dev/hda1 ... */
 			nodname = buf;
@@ -76,7 +174,7 @@ int makedevs_main(int argc, char **argv)
 
 #elif ENABLE_FEATURE_MAKEDEVS_TABLE
 
-/* Licensed under the GPL v2 or later, see the file LICENSE in this tarball. */
+/* Licensed under GPLv2 or later, see file LICENSE in this source tree. */
 
 int makedevs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int makedevs_main(int argc UNUSED_PARAM, char **argv)
@@ -121,7 +219,7 @@ int makedevs_main(int argc UNUSED_PARAM, char **argv)
 
 		if ((2 > sscanf(line, "%40s %c %o %40s %40s %u %u %u %u %u",
 					name, &type, &mode, user, group,
-					&major,	&minor, &start, &increment, &count))
+					&major, &minor, &start, &increment, &count))
 		 || ((unsigned)(major | minor | start | count | increment) > 255)
 		) {
 			bb_error_msg("invalid line %d: '%s'", linenum, line);
@@ -184,7 +282,9 @@ int makedevs_main(int argc UNUSED_PARAM, char **argv)
 			for (i = start; i <= start + count; i++) {
 				sprintf(full_name_inc, count ? "%s%u" : "%s", full_name, i);
 				rdev = makedev(major, minor + (i - start) * increment);
-				if (mknod(full_name_inc, mode, rdev) < 0) {
+				if (mknod(full_name_inc, mode, rdev) != 0
+				 && errno != EEXIST
+				) {
 					bb_perror_msg("line %d: can't create node %s", linenum, full_name_inc);
 					ret = EXIT_FAILURE;
 				} else if (chown(full_name_inc, uid, gid) < 0) {

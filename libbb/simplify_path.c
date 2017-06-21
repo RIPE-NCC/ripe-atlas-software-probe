@@ -4,37 +4,28 @@
  *
  * Copyright (C) 2001  Manuel Novoa III  <mjn3@codepoet.org>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
-
 #include "libbb.h"
 
-char* FAST_FUNC bb_simplify_path(const char *path)
+char* FAST_FUNC bb_simplify_abs_path_inplace(char *start)
 {
-	char *s, *start, *p;
+	char *s, *p;
 
-	if (path[0] == '/')
-		start = xstrdup(path);
-	else {
-		s = xrealloc_getcwd_or_warn(NULL);
-		start = concat_path_file(s, path);
-		free(s);
-	}
 	p = s = start;
-
 	do {
 		if (*p == '/') {
-			if (*s == '/') {	/* skip duplicate (or initial) slash */
+			if (*s == '/') {  /* skip duplicate (or initial) slash */
 				continue;
 			}
 			if (*s == '.') {
-				if (s[1] == '/' || !s[1]) {	/* remove extra '.' */
+				if (s[1] == '/' || !s[1]) {  /* remove extra '.' */
 					continue;
 				}
 				if ((s[1] == '.') && (s[2] == '/' || !s[2])) {
 					++s;
 					if (p > start) {
-						while (*--p != '/')	/* omit previous dir */
+						while (*--p != '/')  /* omit previous dir */
 							continue;
 					}
 					continue;
@@ -44,10 +35,25 @@ char* FAST_FUNC bb_simplify_path(const char *path)
 		*++p = *s;
 	} while (*++s);
 
-	if ((p == start) || (*p != '/')) {	/* not a trailing slash */
-		++p;					/* so keep last character */
+	if ((p == start) || (*p != '/')) {  /* not a trailing slash */
+		++p;  /* so keep last character */
 	}
-	*p = 0;
+	*p = '\0';
+	return p;
+}
 
-	return start;
+char* FAST_FUNC bb_simplify_path(const char *path)
+{
+	char *s, *p;
+
+	if (path[0] == '/')
+		s = xstrdup(path);
+	else {
+		p = xrealloc_getcwd_or_warn(NULL);
+		s = concat_path_file(p, path);
+		free(p);
+	}
+
+	bb_simplify_abs_path_inplace(s);
+	return s;
 }

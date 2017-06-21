@@ -252,7 +252,7 @@ because it looks like whitespace; using lower-case is easy on the eyes.
 Exceptions:
 
  - Enums, macros, and constant variables are occasionally written in all
-   upper-case with words optionally seperatedy by underscores (i.e. FIFO_TYPE,
+   upper-case with words optionally separated by underscores (i.e. FIFO_TYPE,
    ISBLKDEV()).
 
  - Nobody is going to get mad at you for using 'pvar' as the name of a
@@ -422,7 +422,7 @@ called 'strings.c' - instead of two, food for thought).
 Testing String Equivalence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There's a right way and a wrong way to test for sting equivalence with
+There's a right way and a wrong way to test for string equivalence with
 strcmp():
 
 	The wrong way:
@@ -679,11 +679,10 @@ line in the midst of your #includes, if you need to parse long options:
 
 Then have long options defined:
 
-	static const struct option <applet>_long_options[] = {
-		{ "list",    0, NULL, 't' },
-		{ "extract", 0, NULL, 'x' },
-		{ NULL, 0, NULL, 0 }
-	};
+	static const char <applet>_longopts[] ALIGN1 =
+		"list\0"    No_argument "t"
+		"extract\0" No_argument "x"
+	;
 
 And a code block similar to the following near the top of your applet_main()
 routine:
@@ -691,7 +690,7 @@ routine:
 	char *str_b;
 
 	opt_complementary = "cryptic_string";
-	applet_long_options = <applet>_long_options; /* if you have them */
+	applet_long_options = <applet>_longopts; /* if you have them */
 	opt = getopt32(argc, argv, "ab:c", &str_b);
 	if (opt & 1) {
 		handle_option_a();

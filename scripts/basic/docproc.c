@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+//bbox disabled: #include <alloca.h>
 
 /* exitstatus is used to keep track of any failing calls to kernel-doc,
  * but execution continues. */
@@ -79,18 +80,21 @@ void exec_kernel_doc(char **svec)
 {
 	pid_t pid;
 	int ret;
-	char real_filename[PATH_MAX + 1];
+	char *real_filename;
+	int rflen;
+
 	/* Make sure output generated so far are flushed */
 	fflush(stdout);
 	switch(pid=fork()) {
 		case -1:
-			perror("fork");
+			perror("vfork"+1);
 			exit(1);
 		case  0:
-			memset(real_filename, 0, sizeof(real_filename));
-			strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
-			strncat(real_filename, KERNELDOCPATH KERNELDOC,
-					PATH_MAX - strlen(real_filename));
+			rflen  = strlen(getenv("SRCTREE"));
+			rflen += strlen(KERNELDOCPATH KERNELDOC);
+			real_filename = alloca(rflen + 1);
+			strcpy(real_filename, getenv("SRCTREE"));
+			strcat(real_filename, KERNELDOCPATH KERNELDOC);
 			execvp(real_filename, svec);
 			fprintf(stderr, "exec ");
 			perror(real_filename);
@@ -166,11 +170,10 @@ void find_export_symbols(char * filename)
 	struct symfile *sym;
 	char line[MAXLINESZ];
 	if (filename_exist(filename) == NULL) {
-		char real_filename[PATH_MAX + 1];
-		memset(real_filename, 0, sizeof(real_filename));
-		strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
-		strncat(real_filename, filename,
-				PATH_MAX - strlen(real_filename));
+		int rflen = strlen(getenv("SRCTREE")) + strlen(filename);
+		char *real_filename = alloca(rflen + 1);
+		strcpy(real_filename, getenv("SRCTREE"));
+		strcat(real_filename, filename);
 		sym = add_new_file(filename);
 		fp = fopen(real_filename, "r");
 		if (fp == NULL)
@@ -210,7 +213,7 @@ void find_export_symbols(char * filename)
  * Document all external or internal functions in a file.
  * Call kernel-doc with following parameters:
  * kernel-doc -docbook -nofunction function_name1 filename
- * function names are obtained from all the the src files
+ * function names are obtained from all the src files
  * by find_export_symbols.
  * intfunc uses -nofunction
  * extfunc uses -function
@@ -249,7 +252,7 @@ void intfunc(char * filename) {	docfunctions(filename, NOFUNCTION); }
 void extfunc(char * filename) { docfunctions(filename, FUNCTION);   }
 
 /*
- * Document spåecific function(s) in a file.
+ * Document specific function(s) in a file.
  * Call kernel-doc with the following parameters:
  * kernel-doc -docbook -function function1 [-function function2]
  */
@@ -261,7 +264,7 @@ void singfunc(char * filename, char * line)
 	vec[idx++] = KERNELDOC;
 	vec[idx++] = DOCBOOK;
 
-	/* Split line up in individual parameters preceeded by FUNCTION */
+	/* Split line up in individual parameters preceded by FUNCTION */
 	for (i=0; line[i]; i++) {
 		if (isspace(line[i])) {
 			line[i] = '\0';
@@ -395,4 +398,3 @@ int main(int argc, char **argv)
 	fflush(stdout);
 	return exitstatus;
 }
-

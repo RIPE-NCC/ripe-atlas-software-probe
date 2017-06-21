@@ -3,25 +3,55 @@
  * split - split a file into pieces
  * Copyright (c) 2007 Bernhard Reutner-Fischer
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config SPLIT
+//config:	bool "split"
+//config:	default y
+//config:	help
+//config:	  split a file into pieces.
+//config:
+//config:config FEATURE_SPLIT_FANCY
+//config:	bool "Fancy extensions"
+//config:	default y
+//config:	depends on SPLIT
+//config:	help
+//config:	  Add support for features not required by SUSv3.
+//config:	  Supports additional suffixes 'b' for 512 bytes,
+//config:	  'g' for 1GiB for the -b option.
+
+//applet:IF_SPLIT(APPLET(split, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_SPLIT) += split.o
+
 /* BB_AUDIT: SUSv3 compliant
  * SUSv3 requirements:
  * http://www.opengroup.org/onlinepubs/009695399/utilities/split.html
  */
-#include "libbb.h"
 
-static const struct suffix_mult split_suffices[] = {
+//usage:#define split_trivial_usage
+//usage:       "[OPTIONS] [INPUT [PREFIX]]"
+//usage:#define split_full_usage "\n\n"
+//usage:       "	-b N[k|m]	Split by N (kilo|mega)bytes"
+//usage:     "\n	-l N		Split by N lines"
+//usage:     "\n	-a N		Use N letters as suffix"
+//usage:
+//usage:#define split_example_usage
+//usage:       "$ split TODO foo\n"
+//usage:       "$ cat TODO | split -a 2 -l 2 TODO_\n"
+
+#include "libbb.h"
+#include "common_bufsiz.h"
+
 #if ENABLE_FEATURE_SPLIT_FANCY
+static const struct suffix_mult split_suffixes[] = {
 	{ "b", 512 },
-#endif
 	{ "k", 1024 },
 	{ "m", 1024*1024 },
-#if ENABLE_FEATURE_SPLIT_FANCY
 	{ "g", 1024*1024*1024 },
-#endif
-	{ }
+	{ "", 0 }
 };
+#endif
 
 /* Increment the suffix part of the filename.
  * Returns NULL if we are out of filenames.
@@ -32,7 +62,7 @@ static char *next_file(char *old, unsigned suffix_len)
 	unsigned i = 1;
 	char *curr;
 
-	do {
+	while (1) {
 		curr = old + end - i;
 		if (*curr < 'z') {
 			*curr += 1;
@@ -43,7 +73,7 @@ static char *next_file(char *old, unsigned suffix_len)
 			return NULL;
 		}
 		*curr = 'a';
-	} while (1);
+	}
 
 	return old;
 }
@@ -68,20 +98,27 @@ int split_main(int argc UNUSED_PARAM, char **argv)
 	ssize_t bytes_read, to_write;
 	char *src;
 
-	opt_complementary = "?2:a+"; /* max 2 args; -a N */
-	opt = getopt32(argv, "l:b:a:", &count_p, &count_p, &suffix_len);
+	setup_common_bufsiz();
+
+	opt_complementary = "?2"; /* max 2 args; -a N */
+	opt = getopt32(argv, "l:b:a:+", &count_p, &count_p, &suffix_len);
 
 	if (opt & SPLIT_OPT_l)
 		cnt = XATOOFF(count_p);
 	if (opt & SPLIT_OPT_b) // FIXME: also needs XATOOFF
-		cnt = xatoull_sfx(count_p, split_suffices);
+		cnt = xatoull_sfx(count_p,
+				IF_FEATURE_SPLIT_FANCY(split_suffixes)
+				IF_NOT_FEATURE_SPLIT_FANCY(km_suffixes)
+		);
 	sfx = "x";
 
 	argv += optind;
 	if (argv[0]) {
+		int fd;
 		if (argv[1])
 			sfx = argv[1];
-		xmove_fd(xopen(argv[0], O_RDONLY), 0);
+		fd = xopen_stdin(argv[0]);
+		xmove_fd(fd, STDIN_FILENO);
 	} else {
 		argv[0] = (char *) bb_msg_standard_input;
 	}

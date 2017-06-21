@@ -22,7 +22,7 @@ static int conf_lineno, conf_warnings, conf_unsaved;
 
 const char conf_def_filename[] = ".config";
 
-const char conf_defname[] = "scripts/defconfig";
+const char conf_defname[] = "/dev/null"; //bbox
 
 const char *conf_confnames[] = {
 	conf_def_filename,
@@ -70,12 +70,13 @@ static char *conf_expand_value(const char *in)
 char *conf_get_default_confname(void)
 {
 	struct stat buf;
-	static char fullname[PATH_MAX+1];
+	static char *fullname = NULL;
 	char *env, *name;
 
 	name = conf_expand_value(conf_defname);
 	env = getenv(SRCTREE);
 	if (env) {
+		fullname = realloc(fullname, strlen(env) + strlen(name) + 2);
 		sprintf(fullname, "%s/%s", env, name);
 		if (!stat(fullname, &buf))
 			return fullname;
@@ -123,8 +124,7 @@ int conf_read_simple(const char *name)
 		case S_INT:
 		case S_HEX:
 		case S_STRING:
-			if (sym->user.val)
-				free(sym->user.val);
+			free(sym->user.val);
 		default:
 			sym->user.val = NULL;
 			sym->user.tri = no;
@@ -458,8 +458,8 @@ int conf_write(const char *name)
 						fprintf(out_h, "#undef CONFIG_%s\n", sym->name);
 						/* bbox */
 						fprintf(out_h, "#define ENABLE_%s 0\n", sym->name);
-						fprintf(out_h, "#define USE_%s(...)\n", sym->name);
-						fprintf(out_h, "#define SKIP_%s(...) __VA_ARGS__\n", sym->name);
+						fprintf(out_h, "#define IF_%s(...)\n", sym->name);
+						fprintf(out_h, "#define IF_NOT_%s(...) __VA_ARGS__\n", sym->name);
 					}
 					break;
 				case mod:
@@ -473,8 +473,12 @@ int conf_write(const char *name)
 						fprintf(out_h, "#define CONFIG_%s 1\n", sym->name);
 						/* bbox */
 						fprintf(out_h, "#define ENABLE_%s 1\n", sym->name);
-						fprintf(out_h, "#define USE_%s(...) __VA_ARGS__\n", sym->name);
-						fprintf(out_h, "#define SKIP_%s(...)\n", sym->name);
+						fprintf(out_h, "#ifdef MAKE_SUID\n");
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
+						fprintf(out_h, "#else\n");
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
+						fprintf(out_h, "#endif\n");
+						fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 					}
 					break;
 				}
@@ -505,8 +509,12 @@ int conf_write(const char *name)
 					fputs("\"\n", out_h);
 					/* bbox */
 					fprintf(out_h, "#define ENABLE_%s 1\n", sym->name);
-					fprintf(out_h, "#define USE_%s(...) __VA_ARGS__\n", sym->name);
-					fprintf(out_h, "#define SKIP_%s(...)\n", sym->name);
+					fprintf(out_h, "#ifdef MAKE_SUID\n");
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
+					fprintf(out_h, "#else\n");
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
+					fprintf(out_h, "#endif\n");
+					fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 				}
 				break;
 			case S_HEX:
@@ -517,20 +525,30 @@ int conf_write(const char *name)
 						fprintf(out_h, "#define CONFIG_%s 0x%s\n", sym->name, str);
 						/* bbox */
 						fprintf(out_h, "#define ENABLE_%s 1\n", sym->name);
-						fprintf(out_h, "#define USE_%s(...) __VA_ARGS__\n", sym->name);
-						fprintf(out_h, "#define SKIP_%s(...)\n", sym->name);
+						fprintf(out_h, "#ifdef MAKE_SUID\n");
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
+						fprintf(out_h, "#else\n");
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
+						fprintf(out_h, "#endif\n");
+						fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 					}
 					break;
 				}
 			case S_INT:
 				str = sym_get_string_value(sym);
+				if (!str[0])
+					str = "0";
 				fprintf(out, "CONFIG_%s=%s\n", sym->name, str);
 				if (out_h) {
 					fprintf(out_h, "#define CONFIG_%s %s\n", sym->name, str);
 					/* bbox */
 					fprintf(out_h, "#define ENABLE_%s 1\n", sym->name);
-					fprintf(out_h, "#define USE_%s(...) __VA_ARGS__\n", sym->name);
-					fprintf(out_h, "#define SKIP_%s(...)\n", sym->name);
+					fprintf(out_h, "#ifdef MAKE_SUID\n");
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
+					fprintf(out_h, "#else\n");
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
+					fprintf(out_h, "#endif\n");
+					fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 				}
 				break;
 			}

@@ -7,10 +7,35 @@
  * about bzip2 library code.
  */
 
-#include "libbb.h"
-#include "unarchive.h"
+//config:config BZIP2
+//config:	bool "bzip2"
+//config:	default y
+//config:	help
+//config:	  bzip2 is a compression utility using the Burrows-Wheeler block
+//config:	  sorting text compression algorithm, and Huffman coding. Compression
+//config:	  is generally considerably better than that achieved by more
+//config:	  conventional LZ77/LZ78-based compressors, and approaches the
+//config:	  performance of the PPM family of statistical compressors.
+//config:
+//config:	  Unless you have a specific application which requires bzip2, you
+//config:	  should probably say N here.
 
-#define CONFIG_BZIP2_FEATURE_SPEED 1
+//applet:IF_BZIP2(APPLET(bzip2, BB_DIR_USR_BIN, BB_SUID_DROP))
+//kbuild:lib-$(CONFIG_BZIP2) += bzip2.o
+
+//usage:#define bzip2_trivial_usage
+//usage:       "[OPTIONS] [FILE]..."
+//usage:#define bzip2_full_usage "\n\n"
+//usage:       "Compress FILEs (or stdin) with bzip2 algorithm\n"
+//usage:     "\n	-1..9	Compression level"
+//usage:     "\n	-d	Decompress"
+//usage:     "\n	-c	Write to stdout"
+//usage:     "\n	-f	Force"
+
+#include "libbb.h"
+#include "bb_archive.h"
+
+#define CONFIG_BZIP2_FAST 1
 
 /* Speed test:
  * Compiled with gcc 4.2.1, run on Athlon 64 1800 MHz (512K L2 cache).
@@ -18,7 +43,7 @@
  * (time to compress gcc-4.2.1.tar is 126.4% compared to bbox).
  * At SPEED 5 difference is 32.7%.
  *
- * Test run of all CONFIG_BZIP2_FEATURE_SPEED values on a 11Mb text file:
+ * Test run of all CONFIG_BZIP2_FAST values on a 11Mb text file:
  *     Size   Time (3 runs)
  * 0:  10828  4.145 4.146 4.148
  * 1:  11097  3.845 3.860 3.861
@@ -33,14 +58,14 @@
 /* Takes ~300 bytes, detects corruption caused by bad RAM etc */
 #define BZ_LIGHT_DEBUG 0
 
-#include "bz/bzlib.h"
+#include "libarchive/bz/bzlib.h"
 
-#include "bz/bzlib_private.h"
+#include "libarchive/bz/bzlib_private.h"
 
-#include "bz/blocksort.c"
-#include "bz/bzlib.c"
-#include "bz/compress.c"
-#include "bz/huffman.c"
+#include "libarchive/bz/blocksort.c"
+#include "libarchive/bz/bzlib.c"
+#include "libarchive/bz/compress.c"
+#include "libarchive/bz/huffman.c"
 
 /* No point in being shy and having very small buffer here.
  * bzip2 internal buffers are much bigger anyway, hundreds of kbytes.
@@ -64,7 +89,7 @@ static uint8_t level;
  * total written bytes so far otherwise
  */
 static
-USE_DESKTOP(long long) int bz_write(bz_stream *strm, void* rbuf, ssize_t rlen, void *wbuf)
+IF_DESKTOP(long long) int bz_write(bz_stream *strm, void* rbuf, ssize_t rlen, void *wbuf)
 {
 	int n, n2, ret;
 
@@ -88,7 +113,7 @@ USE_DESKTOP(long long) int bz_write(bz_stream *strm, void* rbuf, ssize_t rlen, v
 			if (n2 != n) {
 				if (n2 >= 0)
 					errno = 0; /* prevent bogus error message */
-				bb_perror_msg(n2 >= 0 ? "short write" : "write error");
+				bb_perror_msg(n2 >= 0 ? "short write" : bb_msg_write_error);
 				return -1;
 			}
 		}
@@ -98,13 +123,13 @@ USE_DESKTOP(long long) int bz_write(bz_stream *strm, void* rbuf, ssize_t rlen, v
 		if (rlen && strm->avail_in == 0)
 			break;
 	}
-	return 0 USE_DESKTOP( + strm->total_out );
+	return 0 IF_DESKTOP( + strm->total_out );
 }
 
 static
-USE_DESKTOP(long long) int compressStream(unpack_info_t *info UNUSED_PARAM)
+IF_DESKTOP(long long) int FAST_FUNC compressStream(transformer_state_t *xstate UNUSED_PARAM)
 {
-	USE_DESKTOP(long long) int total;
+	IF_DESKTOP(long long) int total;
 	ssize_t count;
 	bz_stream bzs; /* it's small */
 #define strm (&bzs)
@@ -118,7 +143,7 @@ USE_DESKTOP(long long) int compressStream(unpack_info_t *info UNUSED_PARAM)
 	while (1) {
 		count = full_read(STDIN_FILENO, rbuf, IOBUF_SIZE);
 		if (count < 0) {
-			bb_perror_msg("read error");
+			bb_perror_msg(bb_msg_read_error);
 			total = -1;
 			break;
 		}
@@ -128,17 +153,13 @@ USE_DESKTOP(long long) int compressStream(unpack_info_t *info UNUSED_PARAM)
 			break;
 	}
 
-#if ENABLE_FEATURE_CLEAN_UP
+	/* Can't be conditional on ENABLE_FEATURE_CLEAN_UP -
+	 * we are called repeatedly
+	 */
 	BZ2_bzCompressEnd(strm);
 	free(iobuf);
-#endif
-	return total;
-}
 
-static
-char* make_new_name_bzip2(char *filename)
-{
-	return xasprintf("%s.bz2", filename);
+	return total;
 }
 
 int bzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -163,7 +184,7 @@ int bzip2_main(int argc UNUSED_PARAM, char **argv)
 
 	opt_complementary = "s2"; /* -s means -2 (compatibility) */
 	/* Must match bbunzip's constants OPT_STDOUT, OPT_FORCE! */
-	opt = getopt32(argv, "cfv" USE_BUNZIP2("dt") "123456789qzs");
+	opt = getopt32(argv, "cfv" IF_BUNZIP2("dt") "123456789qzs");
 #if ENABLE_BUNZIP2 /* bunzip2_main may not be visible... */
 	if (opt & 0x18) // -d and/or -t
 		return bunzip2_main(argc, argv);
@@ -181,5 +202,5 @@ int bzip2_main(int argc UNUSED_PARAM, char **argv)
 
 	argv += optind;
 	option_mask32 &= 0x7; /* ignore all except -cfv */
-	return bbunpack(argv, make_new_name_bzip2, compressStream);
+	return bbunpack(argv, compressStream, append_ext, "bz2");
 }

@@ -3,8 +3,28 @@
  *
  * Copyright 2007 Tito Ragusa <farmatito@tiscali.it>
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config PSCAN
+//config:	bool "pscan"
+//config:	default y
+//config:	help
+//config:	  Simple network port scanner.
+
+//applet:IF_PSCAN(APPLET(pscan, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_PSCAN) += pscan.o
+
+//usage:#define pscan_trivial_usage
+//usage:       "[-cb] [-p MIN_PORT] [-P MAX_PORT] [-t TIMEOUT] [-T MIN_RTT] HOST"
+//usage:#define pscan_full_usage "\n\n"
+//usage:       "Scan a host, print all open ports\n"
+//usage:     "\n	-c	Show closed ports too"
+//usage:     "\n	-b	Show blocked ports too"
+//usage:     "\n	-p	Scan from this port (default 1)"
+//usage:     "\n	-P	Scan up to this port (default 1024)"
+//usage:     "\n	-t	Timeout (default 5000 ms)"
+//usage:     "\n	-T	Minimum rtt (default 5 ms, increase for congested hosts)"
 
 #include "libbb.h"
 
@@ -76,7 +96,7 @@ int pscan_main(int argc UNUSED_PARAM, char **argv)
 		DMSG("rtt %u", rtt_4);
 
 		/* The SOCK_STREAM socket type is implemented on the TCP/IP protocol. */
-		set_nport(lsap, htons(port));
+		set_nport(&lsap->u.sa, htons(port));
 		s = xsocket(lsap->u.sa.sa_family, SOCK_STREAM, 0);
 		/* We need unblocking socket so we don't need to wait for ETIMEOUT. */
 		/* Nonblocking connect typically "fails" with errno == EINPROGRESS */
@@ -146,7 +166,7 @@ int pscan_main(int argc UNUSED_PARAM, char **argv)
 	}
 	if (ENABLE_FEATURE_CLEAN_UP) free(lsap);
 
-	printf("%d closed, %d open, %d timed out (or blocked) ports\n",
+	printf("%u closed, %u open, %u timed out (or blocked) ports\n",
 					closed_ports,
 					open_ports,
 					nports - (closed_ports + open_ports));

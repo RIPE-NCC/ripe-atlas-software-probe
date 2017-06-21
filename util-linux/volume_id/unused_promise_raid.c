@@ -18,16 +18,27 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:### lib-$(CONFIG_FEATURE_VOLUMEID_PROMISERAID) += promise_raid.o
+
+//config:
+//config:### config FEATURE_VOLUMEID_PROMISERAID
+//config:###	bool "promise raid"
+//config:###	default y
+//config:###	depends on VOLUMEID
+//config:###	help
+//config:###	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct promise_meta {
 	uint8_t	sig[24];
-} __attribute__((packed));
+} PACKED;
 
 #define PDC_CONFIG_OFF		0x1200
 #define PDC_SIGNATURE		"Promise Technology, Inc."
 
-int volume_id_probe_promise_fasttrack_raid(struct volume_id *id, uint64_t off, uint64_t size)
+int FAST_FUNC volume_id_probe_promise_fasttrack_raid(struct volume_id *id, uint64_t off, uint64_t size)
 {
 	static const unsigned short sectors[] = {
 		63, 255, 256, 16, 399

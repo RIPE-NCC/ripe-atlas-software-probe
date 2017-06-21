@@ -3,7 +3,7 @@
  * tiny vi.c: A small 'vi' clone
  * Copyright (C) 2000, 2001 Sterling Huxley <sterling@europa.com>
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /*
@@ -14,14 +14,179 @@
  *	add :help command
  *	:map macros
  *	if mark[] values were line numbers rather than pointers
- *	   it would be easier to change the mark when add/delete lines
+ *      it would be easier to change the mark when add/delete lines
  *	More intelligence in refresh()
  *	":r !cmd"  and  "!cmd"  to filter text through an external command
- *	A true "undo" facility
  *	An "ex" line oriented mode- maybe using "cmdedit"
  */
 
+//config:config VI
+//config:	bool "vi"
+//config:	default y
+//config:	help
+//config:	  'vi' is a text editor. More specifically, it is the One True
+//config:	  text editor <grin>. It does, however, have a rather steep
+//config:	  learning curve. If you are not already comfortable with 'vi'
+//config:	  you may wish to use something else.
+//config:
+//config:config FEATURE_VI_MAX_LEN
+//config:	int "Maximum screen width in vi"
+//config:	range 256 16384
+//config:	default 4096
+//config:	depends on VI
+//config:	help
+//config:	  Contrary to what you may think, this is not eating much.
+//config:	  Make it smaller than 4k only if you are very limited on memory.
+//config:
+//config:config FEATURE_VI_8BIT
+//config:	bool "Allow vi to display 8-bit chars (otherwise shows dots)"
+//config:	default n
+//config:	depends on VI
+//config:	help
+//config:	  If your terminal can display characters with high bit set,
+//config:	  you may want to enable this. Note: vi is not Unicode-capable.
+//config:	  If your terminal combines several 8-bit bytes into one character
+//config:	  (as in Unicode mode), this will not work properly.
+//config:
+//config:config FEATURE_VI_COLON
+//config:	bool "Enable \":\" colon commands (no \"ex\" mode)"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Enable a limited set of colon commands for vi. This does not
+//config:	  provide an "ex" mode.
+//config:
+//config:config FEATURE_VI_YANKMARK
+//config:	bool "Enable yank/put commands and mark cmds"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  This will enable you to use yank and put, as well as mark in
+//config:	  busybox vi.
+//config:
+//config:config FEATURE_VI_SEARCH
+//config:	bool "Enable search and replace cmds"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Select this if you wish to be able to do search and replace in
+//config:	  busybox vi.
+//config:
+//config:config FEATURE_VI_REGEX_SEARCH
+//config:	bool "Enable regex in search and replace"
+//config:	default n   # Uses GNU regex, which may be unavailable. FIXME
+//config:	depends on FEATURE_VI_SEARCH
+//config:	help
+//config:	  Use extended regex search.
+//config:
+//config:config FEATURE_VI_USE_SIGNALS
+//config:	bool "Catch signals"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Selecting this option will make busybox vi signal aware. This will
+//config:	  make busybox vi support SIGWINCH to deal with Window Changes, catch
+//config:	  Ctrl-Z and Ctrl-C and alarms.
+//config:
+//config:config FEATURE_VI_DOT_CMD
+//config:	bool "Remember previous cmd and \".\" cmd"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Make busybox vi remember the last command and be able to repeat it.
+//config:
+//config:config FEATURE_VI_READONLY
+//config:	bool "Enable -R option and \"view\" mode"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Enable the read-only command line option, which allows the user to
+//config:	  open a file in read-only mode.
+//config:
+//config:config FEATURE_VI_SETOPTS
+//config:	bool "Enable set-able options, ai ic showmatch"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Enable the editor to set some (ai, ic, showmatch) options.
+//config:
+//config:config FEATURE_VI_SET
+//config:	bool "Support for :set"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Support for ":set".
+//config:
+//config:config FEATURE_VI_WIN_RESIZE
+//config:	bool "Handle window resize"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Make busybox vi behave nicely with terminals that get resized.
+//config:
+//config:config FEATURE_VI_ASK_TERMINAL
+//config:	bool "Use 'tell me cursor position' ESC sequence to measure window"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  If terminal size can't be retrieved and $LINES/$COLUMNS are not set,
+//config:	  this option makes vi perform a last-ditch effort to find it:
+//config:	  position cursor to 999,999 and ask terminal to report real
+//config:	  cursor position using "ESC [ 6 n" escape sequence, then read stdin.
+//config:
+//config:	  This is not clean but helps a lot on serial lines and such.
+//config:config FEATURE_VI_UNDO
+//config:	bool "Support undo command 'u'"
+//config:	default y
+//config:	depends on VI
+//config:	help
+//config:	  Support the 'u' command to undo insertion, deletion, and replacement
+//config:	  of text.
+//config:config FEATURE_VI_UNDO_QUEUE
+//config:	bool "Enable undo operation queuing"
+//config:	default y
+//config:	depends on FEATURE_VI_UNDO
+//config:	help
+//config:	  The vi undo functions can use an intermediate queue to greatly lower
+//config:	  malloc() calls and overhead. When the maximum size of this queue is
+//config:	  reached, the contents of the queue are committed to the undo stack.
+//config:	  This increases the size of the undo code and allows some undo
+//config:	  operations (especially un-typing/backspacing) to be far more useful.
+//config:config FEATURE_VI_UNDO_QUEUE_MAX
+//config:	int "Maximum undo character queue size"
+//config:	default 256
+//config:	range 32 65536
+//config:	depends on FEATURE_VI_UNDO_QUEUE
+//config:	help
+//config:	  This option sets the number of bytes used at runtime for the queue.
+//config:	  Smaller values will create more undo objects and reduce the amount
+//config:	  of typed or backspaced characters that are grouped into one undo
+//config:	  operation; larger values increase the potential size of each undo
+//config:	  and will generally malloc() larger objects and less frequently.
+//config:	  Unless you want more (or less) frequent "undo points" while typing,
+//config:	  you should probably leave this unchanged.
+
+//applet:IF_VI(APPLET(vi, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_VI) += vi.o
+
+//usage:#define vi_trivial_usage
+//usage:       "[OPTIONS] [FILE]..."
+//usage:#define vi_full_usage "\n\n"
+//usage:       "Edit FILE\n"
+//usage:	IF_FEATURE_VI_COLON(
+//usage:     "\n	-c CMD	Initial command to run ($EXINIT also available)"
+//usage:	)
+//usage:	IF_FEATURE_VI_READONLY(
+//usage:     "\n	-R	Read-only"
+//usage:	)
+//usage:     "\n	-H	List available features"
+
 #include "libbb.h"
+/* Should be after libbb.h: on some systems regex.h needs sys/types.h: */
+#if ENABLE_FEATURE_VI_REGEX_SEARCH
+# include <regex.h>
+#endif
 
 /* the CRASHME code is unmaintained, and doesn't currently build */
 #define ENABLE_FEATURE_VI_CRASHME 0
@@ -30,18 +195,19 @@
 #if ENABLE_LOCALE_SUPPORT
 
 #if ENABLE_FEATURE_VI_8BIT
-#define Isprint(c) isprint(c)
+//FIXME: this does not work properly for Unicode anyway
+# define Isprint(c) (isprint)(c)
 #else
-#define Isprint(c) (isprint(c) && (unsigned char)(c) < 0x7f)
+# define Isprint(c) isprint_asciionly(c)
 #endif
 
 #else
 
 /* 0x9b is Meta-ESC */
 #if ENABLE_FEATURE_VI_8BIT
-#define Isprint(c) ((unsigned char)(c) >= ' ' && (c) != 0x7f && (unsigned char)(c) != 0x9b)
+# define Isprint(c) ((unsigned char)(c) >= ' ' && (c) != 0x7f && (unsigned char)(c) != 0x9b)
 #else
-#define Isprint(c) ((unsigned char)(c) >= ' ' && (unsigned char)(c) < 0x7f)
+# define Isprint(c) ((unsigned char)(c) >= ' ' && (unsigned char)(c) < 0x7f)
 #endif
 
 #endif
@@ -57,26 +223,35 @@ enum {
 	MAX_SCR_ROWS = CONFIG_FEATURE_VI_MAX_LEN,
 };
 
-/* vt102 typical ESC sequence */
-/* terminal standout start/normal ESC sequence */
-static const char SOs[] ALIGN1 = "\033[7m";
-static const char SOn[] ALIGN1 = "\033[0m";
-/* terminal bell sequence */
-static const char bell[] ALIGN1 = "\007";
-/* Clear-end-of-line and Clear-end-of-screen ESC sequence */
-static const char Ceol[] ALIGN1 = "\033[0K";
-static const char Ceos[] ALIGN1 = "\033[0J";
-/* Cursor motion arbitrary destination ESC sequence */
-static const char CMrc[] ALIGN1 = "\033[%d;%dH";
-/* Cursor motion up and down ESC sequence */
-static const char CMup[] ALIGN1 = "\033[A";
-static const char CMdown[] ALIGN1 = "\n";
+/* VT102 ESC sequences.
+ * See "Xterm Control Sequences"
+ * http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+ */
+/* Inverse/Normal text */
+#define ESC_BOLD_TEXT "\033[7m"
+#define ESC_NORM_TEXT "\033[0m"
+/* Bell */
+#define ESC_BELL "\007"
+/* Clear-to-end-of-line */
+#define ESC_CLEAR2EOL "\033[K"
+/* Clear-to-end-of-screen.
+ * (We use default param here.
+ * Full sequence is "ESC [ <num> J",
+ * <num> is 0/1/2 = "erase below/above/all".)
+ */
+#define ESC_CLEAR2EOS "\033[J"
+/* Cursor to given coordinate (1,1: top left) */
+#define ESC_SET_CURSOR_POS "\033[%u;%uH"
+//UNUSED
+///* Cursor up and down */
+//#define ESC_CURSOR_UP "\033[A"
+//#define ESC_CURSOR_DOWN "\n"
 
 #if ENABLE_FEATURE_VI_DOT_CMD || ENABLE_FEATURE_VI_YANKMARK
 // cmds modifying text[]
 // vda: removed "aAiIs" as they switch us into insert mode
 // and remembering input for replay after them makes no sense
-static const char modifying_cmds[] = "cCdDJoOpPrRxX<>~";
+static const char modifying_cmds[] ALIGN1 = "cCdDJoOpPrRxX<>~";
 #endif
 
 enum {
@@ -131,12 +306,14 @@ struct globals {
 	smallint editing;        // >0 while we are editing a file
 	                         // [code audit says "can be 0, 1 or 2 only"]
 	smallint cmd_mode;       // 0=command  1=insert 2=replace
-	int file_modified;       // buffer contents changed (counter, not flag!)
-	int last_file_modified;  // = -1;
-	int fn_start;            // index of first cmd line file name
+	int modified_count;      // buffer contents changed if !0
+	int last_modified_count; // = -1;
 	int save_argc;           // how many file names on cmd line
 	int cmdcnt;              // repetition count
 	unsigned rows, columns;	 // the terminal screen is this size
+#if ENABLE_FEATURE_VI_ASK_TERMINAL
+	int get_rowcol_error;
+#endif
 	int crow, ccol;          // cursor is on Crow x Ccol
 	int offset;              // chars scrolled off the screen to the left
 	int have_status_msg;     // is default edit status needed?
@@ -151,14 +328,10 @@ struct globals {
 	char erase_char;         // the users erase character
 	char last_input_char;    // last char read from user
 
-	smalluint chars_to_parse;
 #if ENABLE_FEATURE_VI_DOT_CMD
 	smallint adding2q;	 // are we currently adding user input to q
 	int lmc_len;             // length of last_modifying_cmd
 	char *ioq, *ioq_start;   // pointer to string for get_one_char to "read"
-#endif
-#if ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
-	int last_row;		 // where the cursor was last moved to
 #endif
 #if ENABLE_FEATURE_VI_USE_SIGNALS || ENABLE_FEATURE_VI_CRASHME
 	int my_pid;
@@ -203,6 +376,41 @@ struct globals {
 	char get_input_line__buf[MAX_INPUT_LEN]; /* former static */
 
 	char scr_out_buf[MAX_SCR_COLS + MAX_TABSTOP * 2];
+#if ENABLE_FEATURE_VI_UNDO
+// undo_push() operations
+#define UNDO_INS         0
+#define UNDO_DEL         1
+#define UNDO_INS_CHAIN   2
+#define UNDO_DEL_CHAIN   3
+// UNDO_*_QUEUED must be equal to UNDO_xxx ORed with UNDO_QUEUED_FLAG
+#define UNDO_QUEUED_FLAG 4
+#define UNDO_INS_QUEUED  4
+#define UNDO_DEL_QUEUED  5
+#define UNDO_USE_SPOS   32
+#define UNDO_EMPTY      64
+// Pass-through flags for functions that can be undone
+#define NO_UNDO          0
+#define ALLOW_UNDO       1
+#define ALLOW_UNDO_CHAIN 2
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+#define ALLOW_UNDO_QUEUED 3
+	char undo_queue_state;
+	int undo_q;
+	char *undo_queue_spos;	// Start position of queued operation
+	char undo_queue[CONFIG_FEATURE_VI_UNDO_QUEUE_MAX];
+# else
+// If undo queuing disabled, don't invoke the missing queue logic
+#define ALLOW_UNDO_QUEUED 1
+# endif
+
+	struct undo_object {
+		struct undo_object *prev;	// Linking back avoids list traversal (LIFO)
+		int start;		// Offset where the data should be restored/deleted
+		int length;		// total data size
+		uint8_t u_type;		// 0=deleted, 1=inserted, 2=swapped
+		char undo_text[1];	// text that was deleted (if deletion)
+	} *undo_stack_tail;
+#endif /* ENABLE_FEATURE_VI_UNDO */
 };
 #define G (*ptr_to_globals)
 #define text           (G.text          )
@@ -214,9 +422,8 @@ struct globals {
 #define vi_setops               (G.vi_setops          )
 #define editing                 (G.editing            )
 #define cmd_mode                (G.cmd_mode           )
-#define file_modified           (G.file_modified      )
-#define last_file_modified      (G.last_file_modified )
-#define fn_start                (G.fn_start           )
+#define modified_count          (G.modified_count     )
+#define last_modified_count     (G.last_modified_count)
 #define save_argc               (G.save_argc          )
 #define cmdcnt                  (G.cmdcnt             )
 #define rows                    (G.rows               )
@@ -235,7 +442,6 @@ struct globals {
 #define last_forward_char       (G.last_forward_char  )
 #define erase_char              (G.erase_char         )
 #define last_input_char         (G.last_input_char    )
-#define chars_to_parse          (G.chars_to_parse     )
 #if ENABLE_FEATURE_VI_READONLY
 #define readonly_mode           (G.readonly_mode      )
 #else
@@ -245,7 +451,6 @@ struct globals {
 #define lmc_len                 (G.lmc_len            )
 #define ioq                     (G.ioq                )
 #define ioq_start               (G.ioq_start          )
-#define last_row                (G.last_row           )
 #define my_pid                  (G.my_pid             )
 #define last_search_pattern     (G.last_search_pattern)
 
@@ -267,15 +472,24 @@ struct globals {
 #define last_modifying_cmd  (G.last_modifying_cmd )
 #define get_input_line__buf (G.get_input_line__buf)
 
+#if ENABLE_FEATURE_VI_UNDO
+#define undo_stack_tail  (G.undo_stack_tail )
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+#define undo_queue_state (G.undo_queue_state)
+#define undo_q           (G.undo_q          )
+#define undo_queue       (G.undo_queue      )
+#define undo_queue_spos  (G.undo_queue_spos )
+# endif
+#endif
+
 #define INIT_G() do { \
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
-	last_file_modified = -1; \
+	last_modified_count = -1; \
 	/* "" but has space for 2 chars: */ \
-	USE_FEATURE_VI_SEARCH(last_search_pattern = xzalloc(2);) \
+	IF_FEATURE_VI_SEARCH(last_search_pattern = xzalloc(2);) \
 } while (0)
 
 
-static int init_text_buffer(char *); // init from file or create new
 static void edit_file(char *);	// edit one file
 static void do_cmd(int);	// execute a command
 static int next_tabstop(int);
@@ -286,7 +500,7 @@ static char *prev_line(char *);	// return pointer to prev line B-o-l
 static char *next_line(char *);	// return pointer to next line B-o-l
 static char *end_screen(void);	// get pointer to last char on screen
 static int count_lines(char *, char *);	// count line from start to stop
-static char *find_line(int);	// find begining of line #li
+static char *find_line(int);	// find beginning of line #li
 static char *move_to_col(char *, int);	// move "p" to column l
 static void dot_left(void);	// move dot left- dont leave line
 static void dot_right(void);	// move dot right- dont leave line
@@ -296,18 +510,30 @@ static void dot_next(void);	// move dot to next line B-o-l
 static void dot_prev(void);	// move dot to prev line B-o-l
 static void dot_scroll(int, int);	// move the screen up or down
 static void dot_skip_over_ws(void);	// move dot pat WS
-static void dot_delete(void);	// delete the char at 'dot'
 static char *bound_dot(char *);	// make sure  text[0] <= P < "end"
 static char *new_screen(int, int);	// malloc virtual screen memory
-static char *char_insert(char *, char);	// insert the char c at 'p'
-static char *stupid_insert(char *, char);	// stupidly insert the char c at 'p'
+#if !ENABLE_FEATURE_VI_UNDO
+#define char_insert(a,b,c) char_insert(a,b)
+#endif
+static char *char_insert(char *, char, int);	// insert the char c at 'p'
+// might reallocate text[]! use p += stupid_insert(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+static uintptr_t stupid_insert(char *, char);	// stupidly insert the char c at 'p'
 static int find_range(char **, char **, char);	// return pointers for an object
 static int st_test(char *, int, int, char *);	// helper for skip_thing()
 static char *skip_thing(char *, int, int, int);	// skip some object
 static char *find_pair(char *, char);	// find matching pair ()  []  {}
-static char *text_hole_delete(char *, char *);	// at "p", delete a 'size' byte hole
-static char *text_hole_make(char *, int);	// at "p", make a 'size' byte hole
-static char *yank_delete(char *, char *, int, int);	// yank text[] into register then delete
+#if !ENABLE_FEATURE_VI_UNDO
+#define text_hole_delete(a,b,c) text_hole_delete(a,b)
+#endif
+static char *text_hole_delete(char *, char *, int);	// at "p", delete a 'size' byte hole
+// might reallocate text[]! use p += text_hole_make(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+static uintptr_t text_hole_make(char *, int);	// at "p", make a 'size' byte hole
+#if !ENABLE_FEATURE_VI_UNDO
+#define yank_delete(a,b,c,d,e) yank_delete(a,b,c,d)
+#endif
+static char *yank_delete(char *, char *, int, int, int);	// yank text[] into register then delete
 static void show_help(void);	// display some help info
 static void rawmode(void);	// set "raw" mode on tty
 static void cookmode(void);	// return to "cooked" mode on tty
@@ -315,17 +541,10 @@ static void cookmode(void);	// return to "cooked" mode on tty
 static int mysleep(int);
 static int readit(void);	// read (maybe cursor) key from stdin
 static int get_one_char(void);	// read 1 char from stdin
-static int file_size(const char *);   // what is the byte size of "fn"
-#if ENABLE_FEATURE_VI_READONLY
+// file_insert might reallocate text[]!
 static int file_insert(const char *, char *, int);
-#else
-static int file_insert(const char *, char *);
-#endif
 static int file_write(char *, char *, char *);
-#if !ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
-#define place_cursor(a, b, optimize) place_cursor(a, b)
-#endif
-static void place_cursor(int, int, int);
+static void place_cursor(int, int);
 static void screen_erase(void);
 static void clear_to_eol(void);
 static void clear_to_eos(void);
@@ -336,25 +555,24 @@ static void flash(int);		// flash the terminal screen
 static void show_status_line(void);	// put a message on the bottom line
 static void status_line(const char *, ...);     // print to status buf
 static void status_line_bold(const char *, ...);
+static void status_line_bold_errno(const char *fn);
 static void not_implemented(const char *); // display "Not implemented" message
 static int format_edit_status(void);	// format file status on status line
 static void redraw(int);	// force a full screen refresh
 static char* format_line(char* /*, int*/);
 static void refresh(int);	// update the terminal from screen[]
 
-static void Indicate_Error(void);       // use flash or beep to indicate error
-#define indicate_error(c) Indicate_Error()
+static void indicate_error(void);       // use flash or beep to indicate error
 static void Hit_Return(void);
 
 #if ENABLE_FEATURE_VI_SEARCH
 static char *char_search(char *, const char *, int, int);	// search for pattern starting at p
-static int mycmp(const char *, const char *, int);	// string cmp based in "ignorecase"
 #endif
 #if ENABLE_FEATURE_VI_COLON
 static char *get_one_address(char *, int *);	// get colon addr, if present
 static char *get_address(char *, int *, int *);	// get two colon addrs, if present
-static void colon(char *);	// execute the "colon" mode cmds
 #endif
+static void colon(char *);	// execute the "colon" mode cmds
 #if ENABLE_FEATURE_VI_USE_SIGNALS
 static void winch_sig(int);	// catch window size changes
 static void suspend_sig(int);	// catch ctrl-Z
@@ -370,19 +588,37 @@ static void end_cmd_q(void);	// stop saving input chars
 static void showmatching(char *);	// show the matching pair ()  []  {}
 #endif
 #if ENABLE_FEATURE_VI_YANKMARK || (ENABLE_FEATURE_VI_COLON && ENABLE_FEATURE_VI_SEARCH) || ENABLE_FEATURE_VI_CRASHME
-static char *string_insert(char *, char *);	// insert the string at 'p'
+// might reallocate text[]! use p += string_insert(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+# if !ENABLE_FEATURE_VI_UNDO
+#define string_insert(a,b,c) string_insert(a,b)
+# endif
+static uintptr_t string_insert(char *, const char *, int);	// insert the string at 'p'
 #endif
 #if ENABLE_FEATURE_VI_YANKMARK
 static char *text_yank(char *, char *, int);	// save copy of "p" into a register
 static char what_reg(void);		// what is letter of current YDreg
 static void check_context(char);	// remember context for '' command
 #endif
+#if ENABLE_FEATURE_VI_UNDO
+static void flush_undo_data(void);
+static void undo_push(char *, unsigned int, unsigned char);	// Push an operation on the undo stack
+static void undo_pop(void);	// Undo the last operation
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+static void undo_queue_commit(void);	// Flush any queued objects to the undo stack
+# else
+# define undo_queue_commit() ((void)0)
+# endif
+#else
+#define flush_undo_data()   ((void)0)
+#define undo_queue_commit() ((void)0)
+#endif
+
 #if ENABLE_FEATURE_VI_CRASHME
 static void crash_dummy();
 static void crash_test();
 static int crashme = 0;
 #endif
-
 
 static void write1(const char *out)
 {
@@ -395,6 +631,14 @@ int vi_main(int argc, char **argv)
 	int c;
 
 	INIT_G();
+
+#if ENABLE_FEATURE_VI_UNDO
+	/* undo_stack_tail = NULL; - already is */
+#if ENABLE_FEATURE_VI_UNDO_QUEUE
+	undo_queue_state = UNDO_EMPTY;
+	/* undo_q = 0; - already is  */
+#endif
+#endif
 
 #if ENABLE_FEATURE_VI_USE_SIGNALS || ENABLE_FEATURE_VI_CRASHME
 	my_pid = getpid();
@@ -409,7 +653,8 @@ int vi_main(int argc, char **argv)
 	}
 #endif
 
-	vi_setops = VI_AUTOINDENT | VI_SHOWMATCH | VI_IGNORECASE;
+	// autoindent is not default in vim 7.3
+	vi_setops = /*VI_AUTOINDENT |*/ VI_SHOWMATCH | VI_IGNORECASE;
 	//  1-  process $HOME/.exrc file (not inplemented yet)
 	//  2-  process EXINIT variable from environment
 	//  3-  process command line args
@@ -420,7 +665,7 @@ int vi_main(int argc, char **argv)
 			initial_cmds[0] = xstrndup(p, MAX_INPUT_LEN);
 	}
 #endif
-	while ((c = getopt(argc, argv, "hCRH" USE_FEATURE_VI_COLON("c:"))) != -1) {
+	while ((c = getopt(argc, argv, "hCRH" IF_FEATURE_VI_COLON("c:"))) != -1) {
 		switch (c) {
 #if ENABLE_FEATURE_VI_CRASHME
 		case 'C':
@@ -435,7 +680,7 @@ int vi_main(int argc, char **argv)
 #if ENABLE_FEATURE_VI_COLON
 		case 'c':		// cmd line vi command
 			if (*optarg)
-				initial_cmds[initial_cmds[0] != 0] = xstrndup(optarg, MAX_INPUT_LEN);
+				initial_cmds[initial_cmds[0] != NULL] = xstrndup(optarg, MAX_INPUT_LEN);
 			break;
 #endif
 		case 'H':
@@ -448,18 +693,21 @@ int vi_main(int argc, char **argv)
 	}
 
 	// The argv array can be used by the ":next"  and ":rewind" commands
-	// save optind.
-	fn_start = optind;	// remember first file name for :next and :rew
-	save_argc = argc;
+	argv += optind;
+	argc -= optind;
 
 	//----- This is the main file handling loop --------------
-	if (optind >= argc) {
-		edit_file(0);
-	} else {
-		for (; optind < argc; optind++) {
-			edit_file(argv[optind]);
-		}
+	save_argc = argc;
+	optind = 0;
+	// "Save cursor, use alternate screen buffer, clear screen"
+	write1("\033[?1049h");
+	while (1) {
+		edit_file(argv[optind]); /* param might be NULL */
+		if (++optind >= argc)
+			break;
 	}
+	// "Use normal screen buffer, restore cursor"
+	write1("\033[?1049l");
 	//-----------------------------------------------------------
 
 	return 0;
@@ -470,33 +718,45 @@ int vi_main(int argc, char **argv)
 static int init_text_buffer(char *fn)
 {
 	int rc;
-	int size = file_size(fn);	// file size. -1 means does not exist.
+
+	flush_undo_data();
+	modified_count = 0;
+	last_modified_count = -1;
+#if ENABLE_FEATURE_VI_YANKMARK
+	/* init the marks */
+	memset(mark, 0, sizeof(mark));
+#endif
 
 	/* allocate/reallocate text buffer */
 	free(text);
-	text_size = size + 10240;
+	text_size = 10240;
 	screenbegin = dot = end = text = xzalloc(text_size);
 
 	if (fn != current_filename) {
 		free(current_filename);
 		current_filename = xstrdup(fn);
 	}
-	if (size < 0) {
-		// file dont exist. Start empty buf with dummy line
-		char_insert(text, '\n');
-		rc = 0;
-	} else {
-		rc = file_insert(fn, text
-			USE_FEATURE_VI_READONLY(, 1));
+	rc = file_insert(fn, text, 1);
+	if (rc < 0) {
+		// file doesnt exist. Start empty buf with dummy line
+		char_insert(text, '\n', NO_UNDO);
 	}
-	file_modified = 0;
-	last_file_modified = -1;
-#if ENABLE_FEATURE_VI_YANKMARK
-	/* init the marks. */
-	memset(mark, 0, sizeof(mark));
-#endif
 	return rc;
 }
+
+#if ENABLE_FEATURE_VI_WIN_RESIZE
+static int query_screen_dimensions(void)
+{
+	int err = get_terminal_width_height(STDIN_FILENO, &columns, &rows);
+	if (rows > MAX_SCR_ROWS)
+		rows = MAX_SCR_ROWS;
+	if (columns > MAX_SCR_COLS)
+		columns = MAX_SCR_COLS;
+	return err;
+}
+#else
+# define query_screen_dimensions() (0)
+#endif
 
 static void edit_file(char *fn)
 {
@@ -504,7 +764,6 @@ static void edit_file(char *fn)
 #define cur_line edit_file__cur_line
 #endif
 	int c;
-	int size;
 #if ENABLE_FEATURE_VI_USE_SIGNALS
 	int sig;
 #endif
@@ -513,12 +772,24 @@ static void edit_file(char *fn)
 	rawmode();
 	rows = 24;
 	columns = 80;
-	size = 0;
-	if (ENABLE_FEATURE_VI_WIN_RESIZE) {
-		get_terminal_width_height(0, &columns, &rows);
-		if (rows > MAX_SCR_ROWS) rows = MAX_SCR_ROWS;
-		if (columns > MAX_SCR_COLS) columns = MAX_SCR_COLS;
+	IF_FEATURE_VI_ASK_TERMINAL(G.get_rowcol_error =) query_screen_dimensions();
+#if ENABLE_FEATURE_VI_ASK_TERMINAL
+	if (G.get_rowcol_error /* TODO? && no input on stdin */) {
+		uint64_t k;
+		write1("\033[999;999H" "\033[6n");
+		fflush_all();
+		k = read_key(STDIN_FILENO, readbuffer, /*timeout_ms:*/ 100);
+		if ((int32_t)k == KEYCODE_CURSOR_POS) {
+			uint32_t rc = (k >> 32);
+			columns = (rc & 0x7fff);
+			if (columns > MAX_SCR_COLS)
+				columns = MAX_SCR_COLS;
+			rows = ((rc >> 16) & 0x7fff);
+			if (rows > MAX_SCR_ROWS)
+				rows = MAX_SCR_ROWS;
+		}
 	}
+#endif
 	new_screen(rows, columns);	// get memory for virtual screen
 	init_text_buffer(fn);
 
@@ -533,7 +804,7 @@ static void edit_file(char *fn)
 	ccol = 0;
 
 #if ENABLE_FEATURE_VI_USE_SIGNALS
-	catch_sig(0);
+	signal(SIGINT, catch_sig);
 	signal(SIGWINCH, winch_sig);
 	signal(SIGTSTP, suspend_sig);
 	sig = sigsetjmp(restart, 1);
@@ -559,7 +830,7 @@ static void edit_file(char *fn)
 		char *p, *q;
 		int n = 0;
 
-		while ((p = initial_cmds[n])) {
+		while ((p = initial_cmds[n]) != NULL) {
 			do {
 				q = p;
 				p = strchr(q, '\n');
@@ -584,7 +855,8 @@ static void edit_file(char *fn)
 				crash_dummy();	// generate a random command
 			} else {
 				crashme = 0;
-				dot = string_insert(text, "\n\n#####  Ran out of text to work on.  #####\n\n"); // insert the string
+				string_insert(text, "\n\n#####  Ran out of text to work on.  #####\n\n", NO_UNDO); // insert the string
+				dot = text;
 				refresh(FALSE);
 			}
 		}
@@ -614,7 +886,7 @@ static void edit_file(char *fn)
 		// poll to see if there is input already waiting. if we are
 		// not able to display output fast enough to keep up, skip
 		// the display update until we catch up with input.
-		if (!chars_to_parse && mysleep(0) == 0) {
+		if (!readbuffer[0] && mysleep(0) == 0) {
 			// no input pending - so update output
 			refresh(FALSE);
 			show_status_line();
@@ -637,8 +909,8 @@ static char *get_one_address(char *p, int *addr)	// get colon addr, if present
 {
 	int st;
 	char *q;
-	USE_FEATURE_VI_YANKMARK(char c;)
-	USE_FEATURE_VI_SEARCH(char *pat;)
+	IF_FEATURE_VI_YANKMARK(char c;)
+	IF_FEATURE_VI_SEARCH(char *pat;)
 
 	*addr = -1;			// assume no addr
 	if (*p == '.') {	// the current line
@@ -656,7 +928,7 @@ static char *get_one_address(char *p, int *addr)	// get colon addr, if present
 			c = c - 'a';
 			q = mark[(unsigned char) c];
 			if (q != NULL) {	// is mark valid
-				*addr = count_lines(text, q);	// count lines
+				*addr = count_lines(text, q);
 			}
 		}
 	}
@@ -683,7 +955,7 @@ static char *get_one_address(char *p, int *addr)	// get colon addr, if present
 		sscanf(p, "%d%n", addr, &st);
 		p += st;
 	} else {
-		// unrecognised address - assume -1
+		// unrecognized address - assume -1
 		*addr = -1;
 	}
 	return p;
@@ -724,6 +996,7 @@ static void setops(const char *args, const char *opname, int flg_no,
 	const char *a = args + flg_no;
 	int l = strlen(opname) - 1; /* opname have + ' ' */
 
+	// maybe strncmp? we had tons of erroneous strncasecmp's...
 	if (strncasecmp(a, opname, l) == 0
 	 || strncasecmp(a, short_opname, 2) == 0
 	) {
@@ -735,13 +1008,71 @@ static void setops(const char *args, const char *opname, int flg_no,
 }
 #endif
 
+#endif /* FEATURE_VI_COLON */
+
 // buf must be no longer than MAX_INPUT_LEN!
 static void colon(char *buf)
 {
+#if !ENABLE_FEATURE_VI_COLON
+	/* Simple ":cmd" handler with minimal set of commands */
+	char *p = buf;
+	int cnt;
+
+	if (*p == ':')
+		p++;
+	cnt = strlen(p);
+	if (cnt == 0)
+		return;
+	if (strncmp(p, "quit", cnt) == 0
+	 || strncmp(p, "q!", cnt) == 0
+	) {
+		if (modified_count && p[1] != '!') {
+			status_line_bold("No write since last change (:%s! overrides)", p);
+		} else {
+			editing = 0;
+		}
+		return;
+	}
+	if (strncmp(p, "write", cnt) == 0
+	 || strncmp(p, "wq", cnt) == 0
+	 || strncmp(p, "wn", cnt) == 0
+	 || (p[0] == 'x' && !p[1])
+	) {
+		cnt = file_write(current_filename, text, end - 1);
+		if (cnt < 0) {
+			if (cnt == -1)
+				status_line_bold("Write error: %s", strerror(errno));
+		} else {
+			modified_count = 0;
+			last_modified_count = -1;
+			status_line("'%s' %dL, %dC",
+				current_filename,
+				count_lines(text, end - 1), cnt
+			);
+			if (p[0] == 'x' || p[1] == 'q' || p[1] == 'n'
+			 || p[0] == 'X' || p[1] == 'Q' || p[1] == 'N'
+			) {
+				editing = 0;
+			}
+		}
+		return;
+	}
+	if (strncmp(p, "file", cnt) == 0) {
+		last_status_cksum = 0;	// force status update
+		return;
+	}
+	if (sscanf(p, "%d", &cnt) > 0) {
+		dot = find_line(cnt);
+		dot_skip_over_ws();
+		return;
+	}
+	not_implemented(p);
+#else
+
 	char c, *orig_buf, *buf1, *q, *r;
 	char *fn, cmd[MAX_INPUT_LEN], args[MAX_INPUT_LEN];
-	int i, l, li, ch, b, e;
-	int useforce, forced = FALSE;
+	int i, l, li, b, e;
+	int useforce;
 
 	// :3154	// if (-e line 3154) goto it  else stay put
 	// :4,33w! foo	// write a portion of buffer to file "foo"
@@ -759,11 +1090,11 @@ static void colon(char *buf)
 	//
 
 	if (!buf[0])
-		goto vc1;
+		goto ret;
 	if (*buf == ':')
 		buf++;			// move past the ':'
 
-	li = ch = i = 0;
+	li = i = 0;
 	b = e = -1;
 	q = text;			// assume 1,$ for the range
 	r = end - 1;
@@ -819,7 +1150,7 @@ static void colon(char *buf)
 		}
 	}
 #if ENABLE_FEATURE_ALLOW_EXEC
-	else if (strncmp(cmd, "!", 1) == 0) {	// run a cmd
+	else if (cmd[0] == '!') {	// run a cmd
 		int retcode;
 		// :!ls   run the <cmd>
 		go_bottom_and_clear_to_eol();
@@ -831,23 +1162,25 @@ static void colon(char *buf)
 		Hit_Return();			// let user see results
 	}
 #endif
-	else if (strncmp(cmd, "=", i) == 0) {	// where is the address
+	else if (cmd[0] == '=' && !cmd[1]) {	// where is the address
 		if (b < 0) {	// no addr given- use defaults
 			b = e = count_lines(text, dot);
 		}
 		status_line("%d", b);
-	} else if (strncasecmp(cmd, "delete", i) == 0) {	// delete lines
+	} else if (strncmp(cmd, "delete", i) == 0) {	// delete lines
 		if (b < 0) {	// no addr given- use defaults
 			q = begin_line(dot);	// assume .,. for the range
 			r = end_line(dot);
 		}
-		dot = yank_delete(q, r, 1, YANKDEL);	// save, then delete lines
+		dot = yank_delete(q, r, 1, YANKDEL, ALLOW_UNDO);	// save, then delete lines
 		dot_skip_over_ws();
-	} else if (strncasecmp(cmd, "edit", i) == 0) {	// Edit a file
+	} else if (strncmp(cmd, "edit", i) == 0) {	// Edit a file
+		int size;
+
 		// don't edit, if the current file has been modified
-		if (file_modified && !useforce) {
-			status_line_bold("No write since last change (:edit! overrides)");
-			goto vc1;
+		if (modified_count && !useforce) {
+			status_line_bold("No write since last change (:%s! overrides)", cmd);
+			goto ret;
 		}
 		if (args[0]) {
 			// the user supplied a file name
@@ -858,36 +1191,37 @@ static void colon(char *buf)
 		} else {
 			// no user file name, no current name- punt
 			status_line_bold("No current filename");
-			goto vc1;
+			goto ret;
 		}
 
-		if (init_text_buffer(fn) < 0)
-			goto vc1;
+		size = init_text_buffer(fn);
 
 #if ENABLE_FEATURE_VI_YANKMARK
-		if (Ureg >= 0 && Ureg < 28 && reg[Ureg] != 0) {
+		if (Ureg >= 0 && Ureg < 28) {
 			free(reg[Ureg]);	//   free orig line reg- for 'U'
-			reg[Ureg]= 0;
+			reg[Ureg] = NULL;
 		}
-		if (YDreg >= 0 && YDreg < 28 && reg[YDreg] != 0) {
+		if (YDreg >= 0 && YDreg < 28) {
 			free(reg[YDreg]);	//   free default yank/delete register
-			reg[YDreg]= 0;
+			reg[YDreg] = NULL;
 		}
 #endif
 		// how many lines in text[]?
 		li = count_lines(text, end - 1);
-		status_line("\"%s\"%s"
-			USE_FEATURE_VI_READONLY("%s")
-			" %dL, %dC", current_filename,
-			(file_size(fn) < 0 ? " [New file]" : ""),
-			USE_FEATURE_VI_READONLY(
+		status_line("'%s'%s"
+			IF_FEATURE_VI_READONLY("%s")
+			" %dL, %dC",
+			current_filename,
+			(size < 0 ? " [New file]" : ""),
+			IF_FEATURE_VI_READONLY(
 				((readonly_mode) ? " [Readonly]" : ""),
 			)
-			li, ch);
-	} else if (strncasecmp(cmd, "file", i) == 0) {	// what File is this
+			li, (int)(end - text)
+		);
+	} else if (strncmp(cmd, "file", i) == 0) {	// what File is this
 		if (b != -1 || e != -1) {
-			not_implemented("No address allowed on this command");
-			goto vc1;
+			status_line_bold("No address allowed on this command");
+			goto ret;
 		}
 		if (args[0]) {
 			// user wants a new filename
@@ -897,14 +1231,14 @@ static void colon(char *buf)
 			// user wants file status info
 			last_status_cksum = 0;	// force status update
 		}
-	} else if (strncasecmp(cmd, "features", i) == 0) {	// what features are available
+	} else if (strncmp(cmd, "features", i) == 0) {	// what features are available
 		// print out values of all features
 		go_bottom_and_clear_to_eol();
 		cookmode();
 		show_help();
 		rawmode();
 		Hit_Return();
-	} else if (strncasecmp(cmd, "list", i) == 0) {	// literal print line
+	} else if (strncmp(cmd, "list", i) == 0) {	// literal print line
 		if (b < 0) {	// no addr given- use defaults
 			q = begin_line(dot);	// assume .,. for the range
 			r = end_line(dot);
@@ -933,165 +1267,192 @@ static void colon(char *buf)
 			if (c_is_no_print)
 				standout_end();
 		}
-#if ENABLE_FEATURE_VI_SET
- vc2:
-#endif
 		Hit_Return();
-	} else if (strncasecmp(cmd, "quit", i) == 0 // Quit
-	        || strncasecmp(cmd, "next", i) == 0 // edit next file
+	} else if (strncmp(cmd, "quit", i) == 0 // quit
+	        || strncmp(cmd, "next", i) == 0 // edit next file
+	        || strncmp(cmd, "prev", i) == 0 // edit previous file
 	) {
+		int n;
 		if (useforce) {
-			// force end of argv list
 			if (*cmd == 'q') {
+				// force end of argv list
 				optind = save_argc;
 			}
 			editing = 0;
-			goto vc1;
+			goto ret;
 		}
 		// don't exit if the file been modified
-		if (file_modified) {
-			status_line_bold("No write since last change (:%s! overrides)",
-				 (*cmd == 'q' ? "quit" : "next"));
-			goto vc1;
+		if (modified_count) {
+			status_line_bold("No write since last change (:%s! overrides)", cmd);
+			goto ret;
 		}
 		// are there other file to edit
-		if (*cmd == 'q' && optind < save_argc - 1) {
-			status_line_bold("%d more file to edit", (save_argc - optind - 1));
-			goto vc1;
+		n = save_argc - optind - 1;
+		if (*cmd == 'q' && n > 0) {
+			status_line_bold("%d more file(s) to edit", n);
+			goto ret;
 		}
-		if (*cmd == 'n' && optind >= save_argc - 1) {
+		if (*cmd == 'n' && n <= 0) {
 			status_line_bold("No more files to edit");
-			goto vc1;
+			goto ret;
+		}
+		if (*cmd == 'p') {
+			// are there previous files to edit
+			if (optind < 1) {
+				status_line_bold("No previous files to edit");
+				goto ret;
+			}
+			optind -= 2;
 		}
 		editing = 0;
-	} else if (strncasecmp(cmd, "read", i) == 0) {	// read file into text[]
+	} else if (strncmp(cmd, "read", i) == 0) {	// read file into text[]
+		int size;
+
 		fn = args;
 		if (!fn[0]) {
 			status_line_bold("No filename given");
-			goto vc1;
+			goto ret;
 		}
 		if (b < 0) {	// no addr given- use defaults
 			q = begin_line(dot);	// assume "dot"
 		}
 		// read after current line- unless user said ":0r foo"
-		if (b != 0)
+		if (b != 0) {
 			q = next_line(q);
-		ch = file_insert(fn, q  USE_FEATURE_VI_READONLY(, 0));
-		if (ch < 0)
-			goto vc1;	// nothing was inserted
+			// read after last line
+			if (q == end-1)
+				++q;
+		}
+		{ // dance around potentially-reallocated text[]
+			uintptr_t ofs = q - text;
+			size = file_insert(fn, q, 0);
+			q = text + ofs;
+		}
+		if (size < 0)
+			goto ret;	// nothing was inserted
 		// how many lines in text[]?
-		li = count_lines(q, q + ch - 1);
-		status_line("\"%s\""
-			USE_FEATURE_VI_READONLY("%s")
-			" %dL, %dC", fn,
-			USE_FEATURE_VI_READONLY((readonly_mode ? " [Readonly]" : ""),)
-			li, ch);
-		if (ch > 0) {
+		li = count_lines(q, q + size - 1);
+		status_line("'%s'"
+			IF_FEATURE_VI_READONLY("%s")
+			" %dL, %dC",
+			fn,
+			IF_FEATURE_VI_READONLY((readonly_mode ? " [Readonly]" : ""),)
+			li, size
+		);
+		if (size > 0) {
 			// if the insert is before "dot" then we need to update
 			if (q <= dot)
-				dot += ch;
-			file_modified++;
+				dot += size;
 		}
-	} else if (strncasecmp(cmd, "rewind", i) == 0) {	// rewind cmd line args
-		if (file_modified && !useforce) {
-			status_line_bold("No write since last change (:rewind! overrides)");
+	} else if (strncmp(cmd, "rewind", i) == 0) {	// rewind cmd line args
+		if (modified_count && !useforce) {
+			status_line_bold("No write since last change (:%s! overrides)", cmd);
 		} else {
 			// reset the filenames to edit
-			optind = fn_start - 1;
+			optind = -1; /* start from 0th file */
 			editing = 0;
 		}
 #if ENABLE_FEATURE_VI_SET
-	} else if (strncasecmp(cmd, "set", i) == 0) {	// set or clear features
+	} else if (strncmp(cmd, "set", i) == 0) {	// set or clear features
 #if ENABLE_FEATURE_VI_SETOPTS
 		char *argp;
 #endif
 		i = 0;			// offset into args
-		// only blank is regarded as args delmiter. What about tab '\t' ?
+		// only blank is regarded as args delimiter. What about tab '\t'?
 		if (!args[0] || strcasecmp(args, "all") == 0) {
 			// print out values of all options
-			go_bottom_and_clear_to_eol();
-			printf("----------------------------------------\r\n");
 #if ENABLE_FEATURE_VI_SETOPTS
-			if (!autoindent)
-				printf("no");
-			printf("autoindent ");
-			if (!err_method)
-				printf("no");
-			printf("flash ");
-			if (!ignorecase)
-				printf("no");
-			printf("ignorecase ");
-			if (!showmatch)
-				printf("no");
-			printf("showmatch ");
-			printf("tabstop=%d ", tabstop);
+			status_line_bold(
+				"%sautoindent "
+				"%sflash "
+				"%signorecase "
+				"%sshowmatch "
+				"tabstop=%u",
+				autoindent ? "" : "no",
+				err_method ? "" : "no",
+				ignorecase ? "" : "no",
+				showmatch ? "" : "no",
+				tabstop
+			);
 #endif
-			printf("\r\n");
-			goto vc2;
+			goto ret;
 		}
 #if ENABLE_FEATURE_VI_SETOPTS
 		argp = args;
 		while (*argp) {
-			if (strncasecmp(argp, "no", 2) == 0)
+			if (strncmp(argp, "no", 2) == 0)
 				i = 2;		// ":set noautoindent"
 			setops(argp, "autoindent ", i, "ai", VI_AUTOINDENT);
-			setops(argp, "flash ", i, "fl", VI_ERR_METHOD);
+			setops(argp, "flash "     , i, "fl", VI_ERR_METHOD);
 			setops(argp, "ignorecase ", i, "ic", VI_IGNORECASE);
-			setops(argp, "showmatch ", i, "ic", VI_SHOWMATCH);
-			/* tabstopXXXX */
-			if (strncasecmp(argp + i, "tabstop=%d ", 7) == 0) {
-				sscanf(strchr(argp + i, '='), "tabstop=%d" + 7, &ch);
-				if (ch > 0 && ch <= MAX_TABSTOP)
-					tabstop = ch;
+			setops(argp, "showmatch " , i, "sm", VI_SHOWMATCH );
+			if (strncmp(argp + i, "tabstop=", 8) == 0) {
+				int t = 0;
+				sscanf(argp + i+8, "%u", &t);
+				if (t > 0 && t <= MAX_TABSTOP)
+					tabstop = t;
 			}
-			while (*argp && *argp != ' ')
-				argp++; // skip to arg delimiter (i.e. blank)
-			while (*argp && *argp == ' ')
-				argp++; // skip all delimiting blanks
+			argp = skip_non_whitespace(argp);
+			argp = skip_whitespace(argp);
 		}
 #endif /* FEATURE_VI_SETOPTS */
 #endif /* FEATURE_VI_SET */
 #if ENABLE_FEATURE_VI_SEARCH
-	} else if (strncasecmp(cmd, "s", 1) == 0) {	// substitute a pattern with a replacement pattern
-		char *ls, *F, *R;
-		int gflag;
+	} else if (cmd[0] == 's') {	// substitute a pattern with a replacement pattern
+		char *F, *R, *flags;
+		size_t len_F, len_R;
+		int gflag;		// global replace flag
+#if ENABLE_FEATURE_VI_UNDO
+		int dont_chain_first_item = ALLOW_UNDO;
+#endif
 
 		// F points to the "find" pattern
 		// R points to the "replace" pattern
-		// replace the cmd line delimiters "/" with NULLs
-		gflag = 0;		// global replace flag
+		// replace the cmd line delimiters "/" with NULs
 		c = orig_buf[1];	// what is the delimiter
 		F = orig_buf + 2;	// start of "find"
 		R = strchr(F, c);	// middle delimiter
-		if (!R) goto colon_s_fail;
+		if (!R)
+			goto colon_s_fail;
+		len_F = R - F;
 		*R++ = '\0';	// terminate "find"
-		buf1 = strchr(R, c);
-		if (!buf1) goto colon_s_fail;
-		*buf1++ = '\0';	// terminate "replace"
-		if (*buf1 == 'g') {	// :s/foo/bar/g
-			buf1++;
-			gflag++;	// turn on gflag
-		}
+		flags = strchr(R, c);
+		if (!flags)
+			goto colon_s_fail;
+		len_R = flags - R;
+		*flags++ = '\0';	// terminate "replace"
+		gflag = *flags;
+
 		q = begin_line(q);
 		if (b < 0) {	// maybe :s/foo/bar/
-			q = begin_line(dot);	// start with cur line
-			b = count_lines(text, q);	// cur line number
+			q = begin_line(dot);      // start with cur line
+			b = count_lines(text, q); // cur line number
 		}
 		if (e < 0)
 			e = b;		// maybe :.s/foo/bar/
+
 		for (i = b; i <= e; i++) {	// so, :20,23 s \0 find \0 replace \0
-			ls = q;		// orig line start
+			char *ls = q;		// orig line start
+			char *found;
  vc4:
-			buf1 = char_search(q, F, FORWARD, LIMITED);	// search cur line only for "find"
-			if (buf1) {
+			found = char_search(q, F, FORWARD, LIMITED);	// search cur line only for "find"
+			if (found) {
+				uintptr_t bias;
 				// we found the "find" pattern - delete it
-				text_hole_delete(buf1, buf1 + strlen(F) - 1);
-				// inset the "replace" patern
-				string_insert(buf1, R);	// insert the string
+				// For undo support, the first item should not be chained
+				text_hole_delete(found, found + len_F - 1, dont_chain_first_item);
+#if ENABLE_FEATURE_VI_UNDO
+				dont_chain_first_item = ALLOW_UNDO_CHAIN;
+#endif
+				// insert the "replace" patern
+				bias = string_insert(found, R, ALLOW_UNDO_CHAIN);
+				found += bias;
+				ls += bias;
+				/*q += bias; - recalculated anyway */
 				// check for "global"  :s/foo/bar/g
-				if (gflag == 1) {
-					if ((buf1 + strlen(R)) < end_line(ls)) {
-						q = buf1 + strlen(R);
+				if (gflag == 'g') {
+					if ((found + len_R) < end_line(ls)) {
+						q = found + len_R;
 						goto vc4;	// don't let q move past cur line
 					}
 				}
@@ -1099,60 +1460,61 @@ static void colon(char *buf)
 			q = next_line(ls);
 		}
 #endif /* FEATURE_VI_SEARCH */
-	} else if (strncasecmp(cmd, "version", i) == 0) {  // show software version
+	} else if (strncmp(cmd, "version", i) == 0) {  // show software version
 		status_line(BB_VER " " BB_BT);
-	} else if (strncasecmp(cmd, "write", i) == 0  // write text to file
-	        || strncasecmp(cmd, "wq", i) == 0
-	        || strncasecmp(cmd, "wn", i) == 0
-	        || strncasecmp(cmd, "x", i) == 0
+	} else if (strncmp(cmd, "write", i) == 0  // write text to file
+	        || strncmp(cmd, "wq", i) == 0
+	        || strncmp(cmd, "wn", i) == 0
+	        || (cmd[0] == 'x' && !cmd[1])
 	) {
+		int size;
+		//int forced = FALSE;
+
 		// is there a file name to write to?
 		if (args[0]) {
 			fn = args;
 		}
 #if ENABLE_FEATURE_VI_READONLY
 		if (readonly_mode && !useforce) {
-			status_line_bold("\"%s\" File is read only", fn);
-			goto vc3;
+			status_line_bold("'%s' is read only", fn);
+			goto ret;
 		}
 #endif
 		// how many lines in text[]?
 		li = count_lines(q, r);
-		ch = r - q + 1;
-		// see if file exists- if not, its just a new file request
-		if (useforce) {
+		size = r - q + 1;
+		//if (useforce) {
 			// if "fn" is not write-able, chmod u+w
 			// sprintf(syscmd, "chmod u+w %s", fn);
 			// system(syscmd);
-			forced = TRUE;
-		}
+			// forced = TRUE;
+		//}
 		l = file_write(fn, q, r);
-		if (useforce && forced) {
+		//if (useforce && forced) {
 			// chmod u-w
 			// sprintf(syscmd, "chmod u-w %s", fn);
 			// system(syscmd);
-			forced = FALSE;
-		}
+			// forced = FALSE;
+		//}
 		if (l < 0) {
 			if (l == -1)
-				status_line_bold("\"%s\" %s", fn, strerror(errno));
+				status_line_bold_errno(fn);
 		} else {
-			status_line("\"%s\" %dL, %dC", fn, li, l);
-			if (q == text && r == end - 1 && l == ch) {
-				file_modified = 0;
-				last_file_modified = -1;
+			status_line("'%s' %dL, %dC", fn, li, l);
+			if (q == text && r == end - 1 && l == size) {
+				modified_count = 0;
+				last_modified_count = -1;
 			}
-			if ((cmd[0] == 'x' || cmd[1] == 'q' || cmd[1] == 'n' ||
-			     cmd[0] == 'X' || cmd[1] == 'Q' || cmd[1] == 'N')
-			     && l == ch) {
+			if ((cmd[0] == 'x' || cmd[1] == 'q' || cmd[1] == 'n'
+			    || cmd[0] == 'X' || cmd[1] == 'Q' || cmd[1] == 'N'
+			    )
+			 && l == size
+			) {
 				editing = 0;
 			}
 		}
-#if ENABLE_FEATURE_VI_READONLY
- vc3:;
-#endif
 #if ENABLE_FEATURE_VI_YANKMARK
-	} else if (strncasecmp(cmd, "yank", i) == 0) {	// yank lines
+	} else if (strncmp(cmd, "yank", i) == 0) {	// yank lines
 		if (b < 0) {	// no addr given- use defaults
 			q = begin_line(dot);	// assume .,. for the range
 			r = end_line(dot);
@@ -1166,16 +1528,15 @@ static void colon(char *buf)
 		// cmd unknown
 		not_implemented(cmd);
 	}
- vc1:
+ ret:
 	dot = bound_dot(dot);	// make sure "dot" is valid
 	return;
 #if ENABLE_FEATURE_VI_SEARCH
  colon_s_fail:
 	status_line(":s expression missing delimiters");
 #endif
-}
-
 #endif /* FEATURE_VI_COLON */
+}
 
 static void Hit_Return(void)
 {
@@ -1195,7 +1556,7 @@ static int next_tabstop(int col)
 }
 
 //----- Synchronize the cursor to Dot --------------------------
-static void sync_cursor(char *d, int *row, int *col)
+static NOINLINE void sync_cursor(char *d, int *row, int *col)
 {
 	char *beg_cur;	// begin and end of "d" line
 	char *tp;
@@ -1322,10 +1683,10 @@ static char *dollar_line(char *p) // return pointer to just before NL line
 
 static char *prev_line(char *p) // return pointer first char prev line
 {
-	p = begin_line(p);	// goto begining of cur line
+	p = begin_line(p);	// goto beginning of cur line
 	if (p > text && p[-1] == '\n')
 		p--;			// step to prev line
-	p = begin_line(p);	// goto begining of prev line
+	p = begin_line(p);	// goto beginning of prev line
 	return p;
 }
 
@@ -1373,7 +1734,7 @@ static int count_lines(char *start, char *stop)
 	return cnt;
 }
 
-static char *find_line(int li)	// find begining of line #li
+static char *find_line(int li)	// find beginning of line #li
 {
 	char *q;
 
@@ -1386,23 +1747,27 @@ static char *find_line(int li)	// find begining of line #li
 //----- Dot Movement Routines ----------------------------------
 static void dot_left(void)
 {
+	undo_queue_commit();
 	if (dot > text && dot[-1] != '\n')
 		dot--;
 }
 
 static void dot_right(void)
 {
+	undo_queue_commit();
 	if (dot < end - 1 && *dot != '\n')
 		dot++;
 }
 
 static void dot_begin(void)
 {
+	undo_queue_commit();
 	dot = begin_line(dot);	// return pointer to first char cur line
 }
 
 static void dot_end(void)
 {
+	undo_queue_commit();
 	dot = end_line(dot);	// return pointer to last char cur line
 }
 
@@ -1428,11 +1793,13 @@ static char *move_to_col(char *p, int l)
 
 static void dot_next(void)
 {
+	undo_queue_commit();
 	dot = next_line(dot);
 }
 
 static void dot_prev(void)
 {
+	undo_queue_commit();
 	dot = prev_line(dot);
 }
 
@@ -1440,6 +1807,7 @@ static void dot_scroll(int cnt, int dir)
 {
 	char *q;
 
+	undo_queue_commit();
 	for (; cnt > 0; cnt--) {
 		if (dir < 0) {
 			// scroll Backwards
@@ -1467,20 +1835,15 @@ static void dot_skip_over_ws(void)
 		dot++;
 }
 
-static void dot_delete(void)	// delete the char at 'dot'
-{
-	text_hole_delete(dot, dot);
-}
-
 static char *bound_dot(char *p) // make sure  text[0] <= P < "end"
 {
 	if (p >= end && end > text) {
 		p = end - 1;
-		indicate_error('1');
+		indicate_error();
 	}
 	if (p < text) {
 		p = text;
-		indicate_error('2');
+		indicate_error();
 	}
 	return p;
 }
@@ -1515,27 +1878,84 @@ static char *new_screen(int ro, int co)
 }
 
 #if ENABLE_FEATURE_VI_SEARCH
-static int mycmp(const char *s1, const char *s2, int len)
-{
-	int i;
 
-	i = strncmp(s1, s2, len);
-	if (ENABLE_FEATURE_VI_SETOPTS && ignorecase) {
-		i = strncasecmp(s1, s2, len);
-	}
-	return i;
-}
+# if ENABLE_FEATURE_VI_REGEX_SEARCH
 
 // search for pattern starting at p
 static char *char_search(char *p, const char *pat, int dir, int range)
 {
-#ifndef REGEX_SEARCH
+	struct re_pattern_buffer preg;
+	const char *err;
+	char *q;
+	int i;
+	int size;
+
+	re_syntax_options = RE_SYNTAX_POSIX_EXTENDED;
+	if (ignorecase)
+		re_syntax_options = RE_SYNTAX_POSIX_EXTENDED | RE_ICASE;
+
+	memset(&preg, 0, sizeof(preg));
+	err = re_compile_pattern(pat, strlen(pat), &preg);
+	if (err != NULL) {
+		status_line_bold("bad search pattern '%s': %s", pat, err);
+		return p;
+	}
+
+	// assume a LIMITED forward search
+	q = end - 1;
+	if (dir == BACK)
+		q = text;
+	// RANGE could be negative if we are searching backwards
+	range = q - p;
+	q = p;
+	size = range;
+	if (range < 0) {
+		size = -size;
+		q = p - size;
+		if (q < text)
+			q = text;
+	}
+	// search for the compiled pattern, preg, in p[]
+	// range < 0: search backward
+	// range > 0: search forward
+	// 0 < start < size
+	// re_search() < 0: not found or error
+	// re_search() >= 0: index of found pattern
+	//           struct pattern   char     int   int    int    struct reg
+	// re_search(*pattern_buffer, *string, size, start, range, *regs)
+	i = re_search(&preg, q, size, /*start:*/ 0, range, /*struct re_registers*:*/ NULL);
+	regfree(&preg);
+	if (i < 0)
+		return NULL;
+	if (dir == FORWARD)
+		p = p + i;
+	else
+		p = p - i;
+	return p;
+}
+
+# else
+
+#  if ENABLE_FEATURE_VI_SETOPTS
+static int mycmp(const char *s1, const char *s2, int len)
+{
+	if (ignorecase) {
+		return strncasecmp(s1, s2, len);
+	}
+	return strncmp(s1, s2, len);
+}
+#  else
+#   define mycmp strncmp
+#  endif
+
+static char *char_search(char *p, const char *pat, int dir, int range)
+{
 	char *start, *stop;
 	int len;
 
 	len = strlen(pat);
 	if (dir == FORWARD) {
-		stop = end - 1;	// assume range is p - end-1
+		stop = end - 1;	// assume range is p..end-1
 		if (range == LIMITED)
 			stop = next_line(p);	// range is to next line
 		for (start = p; start < stop; start++) {
@@ -1544,7 +1964,7 @@ static char *char_search(char *p, const char *pat, int dir, int range)
 			}
 		}
 	} else if (dir == BACK) {
-		stop = text;	// assume range is text - p
+		stop = text;	// assume range is text..p
 		if (range == LIMITED)
 			stop = prev_line(p);	// range is to prev line
 		for (start = p - len; start >= stop; start--) {
@@ -1555,83 +1975,40 @@ static char *char_search(char *p, const char *pat, int dir, int range)
 	}
 	// pattern not found
 	return NULL;
-#else /* REGEX_SEARCH */
-	char *q;
-	struct re_pattern_buffer preg;
-	int i;
-	int size, range;
-
-	re_syntax_options = RE_SYNTAX_POSIX_EXTENDED;
-	preg.translate = 0;
-	preg.fastmap = 0;
-	preg.buffer = 0;
-	preg.allocated = 0;
-
-	// assume a LIMITED forward search
-	q = next_line(p);
-	q = end_line(q);
-	q = end - 1;
-	if (dir == BACK) {
-		q = prev_line(p);
-		q = text;
-	}
-	// count the number of chars to search over, forward or backward
-	size = q - p;
-	if (size < 0)
-		size = p - q;
-	// RANGE could be negative if we are searching backwards
-	range = q - p;
-
-	q = re_compile_pattern(pat, strlen(pat), &preg);
-	if (q != 0) {
-		// The pattern was not compiled
-		status_line_bold("bad search pattern: \"%s\": %s", pat, q);
-		i = 0;			// return p if pattern not compiled
-		goto cs1;
-	}
-
-	q = p;
-	if (range < 0) {
-		q = p - size;
-		if (q < text)
-			q = text;
-	}
-	// search for the compiled pattern, preg, in p[]
-	// range < 0-  search backward
-	// range > 0-  search forward
-	// 0 < start < size
-	// re_search() < 0  not found or error
-	// re_search() > 0  index of found pattern
-	//            struct pattern    char     int    int    int     struct reg
-	// re_search (*pattern_buffer,  *string, size,  start, range,  *regs)
-	i = re_search(&preg, q, size, 0, range, 0);
-	if (i == -1) {
-		p = 0;
-		i = 0;			// return NULL if pattern not found
-	}
- cs1:
-	if (dir == FORWARD) {
-		p = p + i;
-	} else {
-		p = p - i;
-	}
-	return p;
-#endif /* REGEX_SEARCH */
 }
+
+# endif
+
 #endif /* FEATURE_VI_SEARCH */
 
-static char *char_insert(char *p, char c) // insert the char c at 'p'
+static char *char_insert(char *p, char c, int undo) // insert the char c at 'p'
 {
 	if (c == 22) {		// Is this an ctrl-V?
-		p = stupid_insert(p, '^');	// use ^ to indicate literal next
-		p--;			// backup onto ^
+		p += stupid_insert(p, '^');	// use ^ to indicate literal next
 		refresh(FALSE);	// show the ^
 		c = get_one_char();
 		*p = c;
+#if ENABLE_FEATURE_VI_UNDO
+		switch (undo) {
+			case ALLOW_UNDO:
+				undo_push(p, 1, UNDO_INS);
+				break;
+			case ALLOW_UNDO_CHAIN:
+				undo_push(p, 1, UNDO_INS_CHAIN);
+				break;
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+			case ALLOW_UNDO_QUEUED:
+				undo_push(p, 1, UNDO_INS_QUEUED);
+				break;
+# endif
+		}
+#else
+		modified_count++;
+#endif /* ENABLE_FEATURE_VI_UNDO */
 		p++;
-		file_modified++;
 	} else if (c == 27) {	// Is this an ESC?
 		cmd_mode = 0;
+		undo_queue_commit();
 		cmdcnt = 0;
 		end_cmd_q();	// stop adding to q
 		last_status_cksum = 0;	// force status update
@@ -1639,29 +2016,55 @@ static char *char_insert(char *p, char c) // insert the char c at 'p'
 			p--;
 		}
 	} else if (c == erase_char || c == 8 || c == 127) { // Is this a BS
-		//     123456789
-		if ((p[-1] != '\n') && (dot>text)) {
+		if (p > text) {
 			p--;
-			p = text_hole_delete(p, p);	// shrink buffer 1 char
+			p = text_hole_delete(p, p, ALLOW_UNDO_QUEUED);	// shrink buffer 1 char
 		}
 	} else {
 		// insert a char into text[]
-		char *sp;		// "save p"
-
 		if (c == 13)
 			c = '\n';	// translate \r to \n
-		sp = p;			// remember addr of insert
-		p = stupid_insert(p, c);	// insert the char
+#if ENABLE_FEATURE_VI_UNDO
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+		if (c == '\n')
+			undo_queue_commit();
+# endif
+		switch (undo) {
+			case ALLOW_UNDO:
+				undo_push(p, 1, UNDO_INS);
+				break;
+			case ALLOW_UNDO_CHAIN:
+				undo_push(p, 1, UNDO_INS_CHAIN);
+				break;
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+			case ALLOW_UNDO_QUEUED:
+				undo_push(p, 1, UNDO_INS_QUEUED);
+				break;
+# endif
+		}
+#else
+		modified_count++;
+#endif /* ENABLE_FEATURE_VI_UNDO */
+		p += 1 + stupid_insert(p, c);	// insert the char
 #if ENABLE_FEATURE_VI_SETOPTS
-		if (showmatch && strchr(")]}", *sp) != NULL) {
-			showmatching(sp);
+		if (showmatch && strchr(")]}", c) != NULL) {
+			showmatching(p - 1);
 		}
 		if (autoindent && c == '\n') {	// auto indent the new line
 			char *q;
-
-			q = prev_line(p);	// use prev line as templet
-			for (; isblank(*q); q++) {
-				p = stupid_insert(p, *q);	// insert the char
+			size_t len;
+			q = prev_line(p);	// use prev line as template
+			len = strspn(q, " \t"); // space or tab
+			if (len) {
+				uintptr_t bias;
+				bias = text_hole_make(p, len);
+				p += bias;
+				q += bias;
+#if ENABLE_FEATURE_VI_UNDO
+				undo_push(p, len, UNDO_INS);
+#endif
+				memcpy(p, q, len);
+				p += len;
 			}
 		}
 #endif
@@ -1669,12 +2072,15 @@ static char *char_insert(char *p, char c) // insert the char c at 'p'
 	return p;
 }
 
-static char *stupid_insert(char *p, char c) // stupidly insert the char c at 'p'
+// might reallocate text[]! use p += stupid_insert(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+static uintptr_t stupid_insert(char *p, char c) // stupidly insert the char c at 'p'
 {
-	p = text_hole_make(p, 1);
+	uintptr_t bias;
+	bias = text_hole_make(p, 1);
+	p += bias;
 	*p = c;
-	//file_modified++; - done by text_hole_make()
-	return p + 1;
+	return bias;
 }
 
 static int find_range(char **start, char **stop, char c)
@@ -1721,11 +2127,11 @@ static int find_range(char **start, char **stop, char c)
 		dot_end();		// find NL
 		q = dot;
 	} else {
-	    // nothing -- this causes any other values of c to
-	    // represent the one-character range under the
-	    // cursor.  this is correct for ' ' and 'l', but
-	    // perhaps no others.
-	    //
+		// nothing -- this causes any other values of c to
+		// represent the one-character range under the
+		// cursor.  this is correct for ' ' and 'l', but
+		// perhaps no others.
+		//
 	}
 	if (q < p) {
 		t = q;
@@ -1762,23 +2168,23 @@ static int st_test(char *p, int type, int dir, char *tested)
 
 	if (type == S_BEFORE_WS) {
 		c = ci;
-		test = ((!isspace(c)) || c == '\n');
+		test = (!isspace(c) || c == '\n');
 	}
 	if (type == S_TO_WS) {
 		c = c0;
-		test = ((!isspace(c)) || c == '\n');
+		test = (!isspace(c) || c == '\n');
 	}
 	if (type == S_OVER_WS) {
 		c = c0;
-		test = ((isspace(c)));
+		test = isspace(c);
 	}
 	if (type == S_END_PUNCT) {
 		c = ci;
-		test = ((ispunct(c)));
+		test = ispunct(c);
 	}
 	if (type == S_END_ALNUM) {
 		c = ci;
-		test = ((isalnum(c)) || c == '_');
+		test = (isalnum(c) || c == '_');
 	}
 	*tested = c;
 	return test;
@@ -1802,34 +2208,32 @@ static char *skip_thing(char *p, int linecnt, int dir, int type)
 }
 
 // find matching char of pair  ()  []  {}
+// will crash if c is not one of these
 static char *find_pair(char *p, const char c)
 {
-	char match, *q;
+	const char *braces = "()[]{}";
+	char match;
 	int dir, level;
 
-	match = ')';
+	dir = strchr(braces, c) - braces;
+	dir ^= 1;
+	match = braces[dir];
+	dir = ((dir & 1) << 1) - 1; /* 1 for ([{, -1 for )\} */
+
+	// look for match, count levels of pairs  (( ))
 	level = 1;
-	dir = 1;			// assume forward
-	switch (c) {
-	case '(': match = ')'; break;
-	case '[': match = ']'; break;
-	case '{': match = '}'; break;
-	case ')': match = '('; dir = -1; break;
-	case ']': match = '['; dir = -1; break;
-	case '}': match = '{'; dir = -1; break;
-	}
-	for (q = p + dir; text <= q && q < end; q += dir) {
-		// look for match, count levels of pairs  (( ))
-		if (*q == c)
+	for (;;) {
+		p += dir;
+		if (p < text || p >= end)
+			return NULL;
+		if (*p == c)
 			level++;	// increase pair levels
-		if (*q == match)
+		if (*p == match) {
 			level--;	// reduce pair level
-		if (level == 0)
-			break;		// found matching pair
+			if (level == 0)
+				return p; // found matching pair
+		}
 	}
-	if (level != 0)
-		q = NULL;		// indicate no match
-	return q;
 }
 
 #if ENABLE_FEATURE_VI_SETOPTS
@@ -1841,7 +2245,7 @@ static void showmatching(char *p)
 	// we found half of a pair
 	q = find_pair(p, *p);	// get loc of matching char
 	if (q == NULL) {
-		indicate_error('3');	// no matching char
+		indicate_error();	// no matching char
 	} else {
 		// "q" now points to matching pair
 		save_dot = dot;	// remember where we are
@@ -1854,30 +2258,236 @@ static void showmatching(char *p)
 }
 #endif /* FEATURE_VI_SETOPTS */
 
-//  open a hole in text[]
-static char *text_hole_make(char *p, int size)	// at "p", make a 'size' byte hole
+#if ENABLE_FEATURE_VI_UNDO
+static void flush_undo_data(void)
 {
+	struct undo_object *undo_entry;
+
+	while (undo_stack_tail) {
+		undo_entry = undo_stack_tail;
+		undo_stack_tail = undo_entry->prev;
+		free(undo_entry);
+	}
+}
+
+// Undo functions and hooks added by Jody Bruchon (jody@jodybruchon.com)
+static void undo_push(char *src, unsigned int length, uint8_t u_type)	// Add to the undo stack
+{
+	struct undo_object *undo_entry;
+
+	// "u_type" values
+	// UNDO_INS: insertion, undo will remove from buffer
+	// UNDO_DEL: deleted text, undo will restore to buffer
+	// UNDO_{INS,DEL}_CHAIN: Same as above but also calls undo_pop() when complete
+	// The CHAIN operations are for handling multiple operations that the user
+	// performs with a single action, i.e. REPLACE mode or find-and-replace commands
+	// UNDO_{INS,DEL}_QUEUED: If queuing feature is enabled, allow use of the queue
+	// for the INS/DEL operation. The raw values should be equal to the values of
+	// UNDO_{INS,DEL} ORed with UNDO_QUEUED_FLAG
+
+#if ENABLE_FEATURE_VI_UNDO_QUEUE
+	// This undo queuing functionality groups multiple character typing or backspaces
+	// into a single large undo object. This greatly reduces calls to malloc() for
+	// single-character operations while typing and has the side benefit of letting
+	// an undo operation remove chunks of text rather than a single character.
+	switch (u_type) {
+	case UNDO_EMPTY:	// Just in case this ever happens...
+		return;
+	case UNDO_DEL_QUEUED:
+		if (length != 1)
+			return;	// Only queue single characters
+		switch (undo_queue_state) {
+		case UNDO_EMPTY:
+			undo_queue_state = UNDO_DEL;
+		case UNDO_DEL:
+			undo_queue_spos = src;
+			undo_q++;
+			undo_queue[CONFIG_FEATURE_VI_UNDO_QUEUE_MAX - undo_q] = *src;
+			// If queue is full, dump it into an object
+			if (undo_q == CONFIG_FEATURE_VI_UNDO_QUEUE_MAX)
+				undo_queue_commit();
+			return;
+		case UNDO_INS:
+			// Switch from storing inserted text to deleted text
+			undo_queue_commit();
+			undo_push(src, length, UNDO_DEL_QUEUED);
+			return;
+		}
+		break;
+	case UNDO_INS_QUEUED:
+		if (length != 1)
+			return;
+		switch (undo_queue_state) {
+		case UNDO_EMPTY:
+			undo_queue_state = UNDO_INS;
+			undo_queue_spos = src;
+		case UNDO_INS:
+			undo_q++;	// Don't need to save any data for insertions
+			if (undo_q == CONFIG_FEATURE_VI_UNDO_QUEUE_MAX)
+				undo_queue_commit();
+			return;
+		case UNDO_DEL:
+			// Switch from storing deleted text to inserted text
+			undo_queue_commit();
+			undo_push(src, length, UNDO_INS_QUEUED);
+			return;
+		}
+		break;
+	}
+#else
+	// If undo queuing is disabled, ignore the queuing flag entirely
+	u_type = u_type & ~UNDO_QUEUED_FLAG;
+#endif
+
+	// Allocate a new undo object
+	if (u_type == UNDO_DEL || u_type == UNDO_DEL_CHAIN) {
+		// For UNDO_DEL objects, save deleted text
+		if ((src + length) == end)
+			length--;
+		// If this deletion empties text[], strip the newline. When the buffer becomes
+		// zero-length, a newline is added back, which requires this to compensate.
+		undo_entry = xzalloc(offsetof(struct undo_object, undo_text) + length);
+		memcpy(undo_entry->undo_text, src, length);
+	} else {
+		undo_entry = xzalloc(sizeof(*undo_entry));
+	}
+	undo_entry->length = length;
+#if ENABLE_FEATURE_VI_UNDO_QUEUE
+	if ((u_type & UNDO_USE_SPOS) != 0) {
+		undo_entry->start = undo_queue_spos - text;	// use start position from queue
+	} else {
+		undo_entry->start = src - text;	// use offset from start of text buffer
+	}
+	u_type = (u_type & ~UNDO_USE_SPOS);
+#else
+	undo_entry->start = src - text;
+#endif
+	undo_entry->u_type = u_type;
+
+	// Push it on undo stack
+	undo_entry->prev = undo_stack_tail;
+	undo_stack_tail = undo_entry;
+	modified_count++;
+}
+
+static void undo_pop(void)	// Undo the last operation
+{
+	int repeat;
+	char *u_start, *u_end;
+	struct undo_object *undo_entry;
+
+	// Commit pending undo queue before popping (should be unnecessary)
+	undo_queue_commit();
+
+	undo_entry = undo_stack_tail;
+	// Check for an empty undo stack
+	if (!undo_entry) {
+		status_line("Already at oldest change");
+		return;
+	}
+
+	switch (undo_entry->u_type) {
+	case UNDO_DEL:
+	case UNDO_DEL_CHAIN:
+		// make hole and put in text that was deleted; deallocate text
+		u_start = text + undo_entry->start;
+		text_hole_make(u_start, undo_entry->length);
+		memcpy(u_start, undo_entry->undo_text, undo_entry->length);
+		status_line("Undo [%d] %s %d chars at position %d",
+			modified_count, "restored",
+			undo_entry->length, undo_entry->start
+		);
+		break;
+	case UNDO_INS:
+	case UNDO_INS_CHAIN:
+		// delete what was inserted
+		u_start = undo_entry->start + text;
+		u_end = u_start - 1 + undo_entry->length;
+		text_hole_delete(u_start, u_end, NO_UNDO);
+		status_line("Undo [%d] %s %d chars at position %d",
+			modified_count, "deleted",
+			undo_entry->length, undo_entry->start
+		);
+		break;
+	}
+	repeat = 0;
+	switch (undo_entry->u_type) {
+	// If this is the end of a chain, lower modification count and refresh display
+	case UNDO_DEL:
+	case UNDO_INS:
+		dot = (text + undo_entry->start);
+		refresh(FALSE);
+		break;
+	case UNDO_DEL_CHAIN:
+	case UNDO_INS_CHAIN:
+		repeat = 1;
+		break;
+	}
+	// Deallocate the undo object we just processed
+	undo_stack_tail = undo_entry->prev;
+	free(undo_entry);
+	modified_count--;
+	// For chained operations, continue popping all the way down the chain.
+	if (repeat) {
+		undo_pop();	// Follow the undo chain if one exists
+	}
+}
+
+#if ENABLE_FEATURE_VI_UNDO_QUEUE
+static void undo_queue_commit(void)	// Flush any queued objects to the undo stack
+{
+	// Pushes the queue object onto the undo stack
+	if (undo_q > 0) {
+		// Deleted character undo events grow from the end
+		undo_push(undo_queue + CONFIG_FEATURE_VI_UNDO_QUEUE_MAX - undo_q,
+			undo_q,
+			(undo_queue_state | UNDO_USE_SPOS)
+		);
+		undo_queue_state = UNDO_EMPTY;
+		undo_q = 0;
+	}
+}
+#endif
+
+#endif /* ENABLE_FEATURE_VI_UNDO */
+
+// open a hole in text[]
+// might reallocate text[]! use p += text_hole_make(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+static uintptr_t text_hole_make(char *p, int size)	// at "p", make a 'size' byte hole
+{
+	uintptr_t bias = 0;
+
 	if (size <= 0)
-		return p;
+		return bias;
 	end += size;		// adjust the new END
 	if (end >= (text + text_size)) {
 		char *new_text;
 		text_size += end - (text + text_size) + 10240;
 		new_text = xrealloc(text, text_size);
-		screenbegin = new_text + (screenbegin - text);
-		dot         = new_text + (dot         - text);
-		end         = new_text + (end         - text);
-		p           = new_text + (p           - text);
+		bias = (new_text - text);
+		screenbegin += bias;
+		dot         += bias;
+		end         += bias;
+		p           += bias;
+#if ENABLE_FEATURE_VI_YANKMARK
+		{
+			int i;
+			for (i = 0; i < ARRAY_SIZE(mark); i++)
+				if (mark[i])
+					mark[i] += bias;
+		}
+#endif
 		text = new_text;
 	}
 	memmove(p + size, p, end - size - p);
 	memset(p, ' ', size);	// clear new hole
-	file_modified++;
-	return p;
+	return bias;
 }
 
 //  close a hole in text[]
-static char *text_hole_delete(char *p, char *q) // delete "p" through "q", inclusive
+//  "undo" value indicates if this operation should be undo-able
+static char *text_hole_delete(char *p, char *q, int undo) // delete "p" through "q", inclusive
 {
 	char *src, *dest;
 	int cnt, hole_size;
@@ -1892,10 +2502,29 @@ static char *text_hole_delete(char *p, char *q) // delete "p" through "q", inclu
 	}
 	hole_size = q - p + 1;
 	cnt = end - src;
+#if ENABLE_FEATURE_VI_UNDO
+	switch (undo) {
+		case NO_UNDO:
+			break;
+		case ALLOW_UNDO:
+			undo_push(p, hole_size, UNDO_DEL);
+			break;
+		case ALLOW_UNDO_CHAIN:
+			undo_push(p, hole_size, UNDO_DEL_CHAIN);
+			break;
+# if ENABLE_FEATURE_VI_UNDO_QUEUE
+		case ALLOW_UNDO_QUEUED:
+			undo_push(p, hole_size, UNDO_DEL_QUEUED);
+			break;
+# endif
+	}
+	modified_count--;
+#endif
 	if (src < text || src > end)
 		goto thd0;
 	if (dest < text || dest >= end)
 		goto thd0;
+	modified_count++;
 	if (src >= end)
 		goto thd_atend;	// just delete the end of the buffer
 	memmove(dest, src, cnt);
@@ -1905,7 +2534,6 @@ static char *text_hole_delete(char *p, char *q) // delete "p" through "q", inclu
 		dest = end - 1;	// make sure dest in below end-1
 	if (end <= text)
 		dest = end = text;	// keep pointers valid
-	file_modified++;
  thd0:
 	return dest;
 }
@@ -1913,7 +2541,7 @@ static char *text_hole_delete(char *p, char *q) // delete "p" through "q", inclu
 // copy text into register, then delete text.
 // if dist <= 0, do not include, or go past, a NewLine
 //
-static char *yank_delete(char *start, char *stop, int dist, int yf)
+static char *yank_delete(char *start, char *stop, int dist, int yf, int undo)
 {
 	char *p;
 
@@ -1942,7 +2570,7 @@ static char *yank_delete(char *start, char *stop, int dist, int yf)
 	text_yank(start, stop, YDreg);
 #endif
 	if (yf == YANKDEL) {
-		p = text_hole_delete(start, stop);
+		p = text_hole_delete(start, stop, undo);
 	}					// delete lines
 	return p;
 }
@@ -1954,18 +2582,18 @@ static void show_help(void)
 	"\n\tPattern searches with / and ?"
 #endif
 #if ENABLE_FEATURE_VI_DOT_CMD
-	"\n\tLast command repeat with \'.\'"
+	"\n\tLast command repeat with ."
 #endif
 #if ENABLE_FEATURE_VI_YANKMARK
 	"\n\tLine marking with 'x"
 	"\n\tNamed buffers with \"x"
 #endif
 #if ENABLE_FEATURE_VI_READONLY
-	"\n\tReadonly if vi is called as \"view\""
-	"\n\tReadonly with -R command line arg"
+	//not implemented: "\n\tReadonly if vi is called as \"view\""
+	//redundant: usage text says this too: "\n\tReadonly with -R command line arg"
 #endif
 #if ENABLE_FEATURE_VI_SET
-	"\n\tSome colon mode commands with \':\'"
+	"\n\tSome colon mode commands with :"
 #endif
 #if ENABLE_FEATURE_VI_SETOPTS
 	"\n\tSettable options with \":set\""
@@ -2006,42 +2634,51 @@ static void end_cmd_q(void)
 #if ENABLE_FEATURE_VI_YANKMARK \
  || (ENABLE_FEATURE_VI_COLON && ENABLE_FEATURE_VI_SEARCH) \
  || ENABLE_FEATURE_VI_CRASHME
-static char *string_insert(char *p, char *s) // insert the string at 'p'
+// might reallocate text[]! use p += string_insert(p, ...),
+// and be careful to not use pointers into potentially freed text[]!
+static uintptr_t string_insert(char *p, const char *s, int undo) // insert the string at 'p'
 {
-	int cnt, i;
+	uintptr_t bias;
+	int i;
 
 	i = strlen(s);
-	text_hole_make(p, i);
-	strncpy(p, s, i);
-	for (cnt = 0; *s != '\0'; s++) {
-		if (*s == '\n')
-			cnt++;
+#if ENABLE_FEATURE_VI_UNDO
+	switch (undo) {
+		case ALLOW_UNDO:
+			undo_push(p, i, UNDO_INS);
+			break;
+		case ALLOW_UNDO_CHAIN:
+			undo_push(p, i, UNDO_INS_CHAIN);
+			break;
 	}
-#if ENABLE_FEATURE_VI_YANKMARK
-	status_line("Put %d lines (%d chars) from [%c]", cnt, i, what_reg());
 #endif
-	return p;
+	bias = text_hole_make(p, i);
+	p += bias;
+	memcpy(p, s, i);
+#if ENABLE_FEATURE_VI_YANKMARK
+	{
+		int cnt;
+		for (cnt = 0; *s != '\0'; s++) {
+			if (*s == '\n')
+				cnt++;
+		}
+		status_line("Put %d lines (%d chars) from [%c]", cnt, i, what_reg());
+	}
+#endif
+	return bias;
 }
 #endif
 
 #if ENABLE_FEATURE_VI_YANKMARK
 static char *text_yank(char *p, char *q, int dest)	// copy text into a register
 {
-	char *t;
-	int cnt;
-
-	if (q < p) {		// they are backwards- reverse them
-		t = q;
-		q = p;
-		p = t;
+	int cnt = q - p;
+	if (cnt < 0) {		// they are backwards- reverse them
+		p = q;
+		cnt = -cnt;
 	}
-	cnt = q - p + 1;
-	t = reg[dest];
-	free(t);		//  if already a yank register, free it
-	t = xmalloc(cnt + 1);	// get a new register
-	memset(t, '\0', cnt + 1);	// clear new text[]
-	strncpy(t, p, cnt);	// copy text[] into bufer
-	reg[dest] = t;
+	free(reg[dest]);	//  if already a yank register, free it
+	reg[dest] = xstrndup(p, cnt + 1);
 	return p;
 }
 
@@ -2085,9 +2722,8 @@ static char *swap_context(char *p) // goto new context for '' command make this 
 	// only swap context if other context is valid
 	if (text <= mark[27] && mark[27] <= end - 1) {
 		tmp = mark[27];
-		mark[27] = mark[26];
-		mark[26] = tmp;
-		p = mark[26];	// where we are going- previous context
+		mark[27] = p;
+		mark[26] = p = tmp;
 		context_start = prev_line(prev_line(prev_line(p)));
 		context_end = next_line(next_line(next_line(p)));
 	}
@@ -2100,7 +2736,7 @@ static void rawmode(void)
 {
 	tcgetattr(0, &term_orig);
 	term_vi = term_orig;
-	term_vi.c_lflag &= (~ICANON & ~ECHO);	// leave ISIG ON- allow intr's
+	term_vi.c_lflag &= (~ICANON & ~ECHO);	// leave ISIG on - allow intr's
 	term_vi.c_iflag &= (~IXON & ~ICRNL);
 	term_vi.c_oflag &= (~ONLCR);
 	term_vi.c_cc[VMIN] = 1;
@@ -2111,62 +2747,66 @@ static void rawmode(void)
 
 static void cookmode(void)
 {
-	fflush(stdout);
+	fflush_all();
 	tcsetattr_stdin_TCSANOW(&term_orig);
 }
 
-//----- Come here when we get a window resize signal ---------
 #if ENABLE_FEATURE_VI_USE_SIGNALS
+//----- Come here when we get a window resize signal ---------
 static void winch_sig(int sig UNUSED_PARAM)
 {
+	int save_errno = errno;
 	// FIXME: do it in main loop!!!
 	signal(SIGWINCH, winch_sig);
-	if (ENABLE_FEATURE_VI_WIN_RESIZE) {
-		get_terminal_width_height(0, &columns, &rows);
-		if (rows > MAX_SCR_ROWS) rows = MAX_SCR_ROWS;
-		if (columns > MAX_SCR_COLS) columns = MAX_SCR_COLS;
-	}
+	query_screen_dimensions();
 	new_screen(rows, columns);	// get memory for virtual screen
 	redraw(TRUE);		// re-draw the screen
+	errno = save_errno;
 }
 
 //----- Come here when we get a continue signal -------------------
 static void cont_sig(int sig UNUSED_PARAM)
 {
+	int save_errno = errno;
 	rawmode(); // terminal to "raw"
 	last_status_cksum = 0; // force status update
 	redraw(TRUE); // re-draw the screen
 
 	signal(SIGTSTP, suspend_sig);
 	signal(SIGCONT, SIG_DFL);
-	kill(my_pid, SIGCONT); // huh? why? we are already "continued"...
+	//kill(my_pid, SIGCONT); // huh? why? we are already "continued"...
+	errno = save_errno;
 }
 
 //----- Come here when we get a Suspend signal -------------------
 static void suspend_sig(int sig UNUSED_PARAM)
 {
+	int save_errno = errno;
 	go_bottom_and_clear_to_eol();
 	cookmode(); // terminal to "cooked"
 
 	signal(SIGCONT, cont_sig);
 	signal(SIGTSTP, SIG_DFL);
 	kill(my_pid, SIGTSTP);
+	errno = save_errno;
 }
 
 //----- Come here when we get a signal ---------------------------
 static void catch_sig(int sig)
 {
 	signal(SIGINT, catch_sig);
-	if (sig)
-		siglongjmp(restart, sig);
+	siglongjmp(restart, sig);
 }
 #endif /* FEATURE_VI_USE_SIGNALS */
 
-static int mysleep(int hund)	// sleep for 'h' 1/100 seconds
+static int mysleep(int hund)	// sleep for 'hund' 1/100 seconds or stdin ready
 {
 	struct pollfd pfd[1];
 
-	pfd[0].fd = 0;
+	if (hund != 0)
+		fflush_all();
+
+	pfd[0].fd = STDIN_FILENO;
 	pfd[0].events = POLLIN;
 	return safe_poll(pfd, 1, hund*10) > 0;
 }
@@ -2176,8 +2816,8 @@ static int readit(void) // read (maybe cursor) key from stdin
 {
 	int c;
 
-	fflush(stdout);
-	c = read_key(STDIN_FILENO, &chars_to_parse, readbuffer);
+	fflush_all();
+	c = read_key(STDIN_FILENO, readbuffer, /*timeout off:*/ -2);
 	if (c == -1) { // EOF/error
 		go_bottom_and_clear_to_eol();
 		cookmode(); // terminal to "cooked"
@@ -2262,62 +2902,50 @@ static char *get_input_line(const char *prompt)
 #undef buf
 }
 
-static int file_size(const char *fn) // what is the byte size of "fn"
-{
-	struct stat st_buf;
-	int cnt;
-
-	cnt = -1;
-	if (fn && fn[0] && stat(fn, &st_buf) == 0)	// see if file exists
-		cnt = (int) st_buf.st_size;
-	return cnt;
-}
-
-static int file_insert(const char *fn, char *p
-		USE_FEATURE_VI_READONLY(, int update_ro_status))
+// might reallocate text[]!
+static int file_insert(const char *fn, char *p, int initial)
 {
 	int cnt = -1;
 	int fd, size;
 	struct stat statbuf;
 
-	/* Validate file */
-	if (stat(fn, &statbuf) < 0) {
-		status_line_bold("\"%s\" %s", fn, strerror(errno));
-		goto fi0;
-	}
-	if (!S_ISREG(statbuf.st_mode)) {
-		// This is not a regular file
-		status_line_bold("\"%s\" Not a regular file", fn);
-		goto fi0;
-	}
-	if (p < text || p > end) {
-		status_line_bold("Trying to insert file outside of memory");
-		goto fi0;
-	}
+	if (p < text)
+		p = text;
+	if (p > end)
+		p = end;
 
-	// read file to buffer
 	fd = open(fn, O_RDONLY);
 	if (fd < 0) {
-		status_line_bold("\"%s\" %s", fn, strerror(errno));
-		goto fi0;
+		if (!initial)
+			status_line_bold_errno(fn);
+		return cnt;
 	}
-	size = statbuf.st_size;
-	p = text_hole_make(p, size);
-	cnt = safe_read(fd, p, size);
+
+	/* Validate file */
+	if (fstat(fd, &statbuf) < 0) {
+		status_line_bold_errno(fn);
+		goto fi;
+	}
+	if (!S_ISREG(statbuf.st_mode)) {
+		status_line_bold("'%s' is not a regular file", fn);
+		goto fi;
+	}
+	size = (statbuf.st_size < INT_MAX ? (int)statbuf.st_size : INT_MAX);
+	p += text_hole_make(p, size);
+	cnt = full_read(fd, p, size);
 	if (cnt < 0) {
-		status_line_bold("\"%s\" %s", fn, strerror(errno));
-		p = text_hole_delete(p, p + size - 1);	// un-do buffer insert
+		status_line_bold_errno(fn);
+		p = text_hole_delete(p, p + size - 1, NO_UNDO);	// un-do buffer insert
 	} else if (cnt < size) {
-		// There was a partial read, shrink unused space text[]
-		p = text_hole_delete(p + cnt, p + (size - cnt) - 1);	// un-do buffer insert
-		status_line_bold("cannot read all of file \"%s\"", fn);
+		// There was a partial read, shrink unused space
+		p = text_hole_delete(p + cnt, p + size - 1, NO_UNDO);
+		status_line_bold("can't read '%s'", fn);
 	}
-	if (cnt >= size)
-		file_modified++;
+ fi:
 	close(fd);
- fi0:
+
 #if ENABLE_FEATURE_VI_READONLY
-	if (update_ro_status
+	if (initial
 	 && ((access(fn, W_OK) < 0) ||
 		/* root will always have access()
 		 * so we check fileperms too */
@@ -2338,7 +2966,6 @@ static int file_write(char *fn, char *first, char *last)
 		status_line_bold("No current filename");
 		return -2;
 	}
-	charcnt = 0;
 	/* By popular request we do not open file with O_TRUNC,
 	 * but instead ftruncate() it _after_ successful write.
 	 * Might reduce amount of data lost on power fail etc.
@@ -2351,7 +2978,7 @@ static int file_write(char *fn, char *first, char *last)
 	ftruncate(fd, charcnt);
 	if (charcnt == cnt) {
 		// good write
-		//file_modified = FALSE;
+		//modified_count = FALSE;
 	} else {
 		charcnt = 0;
 	}
@@ -2371,118 +2998,67 @@ static int file_write(char *fn, char *first, char *last)
 //  23,0    ...     23,79   <- status line
 
 //----- Move the cursor to row x col (count from 0, not 1) -------
-static void place_cursor(int row, int col, int optimize)
+static void place_cursor(int row, int col)
 {
-	char cm1[sizeof(CMrc) + sizeof(int)*3 * 2];
-#if ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
-	enum {
-		SZ_UP = sizeof(CMup),
-		SZ_DN = sizeof(CMdown),
-		SEQ_SIZE = SZ_UP > SZ_DN ? SZ_UP : SZ_DN,
-	};
-	char cm2[SEQ_SIZE * 5 + 32]; // bigger than worst case size
-#endif
-	char *cm;
+	char cm1[sizeof(ESC_SET_CURSOR_POS) + sizeof(int)*3 * 2];
 
 	if (row < 0) row = 0;
 	if (row >= rows) row = rows - 1;
 	if (col < 0) col = 0;
 	if (col >= columns) col = columns - 1;
 
-	//----- 1.  Try the standard terminal ESC sequence
-	sprintf(cm1, CMrc, row + 1, col + 1);
-	cm = cm1;
-
-#if ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
-	if (optimize && col < 16) {
-		char *screenp;
-		int Rrow = last_row;
-		int diff = Rrow - row;
-
-		if (diff < -5 || diff > 5)
-			goto skip;
-
-		//----- find the minimum # of chars to move cursor -------------
-		//----- 2.  Try moving with discreet chars (Newline, [back]space, ...)
-		cm2[0] = '\0';
-
-		// move to the correct row
-		while (row < Rrow) {
-			// the cursor has to move up
-			strcat(cm2, CMup);
-			Rrow--;
-		}
-		while (row > Rrow) {
-			// the cursor has to move down
-			strcat(cm2, CMdown);
-			Rrow++;
-		}
-
-		// now move to the correct column
-		strcat(cm2, "\r");			// start at col 0
-		// just send out orignal source char to get to correct place
-		screenp = &screen[row * columns];	// start of screen line
-		strncat(cm2, screenp, col);
-
-		// pick the shortest cursor motion to send out
-		if (strlen(cm2) < strlen(cm)) {
-			cm = cm2;
-		}
- skip: ;
-	}
-	last_row = row;
-#endif /* FEATURE_VI_OPTIMIZE_CURSOR */
-	write1(cm);
+	sprintf(cm1, ESC_SET_CURSOR_POS, row + 1, col + 1);
+	write1(cm1);
 }
 
 //----- Erase from cursor to end of line -----------------------
 static void clear_to_eol(void)
 {
-	write1(Ceol);   // Erase from cursor to end of line
+	write1(ESC_CLEAR2EOL);
 }
 
 static void go_bottom_and_clear_to_eol(void)
 {
-	place_cursor(rows - 1, 0, FALSE); // go to bottom of screen
-	clear_to_eol(); // erase to end of line
+	place_cursor(rows - 1, 0);
+	clear_to_eol();
 }
 
 //----- Erase from cursor to end of screen -----------------------
 static void clear_to_eos(void)
 {
-	write1(Ceos);   // Erase from cursor to end of screen
+	write1(ESC_CLEAR2EOS);
 }
 
 //----- Start standout mode ------------------------------------
-static void standout_start(void) // send "start reverse video" sequence
+static void standout_start(void)
 {
-	write1(SOs);     // Start reverse video mode
+	write1(ESC_BOLD_TEXT);
 }
 
 //----- End standout mode --------------------------------------
-static void standout_end(void) // send "end reverse video" sequence
+static void standout_end(void)
 {
-	write1(SOn);     // End reverse video mode
+	write1(ESC_NORM_TEXT);
 }
 
 //----- Flash the screen  --------------------------------------
 static void flash(int h)
 {
-	standout_start();	// send "start reverse video" sequence
+	standout_start();
 	redraw(TRUE);
 	mysleep(h);
-	standout_end();		// send "end reverse video" sequence
+	standout_end();
 	redraw(TRUE);
 }
 
-static void Indicate_Error(void)
+static void indicate_error(void)
 {
 #if ENABLE_FEATURE_VI_CRASHME
 	if (crashme > 0)
 		return;			// generate a random command
 #endif
 	if (!err_method) {
-		write1(bell);   // send out a bell character
+		write1(ESC_BELL);
 	} else {
 		flash(10);
 	}
@@ -2528,9 +3104,9 @@ static void show_status_line(void)
 			}
 			have_status_msg = 0;
 		}
-		place_cursor(crow, ccol, FALSE);	// put cursor back in correct place
+		place_cursor(crow, ccol);  // put cursor back in correct place
 	}
-	fflush(stdout);
+	fflush_all();
 }
 
 //----- format the status buffer, the bottom line of screen ------
@@ -2540,12 +3116,17 @@ static void status_line_bold(const char *format, ...)
 	va_list args;
 
 	va_start(args, format);
-	strcpy(status_buffer, SOs);	// Terminal standout mode on
-	vsprintf(status_buffer + sizeof(SOs)-1, format, args);
-	strcat(status_buffer, SOn);	// Terminal standout mode off
+	strcpy(status_buffer, ESC_BOLD_TEXT);
+	vsprintf(status_buffer + sizeof(ESC_BOLD_TEXT)-1, format, args);
+	strcat(status_buffer, ESC_NORM_TEXT);
 	va_end(args);
 
-	have_status_msg = 1 + sizeof(SOs) + sizeof(SOn) - 2;
+	have_status_msg = 1 + sizeof(ESC_BOLD_TEXT) + sizeof(ESC_NORM_TEXT) - 2;
+}
+
+static void status_line_bold_errno(const char *fn)
+{
+	status_line_bold("'%s' %s", fn, strerror(errno));
 }
 
 // format status buffer
@@ -2563,36 +3144,41 @@ static void status_line(const char *format, ...)
 // copy s to buf, convert unprintable
 static void print_literal(char *buf, const char *s)
 {
+	char *d;
 	unsigned char c;
-	char b[2];
 
-	b[1] = '\0';
 	buf[0] = '\0';
 	if (!s[0])
 		s = "(NULL)";
+
+	d = buf;
 	for (; *s; s++) {
 		int c_is_no_print;
 
 		c = *s;
 		c_is_no_print = (c & 0x80) && !Isprint(c);
 		if (c_is_no_print) {
-			strcat(buf, SOn);
+			strcpy(d, ESC_NORM_TEXT);
+			d += sizeof(ESC_NORM_TEXT)-1;
 			c = '.';
 		}
-		if (c < ' ' || c == 127) {
-			strcat(buf, "^");
-			if (c == 127)
+		if (c < ' ' || c == 0x7f) {
+			*d++ = '^';
+			c |= '@'; /* 0x40 */
+			if (c == 0x7f)
 				c = '?';
-			else
-				c += '@';
 		}
-		b[0] = c;
-		strcat(buf, b);
-		if (c_is_no_print)
-			strcat(buf, SOs);
-		if (*s == '\n')
-			strcat(buf, "$");
-		if (strlen(buf) > MAX_INPUT_LEN - 10) // paranoia
+		*d++ = c;
+		*d = '\0';
+		if (c_is_no_print) {
+			strcpy(d, ESC_BOLD_TEXT);
+			d += sizeof(ESC_BOLD_TEXT)-1;
+		}
+		if (*s == '\n') {
+			*d++ = '$';
+			*d = '\0';
+		}
+		if (d - buf > MAX_INPUT_LEN - 10) // paranoia
 			break;
 	}
 }
@@ -2614,7 +3200,7 @@ static int format_edit_status(void)
 
 	int cur, percent, ret, trunc_at;
 
-	// file_modified is now a counter rather than a flag.  this
+	// modified_count is now a counter rather than a flag.  this
 	// helps reduce the amount of line counting we need to do.
 	// (this will cause a mis-reporting of modified status
 	// once every MAXINT editing operations.)
@@ -2624,11 +3210,12 @@ static int format_edit_status(void)
 	// we're on, then we shouldn't have to do this count_lines()
 	cur = count_lines(text, dot);
 
-	// reduce counting -- the total lines can't have
-	// changed if we haven't done any edits.
-	if (file_modified != last_file_modified) {
+	// count_lines() is expensive.
+	// Call it only if something was changed since last time
+	// we were here:
+	if (modified_count != last_modified_count) {
 		tot = cur + count_lines(dot, end - 1) - 1;
-		last_file_modified = file_modified;
+		last_modified_count = modified_count;
 	}
 
 	//    current line         percent
@@ -2655,7 +3242,7 @@ static int format_edit_status(void)
 #if ENABLE_FEATURE_VI_READONLY
 		(readonly_mode ? " [Readonly]" : ""),
 #endif
-		(file_modified ? " [Modified]" : ""),
+		(modified_count ? " [Modified]" : ""),
 		cur, tot, percent);
 
 	if (ret >= 0 && ret < trunc_at)
@@ -2668,8 +3255,8 @@ static int format_edit_status(void)
 //----- Force refresh of all Lines -----------------------------
 static void redraw(int full_screen)
 {
-	place_cursor(0, 0, FALSE);	// put cursor in correct place
-	clear_to_eos();		// tell terminal to erase display
+	place_cursor(0, 0);
+	clear_to_eos();
 	screen_erase();		// erase the internal screen buffer
 	last_status_cksum = 0;	// force status update
 	refresh(full_screen);	// this will redraw the entire display
@@ -2746,11 +3333,9 @@ static void refresh(int full_screen)
 	int li, changed;
 	char *tp, *sp;		// pointer into text[] and screen[]
 
-	if (ENABLE_FEATURE_VI_WIN_RESIZE) {
+	if (ENABLE_FEATURE_VI_WIN_RESIZE IF_FEATURE_VI_ASK_TERMINAL(&& !G.get_rowcol_error) ) {
 		unsigned c = columns, r = rows;
-		get_terminal_width_height(0, &columns, &rows);
-		if (rows > MAX_SCR_ROWS) rows = MAX_SCR_ROWS;
-		if (columns > MAX_SCR_COLS) columns = MAX_SCR_COLS;
+		query_screen_dimensions();
 		full_screen |= (c - columns) | (r - rows);
 	}
 	sync_cursor(dot, &crow, &ccol);	// where cursor will be (on "dot")
@@ -2770,7 +3355,7 @@ static void refresh(int full_screen)
 			tp = t + 1;
 		}
 
-		// see if there are any changes between vitual screen and out_buf
+		// see if there are any changes between virtual screen and out_buf
 		changed = FALSE;	// assume no change
 		cs = 0;
 		ce = columns - 1;
@@ -2807,26 +3392,17 @@ static void refresh(int full_screen)
 		if (cs < 0) cs = 0;
 		if (ce > columns - 1) ce = columns - 1;
 		if (cs > ce) { cs = 0; ce = columns - 1; }
-		// is there a change between vitual screen and out_buf
+		// is there a change between virtual screen and out_buf
 		if (changed) {
 			// copy changed part of buffer to virtual screen
 			memcpy(sp+cs, out_buf+cs, ce-cs+1);
-
-			// move cursor to column of first change
-			//if (offset != old_offset) {
-			//	// place_cursor is still too stupid
-			//	// to handle offsets correctly
-			//	place_cursor(li, cs, FALSE);
-			//} else {
-				place_cursor(li, cs, TRUE);
-			//}
-
+			place_cursor(li, cs);
 			// write line out to terminal
 			fwrite(&sp[cs], ce - cs + 1, 1, stdout);
 		}
 	}
 
-	place_cursor(crow, ccol, TRUE);
+	place_cursor(crow, ccol);
 
 	old_offset = offset;
 #undef old_offset
@@ -2856,7 +3432,6 @@ static void refresh(int full_screen)
 //----- Execute a Vi Command -----------------------------------
 static void do_cmd(int c)
 {
-	const char *msg = msg; // for compiler
 	char *p, *q, *save_dot;
 	char buf[12];
 	int dir;
@@ -2865,8 +3440,8 @@ static void do_cmd(int c)
 
 //	c1 = c; // quiet the compiler
 //	cnt = yf = 0; // quiet the compiler
-//	msg = p = q = save_dot = buf; // quiet the compiler
-	memset(buf, '\0', 12);
+//	p = q = save_dot = buf; // quiet the compiler
+	memset(buf, '\0', sizeof(buf));
 
 	show_status_line();
 
@@ -2892,11 +3467,12 @@ static void do_cmd(int c)
 		if (*dot == '\n') {
 			// don't Replace past E-o-l
 			cmd_mode = 1;	// convert to insert
+			undo_queue_commit();
 		} else {
 			if (1 <= c || Isprint(c)) {
 				if (c != 27)
-					dot = yank_delete(dot, dot, 0, YANKDEL);	// delete char
-				dot = char_insert(dot, c);	// insert new char
+					dot = yank_delete(dot, dot, 0, YANKDEL, ALLOW_UNDO);	// delete char
+				dot = char_insert(dot, c, ALLOW_UNDO_CHAIN);	// insert new char
 			}
 			goto dc1;
 		}
@@ -2906,7 +3482,7 @@ static void do_cmd(int c)
 		if (c == KEYCODE_INSERT) goto dc5;
 		// insert the char c at "dot"
 		if (1 <= c || Isprint(c)) {
-			dot = char_insert(dot, c);
+			dot = char_insert(dot, c, ALLOW_UNDO_QUEUED);
 		}
 		goto dc1;
 	}
@@ -2952,16 +3528,10 @@ static void do_cmd(int c)
 		//case ']':	// ]-
 		//case '_':	// _-
 		//case '`':	// `-
-		//case 'u':	// u- FIXME- there is no undo
 		//case 'v':	// v-
-	default:			// unrecognised command
+	default:			// unrecognized command
 		buf[0] = c;
 		buf[1] = '\0';
-		if (c < ' ') {
-			buf[0] = '^';
-			buf[1] = c + '@';
-			buf[2] = '\0';
-		}
 		not_implemented(buf);
 		end_cmd_q();	// stop adding to q
 	case 0x00:			// nul- ignore
@@ -2987,36 +3557,34 @@ static void do_cmd(int c)
 	case KEYCODE_LEFT:	// cursor key Left
 	case 8:		// ctrl-H- move left    (This may be ERASE char)
 	case 0x7f:	// DEL- move left   (This may be ERASE char)
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_left();
+		do {
+			dot_left();
+		} while (--cmdcnt > 0);
 		break;
 	case 10:			// Newline ^J
 	case 'j':			// j- goto next line, same col
 	case KEYCODE_DOWN:	// cursor key Down
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_next();		// go to next B-o-l
-		dot = move_to_col(dot, ccol + offset);	// try stay in same col
+		do {
+			dot_next();		// go to next B-o-l
+			// try stay in same col
+			dot = move_to_col(dot, ccol + offset);
+		} while (--cmdcnt > 0);
 		break;
 	case 12:			// ctrl-L  force redraw whole screen
 	case 18:			// ctrl-R  force redraw
-		place_cursor(0, 0, FALSE);	// put cursor in correct place
-		clear_to_eos();	// tel terminal to erase display
-		mysleep(10);
+		place_cursor(0, 0);
+		clear_to_eos();
+		//mysleep(10); // why???
 		screen_erase();	// erase the internal screen buffer
 		last_status_cksum = 0;	// force status update
 		refresh(TRUE);	// this will redraw the entire display
 		break;
 	case 13:			// Carriage Return ^M
 	case '+':			// +- goto next line
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_next();
-		dot_skip_over_ws();
+		do {
+			dot_next();
+			dot_skip_over_ws();
+		} while (--cmdcnt > 0);
 		break;
 	case 21:			// ctrl-U  scroll up   half screen
 		dot_scroll((rows - 2) / 2, -1);
@@ -3026,18 +3594,18 @@ static void do_cmd(int c)
 		break;
 	case 27:			// esc
 		if (cmd_mode == 0)
-			indicate_error(c);
+			indicate_error();
 		cmd_mode = 0;	// stop insrting
+		undo_queue_commit();
 		end_cmd_q();
 		last_status_cksum = 0;	// force status update
 		break;
 	case ' ':			// move right
 	case 'l':			// move right
 	case KEYCODE_RIGHT:	// Cursor Key Right
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_right();
+		do {
+			dot_right();
+		} while (--cmdcnt > 0);
 		break;
 #if ENABLE_FEATURE_VI_YANKMARK
 	case '"':			// "- name a register to use for Delete/Yank
@@ -3045,12 +3613,13 @@ static void do_cmd(int c)
 		if ((unsigned)c1 <= 25) { // a-z?
 			YDreg = c1;
 		} else {
-			indicate_error(c);
+			indicate_error();
 		}
 		break;
 	case '\'':			// '- goto a specific mark
-		c1 = (get_one_char() | 0x20) - 'a';
-		if ((unsigned)c1 <= 25) { // a-z?
+		c1 = (get_one_char() | 0x20);
+		if ((unsigned)(c1 - 'a') <= 25) { // a-z?
+			c1 = (c1 - 'a');
 			// get the b-o-l
 			q = mark[c1];
 			if (text <= q && q < end) {
@@ -3063,7 +3632,7 @@ static void do_cmd(int c)
 			dot_begin();	// go to B-o-l
 			dot_skip_over_ws();
 		} else {
-			indicate_error(c);
+			indicate_error();
 		}
 		break;
 	case 'm':			// m- Mark a line
@@ -3076,13 +3645,13 @@ static void do_cmd(int c)
 			// remember the line
 			mark[c1] = dot;
 		} else {
-			indicate_error(c);
+			indicate_error();
 		}
 		break;
 	case 'P':			// P- Put register before
 	case 'p':			// p- put register after
 		p = reg[YDreg];
-		if (p == 0) {
+		if (p == NULL) {
 			status_line_bold("Nothing in register %c", what_reg());
 			break;
 		}
@@ -3103,26 +3672,33 @@ static void do_cmd(int c)
 			if (c == 'p')
 				dot_right();	// move to right, can move to NL
 		}
-		dot = string_insert(dot, p);	// insert the string
+		string_insert(dot, p, ALLOW_UNDO);	// insert the string
 		end_cmd_q();	// stop adding to q
 		break;
 	case 'U':			// U- Undo; replace current line with original version
-		if (reg[Ureg] != 0) {
+		if (reg[Ureg] != NULL) {
 			p = begin_line(dot);
 			q = end_line(dot);
-			p = text_hole_delete(p, q);	// delete cur line
-			p = string_insert(p, reg[Ureg]);	// insert orig line
+			p = text_hole_delete(p, q, ALLOW_UNDO);	// delete cur line
+			p += string_insert(p, reg[Ureg], ALLOW_UNDO_CHAIN);	// insert orig line
 			dot = p;
 			dot_skip_over_ws();
 		}
 		break;
 #endif /* FEATURE_VI_YANKMARK */
+#if ENABLE_FEATURE_VI_UNDO
+	case 'u':	// u- undo last operation
+		undo_pop();
+		break;
+#endif
 	case '$':			// $- goto end of line
 	case KEYCODE_END:		// Cursor Key End
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot = end_line(dot);
+		for (;;) {
+			dot = end_line(dot);
+			if (--cmdcnt <= 0)
+				break;
+			dot_next();
+		}
 		break;
 	case '%':			// %- find matching char of pair () [] {}
 		for (q = dot; q < end && *q != '\n'; q++) {
@@ -3130,7 +3706,7 @@ static void do_cmd(int c)
 				// we found half of a pair
 				p = find_pair(q, *q);
 				if (p == NULL) {
-					indicate_error(c);
+					indicate_error();
 				} else {
 					dot = p;
 				}
@@ -3138,7 +3714,7 @@ static void do_cmd(int c)
 			}
 		}
 		if (*q == '\n')
-			indicate_error(c);
+			indicate_error();
 		break;
 	case 'f':			// f- forward to a user specified char
 		last_forward_char = get_one_char();	// get the search char
@@ -3147,38 +3723,35 @@ static void do_cmd(int c)
 		//
 		//**** fall through to ... ';'
 	case ';':			// ;- look at rest of line for last forward char
-		if (cmdcnt-- > 1) {
-			do_cmd(';');
-		}				// repeat cnt
-		if (last_forward_char == 0)
-			break;
-		q = dot + 1;
-		while (q < end - 1 && *q != '\n' && *q != last_forward_char) {
-			q++;
-		}
-		if (*q == last_forward_char)
-			dot = q;
+		do {
+			if (last_forward_char == 0)
+				break;
+			q = dot + 1;
+			while (q < end - 1 && *q != '\n' && *q != last_forward_char) {
+				q++;
+			}
+			if (*q == last_forward_char)
+				dot = q;
+		} while (--cmdcnt > 0);
 		break;
 	case ',':           // repeat latest 'f' in opposite direction
-		if (cmdcnt-- > 1) {
-			do_cmd(',');
-		}                               // repeat cnt
 		if (last_forward_char == 0)
 			break;
-		q = dot - 1;
-		while (q >= text && *q != '\n' && *q != last_forward_char) {
-			q--;
-		}
-		if (q >= text && *q == last_forward_char)
-			dot = q;
+		do {
+			q = dot - 1;
+			while (q >= text && *q != '\n' && *q != last_forward_char) {
+				q--;
+			}
+			if (q >= text && *q == last_forward_char)
+				dot = q;
+		} while (--cmdcnt > 0);
 		break;
 
 	case '-':			// -- goto prev line
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_prev();
-		dot_skip_over_ws();
+		do {
+			dot_prev();
+			dot_skip_over_ws();
+		} while (--cmdcnt > 0);
 		break;
 #if ENABLE_FEATURE_VI_DOT_CMD
 	case '.':			// .- repeat the last modifying command
@@ -3210,9 +3783,6 @@ static void do_cmd(int c)
 		// user changed mind and erased the "/"-  do nothing
 		break;
 	case 'N':			// N- backward search for last pattern
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
 		dir = BACK;		// assume BACKWARD search
 		p = dot - 1;
 		if (last_search_pattern[0] == '?') {
@@ -3224,41 +3794,41 @@ static void do_cmd(int c)
 	case 'n':			// n- repeat search for last pattern
 		// search rest of text[] starting at next char
 		// if search fails return orignal "p" not the "p+1" address
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
+		do {
+			const char *msg;
  dc3:
-		dir = FORWARD;	// assume FORWARD search
-		p = dot + 1;
-		if (last_search_pattern[0] == '?') {
-			dir = BACK;
-			p = dot - 1;
-		}
- dc4:
-		q = char_search(p, last_search_pattern + 1, dir, FULL);
-		if (q != NULL) {
-			dot = q;	// good search, update "dot"
-			msg = "";
-			goto dc2;
-		}
-		// no pattern found between "dot" and "end"- continue at top
-		p = text;
-		if (dir == BACK) {
-			p = end - 1;
-		}
-		q = char_search(p, last_search_pattern + 1, dir, FULL);
-		if (q != NULL) {	// found something
-			dot = q;	// found new pattern- goto it
-			msg = "search hit BOTTOM, continuing at TOP";
-			if (dir == BACK) {
-				msg = "search hit TOP, continuing at BOTTOM";
+			dir = FORWARD;	// assume FORWARD search
+			p = dot + 1;
+			if (last_search_pattern[0] == '?') {
+				dir = BACK;
+				p = dot - 1;
 			}
-		} else {
-			msg = "Pattern not found";
-		}
+ dc4:
+			q = char_search(p, last_search_pattern + 1, dir, FULL);
+			if (q != NULL) {
+				dot = q;	// good search, update "dot"
+				msg = NULL;
+				goto dc2;
+			}
+			// no pattern found between "dot" and "end"- continue at top
+			p = text;
+			if (dir == BACK) {
+				p = end - 1;
+			}
+			q = char_search(p, last_search_pattern + 1, dir, FULL);
+			if (q != NULL) {	// found something
+				dot = q;	// found new pattern- goto it
+				msg = "search hit BOTTOM, continuing at TOP";
+				if (dir == BACK) {
+					msg = "search hit TOP, continuing at BOTTOM";
+				}
+			} else {
+				msg = "Pattern not found";
+			}
  dc2:
-		if (*msg)
-			status_line_bold("%s", msg);
+			if (msg)
+				status_line_bold("%s", msg);
+		} while (--cmdcnt > 0);
 		break;
 	case '{':			// {- move backward paragraph
 		q = char_search(dot, "\n\n", BACK, FULL);
@@ -3273,7 +3843,7 @@ static void do_cmd(int c)
 		}
 		break;
 #endif /* FEATURE_VI_SEARCH */
-	case '0':			// 0- goto begining of line
+	case '0':			// 0- goto beginning of line
 	case '1':			// 1-
 	case '2':			// 2-
 	case '3':			// 3-
@@ -3291,57 +3861,14 @@ static void do_cmd(int c)
 		break;
 	case ':':			// :- the colon mode commands
 		p = get_input_line(":");	// get input line- use "status line"
-#if ENABLE_FEATURE_VI_COLON
 		colon(p);		// execute the command
-#else
-		if (*p == ':')
-			p++;				// move past the ':'
-		cnt = strlen(p);
-		if (cnt <= 0)
-			break;
-		if (strncasecmp(p, "quit", cnt) == 0
-		 || strncasecmp(p, "q!", cnt) == 0   // delete lines
-		) {
-			if (file_modified && p[1] != '!') {
-				status_line_bold("No write since last change (:quit! overrides)");
-			} else {
-				editing = 0;
-			}
-		} else if (strncasecmp(p, "write", cnt) == 0
-		        || strncasecmp(p, "wq", cnt) == 0
-		        || strncasecmp(p, "wn", cnt) == 0
-		        || strncasecmp(p, "x", cnt) == 0
-		) {
-			cnt = file_write(current_filename, text, end - 1);
-			if (cnt < 0) {
-				if (cnt == -1)
-					status_line_bold("Write error: %s", strerror(errno));
-			} else {
-				file_modified = 0;
-				last_file_modified = -1;
-				status_line("\"%s\" %dL, %dC", current_filename, count_lines(text, end - 1), cnt);
-				if (p[0] == 'x' || p[1] == 'q' || p[1] == 'n'
-				 || p[0] == 'X' || p[1] == 'Q' || p[1] == 'N'
-				) {
-					editing = 0;
-				}
-			}
-		} else if (strncasecmp(p, "file", cnt) == 0) {
-			last_status_cksum = 0;	// force status update
-		} else if (sscanf(p, "%d", &j) > 0) {
-			dot = find_line(j);		// go to line # j
-			dot_skip_over_ws();
-		} else {		// unrecognised cmd
-			not_implemented(p);
-		}
-#endif /* !FEATURE_VI_COLON */
 		break;
 	case '<':			// <- Left  shift something
 	case '>':			// >- Right shift something
 		cnt = count_lines(text, dot);	// remember what line we are on
 		c1 = get_one_char();	// get the type of thing to delete
 		find_range(&p, &q, c1);
-		yank_delete(p, q, 1, YANKONLY);	// save copy before change
+		yank_delete(p, q, 1, YANKONLY, NO_UNDO);	// save copy before change
 		p = begin_line(p);
 		q = end_line(q);
 		i = count_lines(p, q);	// # of lines we are shifting
@@ -3350,16 +3877,16 @@ static void do_cmd(int c)
 				// shift left- remove tab or 8 spaces
 				if (*p == '\t') {
 					// shrink buffer 1 char
-					text_hole_delete(p, p);
+					text_hole_delete(p, p, NO_UNDO);
 				} else if (*p == ' ') {
 					// we should be calculating columns, not just SPACE
 					for (j = 0; *p == ' ' && j < tabstop; j++) {
-						text_hole_delete(p, p);
+						text_hole_delete(p, p, NO_UNDO);
 					}
 				}
 			} else if (c == '>') {
 				// shift right -- add tab or 8 spaces
-				char_insert(p, '\t');
+				char_insert(p, '\t', ALLOW_UNDO);
 			}
 		}
 		dot = find_line(cnt);	// what line were we on
@@ -3377,25 +3904,24 @@ static void do_cmd(int c)
 	case 'B':			// B- back a blank-delimited Word
 	case 'E':			// E- end of a blank-delimited word
 	case 'W':			// W- forward a blank-delimited word
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
 		dir = FORWARD;
 		if (c == 'B')
 			dir = BACK;
-		if (c == 'W' || isspace(dot[dir])) {
-			dot = skip_thing(dot, 1, dir, S_TO_WS);
-			dot = skip_thing(dot, 2, dir, S_OVER_WS);
-		}
-		if (c != 'W')
-			dot = skip_thing(dot, 1, dir, S_BEFORE_WS);
+		do {
+			if (c == 'W' || isspace(dot[dir])) {
+				dot = skip_thing(dot, 1, dir, S_TO_WS);
+				dot = skip_thing(dot, 2, dir, S_OVER_WS);
+			}
+			if (c != 'W')
+				dot = skip_thing(dot, 1, dir, S_BEFORE_WS);
+		} while (--cmdcnt > 0);
 		break;
 	case 'C':			// C- Change to e-o-l
 	case 'D':			// D- delete to e-o-l
 		save_dot = dot;
 		dot = dollar_line(dot);	// move to before NL
 		// copy text into a register and delete
-		dot = yank_delete(save_dot, dot, 0, YANKDEL);	// delete to e-o-l
+		dot = yank_delete(save_dot, dot, 0, YANKDEL, ALLOW_UNDO);	// delete to e-o-l
 		if (c == 'C')
 			goto dc_i;	// start inserting
 #if ENABLE_FEATURE_VI_DOT_CMD
@@ -3407,7 +3933,9 @@ static void do_cmd(int c)
 		c1 = get_one_char();
 		if (c1 != 'g') {
 			buf[0] = 'g';
-			buf[1] = c1; // TODO: if Unicode?
+			// c1 < 0 if the key was special. Try "g<up-arrow>"
+			// TODO: if Unicode?
+			buf[1] = (c1 >= 0 ? c1 : '*');
 			buf[2] = '\0';
 			not_implemented(buf);
 			break;
@@ -3427,9 +3955,9 @@ static void do_cmd(int c)
 		if (cmdcnt > (rows - 1)) {
 			cmdcnt = (rows - 1);
 		}
-		if (cmdcnt-- > 1) {
+		if (--cmdcnt > 0) {
 			do_cmd('+');
-		}				// repeat cnt
+		}
 		dot_skip_over_ws();
 		break;
 	case 'I':			// I- insert before first non-blank
@@ -3439,20 +3967,26 @@ static void do_cmd(int c)
 	case 'i':			// i- insert before current char
 	case KEYCODE_INSERT:	// Cursor Key Insert
  dc_i:
-		cmd_mode = 1;	// start insrting
+		cmd_mode = 1;	// start inserting
+		undo_queue_commit();	// commit queue when cmd_mode changes
 		break;
 	case 'J':			// J- join current and next lines together
-		if (cmdcnt-- > 2) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_end();		// move to NL
-		if (dot < end - 1) {	// make sure not last char in text[]
-			*dot++ = ' ';	// replace NL with space
-			file_modified++;
-			while (isblank(*dot)) {	// delete leading WS
-				dot_delete();
+		do {
+			dot_end();		// move to NL
+			if (dot < end - 1) {	// make sure not last char in text[]
+#if ENABLE_FEATURE_VI_UNDO
+				undo_push(dot, 1, UNDO_DEL);
+				*dot++ = ' ';	// replace NL with space
+				undo_push((dot - 1), 1, UNDO_INS_CHAIN);
+#else
+				*dot++ = ' ';
+				modified_count++;
+#endif
+				while (isblank(*dot)) {	// delete leading WS
+					text_hole_delete(dot, dot, ALLOW_UNDO_CHAIN);
+				}
 			}
-		}
+		} while (--cmdcnt > 0);
 		end_cmd_q();	// stop adding to q
 		break;
 	case 'L':			// L- goto bottom line on screen
@@ -3460,9 +3994,9 @@ static void do_cmd(int c)
 		if (cmdcnt > (rows - 1)) {
 			cmdcnt = (rows - 1);
 		}
-		if (cmdcnt-- > 1) {
+		if (--cmdcnt > 0) {
 			do_cmd('-');
-		}				// repeat cnt
+		}
 		dot_begin();
 		dot_skip_over_ws();
 		break;
@@ -3478,10 +4012,10 @@ static void do_cmd(int c)
 			dot_prev();
 	case 'o':			// o- open a empty line below; Yes, I know it is in the middle of the "if (..."
 			dot_end();
-			dot = char_insert(dot, '\n');
+			dot = char_insert(dot, '\n', ALLOW_UNDO);
 		} else {
 			dot_begin();	// 0
-			dot = char_insert(dot, '\n');	// i\n ESC
+			dot = char_insert(dot, '\n', ALLOW_UNDO);	// i\n ESC
 			dot_prev();	// -
 		}
 		goto dc_i;
@@ -3489,38 +4023,39 @@ static void do_cmd(int c)
 	case 'R':			// R- continuous Replace char
  dc5:
 		cmd_mode = 2;
+		undo_queue_commit();
 		break;
 	case KEYCODE_DELETE:
-		c = 'x';
-		// fall through
+		if (dot < end - 1)
+			dot = yank_delete(dot, dot, 1, YANKDEL, ALLOW_UNDO);
+		break;
 	case 'X':			// X- delete char before dot
 	case 'x':			// x- delete the current char
 	case 's':			// s- substitute the current char
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
 		dir = 0;
 		if (c == 'X')
 			dir = -1;
-		if (dot[dir] != '\n') {
-			if (c == 'X')
-				dot--;	// delete prev char
-			dot = yank_delete(dot, dot, 0, YANKDEL);	// delete char
-		}
-		if (c == 's')
-			goto dc_i;	// start insrting
+		do {
+			if (dot[dir] != '\n') {
+				if (c == 'X')
+					dot--;	// delete prev char
+				dot = yank_delete(dot, dot, 0, YANKDEL, ALLOW_UNDO);	// delete char
+			}
+		} while (--cmdcnt > 0);
 		end_cmd_q();	// stop adding to q
+		if (c == 's')
+			goto dc_i;	// start inserting
 		break;
 	case 'Z':			// Z- if modified, {write}; exit
 		// ZZ means to save file (if necessary), then exit
 		c1 = get_one_char();
 		if (c1 != 'Z') {
-			indicate_error(c);
+			indicate_error();
 			break;
 		}
-		if (file_modified) {
+		if (modified_count) {
 			if (ENABLE_FEATURE_VI_READONLY && readonly_mode) {
-				status_line_bold("\"%s\" File is read only", current_filename);
+				status_line_bold("'%s' is read only", current_filename);
 				break;
 			}
 			cnt = file_write(current_filename, text, end - 1);
@@ -3540,23 +4075,22 @@ static void do_cmd(int c)
 		break;
 	case 'b':			// b- back a word
 	case 'e':			// e- end of word
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
 		dir = FORWARD;
 		if (c == 'b')
 			dir = BACK;
-		if ((dot + dir) < text || (dot + dir) > end - 1)
-			break;
-		dot += dir;
-		if (isspace(*dot)) {
-			dot = skip_thing(dot, (c == 'e') ? 2 : 1, dir, S_OVER_WS);
-		}
-		if (isalnum(*dot) || *dot == '_') {
-			dot = skip_thing(dot, 1, dir, S_END_ALNUM);
-		} else if (ispunct(*dot)) {
-			dot = skip_thing(dot, 1, dir, S_END_PUNCT);
-		}
+		do {
+			if ((dot + dir) < text || (dot + dir) > end - 1)
+				break;
+			dot += dir;
+			if (isspace(*dot)) {
+				dot = skip_thing(dot, (c == 'e') ? 2 : 1, dir, S_OVER_WS);
+			}
+			if (isalnum(*dot) || *dot == '_') {
+				dot = skip_thing(dot, 1, dir, S_END_ALNUM);
+			} else if (ispunct(*dot)) {
+				dot = skip_thing(dot, 1, dir, S_END_PUNCT);
+			}
+		} while (--cmdcnt > 0);
 		break;
 	case 'c':			// c- change something
 	case 'd':			// d- delete something
@@ -3576,6 +4110,7 @@ static void do_cmd(int c)
 			c1 = get_one_char();	// get the type of thing to delete
 		// determine range, and whether it spans lines
 		ml = find_range(&p, &q, c1);
+		place_cursor(0, 0);
 		if (c1 == 27) {	// ESC- user changed mind and wants out
 			c = c1 = 27;	// Escape- do nothing
 		} else if (strchr("wW", c1)) {
@@ -3587,23 +4122,23 @@ static void do_cmd(int c)
 					q--;
 				}
 			}
-			dot = yank_delete(p, q, ml, yf);	// delete word
+			dot = yank_delete(p, q, ml, yf, ALLOW_UNDO);	// delete word
 		} else if (strchr("^0bBeEft%$ lh\b\177", c1)) {
 			// partial line copy text into a register and delete
-			dot = yank_delete(p, q, ml, yf);	// delete word
+			dot = yank_delete(p, q, ml, yf, ALLOW_UNDO);	// delete word
 		} else if (strchr("cdykjHL+-{}\r\n", c1)) {
 			// whole line copy text into a register and delete
-			dot = yank_delete(p, q, ml, yf);	// delete lines
+			dot = yank_delete(p, q, ml, yf, ALLOW_UNDO);	// delete lines
 			whole = 1;
 		} else {
 			// could not recognize object
 			c = c1 = 27;	// error-
 			ml = 0;
-			indicate_error(c);
+			indicate_error();
 		}
 		if (ml && whole) {
 			if (c == 'c') {
-				dot = char_insert(dot, '\n');
+				dot = char_insert(dot, '\n', ALLOW_UNDO_CHAIN);
 				// on the last line of file don't move to prev line
 				if (whole && dot != (end-1)) {
 					dot_prev();
@@ -3641,17 +4176,22 @@ static void do_cmd(int c)
 	}
 	case 'k':			// k- goto prev line, same col
 	case KEYCODE_UP:		// cursor key Up
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		dot_prev();
-		dot = move_to_col(dot, ccol + offset);	// try stay in same col
+		do {
+			dot_prev();
+			dot = move_to_col(dot, ccol + offset);	// try stay in same col
+		} while (--cmdcnt > 0);
 		break;
 	case 'r':			// r- replace the current char with user input
 		c1 = get_one_char();	// get the replacement char
 		if (*dot != '\n') {
+#if ENABLE_FEATURE_VI_UNDO
+			undo_push(dot, 1, UNDO_DEL);
 			*dot = c1;
-			file_modified++;
+			undo_push(dot, 1, UNDO_INS_CHAIN);
+#else
+			*dot = c1;
+			modified_count++;
+#endif
 		}
 		end_cmd_q();	// stop adding to q
 		break;
@@ -3663,19 +4203,18 @@ static void do_cmd(int c)
 		last_forward_char = 0;
 		break;
 	case 'w':			// w- forward a word
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		if (isalnum(*dot) || *dot == '_') {	// we are on ALNUM
-			dot = skip_thing(dot, 1, FORWARD, S_END_ALNUM);
-		} else if (ispunct(*dot)) {	// we are on PUNCT
-			dot = skip_thing(dot, 1, FORWARD, S_END_PUNCT);
-		}
-		if (dot < end - 1)
-			dot++;		// move over word
-		if (isspace(*dot)) {
-			dot = skip_thing(dot, 2, FORWARD, S_OVER_WS);
-		}
+		do {
+			if (isalnum(*dot) || *dot == '_') {	// we are on ALNUM
+				dot = skip_thing(dot, 1, FORWARD, S_END_ALNUM);
+			} else if (ispunct(*dot)) {	// we are on PUNCT
+				dot = skip_thing(dot, 1, FORWARD, S_END_PUNCT);
+			}
+			if (dot < end - 1)
+				dot++;		// move over word
+			if (isspace(*dot)) {
+				dot = skip_thing(dot, 2, FORWARD, S_OVER_WS);
+			}
+		} while (--cmdcnt > 0);
 		break;
 	case 'z':			// z-
 		c1 = get_one_char();	// get the replacement char
@@ -3691,17 +4230,28 @@ static void do_cmd(int c)
 		dot = move_to_col(dot, cmdcnt - 1);	// try to move to column
 		break;
 	case '~':			// ~- flip the case of letters   a-z -> A-Z
-		if (cmdcnt-- > 1) {
-			do_cmd(c);
-		}				// repeat cnt
-		if (islower(*dot)) {
-			*dot = toupper(*dot);
-			file_modified++;
-		} else if (isupper(*dot)) {
-			*dot = tolower(*dot);
-			file_modified++;
-		}
-		dot_right();
+		do {
+#if ENABLE_FEATURE_VI_UNDO
+			if (islower(*dot)) {
+				undo_push(dot, 1, UNDO_DEL);
+				*dot = toupper(*dot);
+				undo_push(dot, 1, UNDO_INS_CHAIN);
+			} else if (isupper(*dot)) {
+				undo_push(dot, 1, UNDO_DEL);
+				*dot = tolower(*dot);
+				undo_push(dot, 1, UNDO_INS_CHAIN);
+			}
+#else
+			if (islower(*dot)) {
+				*dot = toupper(*dot);
+				modified_count++;
+			} else if (isupper(*dot)) {
+				*dot = tolower(*dot);
+				modified_count++;
+			}
+#endif
+			dot_right();
+		} while (--cmdcnt > 0);
 		end_cmd_q();	// stop adding to q
 		break;
 		//----- The Cursor and Function Keys -----------------------------
@@ -3729,7 +4279,7 @@ static void do_cmd(int c)
  dc1:
 	// if text[] just became empty, add back an empty line
 	if (end == text) {
-		char_insert(text, '\n');	// start empty buf with dummy line
+		char_insert(text, '\n', NO_UNDO);	// start empty buf with dummy line
 		dot = text;
 	}
 	// it is OK for dot to exactly equal to end, otherwise check dot validity
@@ -3822,10 +4372,11 @@ static void crash_dummy()
 	cmd1 = " \n\r\002\004\005\006\025\0310^$-+wWeEbBhjklHL";
 
 	// is there already a command running?
-	if (chars_to_parse > 0)
+	if (readbuffer[0] > 0)
 		goto cd1;
  cd0:
-	startrbi = rbi = 0;
+	readbuffer[0] = 'X';
+	startrbi = rbi = 1;
 	sleeptime = 0;          // how long to pause between commands
 	memset(readbuffer, '\0', sizeof(readbuffer));
 	// generate a command by percentages
@@ -3899,7 +4450,7 @@ static void crash_dummy()
 		}
 		strcat(readbuffer, "\033");
 	}
-	chars_to_parse = strlen(readbuffer);
+	readbuffer[0] = strlen(readbuffer + 1);
  cd1:
 	totalcmds++;
 	if (sleeptime > 0)
@@ -3936,8 +4487,8 @@ static void crash_test()
 
 	if (msg[0]) {
 		printf("\n\n%d: \'%c\' %s\n\n\n%s[Hit return to continue]%s",
-			totalcmds, last_input_char, msg, SOs, SOn);
-		fflush(stdout);
+			totalcmds, last_input_char, msg, ESC_BOLD_TEXT, ESC_NORM_TEXT);
+		fflush_all();
 		while (safe_read(STDIN_FILENO, d, 1) > 0) {
 			if (d[0] == '\n' || d[0] == '\r')
 				break;

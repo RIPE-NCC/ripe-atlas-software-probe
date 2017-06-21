@@ -1,3 +1,8 @@
+unset LANG
+unset LANGUAGE
+unset LC_TIME
+unset LC_ALL
+
 dt=`busybox date -d 1:2 +%T`
 test x"$dt" = x"01:02:00"
 
@@ -36,18 +41,18 @@ test x"$hdt" = x"$dt"
 # Avoiding using week day in this evaluation, as it's mostly different every year
 # date (GNU coreutils) 6.10 reports:
 #	date: invalid date '01231133'
-dt=`busybox date -d 01231133 +%c`
-dt=`echo "$dt" | cut -b5-19`
-test x"$dt" = x"Jan 23 11:33:00"
+#dt=`busybox date -d 01231133 +%c`
+#dt=`echo "$dt" | cut -b5-19`
+#test x"$dt" = x"Jan 23 11:33:00"
 
 # date (GNU coreutils) 6.10 reports:
 #	date: invalid date '012311332000'
-dt=`busybox date -d 012311332000 +%c`
+dt=`busybox date -d 200001231133 +%c`
 test x"$dt" = x"Sun Jan 23 11:33:00 2000"
 
 # date (GNU coreutils) 6.10 reports:
 #	date: invalid date '012311332000'
-dt=`busybox date -d 012311332000.30 +%c`
+dt=`busybox date -d 200001231133.30 +%c`
 test x"$dt" = x"Sun Jan 23 11:33:30 2000"
 
 lcbbd="LC_ALL=C busybox date"
@@ -126,4 +131,4 @@ test x"$res" = xOK
 
 # This should error out (by showing usage text). Testing for that
 dt=`busybox date -d 012311332000.30 %+c 2>&1 | head -n 1`
-test x"${dt#BusyBox * multi-call binary}" = x
+test x"${dt##BusyBox * multi-call binary*}" = x""

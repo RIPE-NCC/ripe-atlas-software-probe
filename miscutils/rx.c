@@ -1,22 +1,37 @@
 /* vi: set sw=4 ts=4: */
-/*-------------------------------------------------------------------------
- * Filename:      xmodem.c
+/*
  * Copyright:     Copyright (C) 2001, Hewlett-Packard Company
  * Author:        Christopher Hoover <ch@hpl.hp.com>
  * Description:   xmodem functionality for uploading of kernels
  *                and the like
  * Created at:    Thu Dec 20 01:58:08 PST 2001
- *-----------------------------------------------------------------------*/
-/*
- * xmodem.c: xmodem functionality for uploading of kernels and
- *            the like
+ *
+ * xmodem functionality for uploading of kernels and the like
  *
  * Copyright (C) 2001 Hewlett-Packard Laboratories
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
  * This was originally written for blob and then adapted for busybox.
  */
+//config:config RX
+//config:	bool "rx"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	help
+//config:	  Receive files using the Xmodem protocol.
+
+//applet:IF_RX(APPLET(rx, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_RX) += rx.o
+
+//usage:#define rx_trivial_usage
+//usage:       "FILE"
+//usage:#define rx_full_usage "\n\n"
+//usage:       "Receive a file using the xmodem protocol"
+//usage:
+//usage:#define rx_example_usage
+//usage:       "$ rx /tmp/foo\n"
 
 #include "libbb.h"
 
@@ -26,6 +41,7 @@
 #define ACK 0x06
 #define NAK 0x15
 #define BS  0x08
+#define PAD 0x1A
 
 /*
 Cf:
@@ -44,69 +60,91 @@ Cf:
 
 static int read_byte(unsigned timeout)
 {
-	char buf[1];
+	unsigned char buf;
 	int n;
 
 	alarm(timeout);
 	/* NOT safe_read! We want ALRM to interrupt us */
-	n = read(read_fd, buf, 1);
+	n = read(read_fd, &buf, 1);
 	alarm(0);
 	if (n == 1)
-		return (unsigned char)buf[0];
+		return buf;
 	return -1;
 }
 
 static int receive(/*int read_fd, */int file_fd)
 {
 	unsigned char blockBuf[1024];
+	unsigned blockLength = 0;
 	unsigned errors = 0;
 	unsigned wantBlockNo = 1;
 	unsigned length = 0;
 	int do_crc = 1;
-	char nak = 'C';
+	char reply_char;
 	unsigned timeout = TIMEOUT_LONG;
 
 	/* Flush pending input */
 	tcflush(read_fd, TCIFLUSH);
 
 	/* Ask for CRC; if we get errors, we will go with checksum */
-	full_write(write_fd, &nak, 1);
+	reply_char = 'C';
+	full_write(write_fd, &reply_char, 1);
 
 	for (;;) {
 		int blockBegin;
 		int blockNo, blockNoOnesCompl;
-		int blockLength;
-		int cksum_crc;	/* cksum OR crc */
+		int cksum_or_crc;
 		int expected;
-		int i,j;
+		int i, j;
 
 		blockBegin = read_byte(timeout);
 		if (blockBegin < 0)
 			goto timeout;
 
+		/* If last block, remove padding */
+		if (blockBegin == EOT) {
+			/* Data blocks can be padded with ^Z characters */
+			/* This code tries to detect and remove them */
+			if (blockLength >= 3
+			 && blockBuf[blockLength - 1] == PAD
+			 && blockBuf[blockLength - 2] == PAD
+			 && blockBuf[blockLength - 3] == PAD
+			) {
+				while (blockLength
+				    && blockBuf[blockLength - 1] == PAD
+				) {
+					blockLength--;
+				}
+			}
+		}
+		/* Write previously received block */
+		errno = 0;
+		if (full_write(file_fd, blockBuf, blockLength) != blockLength) {
+			bb_perror_msg(bb_msg_write_error);
+			goto fatal;
+		}
+
 		timeout = TIMEOUT;
-		nak = NAK;
+		reply_char = NAK;
 
 		switch (blockBegin) {
 		case SOH:
 		case STX:
 			break;
-
 		case EOT:
-			nak = ACK;
-			full_write(write_fd, &nak, 1);
+			reply_char = ACK;
+			full_write(write_fd, &reply_char, 1);
 			return length;
-
 		default:
 			goto error;
 		}
 
-		/* block no */
+		/* Block no */
 		blockNo = read_byte(TIMEOUT);
 		if (blockNo < 0)
 			goto timeout;
 
-		/* block no one's compliment */
+		/* Block no, in one's complement form */
 		blockNoOnesCompl = read_byte(TIMEOUT);
 		if (blockNoOnesCompl < 0)
 			goto timeout;
@@ -125,16 +163,12 @@ static int receive(/*int read_fd, */int file_fd)
 			blockBuf[i] = cc;
 		}
 
+		cksum_or_crc = read_byte(TIMEOUT);
+		if (cksum_or_crc < 0)
+			goto timeout;
 		if (do_crc) {
-			cksum_crc = read_byte(TIMEOUT);
-			if (cksum_crc < 0)
-				goto timeout;
-			cksum_crc = (cksum_crc << 8) | read_byte(TIMEOUT);
-			if (cksum_crc < 0)
-				goto timeout;
-		} else {
-			cksum_crc = read_byte(TIMEOUT);
-			if (cksum_crc < 0)
+			cksum_or_crc = (cksum_or_crc << 8) | read_byte(TIMEOUT);
+			if (cksum_or_crc < 0)
 				goto timeout;
 		}
 
@@ -142,6 +176,7 @@ static int receive(/*int read_fd, */int file_fd)
 			/* a repeat of the last block is ok, just ignore it. */
 			/* this also ignores the initial block 0 which is */
 			/* meta data. */
+			blockLength = 0;
 			goto next;
 		}
 		if (blockNo != (wantBlockNo & 0xff)) {
@@ -155,9 +190,9 @@ static int receive(/*int read_fd, */int file_fd)
 				expected = expected ^ blockBuf[i] << 8;
 				for (j = 0; j < 8; j++) {
 					if (expected & 0x8000)
-						expected = expected << 1 ^ 0x1021;
+						expected = (expected << 1) ^ 0x1021;
 					else
-						expected = expected << 1;
+						expected = (expected << 1);
 				}
 			}
 			expected &= 0xffff;
@@ -166,35 +201,30 @@ static int receive(/*int read_fd, */int file_fd)
 				expected += blockBuf[i];
 			expected &= 0xff;
 		}
-		if (cksum_crc != expected) {
+		if (cksum_or_crc != expected) {
 			bb_error_msg(do_crc ? "crc error, expected 0x%04x, got 0x%04x"
-			                   : "checksum error, expected 0x%02x, got 0x%02x",
-					    expected, cksum_crc);
+					: "checksum error, expected 0x%02x, got 0x%02x",
+				expected, cksum_or_crc);
 			goto error;
 		}
 
 		wantBlockNo++;
 		length += blockLength;
-
-		errno = 0;
-		if (full_write(file_fd, blockBuf, blockLength) != blockLength) {
-			bb_perror_msg("can't write to file");
-			goto fatal;
-		}
  next:
 		errors = 0;
-		nak = ACK;
-		full_write(write_fd, &nak, 1);
+		reply_char = ACK;
+		full_write(write_fd, &reply_char, 1);
 		continue;
  error:
  timeout:
+		blockLength = 0;
 		errors++;
 		if (errors == MAXERRORS) {
 			/* Abort */
 
-			/* if were asking for crc, try again w/o crc */
-			if (nak == 'C') {
-				nak = NAK;
+			/* If were asking for crc, try again w/o crc */
+			if (reply_char == 'C') {
+				reply_char = NAK;
 				errors = 0;
 				do_crc = 0;
 				goto timeout;
@@ -209,7 +239,7 @@ static int receive(/*int read_fd, */int file_fd)
 		/* Flush pending input */
 		tcflush(read_fd, TCIFLUSH);
 
-		full_write(write_fd, &nak, 1);
+		full_write(write_fd, &reply_char, 1);
 	} /* for (;;) */
 }
 
@@ -218,21 +248,18 @@ static void sigalrm_handler(int UNUSED_PARAM signum)
 }
 
 int rx_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int rx_main(int argc, char **argv)
+int rx_main(int argc UNUSED_PARAM, char **argv)
 {
 	struct termios tty, orig_tty;
 	int termios_err;
 	int file_fd;
 	int n;
 
-	if (argc != 2)
-		bb_show_usage();
-
 	/* Disabled by vda:
 	 * why we can't receive from stdin? Why we *require*
 	 * controlling tty?? */
 	/*read_fd = xopen(CURRENT_TTY, O_RDWR);*/
-	file_fd = xopen(argv[1], O_RDWR|O_CREAT|O_TRUNC);
+	file_fd = xopen(single_argv(argv), O_RDWR|O_CREAT|O_TRUNC);
 
 	termios_err = tcgetattr(read_fd, &tty);
 	if (termios_err == 0) {

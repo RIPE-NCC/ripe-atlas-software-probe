@@ -146,6 +146,10 @@ Rob Sullivan <cogito.ergo.cogito@gmail.com>
 Linus Torvalds
     mkswap, fsck.minix, mkfs.minix
 
+Linus Walleij
+    fbset and fbsplash config RGBA parsing
+    rewrite of mdev helper to create devices from /sys/dev
+
 Mark Whitley <markw@codepoet.org>
     grep, sed, cut, xargs(previous),
     style-guide, new-applet-HOWTO, bug fixes, etc.
@@ -171,3 +175,6 @@ Bernhard Reutner-Fischer <rep.dot.nop@gmail.com>
 
 Mike Frysinger <vapier@gentoo.org>
     initial e2fsprogs, printenv, setarch, sum, misc
+
+Jie Zhang <jie.zhang@analog.com>
+    fixed two bugs in msh and hush (exitcode of killed processes)

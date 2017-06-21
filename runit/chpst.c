@@ -26,10 +26,115 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
-/* Dependencies on runit_lib.c removed */
+
+//config:config CHPST
+//config:	bool "chpst"
+//config:	default y
+//config:	help
+//config:	  chpst changes the process state according to the given options, and
+//config:	  execs specified program.
+//config:
+//config:config SETUIDGID
+//config:	bool "setuidgid"
+//config:	default y
+//config:	help
+//config:	  Sets soft resource limits as specified by options
+//config:
+//config:config ENVUIDGID
+//config:	bool "envuidgid"
+//config:	default y
+//config:	help
+//config:	  Sets $UID to account's uid and $GID to account's gid
+//config:
+//config:config ENVDIR
+//config:	bool "envdir"
+//config:	default y
+//config:	help
+//config:	  Sets various environment variables as specified by files
+//config:	  in the given directory
+//config:
+//config:config SOFTLIMIT
+//config:	bool "softlimit"
+//config:	default y
+//config:	help
+//config:	  Sets soft resource limits as specified by options
+
+//applet:IF_CHPST(APPLET(chpst, BB_DIR_USR_BIN, BB_SUID_DROP))
+//applet:IF_ENVDIR(APPLET_ODDNAME(envdir, chpst, BB_DIR_USR_BIN, BB_SUID_DROP, envdir))
+//applet:IF_ENVUIDGID(APPLET_ODDNAME(envuidgid, chpst, BB_DIR_USR_BIN, BB_SUID_DROP, envuidgid))
+//applet:IF_SETUIDGID(APPLET_ODDNAME(setuidgid, chpst, BB_DIR_USR_BIN, BB_SUID_DROP, setuidgid))
+//applet:IF_SOFTLIMIT(APPLET_ODDNAME(softlimit, chpst, BB_DIR_USR_BIN, BB_SUID_DROP, softlimit))
+
+//kbuild:lib-$(CONFIG_CHPST) += chpst.o
+//kbuild:lib-$(CONFIG_ENVDIR) += chpst.o
+//kbuild:lib-$(CONFIG_ENVUIDGID) += chpst.o
+//kbuild:lib-$(CONFIG_SETUIDGID) += chpst.o
+//kbuild:lib-$(CONFIG_SOFTLIMIT) += chpst.o
+
+//usage:#define chpst_trivial_usage
+//usage:       "[-vP012] [-u USER[:GRP]] [-U USER[:GRP]] [-e DIR]\n"
+//usage:       "	[-/ DIR] [-n NICE] [-m BYTES] [-d BYTES] [-o N]\n"
+//usage:       "	[-p N] [-f BYTES] [-c BYTES] PROG ARGS"
+//usage:#define chpst_full_usage "\n\n"
+//usage:       "Change the process state, run PROG\n"
+//usage:     "\n	-u USER[:GRP]	Set uid and gid"
+//usage:     "\n	-U USER[:GRP]	Set $UID and $GID in environment"
+//usage:     "\n	-e DIR		Set environment variables as specified by files"
+//usage:     "\n			in DIR: file=1st_line_of_file"
+//usage:     "\n	-/ DIR		Chroot to DIR"
+//usage:     "\n	-n NICE		Add NICE to nice value"
+//usage:     "\n	-m BYTES	Same as -d BYTES -s BYTES -l BYTES"
+//usage:     "\n	-d BYTES	Limit data segment"
+//usage:     "\n	-o N		Limit number of open files per process"
+//usage:     "\n	-p N		Limit number of processes per uid"
+//usage:     "\n	-f BYTES	Limit output file sizes"
+//usage:     "\n	-c BYTES	Limit core file size"
+//usage:     "\n	-v		Verbose"
+//usage:     "\n	-P		Create new process group"
+//usage:     "\n	-0		Close stdin"
+//usage:     "\n	-1		Close stdout"
+//usage:     "\n	-2		Close stderr"
+//usage:
+//usage:#define envdir_trivial_usage
+//usage:       "DIR PROG ARGS"
+//usage:#define envdir_full_usage "\n\n"
+//usage:       "Set various environment variables as specified by files\n"
+//usage:       "in the directory DIR, run PROG"
+//usage:
+//usage:#define envuidgid_trivial_usage
+//usage:       "USER PROG ARGS"
+//usage:#define envuidgid_full_usage "\n\n"
+//usage:       "Set $UID to USER's uid and $GID to USER's gid, run PROG"
+//usage:
+//usage:#define setuidgid_trivial_usage
+//usage:       "USER PROG ARGS"
+//usage:#define setuidgid_full_usage "\n\n"
+//usage:       "Set uid and gid to USER's uid and gid, drop supplementary group ids,\n"
+//usage:       "run PROG"
+//usage:
+//usage:#define softlimit_trivial_usage
+//usage:       "[-a BYTES] [-m BYTES] [-d BYTES] [-s BYTES] [-l BYTES]\n"
+//usage:       "	[-f BYTES] [-c BYTES] [-r BYTES] [-o N] [-p N] [-t N]\n"
+//usage:       "	PROG ARGS"
+//usage:#define softlimit_full_usage "\n\n"
+//usage:       "Set soft resource limits, then run PROG\n"
+//usage:     "\n	-a BYTES	Limit total size of all segments"
+//usage:     "\n	-m BYTES	Same as -d BYTES -s BYTES -l BYTES -a BYTES"
+//usage:     "\n	-d BYTES	Limit data segment"
+//usage:     "\n	-s BYTES	Limit stack segment"
+//usage:     "\n	-l BYTES	Limit locked memory size"
+//usage:     "\n	-o N		Limit number of open files per process"
+//usage:     "\n	-p N		Limit number of processes per uid"
+//usage:     "\nOptions controlling file sizes:"
+//usage:     "\n	-f BYTES	Limit output file sizes"
+//usage:     "\n	-c BYTES	Limit core file size"
+//usage:     "\nEfficiency opts:"
+//usage:     "\n	-r BYTES	Limit resident set size"
+//usage:     "\n	-t N		Limit CPU time, process receives"
+//usage:     "\n			a SIGXCPU after N seconds"
 
 #include "libbb.h"
-#include <dirent.h>
+#include <sys/resource.h> /* getrlimit */
 
 /*
 Five applets here: chpst, envdir, envuidgid, setuidgid, softlimit.
@@ -92,7 +197,8 @@ enum {
 	OPT_2 = (1 << 20) * ENABLE_CHPST,
 };
 
-static void edir(const char *directory_name)
+/* TODO: use recursive_action? */
+static NOINLINE void edir(const char *directory_name)
 {
 	int wdir;
 	DIR *dir;
@@ -101,9 +207,7 @@ static void edir(const char *directory_name)
 
 	wdir = xopen(".", O_RDONLY | O_NDELAY);
 	xchdir(directory_name);
-	dir = opendir(".");
-	if (!dir)
-		bb_perror_msg_and_die("opendir %s", directory_name);
+	dir = xopendir(".");
 	for (;;) {
 		char buf[256];
 		char *tail;
@@ -124,10 +228,10 @@ static void edir(const char *directory_name)
 			if ((errno == EISDIR) && directory_name) {
 				if (option_mask32 & OPT_v)
 					bb_perror_msg("warning: %s/%s is a directory",
-						directory_name,	d->d_name);
+						directory_name, d->d_name);
 				continue;
-			} else
-				bb_perror_msg_and_die("open %s/%s",
+			}
+			bb_perror_msg_and_die("open %s/%s",
 						directory_name, d->d_name);
 		}
 		size = full_read(fd, buf, sizeof(buf)-1);
@@ -151,8 +255,7 @@ static void edir(const char *directory_name)
 		xsetenv(d->d_name, buf);
 	}
 	closedir(dir);
-	if (fchdir(wdir) == -1)
-		bb_perror_msg_and_die("fchdir");
+	xfchdir(wdir);
 	close(wdir);
 }
 
@@ -175,7 +278,6 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
 {
 	struct bb_uidgid_t ugid;
 	char *set_user = set_user; /* for compiler */
-	char *env_user = env_user;
 	char *env_dir = env_dir;
 	char *root;
 	char *nicestr;
@@ -198,13 +300,13 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
 		// FIXME: can we live with int-sized limits?
 		// can we live with 40000 days?
 		// if yes -> getopt converts strings to numbers for us
-		opt_complementary = "-1:a+:c+:d+:f+:l+:m+:o+:p+:r+:s+:t+";
-		opt = getopt32(argv, "+a:c:d:f:l:m:o:p:r:s:t:u:U:e:"
-			USE_CHPST("/:n:vP012"),
+		opt_complementary = "-1";
+		opt = getopt32(argv, "+a:+c:+d:+f:+l:+m:+o:+p:+r:+s:+t:+u:U:e:"
+			IF_CHPST("/:n:vP012"),
 			&limita, &limitc, &limitd, &limitf, &limitl,
 			&limitm, &limito, &limitp, &limitr, &limits, &limitt,
-			&set_user, &env_user, &env_dir
-			USE_CHPST(, &root, &nicestr));
+			&set_user, &set_user, &env_dir
+			IF_CHPST(, &root, &nicestr));
 		argv += optind;
 		if (opt & OPT_m) { // -m means -asld
 			limita = limits = limitl = limitd = limitm;
@@ -231,7 +333,7 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
 
 	// envuidgid?
 	if (ENABLE_ENVUIDGID && applet_name[0] == 'e' && applet_name[3] == 'u') {
-		env_user = *argv++;
+		set_user = *argv++;
 		opt |= OPT_U;
 	}
 
@@ -345,22 +447,19 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
 	if (opt & OPT_e)
 		edir(env_dir);
 
-	// FIXME: chrooted jail must have /etc/passwd if we move this after chroot!
-	// OTOH chroot fails for non-roots!
-	// SOLUTION: cache uid/gid before chroot, apply uid/gid after
+	if (opt & (OPT_u|OPT_U))
+		xget_uidgid(&ugid, set_user);
+
+	// chrooted jail must have /etc/passwd if we move this after chroot.
+	// OTOH chroot fails for non-roots.
+	// Solution: cache uid/gid before chroot, apply uid/gid after.
 	if (opt & OPT_U) {
-		xget_uidgid(&ugid, env_user);
 		xsetenv("GID", utoa(ugid.gid));
 		xsetenv("UID", utoa(ugid.uid));
 	}
 
-	if (opt & OPT_u) {
-		xget_uidgid(&ugid, set_user);
-	}
-
 	if (opt & OPT_root) {
-		xchdir(root);
-		xchroot(".");
+		xchroot(root);
 	}
 
 	if (opt & OPT_u) {
@@ -383,6 +482,5 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
 	if (opt & OPT_2)
 		close(STDERR_FILENO);
 
-	BB_EXECVP(argv[0], argv);
-	bb_perror_msg_and_die("exec %s", argv[0]);
+	BB_EXECVP_or_die(argv);
 }

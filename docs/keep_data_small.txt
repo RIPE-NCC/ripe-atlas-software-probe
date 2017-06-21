@@ -59,7 +59,7 @@ wait
 		Example 1
 
 One example how to reduce global data usage is in
-archival/libunarchive/decompress_unzip.c:
+archival/libarchive/decompress_gunzip.c:
 
 /* This is somewhat complex-looking arrangement, but it allows
  * to place decompressor state either in bss or in
@@ -87,7 +87,7 @@ take a look at archival/gzip.c. Here all global data is replaced by
 single global pointer (ptr_to_globals) to allocated storage.
 
 In order to not duplicate ptr_to_globals in every applet, you can
-reuse single common one. It is defined in libbb/messages.c
+reuse single common one. It is defined in libbb/ptr_to_globals.c
 as struct globals *const ptr_to_globals, but the struct globals is
 NOT defined in libbb.h. You first define your own struct:
 
@@ -103,7 +103,15 @@ smaller code. In order to assign it, use SET_PTR_TO_GLOBALS macro:
 
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G)));
 
-Typically it is done in <applet>_main().
+Typically it is done in <applet>_main(). Another variation is
+to use stack:
+
+int <applet>_main(...)
+{
+#undef G
+	struct globals G;
+	memset(&G, 0, sizeof(G));
+	SET_PTR_TO_GLOBALS(&G);
 
 Now you can reference "globals" by G.a, G.buf and so on, in any function.
 
@@ -138,11 +146,9 @@ less readable, use #defines:
 #define sector (G.sector)
 
 
-		Word of caution
+		Finding non-shared duplicated strings
 
-If applet doesn't use much of global data, converting it to use
-one of above methods is not worth the resulting code obfuscation.
-If you have less than ~300 bytes of global data - don't bother.
+strings busybox | sort | uniq -c | sort -nr
 
 
 		gcc's data alignment problem
@@ -214,3 +220,46 @@ Result (non-static busybox built against glibc):
    text    data     bss     dec     hex filename
  634416    2736   23856  661008   a1610 busybox
  632580    2672   22944  658196   a0b14 busybox_noalign
+
+
+
+		Keeping code small
+
+Use scripts/bloat-o-meter to check whether introduced changes
+didn't generate unnecessary bloat. This script needs unstripped binaries
+to generate a detailed report. To automate this, just use
+"make bloatcheck". It requires busybox_old binary to be present,
+use "make baseline" to generate it from unmodified source, or
+copy busybox_unstripped to busybox_old before modifying sources
+and rebuilding.
+
+Set CONFIG_EXTRA_CFLAGS="-fno-inline-functions-called-once",
+produce "make bloatcheck", see the biggest auto-inlined functions.
+Now, set CONFIG_EXTRA_CFLAGS back to "", but add NOINLINE
+to some of these functions. In 1.16.x timeframe, the results were
+(annotated "make bloatcheck" output):
+
+function             old     new   delta
+expand_vars_to_list    -    1712   +1712 win
+lzo1x_optimize         -    1429   +1429 win
+arith_apply            -    1326   +1326 win
+read_interfaces        -    1163   +1163 loss, leave w/o NOINLINE
+logdir_open            -    1148   +1148 win
+check_deps             -    1148   +1148 loss
+rewrite                -    1039   +1039 win
+run_pipe             358    1396   +1038 win
+write_status_file      -    1029   +1029 almost the same, leave w/o NOINLINE
+dump_identity          -     987    +987 win
+mainQSort3             -     921    +921 win
+parse_one_line         -     916    +916 loss
+summarize              -     897    +897 almost the same
+do_shm                 -     884    +884 win
+cpio_o                 -     863    +863 win
+subCommand             -     841    +841 loss
+receive                -     834    +834 loss
+
+855 bytes saved in total.
+
+scripts/mkdiff_obj_bloat may be useful to automate this process: run
+"scripts/mkdiff_obj_bloat NORMALLY_BUILT_TREE FORCED_NOINLINE_TREE"
+and select modules which shrank.

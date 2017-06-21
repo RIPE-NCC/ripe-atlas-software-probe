@@ -5,33 +5,56 @@
  * Copyright (C) 2006 by Jason Schoon <floydpink@gmail.com>
  * Some portions cribbed from e2fsprogs, util-linux, dosfstools
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config FINDFS
+//config:	bool "findfs"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	select VOLUMEID
+//config:	help
+//config:	  Prints the name of a filesystem with given label or UUID.
+//config:	  WARNING:
+//config:	  With all submodules selected, it will add ~8k to busybox.
+
+/* Benefits from suid root: better access to /dev/BLOCKDEVs: */
+//applet:IF_FINDFS(APPLET(findfs, BB_DIR_SBIN, BB_SUID_MAYBE))
+
+//kbuild:lib-$(CONFIG_FINDFS) += findfs.o
+
+//usage:#define findfs_trivial_usage
+//usage:       "LABEL=label or UUID=uuid"
+//usage:#define findfs_full_usage "\n\n"
+//usage:       "Find a filesystem device based on a label or UUID"
+//usage:
+//usage:#define findfs_example_usage
+//usage:       "$ findfs LABEL=MyDevice"
 
 #include "libbb.h"
 #include "volume_id.h"
 
 int findfs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int findfs_main(int argc, char **argv)
+int findfs_main(int argc UNUSED_PARAM, char **argv)
 {
-	char *tmp = NULL;
+	char *dev = *++argv;
 
-	if (argc != 2)
+	if (!dev)
 		bb_show_usage();
 
-	if (!strncmp(argv[1], "LABEL=", 6))
-		tmp = get_devname_from_label(argv[1] + 6);
-	else if (!strncmp(argv[1], "UUID=", 5))
-		tmp = get_devname_from_uuid(argv[1] + 5);
-	else if (!strncmp(argv[1], "/dev/", 5)) {
-		/* Just pass a device name right through.  This might aid in some scripts
-		being able to call this unconditionally */
-		tmp = argv[1];
-	} else
-		bb_show_usage();
+	if (is_prefixed_with(dev, "/dev/")) {
+		/* Just pass any /dev/xxx name right through.
+		 * This might aid in some scripts being able
+		 * to call this unconditionally */
+		dev = NULL;
+	} else {
+		/* Otherwise, handle LABEL=xxx and UUID=xxx,
+		 * fail on anything else */
+		if (!resolve_mount_spec(argv))
+			bb_show_usage();
+	}
 
-	if (tmp) {
-		puts(tmp);
+	if (*argv != dev) {
+		puts(*argv);
 		return 0;
 	}
 	return 1;

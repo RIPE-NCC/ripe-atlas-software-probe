@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_XFS) += xfs.o
+
+//config:
+//config:config FEATURE_VOLUMEID_XFS
+//config:	bool "xfs filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct xfs_super_block {
@@ -33,10 +44,11 @@ struct xfs_super_block {
 	uint64_t	icount;
 	uint64_t	ifree;
 	uint64_t	fdblocks;
-} __attribute__((__packed__));
+} PACKED;
 
-int volume_id_probe_xfs(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	struct xfs_super_block *xs;
 
 	dbg("probing at offset 0x%llx", (unsigned long long) off);
@@ -53,7 +65,7 @@ int volume_id_probe_xfs(struct volume_id *id, uint64_t off)
 	volume_id_set_uuid(id, xs->uuid, UUID_DCE);
 
 //	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
-//	id->type = "xfs";
+	IF_FEATURE_BLKID_TYPE(id->type = "xfs";)
 
 	return 0;
 }

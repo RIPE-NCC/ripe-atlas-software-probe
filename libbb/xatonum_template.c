@@ -1,4 +1,8 @@
 /*
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
+ */
+/*
 You need to define the following (example):
 
 #define type long
@@ -21,9 +25,8 @@ unsigned type FAST_FUNC xstrtou(_range_sfx)(const char *numstr, int base,
 	int old_errno;
 	char *e;
 
-	/* Disallow '-' and any leading whitespace. Make sure we get the
-	 * actual isspace function rather than a macro implementaion. */
-	if (*numstr == '-' || *numstr == '+' || (isspace)(*numstr))
+	/* Disallow '-' and any leading whitespace. */
+	if (*numstr == '-' || *numstr == '+' || isspace(*numstr))
 		goto inval;
 
 	/* Since this is a lib function, we're not allowed to reset errno to 0.
@@ -38,7 +41,7 @@ unsigned type FAST_FUNC xstrtou(_range_sfx)(const char *numstr, int base,
 	if (errno || numstr == e)
 		goto inval; /* error / no digits / illegal trailing chars */
 
-	errno = old_errno;	/* Ok.  So restore errno. */
+	errno = old_errno;  /* Ok.  So restore errno. */
 
 	/* Do optional suffix parsing.  Allow 'empty' suffix tables.
 	 * Note that we also allow nul suffixes with associated multipliers,
@@ -56,7 +59,7 @@ unsigned type FAST_FUNC xstrtou(_range_sfx)(const char *numstr, int base,
 	}
 
 	/* Note: trailing space is an error.
-	   It would be easy enough to allow though if desired. */
+	 * It would be easy enough to allow though if desired. */
 	if (*e)
 		goto inval;
  chk_range:
@@ -151,6 +154,11 @@ type FAST_FUNC xstrto(_range_sfx)(const char *numstr, int base,
 type FAST_FUNC xstrto(_range)(const char *numstr, int base, type lower, type upper)
 {
 	return xstrto(_range_sfx)(numstr, base, lower, upper, NULL);
+}
+
+type FAST_FUNC xstrto()(const char *numstr, int base)
+{
+	return xstrto(_range_sfx)(numstr, base, XSTR_TYPE_MIN, XSTR_TYPE_MAX, NULL);
 }
 
 type FAST_FUNC xato(_range_sfx)(const char *numstr,

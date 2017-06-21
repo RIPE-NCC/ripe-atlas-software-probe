@@ -4,7 +4,7 @@
  *
  * This is written specifically for the linux /proc/<PID>/stat(m)
  * files format.
-
+ *
  * This reads the PIDs of all processes and their status and shows
  * the status of processes (first ones that fit to screen) at given
  * intervals.
@@ -19,22 +19,96 @@
  *
  * Sept 2008: Vineet Gupta <vineet.gupta@arc.com>
  * Added Support for reporting SMP Information
- * - CPU where Process was last seen running
+ * - CPU where process was last seen running
  *   (to see effect of sched_setaffinity() etc)
- * - CPU Time Split (idle/IO/wait etc) PER CPU
- */
-
-/* Original code Copyrights */
-/*
+ * - CPU time split (idle/IO/wait etc) per CPU
+ *
  * Copyright (c) 1992 Branko Lankester
  * Copyright (c) 1992 Roger Binns
  * Copyright (C) 1994-1996 Charles L. Blake.
  * Copyright (C) 1992-1998 Michael K. Johnson
- * May be distributed under the conditions of the
- * GNU Library General Public License
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+/* How to snapshot /proc for debugging top problems:
+ * for f in /proc/[0-9]*""/stat; do
+ *         n=${f#/proc/}
+ *         n=${n%/stat}_stat
+ *         cp $f $n
+ * done
+ * cp /proc/stat /proc/meminfo /proc/loadavg .
+ * top -bn1 >top.out
+ *
+ * ...and how to run top on it on another machine:
+ * rm -rf proc; mkdir proc
+ * for f in [0-9]*_stat; do
+ *         p=${f%_stat}
+ *         mkdir -p proc/$p
+ *         cp $f proc/$p/stat
+ * done
+ * cp stat meminfo loadavg proc
+ * chroot . ./top -bn1 >top1.out
+ */
+//config:config TOP
+//config:	bool "top"
+//config:	default y
+//config:	help
+//config:	  The top program provides a dynamic real-time view of a running
+//config:	  system.
+//config:
+//config:config FEATURE_TOP_CPU_USAGE_PERCENTAGE
+//config:	bool "Show CPU per-process usage percentage"
+//config:	default y
+//config:	depends on TOP
+//config:	help
+//config:	  Make top display CPU usage for each process.
+//config:	  This adds about 2k.
+//config:
+//config:config FEATURE_TOP_CPU_GLOBAL_PERCENTS
+//config:	bool "Show CPU global usage percentage"
+//config:	default y
+//config:	depends on FEATURE_TOP_CPU_USAGE_PERCENTAGE
+//config:	help
+//config:	  Makes top display "CPU: NN% usr NN% sys..." line.
+//config:	  This adds about 0.5k.
+//config:
+//config:config FEATURE_TOP_SMP_CPU
+//config:	bool "SMP CPU usage display ('c' key)"
+//config:	default y
+//config:	depends on FEATURE_TOP_CPU_GLOBAL_PERCENTS
+//config:	help
+//config:	  Allow 'c' key to switch between individual/cumulative CPU stats
+//config:	  This adds about 0.5k.
+//config:
+//config:config FEATURE_TOP_DECIMALS
+//config:	bool "Show 1/10th of a percent in CPU/mem statistics"
+//config:	default y
+//config:	depends on FEATURE_TOP_CPU_USAGE_PERCENTAGE
+//config:	help
+//config:	  Show 1/10th of a percent in CPU/mem statistics.
+//config:	  This adds about 0.3k.
+//config:
+//config:config FEATURE_TOP_SMP_PROCESS
+//config:	bool "Show CPU process runs on ('j' field)"
+//config:	default y
+//config:	depends on TOP
+//config:	help
+//config:	  Show CPU where process was last found running on.
+//config:	  This is the 'j' field.
+//config:
+//config:config FEATURE_TOPMEM
+//config:	bool "Topmem command ('s' key)"
+//config:	default y
+//config:	depends on TOP
+//config:	help
+//config:	  Enable 's' in top (gives lots of memory info).
+
+//applet:IF_TOP(APPLET(top, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_TOP) += top.o
 
 #include "libbb.h"
+#include "common_bufsiz.h"
 
 
 typedef struct top_status_t {
@@ -53,7 +127,9 @@ typedef struct top_status_t {
 } top_status_t;
 
 typedef struct jiffy_counts_t {
-	unsigned long long usr,nic,sys,idle,iowait,irq,softirq,steal;
+	/* Linux 2.4.x has only first four */
+	unsigned long long usr, nic, sys, idle;
+	unsigned long long iowait, irq, softirq, steal;
 	unsigned long long total;
 	unsigned long long busy;
 } jiffy_counts_t;
@@ -74,15 +150,20 @@ enum { SORT_DEPTH = 3 };
 struct globals {
 	top_status_t *top;
 	int ntop;
+	smallint inverted;
 #if ENABLE_FEATURE_TOPMEM
 	smallint sort_field;
-	smallint inverted;
 #endif
 #if ENABLE_FEATURE_TOP_SMP_CPU
 	smallint smp_cpu_info; /* one/many cpu info lines? */
 #endif
+	unsigned lines;  /* screen height */
 #if ENABLE_FEATURE_USE_TERMIOS
 	struct termios initial_settings;
+	int scroll_ofs;
+#define G_scroll_ofs G.scroll_ofs
+#else
+#define G_scroll_ofs 0
 #endif
 #if !ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
 	cmp_funcp sort_function[1];
@@ -100,17 +181,13 @@ struct globals {
 	jiffy_counts_t *cpu_jif, *cpu_prev_jif;
 	int num_cpus;
 #endif
+#if ENABLE_FEATURE_USE_TERMIOS
+	char kbd_input[KEYCODE_BUFFER_SIZE];
+#endif
 	char line_buf[80];
-};
-
+}; //FIX_ALIASING; - large code growth
 enum { LINE_BUF_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line_buf) };
-
-#define G (*(struct globals*)&bb_common_bufsiz1)
-#define INIT_G() do { \
-	struct G_sizecheck { \
-		char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
-	}; \
-} while (0)
+#define G (*(struct globals*)bb_common_bufsiz1)
 #define top              (G.top               )
 #define ntop             (G.ntop              )
 #define sort_field       (G.sort_field        )
@@ -127,12 +204,18 @@ enum { LINE_BUF_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line_buf) };
 #define num_cpus         (G.num_cpus          )
 #define total_pcpu       (G.total_pcpu        )
 #define line_buf         (G.line_buf          )
+#define INIT_G() do { \
+	setup_common_bufsiz(); \
+	BUILD_BUG_ON(sizeof(G) > COMMON_BUFSIZE); \
+	BUILD_BUG_ON(LINE_BUF_SIZE <= 80); \
+} while (0)
 
 enum {
 	OPT_d = (1 << 0),
 	OPT_n = (1 << 1),
 	OPT_b = (1 << 2),
-	OPT_EOF = (1 << 3), /* pseudo: "we saw EOF in stdin" */
+	OPT_m = (1 << 3),
+	OPT_EOF = (1 << 4), /* pseudo: "we saw EOF in stdin" */
 };
 #define OPT_BATCH_MODE (option_mask32 & OPT_b)
 
@@ -177,20 +260,17 @@ static int mult_lvl_cmp(void* a, void* b)
 	for (i = 0; i < SORT_DEPTH; i++) {
 		cmp_val = (*sort_function[i])(a, b);
 		if (cmp_val != 0)
-			return cmp_val;
+			break;
 	}
-	return 0;
+	return inverted ? -cmp_val : cmp_val;
 }
 
-/* NOINLINE so that complier doesn't unfold the call
- * causing multiple copies of the arithmatic instrns
- */
 static NOINLINE int read_cpu_jiffy(FILE *fp, jiffy_counts_t *p_jif)
 {
 #if !ENABLE_FEATURE_TOP_SMP_CPU
-	static const char fmt[] = "cpu %lld %lld %lld %lld %lld %lld %lld %lld";
+	static const char fmt[] ALIGN1 = "cpu %llu %llu %llu %llu %llu %llu %llu %llu";
 #else
-	static const char fmt[] = "cp%*s %lld %lld %lld %lld %lld %lld %lld %lld";
+	static const char fmt[] ALIGN1 = "cp%*s %llu %llu %llu %llu %llu %llu %llu %llu";
 #endif
 	int ret;
 
@@ -218,7 +298,7 @@ static void get_jiffy_counts(void)
 	 * they are used to calculate per process CPU% */
 	prev_jif = cur_jif;
 	if (read_cpu_jiffy(fp, &cur_jif) < 4)
-		bb_error_msg_and_die("can't read /proc/stat");
+		bb_error_msg_and_die("can't read '%s'", "/proc/stat");
 
 #if !ENABLE_FEATURE_TOP_SMP_CPU
 	fclose(fp);
@@ -351,30 +431,32 @@ static void display_cpus(int scr_width, char *scrbuf, int *lines_rem_p)
 	unsigned total_diff;
 	jiffy_counts_t *p_jif, *p_prev_jif;
 	int i;
-
-#if ENABLE_FEATURE_TOP_SMP_CPU
+# if ENABLE_FEATURE_TOP_SMP_CPU
 	int n_cpu_lines;
-#endif
+# endif
 
 	/* using (unsigned) casts to make operations cheaper */
-#define  CALC_TOT_DIFF  ((unsigned)(p_jif->total - p_prev_jif->total) ? : 1)
+# define  CALC_TOTAL_DIFF do { \
+	total_diff = (unsigned)(p_jif->total - p_prev_jif->total); \
+	if (total_diff == 0) total_diff = 1; \
+} while (0)
 
-#if ENABLE_FEATURE_TOP_DECIMALS
-#define CALC_STAT(xxx) char xxx[8]
-#define SHOW_STAT(xxx) fmt_100percent_8(xxx, (unsigned)(p_jif->xxx - p_prev_jif->xxx), total_diff)
-#define FMT "%s"
-#else
-#define CALC_STAT(xxx) unsigned xxx = 100 * (unsigned)(p_jif->xxx - p_prev_jif->xxx) / total_diff
-#define SHOW_STAT(xxx) xxx
-#define FMT "%4u%% "
-#endif
+# if ENABLE_FEATURE_TOP_DECIMALS
+#  define CALC_STAT(xxx) char xxx[8]
+#  define SHOW_STAT(xxx) fmt_100percent_8(xxx, (unsigned)(p_jif->xxx - p_prev_jif->xxx), total_diff)
+#  define FMT "%s"
+# else
+#  define CALC_STAT(xxx) unsigned xxx = 100 * (unsigned)(p_jif->xxx - p_prev_jif->xxx) / total_diff
+#  define SHOW_STAT(xxx) xxx
+#  define FMT "%4u%% "
+# endif
 
-#if !ENABLE_FEATURE_TOP_SMP_CPU
+# if !ENABLE_FEATURE_TOP_SMP_CPU
 	{
 		i = 1;
 		p_jif = &cur_jif;
 		p_prev_jif = &prev_jif;
-#else
+# else
 	/* Loop thru CPU(s) */
 	n_cpu_lines = smp_cpu_info ? num_cpus : 1;
 	if (n_cpu_lines > *lines_rem_p)
@@ -383,8 +465,8 @@ static void display_cpus(int scr_width, char *scrbuf, int *lines_rem_p)
 	for (i = 0; i < n_cpu_lines; i++) {
 		p_jif = &cpu_jif[i];
 		p_prev_jif = &cpu_prev_jif[i];
-#endif
-		total_diff = CALC_TOT_DIFF;
+# endif
+		CALC_TOTAL_DIFF;
 
 		{ /* Need a block: CALC_STAT are declarations */
 			CALC_STAT(usr);
@@ -398,12 +480,12 @@ static void display_cpus(int scr_width, char *scrbuf, int *lines_rem_p)
 
 			snprintf(scrbuf, scr_width,
 				/* Barely fits in 79 chars when in "decimals" mode. */
-#if ENABLE_FEATURE_TOP_SMP_CPU
+# if ENABLE_FEATURE_TOP_SMP_CPU
 				"CPU%s:"FMT"usr"FMT"sys"FMT"nic"FMT"idle"FMT"io"FMT"irq"FMT"sirq",
 				(smp_cpu_info ? utoa(i) : ""),
-#else
+# else
 				"CPU:"FMT"usr"FMT"sys"FMT"nic"FMT"idle"FMT"io"FMT"irq"FMT"sirq",
-#endif
+# endif
 				SHOW_STAT(usr), SHOW_STAT(sys), SHOW_STAT(nic), SHOW_STAT(idle),
 				SHOW_STAT(iowait), SHOW_STAT(irq), SHOW_STAT(softirq)
 				/*, SHOW_STAT(steal) - what is this 'steal' thing? */
@@ -412,94 +494,102 @@ static void display_cpus(int scr_width, char *scrbuf, int *lines_rem_p)
 			puts(scrbuf);
 		}
 	}
-#undef SHOW_STAT
-#undef CALC_STAT
-#undef FMT
+# undef SHOW_STAT
+# undef CALC_STAT
+# undef FMT
 	*lines_rem_p -= i;
 }
 #else  /* !ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS */
-#define display_cpus(scr_width, scrbuf, lines_rem) ((void)0)
+# define display_cpus(scr_width, scrbuf, lines_rem) ((void)0)
 #endif
+
+enum {
+	MI_MEMTOTAL,
+	MI_MEMFREE,
+	MI_MEMSHARED,
+	MI_SHMEM,
+	MI_BUFFERS,
+	MI_CACHED,
+	MI_SWAPTOTAL,
+	MI_SWAPFREE,
+	MI_DIRTY,
+	MI_WRITEBACK,
+	MI_ANONPAGES,
+	MI_MAPPED,
+	MI_SLAB,
+	MI_MAX
+};
+
+static void parse_meminfo(unsigned long meminfo[MI_MAX])
+{
+	static const char fields[] ALIGN1 =
+		"MemTotal\0"
+		"MemFree\0"
+		"MemShared\0"
+		"Shmem\0"
+		"Buffers\0"
+		"Cached\0"
+		"SwapTotal\0"
+		"SwapFree\0"
+		"Dirty\0"
+		"Writeback\0"
+		"AnonPages\0"
+		"Mapped\0"
+		"Slab\0";
+	char buf[60]; /* actual lines we expect are ~30 chars or less */
+	FILE *f;
+	int i;
+
+	memset(meminfo, 0, sizeof(meminfo[0]) * MI_MAX);
+	f = xfopen_for_read("meminfo");
+	while (fgets(buf, sizeof(buf), f) != NULL) {
+		char *c = strchr(buf, ':');
+		if (!c)
+			continue;
+		*c = '\0';
+		i = index_in_strings(fields, buf);
+		if (i >= 0)
+			meminfo[i] = strtoul(c+1, NULL, 10);
+	}
+	fclose(f);
+}
 
 static unsigned long display_header(int scr_width, int *lines_rem_p)
 {
-	FILE *fp;
-	char buf[80];
-	char scrbuf[80];
-	unsigned long total, used, mfree, shared, buffers, cached;
+	char scrbuf[100]; /* [80] was a bit too low on 8Gb ram box */
+	char *buf;
+	unsigned long meminfo[MI_MAX];
 
-	/* read memory info */
-	fp = xfopen_for_read("meminfo");
+	parse_meminfo(meminfo);
 
-	/*
-	 * Old kernels (such as 2.4.x) had a nice summary of memory info that
-	 * we could parse, however this is gone entirely in 2.6. Try parsing
-	 * the old way first, and if that fails, parse each field manually.
-	 *
-	 * First, we read in the first line. Old kernels will have bogus
-	 * strings we don't care about, whereas new kernels will start right
-	 * out with MemTotal:
-	 *                              -- PFM.
-	 */
-	if (fscanf(fp, "MemTotal: %lu %s\n", &total, buf) != 2) {
-		fgets(buf, sizeof(buf), fp);    /* skip first line */
-
-		fscanf(fp, "Mem: %lu %lu %lu %lu %lu %lu",
-			&total, &used, &mfree, &shared, &buffers, &cached);
-		/* convert to kilobytes */
-		used /= 1024;
-		mfree /= 1024;
-		shared /= 1024;
-		buffers /= 1024;
-		cached /= 1024;
-		total /= 1024;
-	} else {
-		/*
-		 * Revert to manual parsing, which incidentally already has the
-		 * sizes in kilobytes. This should be safe for both 2.4 and
-		 * 2.6.
-		 */
-		fscanf(fp, "MemFree: %lu %s\n", &mfree, buf);
-
-		/*
-		 * MemShared: is no longer present in 2.6. Report this as 0,
-		 * to maintain consistent behavior with normal procps.
-		 */
-		if (fscanf(fp, "MemShared: %lu %s\n", &shared, buf) != 2)
-			shared = 0;
-
-		fscanf(fp, "Buffers: %lu %s\n", &buffers, buf);
-		fscanf(fp, "Cached: %lu %s\n", &cached, buf);
-
-		used = total - mfree;
-	}
-	fclose(fp);
-
-	/* output memory info */
+	/* Output memory info */
 	if (scr_width > (int)sizeof(scrbuf))
 		scr_width = sizeof(scrbuf);
 	snprintf(scrbuf, scr_width,
 		"Mem: %luK used, %luK free, %luK shrd, %luK buff, %luK cached",
-		used, mfree, shared, buffers, cached);
-	/* clear screen & go to top */
-	printf(OPT_BATCH_MODE ? "%s\n" : "\e[H\e[J%s\n", scrbuf);
+		meminfo[MI_MEMTOTAL] - meminfo[MI_MEMFREE],
+		meminfo[MI_MEMFREE],
+		meminfo[MI_MEMSHARED] + meminfo[MI_SHMEM],
+		meminfo[MI_BUFFERS],
+		meminfo[MI_CACHED]);
+	/* Go to top & clear to the end of screen */
+	printf(OPT_BATCH_MODE ? "%s\n" : "\033[H\033[J%s\n", scrbuf);
 	(*lines_rem_p)--;
 
-	/* Display CPU time split as percentage of total time
-	 * This displays either a cumulative line or one line per CPU
+	/* Display CPU time split as percentage of total time.
+	 * This displays either a cumulative line or one line per CPU.
 	 */
 	display_cpus(scr_width, scrbuf, lines_rem_p);
 
-	/* read load average as a string */
-	buf[0] = '\0';
-	open_read_close("loadavg", buf, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\n';
-	*strchr(buf, '\n') = '\0';
-	snprintf(scrbuf, scr_width, "Load average: %s", buf);
+	/* Read load average as a string */
+	buf = stpcpy(scrbuf, "Load average: ");
+	open_read_close("loadavg", buf, sizeof(scrbuf) - sizeof("Load average: "));
+	scrbuf[scr_width - 1] = '\0';
+	strchrnul(buf, '\n')[0] = '\0';
 	puts(scrbuf);
 	(*lines_rem_p)--;
 
-	return total;
+	return meminfo[MI_MEMTOTAL];
 }
 
 static NOINLINE void display_process_list(int lines_rem, int scr_width)
@@ -515,35 +605,32 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
 	 * expensive divides with multiply and shift */
 	unsigned pmem_shift, pmem_scale, pmem_half;
 #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+	unsigned tmp_unsigned;
 	unsigned pcpu_shift, pcpu_scale, pcpu_half;
 	unsigned busy_jifs;
 #endif
 
 	/* what info of the processes is shown */
-	printf(OPT_BATCH_MODE ? "%.*s" : "\e[7m%.*s\e[0m", scr_width,
-		"  PID  PPID USER     STAT   VSZ %MEM"
-#if ENABLE_FEATURE_TOP_SMP_PROCESS
-		" CPU"
-#endif
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-		" %CPU"
-#endif
+	printf(OPT_BATCH_MODE ? "%.*s" : "\033[7m%.*s\033[0m", scr_width,
+		"  PID  PPID USER     STAT   VSZ %VSZ"
+		IF_FEATURE_TOP_SMP_PROCESS(" CPU")
+		IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE(" %CPU")
 		" COMMAND");
 	lines_rem--;
 
 #if ENABLE_FEATURE_TOP_DECIMALS
-#define UPSCALE 1000
-#define CALC_STAT(name, val) div_t name = div((val), 10)
-#define SHOW_STAT(name) name.quot, '0'+name.rem
-#define FMT "%3u.%c"
+# define UPSCALE 1000
+# define CALC_STAT(name, val) div_t name = div((val), 10)
+# define SHOW_STAT(name) name.quot, '0'+name.rem
+# define FMT "%3u.%c"
 #else
-#define UPSCALE 100
-#define CALC_STAT(name, val) unsigned name = (val)
-#define SHOW_STAT(name) name
-#define FMT "%4u%%"
+# define UPSCALE 100
+# define CALC_STAT(name, val) unsigned name = (val)
+# define SHOW_STAT(name) name
+# define FMT "%4u%%"
 #endif
 	/*
-	 * MEM% = s->vsz/MemTotal
+	 * %VSZ = s->vsz/MemTotal
 	 */
 	pmem_shift = BITS_PER_INT-11;
 	pmem_scale = UPSCALE*(1U<<(BITS_PER_INT-11)) / total_memory;
@@ -552,7 +639,7 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
 		pmem_scale /= 4;
 		pmem_shift -= 2;
 	}
-	pmem_half = (1U << pmem_shift) / (ENABLE_FEATURE_TOP_DECIMALS? 20 : 2);
+	pmem_half = (1U << pmem_shift) / (ENABLE_FEATURE_TOP_DECIMALS ? 20 : 2);
 #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
 	busy_jifs = cur_jif.busy - prev_jif.busy;
 	/* This happens if there were lots of short-lived processes
@@ -568,26 +655,30 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
 	 * we assume that unsigned is at least 32-bit.
 	 */
 	pcpu_shift = 6;
-	pcpu_scale = (UPSCALE*64 * (uint16_t)busy_jifs ? : 1);
+	pcpu_scale = UPSCALE*64 * (uint16_t)busy_jifs;
+	if (pcpu_scale == 0)
+		pcpu_scale = 1;
 	while (pcpu_scale < (1U << (BITS_PER_INT-2))) {
 		pcpu_scale *= 4;
 		pcpu_shift += 2;
 	}
-	pcpu_scale /= ( (uint16_t)(cur_jif.total - prev_jif.total) * total_pcpu ? : 1);
+	tmp_unsigned = (uint16_t)(cur_jif.total - prev_jif.total) * total_pcpu;
+	if (tmp_unsigned != 0)
+		pcpu_scale /= tmp_unsigned;
 	/* we want (s->pcpu * pcpu_scale) to never overflow */
 	while (pcpu_scale >= 1024) {
 		pcpu_scale /= 4;
 		pcpu_shift -= 2;
 	}
-	pcpu_half = (1U << pcpu_shift) / (ENABLE_FEATURE_TOP_DECIMALS? 20 : 2);
+	pcpu_half = (1U << pcpu_shift) / (ENABLE_FEATURE_TOP_DECIMALS ? 20 : 2);
 	/* printf(" pmem_scale=%u pcpu_scale=%u ", pmem_scale, pcpu_scale); */
 #endif
 
 	/* Ok, all preliminary data is ready, go through the list */
 	scr_width += 2; /* account for leading '\n' and trailing NUL */
-	if (lines_rem > ntop)
-		lines_rem = ntop;
-	s = top;
+	if (lines_rem > ntop - G_scroll_ofs)
+		lines_rem = ntop - G_scroll_ofs;
+	s = top + G_scroll_ofs;
 	while (--lines_rem >= 0) {
 		unsigned col;
 		CALC_STAT(pmem, (s->vsz*pmem_scale + pmem_half) >> pmem_shift);
@@ -598,29 +689,21 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
 		if (s->vsz >= 100000)
 			sprintf(vsz_str_buf, "%6ldm", s->vsz/1024);
 		else
-			sprintf(vsz_str_buf, "%7ld", s->vsz);
-		/* PID PPID USER STAT VSZ %MEM [%CPU] COMMAND */
+			sprintf(vsz_str_buf, "%7lu", s->vsz);
+		/* PID PPID USER STAT VSZ %VSZ [%CPU] COMMAND */
 		col = snprintf(line_buf, scr_width,
 				"\n" "%5u%6u %-8.8s %s%s" FMT
-#if ENABLE_FEATURE_TOP_SMP_PROCESS
-				" %3d"
-#endif
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-				FMT
-#endif
+				IF_FEATURE_TOP_SMP_PROCESS(" %3d")
+				IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE(FMT)
 				" ",
 				s->pid, s->ppid, get_cached_username(s->uid),
 				s->state, vsz_str_buf,
 				SHOW_STAT(pmem)
-#if ENABLE_FEATURE_TOP_SMP_PROCESS
-				, s->last_seen_on_cpu
-#endif
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-				, SHOW_STAT(pcpu)
-#endif
+				IF_FEATURE_TOP_SMP_PROCESS(, s->last_seen_on_cpu)
+				IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE(, SHOW_STAT(pcpu))
 		);
 		if ((int)(col + 1) < scr_width)
-			read_cmdline(line_buf + col, scr_width - col - 1, s->pid, s->comm);
+			read_cmdline(line_buf + col, scr_width - col, s->pid, s->comm);
 		fputs(line_buf, stdout);
 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
 			cur_jif.busy - prev_jif.busy, cur_jif.total - prev_jif.total); */
@@ -628,7 +711,7 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
 	}
 	/* printf(" %d", hist_iterations); */
 	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
-	fflush(stdout);
+	fflush_all();
 }
 #undef UPSCALE
 #undef SHOW_STAT
@@ -640,29 +723,22 @@ static void clearmems(void)
 	clear_username_cache();
 	free(top);
 	top = NULL;
-	ntop = 0;
 }
 
 #if ENABLE_FEATURE_USE_TERMIOS
-#include <termios.h>
-#include <signal.h>
 
 static void reset_term(void)
 {
-	tcsetattr_stdin_TCSANOW(&initial_settings);
-	if (ENABLE_FEATURE_CLEAN_UP) {
-		clearmems();
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-		free(prev_hist);
-#endif
-	}
+	if (!OPT_BATCH_MODE)
+		tcsetattr_stdin_TCSANOW(&initial_settings);
 }
 
-static void sig_catcher(int sig UNUSED_PARAM)
+static void sig_catcher(int sig)
 {
 	reset_term();
-	exit(EXIT_FAILURE);
+	kill_myself_with_sig(sig);
 }
+
 #endif /* FEATURE_USE_TERMIOS */
 
 /*
@@ -698,144 +774,76 @@ static int topmem_sort(char *a, char *b)
 	n = offsetof(topmem_status_t, vsz) + (sort_field * sizeof(mem_t));
 	l = *(mem_t*)(a + n);
 	r = *(mem_t*)(b + n);
-//	if (l == r) {
-//		l = a->mapped_rw;
-//		r = b->mapped_rw;
-//	}
+	if (l == r) {
+		l = ((topmem_status_t*)a)->dirty;
+		r = ((topmem_status_t*)b)->dirty;
+	}
 	/* We want to avoid unsigned->signed and truncation errors */
 	/* l>r: -1, l=r: 0, l<r: 1 */
 	n = (l > r) ? -1 : (l != r);
 	return inverted ? -n : n;
 }
 
-/* Cut "NNNN " out of "    NNNN kb" */
-static char *grab_number(char *str, const char *match, unsigned sz)
-{
-	if (strncmp(str, match, sz) == 0) {
-		str = skip_whitespace(str + sz);
-		(skip_non_whitespace(str))[1] = '\0';
-		return xstrdup(str);
-	}
-	return NULL;
-}
-
 /* display header info (meminfo / loadavg) */
 static void display_topmem_header(int scr_width, int *lines_rem_p)
 {
-	char linebuf[128];
-	unsigned i;
-	FILE *fp;
-	union {
-		struct {
-			/*  1 */ char *total;
-			/*  2 */ char *mfree;
-			/*  3 */ char *buf;
-			/*  4 */ char *cache;
-			/*  5 */ char *swaptotal;
-			/*  6 */ char *swapfree;
-			/*  7 */ char *dirty;
-			/*  8 */ char *mwrite;
-			/*  9 */ char *anon;
-			/* 10 */ char *map;
-			/* 11 */ char *slab;
-		} u;
-		char *str[11];
-	} Z;
-#define total     Z.u.total
-#define mfree     Z.u.mfree
-#define buf       Z.u.buf
-#define cache     Z.u.cache
-#define swaptotal Z.u.swaptotal
-#define swapfree  Z.u.swapfree
-#define dirty     Z.u.dirty
-#define mwrite    Z.u.mwrite
-#define anon      Z.u.anon
-#define map       Z.u.map
-#define slab      Z.u.slab
-#define str       Z.str
+	unsigned long meminfo[MI_MAX];
 
-	memset(&Z, 0, sizeof(Z));
+	parse_meminfo(meminfo);
 
-	/* read memory info */
-	fp = xfopen_for_read("meminfo");
-	while (fgets(linebuf, sizeof(linebuf), fp)) {
-		char *p;
+	snprintf(line_buf, LINE_BUF_SIZE,
+		"Mem total:%lu anon:%lu map:%lu free:%lu",
+		meminfo[MI_MEMTOTAL],
+		meminfo[MI_ANONPAGES],
+		meminfo[MI_MAPPED],
+		meminfo[MI_MEMFREE]);
+	printf(OPT_BATCH_MODE ? "%.*s\n" : "\033[H\033[J%.*s\n", scr_width, line_buf);
 
-#define SCAN(match, name) \
-		p = grab_number(linebuf, match, sizeof(match)-1); \
-		if (p) { name = p; continue; }
+	snprintf(line_buf, LINE_BUF_SIZE,
+		" slab:%lu buf:%lu cache:%lu dirty:%lu write:%lu",
+		meminfo[MI_SLAB],
+		meminfo[MI_BUFFERS],
+		meminfo[MI_CACHED],
+		meminfo[MI_DIRTY],
+		meminfo[MI_WRITEBACK]);
+	printf("%.*s\n", scr_width, line_buf);
 
-		SCAN("MemTotal:", total);
-		SCAN("MemFree:", mfree);
-		SCAN("Buffers:", buf);
-		SCAN("Cached:", cache);
-		SCAN("SwapTotal:", swaptotal);
-		SCAN("SwapFree:", swapfree);
-		SCAN("Dirty:", dirty);
-		SCAN("Writeback:", mwrite);
-		SCAN("AnonPages:", anon);
-		SCAN("Mapped:", map);
-		SCAN("Slab:", slab);
-#undef SCAN
-	}
-	fclose(fp);
-
-#define S(s) (s ? s : "0 ")
-	snprintf(linebuf, sizeof(linebuf),
-		"Mem %stotal %sanon %smap %sfree",
-		S(total), S(anon), S(map), S(mfree));
-	printf(OPT_BATCH_MODE ? "%.*s\n" : "\e[H\e[J%.*s\n", scr_width, linebuf);
-
-	snprintf(linebuf, sizeof(linebuf),
-		" %sslab %sbuf %scache %sdirty %swrite",
-		S(slab), S(buf), S(cache), S(dirty), S(mwrite));
-	printf("%.*s\n", scr_width, linebuf);
-
-	snprintf(linebuf, sizeof(linebuf),
-		"Swap %stotal %sfree", // TODO: % used?
-		S(swaptotal), S(swapfree));
-	printf("%.*s\n", scr_width, linebuf);
+	snprintf(line_buf, LINE_BUF_SIZE,
+		"Swap total:%lu free:%lu", // TODO: % used?
+		meminfo[MI_SWAPTOTAL],
+		meminfo[MI_SWAPFREE]);
+	printf("%.*s\n", scr_width, line_buf);
 
 	(*lines_rem_p) -= 3;
-#undef S
-
-	for (i = 0; i < ARRAY_SIZE(str); i++)
-		free(str[i]);
-#undef total
-#undef free
-#undef buf
-#undef cache
-#undef swaptotal
-#undef swapfree
-#undef dirty
-#undef write
-#undef anon
-#undef map
-#undef slab
-#undef str
 }
 
 static void ulltoa6_and_space(unsigned long long ul, char buf[6])
 {
 	/* see http://en.wikipedia.org/wiki/Tera */
-	smart_ulltoa5(ul, buf, " mgtpezy");
-	buf[5] = ' ';
+	smart_ulltoa5(ul, buf, " mgtpezy")[0] = ' ';
 }
 
 static NOINLINE void display_topmem_process_list(int lines_rem, int scr_width)
 {
 #define HDR_STR "  PID   VSZ VSZRW   RSS (SHR) DIRTY (SHR) STACK"
 #define MIN_WIDTH sizeof(HDR_STR)
-	const topmem_status_t *s = topmem;
+	const topmem_status_t *s = topmem + G_scroll_ofs;
+	char *cp, ch;
 
 	display_topmem_header(scr_width, &lines_rem);
+
 	strcpy(line_buf, HDR_STR " COMMAND");
-	line_buf[5 + sort_field * 6] = '*';
+	/* Mark the ^FIELD^ we sort by */
+	cp = &line_buf[5 + sort_field * 6];
+	ch = "^_"[inverted];
+	cp[6] = ch;
+	do *cp++ = ch; while (*cp == ' ');
+
 	printf(OPT_BATCH_MODE ? "%.*s" : "\e[7m%.*s\e[0m", scr_width, line_buf);
 	lines_rem--;
 
-	if (lines_rem > ntop)
-		lines_rem = ntop;
+	if (lines_rem > ntop - G_scroll_ofs)
+		lines_rem = ntop - G_scroll_ofs;
 	while (--lines_rem >= 0) {
 		/* PID VSZ VSZRW RSS (SHR) DIRTY (SHR) COMMAND */
 		ulltoa6_and_space(s->pid     , &line_buf[0*6]);
@@ -854,7 +862,7 @@ static NOINLINE void display_topmem_process_list(int lines_rem, int scr_width)
 		s++;
 	}
 	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
-	fflush(stdout);
+	fflush_all();
 #undef HDR_STR
 #undef MIN_WIDTH
 }
@@ -877,33 +885,215 @@ enum {
 		| PSSCAN_UTIME
 		| PSSCAN_STATE
 		| PSSCAN_COMM
-#if ENABLE_FEATURE_TOP_SMP_PROCESS
 		| PSSCAN_CPU
-#endif
 		| PSSCAN_UIDGID,
 	TOPMEM_MASK = 0
 		| PSSCAN_PID
 		| PSSCAN_SMAPS
 		| PSSCAN_COMM,
+	EXIT_MASK = (unsigned)-1,
 };
+
+#if ENABLE_FEATURE_USE_TERMIOS
+static unsigned handle_input(unsigned scan_mask, unsigned interval)
+{
+	if (option_mask32 & OPT_EOF) {
+		/* EOF on stdin ("top </dev/null") */
+		sleep(interval);
+		return scan_mask;
+	}
+
+	while (1) {
+		int32_t c;
+
+		c = read_key(STDIN_FILENO, G.kbd_input, interval * 1000);
+		if (c == -1 && errno != EAGAIN) {
+			/* error/EOF */
+			option_mask32 |= OPT_EOF;
+			break;
+		}
+		interval = 0;
+
+		if (c == initial_settings.c_cc[VINTR])
+			return EXIT_MASK;
+		if (c == initial_settings.c_cc[VEOF])
+			return EXIT_MASK;
+
+		if (c == KEYCODE_UP) {
+			G_scroll_ofs--;
+			goto normalize_ofs;
+		}
+		if (c == KEYCODE_DOWN) {
+			G_scroll_ofs++;
+			goto normalize_ofs;
+		}
+		if (c == KEYCODE_HOME) {
+			G_scroll_ofs = 0;
+			break;
+		}
+		if (c == KEYCODE_END) {
+			G_scroll_ofs = ntop - G.lines / 2;
+			goto normalize_ofs;
+		}
+		if (c == KEYCODE_PAGEUP) {
+			G_scroll_ofs -= G.lines / 2;
+			goto normalize_ofs;
+		}
+		if (c == KEYCODE_PAGEDOWN) {
+			G_scroll_ofs += G.lines / 2;
+ normalize_ofs:
+			if (G_scroll_ofs >= ntop)
+				G_scroll_ofs = ntop - 1;
+			if (G_scroll_ofs < 0)
+				G_scroll_ofs = 0;
+			break;
+		}
+
+		c |= 0x20; /* lowercase */
+		if (c == 'q')
+			return EXIT_MASK;
+
+		if (c == 'n') {
+			IF_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
+			sort_function[0] = pid_sort;
+			continue;
+		}
+		if (c == 'm') {
+			IF_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
+			sort_function[0] = mem_sort;
+# if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+			sort_function[1] = pcpu_sort;
+			sort_function[2] = time_sort;
+# endif
+			continue;
+		}
+# if ENABLE_FEATURE_SHOW_THREADS
+		if (c == 'h'
+		IF_FEATURE_TOPMEM(&& scan_mask != TOPMEM_MASK)
+		) {
+			scan_mask ^= PSSCAN_TASKS;
+			continue;
+		}
+# endif
+# if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+		if (c == 'p') {
+			IF_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
+			sort_function[0] = pcpu_sort;
+			sort_function[1] = mem_sort;
+			sort_function[2] = time_sort;
+			continue;
+		}
+		if (c == 't') {
+			IF_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
+			sort_function[0] = time_sort;
+			sort_function[1] = mem_sort;
+			sort_function[2] = pcpu_sort;
+			continue;
+		}
+#  if ENABLE_FEATURE_TOPMEM
+		if (c == 's') {
+			scan_mask = TOPMEM_MASK;
+			free(prev_hist);
+			prev_hist = NULL;
+			prev_hist_count = 0;
+			sort_field = (sort_field + 1) % NUM_SORT_FIELD;
+			continue;
+		}
+#  endif
+		if (c == 'r') {
+			inverted ^= 1;
+			continue;
+		}
+#  if ENABLE_FEATURE_TOP_SMP_CPU
+		/* procps-2.0.18 uses 'C', 3.2.7 uses '1' */
+		if (c == 'c' || c == '1') {
+			/* User wants to toggle per cpu <> aggregate */
+			if (smp_cpu_info) {
+				free(cpu_prev_jif);
+				free(cpu_jif);
+				cpu_jif = &cur_jif;
+				cpu_prev_jif = &prev_jif;
+			} else {
+				/* Prepare for xrealloc() */
+				cpu_jif = cpu_prev_jif = NULL;
+			}
+			num_cpus = 0;
+			smp_cpu_info = !smp_cpu_info;
+			get_jiffy_counts();
+			continue;
+		}
+#  endif
+# endif
+		break; /* unknown key -> force refresh */
+	}
+
+	return scan_mask;
+}
+#endif
+
+//usage:#if ENABLE_FEATURE_SHOW_THREADS || ENABLE_FEATURE_TOP_SMP_CPU
+//usage:# define IF_SHOW_THREADS_OR_TOP_SMP(...) __VA_ARGS__
+//usage:#else
+//usage:# define IF_SHOW_THREADS_OR_TOP_SMP(...)
+//usage:#endif
+//usage:#define top_trivial_usage
+//usage:       "[-b] [-nCOUNT] [-dSECONDS]" IF_FEATURE_TOPMEM(" [-m]")
+//usage:#define top_full_usage "\n\n"
+//usage:       "Provide a view of process activity in real time."
+//usage:   "\n""Read the status of all processes from /proc each SECONDS"
+//usage:   "\n""and display a screenful of them."
+//usage:   "\n"
+//usage:	IF_FEATURE_USE_TERMIOS(
+//usage:       "Keys:"
+//usage:   "\n""	N/M"
+//usage:                IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE("/P")
+//usage:                IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE("/T")
+//usage:           ": " IF_FEATURE_TOPMEM("show CPU usage, ") "sort by pid/mem"
+//usage:                IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE("/cpu")
+//usage:                IF_FEATURE_TOP_CPU_USAGE_PERCENTAGE("/time")
+//usage:	IF_FEATURE_TOPMEM(
+//usage:   "\n""	S: show memory"
+//usage:	)
+//usage:   "\n""	R: reverse sort"
+//usage:	IF_SHOW_THREADS_OR_TOP_SMP(
+//usage:   "\n""	"
+//usage:                IF_FEATURE_SHOW_THREADS("H: toggle threads")
+//usage:                IF_FEATURE_SHOW_THREADS(IF_FEATURE_TOP_SMP_CPU(", "))
+//usage:                IF_FEATURE_TOP_SMP_CPU("1: toggle SMP")
+//usage:	)
+//usage:   "\n""	Q,^C: exit"
+//usage:   "\n"
+//usage:   "\n""Options:"
+//usage:	)
+//usage:   "\n""	-b	Batch mode"
+//usage:   "\n""	-n N	Exit after N iterations"
+//usage:   "\n""	-d N	Delay between updates"
+//usage:	IF_FEATURE_TOPMEM(
+//usage:   "\n""	-m	Same as 's' key"
+//usage:	)
+
+/* Interactive testing:
+ * echo sss | ./busybox top
+ * - shows memory screen
+ * echo sss | ./busybox top -bn1 >mem
+ * - saves memory screen - the *whole* list, not first NROWS processes!
+ * echo .m.s.s.s.s.s.s.q | ./busybox top -b >z
+ * - saves several different screens, and exits
+ *
+ * TODO: -i STRING param as a better alternative?
+ */
 
 int top_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int top_main(int argc UNUSED_PARAM, char **argv)
 {
 	int iterations;
-	unsigned lines, col;
-	int lines_rem;
+	unsigned col;
 	unsigned interval;
 	char *str_interval, *str_iterations;
-	SKIP_FEATURE_TOPMEM(const) unsigned scan_mask = TOP_MASK;
+	unsigned scan_mask = TOP_MASK;
 #if ENABLE_FEATURE_USE_TERMIOS
 	struct termios new_settings;
-	struct pollfd pfd[1];
-	unsigned char c;
-
-	pfd[0].fd = 0;
-	pfd[0].events = POLLIN;
-#endif /* FEATURE_USE_TERMIOS */
+#endif
 
 	INIT_G();
 
@@ -917,10 +1107,15 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 #endif
 
 	/* all args are options; -n NUM */
-	opt_complementary = "-";
-	col = getopt32(argv, "d:n:b", &str_interval, &str_iterations);
+	opt_complementary = "-"; /* options can be specified w/o dash */
+	col = getopt32(argv, "d:n:b"IF_FEATURE_TOPMEM("m"), &str_interval, &str_iterations);
+#if ENABLE_FEATURE_TOPMEM
+	if (col & OPT_m) /* -m (busybox specific) */
+		scan_mask = TOPMEM_MASK;
+#endif
 	if (col & OPT_d) {
-		/* work around for "-d 1" -> "-d -1" done by getopt32 */
+		/* work around for "-d 1" -> "-d -1" done by getopt32
+		 * (opt_complementary == "-" does this) */
 		if (str_interval[0] == '-')
 			str_interval++;
 		/* Need to limit it to not overflow poll timeout */
@@ -934,15 +1129,6 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 
 	/* change to /proc */
 	xchdir("/proc");
-#if ENABLE_FEATURE_USE_TERMIOS
-	tcgetattr(0, (void *) &initial_settings);
-	memcpy(&new_settings, &initial_settings, sizeof(new_settings));
-	/* unbuffered input, turn off echo */
-	new_settings.c_lflag &= ~(ISIG | ICANON | ECHO | ECHONL);
-
-	bb_signals(BB_FATAL_SIGS, sig_catcher);
-	tcsetattr_stdin_TCSANOW(&new_settings);
-#endif /* FEATURE_USE_TERMIOS */
 
 #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
 	sort_function[0] = pcpu_sort;
@@ -950,28 +1136,53 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 	sort_function[2] = time_sort;
 #else
 	sort_function[0] = mem_sort;
-#endif /* FEATURE_TOP_CPU_USAGE_PERCENTAGE */
+#endif
 
-	while (1) {
+	if (OPT_BATCH_MODE) {
+		option_mask32 |= OPT_EOF;
+	}
+#if ENABLE_FEATURE_USE_TERMIOS
+	else {
+		tcgetattr(0, (void *) &initial_settings);
+		memcpy(&new_settings, &initial_settings, sizeof(new_settings));
+		/* unbuffered input, turn off echo */
+		new_settings.c_lflag &= ~(ISIG | ICANON | ECHO | ECHONL);
+		tcsetattr_stdin_TCSANOW(&new_settings);
+	}
+
+	bb_signals(BB_FATAL_SIGS, sig_catcher);
+
+	/* Eat initial input, if any */
+	scan_mask = handle_input(scan_mask, 0);
+#endif
+
+	while (scan_mask != EXIT_MASK) {
 		procps_status_t *p = NULL;
 
-		lines = 24; /* default */
-		col = 79;
+		if (OPT_BATCH_MODE) {
+			G.lines = INT_MAX;
+			col = LINE_BUF_SIZE - 2; /* +2 bytes for '\n', NUL */
+		} else {
+			G.lines = 24; /* default */
+			col = 79;
 #if ENABLE_FEATURE_USE_TERMIOS
-		/* We output to stdout, we need size of stdout (not stdin)! */
-		get_terminal_width_height(STDOUT_FILENO, &col, &lines);
-		if (lines < 5 || col < 10) {
-			sleep(interval);
-			continue;
+			/* We output to stdout, we need size of stdout (not stdin)! */
+			get_terminal_width_height(STDOUT_FILENO, &col, &G.lines);
+			if (G.lines < 5 || col < 10) {
+				sleep(interval);
+				continue;
+			}
+#endif
+			if (col > LINE_BUF_SIZE - 2)
+				col = LINE_BUF_SIZE - 2;
 		}
-#endif /* FEATURE_USE_TERMIOS */
-		if (col > LINE_BUF_SIZE-2) /* +2 bytes for '\n', NUL, */
-			col = LINE_BUF_SIZE-2;
 
 		/* read process IDs & status for all the processes */
+		ntop = 0;
 		while ((p = procps_scan(p, scan_mask)) != NULL) {
 			int n;
-			if (scan_mask == TOP_MASK) {
+
+			IF_FEATURE_TOPMEM(if (scan_mask != TOPMEM_MASK)) {
 				n = ntop;
 				top = xrealloc_vector(top, 6, ntop++);
 				top[n].pid = p->pid;
@@ -986,31 +1197,32 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 #if ENABLE_FEATURE_TOP_SMP_PROCESS
 				top[n].last_seen_on_cpu = p->last_seen_on_cpu;
 #endif
-			} else { /* TOPMEM */
+			}
 #if ENABLE_FEATURE_TOPMEM
-				if (!(p->mapped_ro | p->mapped_rw))
+			else { /* TOPMEM */
+				if (!(p->smaps.mapped_ro | p->smaps.mapped_rw))
 					continue; /* kernel threads are ignored */
 				n = ntop;
 				/* No bug here - top and topmem are the same */
 				top = xrealloc_vector(topmem, 6, ntop++);
 				strcpy(topmem[n].comm, p->comm);
 				topmem[n].pid      = p->pid;
-				topmem[n].vsz      = p->mapped_rw + p->mapped_ro;
-				topmem[n].vszrw    = p->mapped_rw;
-				topmem[n].rss_sh   = p->shared_clean + p->shared_dirty;
-				topmem[n].rss      = p->private_clean + p->private_dirty + topmem[n].rss_sh;
-				topmem[n].dirty    = p->private_dirty + p->shared_dirty;
-				topmem[n].dirty_sh = p->shared_dirty;
-				topmem[n].stack    = p->stack;
-#endif
+				topmem[n].vsz      = p->smaps.mapped_rw + p->smaps.mapped_ro;
+				topmem[n].vszrw    = p->smaps.mapped_rw;
+				topmem[n].rss_sh   = p->smaps.shared_clean + p->smaps.shared_dirty;
+				topmem[n].rss      = p->smaps.private_clean + p->smaps.private_dirty + topmem[n].rss_sh;
+				topmem[n].dirty    = p->smaps.private_dirty + p->smaps.shared_dirty;
+				topmem[n].dirty_sh = p->smaps.shared_dirty;
+				topmem[n].stack    = p->smaps.stack;
 			}
+#endif
 		} /* end of "while we read /proc" */
 		if (ntop == 0) {
 			bb_error_msg("no process info in /proc");
 			break;
 		}
 
-		if (scan_mask == TOP_MASK) {
+		IF_FEATURE_TOPMEM(if (scan_mask != TOPMEM_MASK)) {
 #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
 			if (!prev_hist_count) {
 				do_stats();
@@ -1023,22 +1235,14 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 			qsort(top, ntop, sizeof(top_status_t), (void*)mult_lvl_cmp);
 #else
 			qsort(top, ntop, sizeof(top_status_t), (void*)(sort_function[0]));
-#endif /* FEATURE_TOP_CPU_USAGE_PERCENTAGE */
+#endif
+			display_process_list(G.lines, col);
 		}
 #if ENABLE_FEATURE_TOPMEM
 		else { /* TOPMEM */
 			qsort(topmem, ntop, sizeof(topmem_status_t), (void*)topmem_sort);
+			display_topmem_process_list(G.lines, col);
 		}
-#endif
-		lines_rem = lines;
-		if (OPT_BATCH_MODE) {
-			lines_rem = INT_MAX;
-		}
-		if (scan_mask == TOP_MASK)
-			display_process_list(lines_rem, col);
-#if ENABLE_FEATURE_TOPMEM
-		else
-			display_topmem_process_list(lines_rem, col);
 #endif
 		clearmems();
 		if (iterations >= 0 && !--iterations)
@@ -1046,81 +1250,19 @@ int top_main(int argc UNUSED_PARAM, char **argv)
 #if !ENABLE_FEATURE_USE_TERMIOS
 		sleep(interval);
 #else
-		if (option_mask32 & (OPT_b|OPT_EOF))
-			 /* batch mode, or EOF on stdin ("top </dev/null") */
-			sleep(interval);
-		else if (safe_poll(pfd, 1, interval * 1000) > 0) {
-			if (safe_read(STDIN_FILENO, &c, 1) != 1) { /* error/EOF? */
-				option_mask32 |= OPT_EOF;
-				continue;
-			}
-			if (c == initial_settings.c_cc[VINTR])
-				break;
-			c |= 0x20; /* lowercase */
-			if (c == 'q')
-				break;
-			if (c == 'n') {
-				USE_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
-				sort_function[0] = pid_sort;
-			}
-			if (c == 'm') {
-				USE_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
-				sort_function[0] = mem_sort;
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-				sort_function[1] = pcpu_sort;
-				sort_function[2] = time_sort;
+		scan_mask = handle_input(scan_mask, interval);
 #endif
-			}
-#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
-			if (c == 'p') {
-				USE_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
-				sort_function[0] = pcpu_sort;
-				sort_function[1] = mem_sort;
-				sort_function[2] = time_sort;
-			}
-			if (c == 't') {
-				USE_FEATURE_TOPMEM(scan_mask = TOP_MASK;)
-				sort_function[0] = time_sort;
-				sort_function[1] = mem_sort;
-				sort_function[2] = pcpu_sort;
-			}
-#if ENABLE_FEATURE_TOPMEM
-			if (c == 's') {
-				scan_mask = TOPMEM_MASK;
-				free(prev_hist);
-				prev_hist = NULL;
-				prev_hist_count = 0;
-				sort_field = (sort_field + 1) % NUM_SORT_FIELD;
-			}
-			if (c == 'r')
-				inverted ^= 1;
-#endif
-#if ENABLE_FEATURE_TOP_SMP_CPU
-			/* procps-2.0.18 uses 'C', 3.2.7 uses '1' */
-			if (c == 'c' || c == '1') {
-				/* User wants to toggle per cpu <> aggregate */
-				if (smp_cpu_info) {
-					free(cpu_prev_jif);
-					free(cpu_jif);
-					cpu_jif = &cur_jif;
-					cpu_prev_jif = &prev_jif;
-				} else {
-					/* Prepare for xrealloc() */
-					cpu_jif = cpu_prev_jif = NULL;
-				}
-				num_cpus = 0;
-				smp_cpu_info = !smp_cpu_info;
-				get_jiffy_counts();
-			}
-#endif
-#endif
-		}
-#endif /* FEATURE_USE_TERMIOS */
-	} /* end of "while (1)" */
+	} /* end of "while (not Q)" */
 
 	bb_putchar('\n');
 #if ENABLE_FEATURE_USE_TERMIOS
 	reset_term();
 #endif
+	if (ENABLE_FEATURE_CLEAN_UP) {
+		clearmems();
+#if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+		free(prev_hist);
+#endif
+	}
 	return EXIT_SUCCESS;
 }

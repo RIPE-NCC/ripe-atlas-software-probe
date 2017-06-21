@@ -1,10 +1,10 @@
 /* vi: set sw=4 ts=4: */
 /*
- * Ckeck user and group names for illegal characters
+ * Check user and group names for illegal characters
  *
  * Copyright (C) 2008 Tito Ragusa <farmatito@tiscali.it>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
@@ -18,19 +18,45 @@
 
 void FAST_FUNC die_if_bad_username(const char *name)
 {
-	goto skip; /* 1st char being dash isn't valid */
+	const char *start = name;
+
+	/* 1st char being dash or dot isn't valid:
+	 * for example, name like ".." can make adduser
+	 * chown "/home/.." recursively - NOT GOOD.
+	 * Name of just a single "$" is also rejected.
+	 */
+	goto skip;
+
 	do {
-		if (*name == '-')
-			continue;
- skip:
-		if (isalnum(*name)
-		 || *name == '_'
+		unsigned char ch;
+
+		/* These chars are valid unless they are at the 1st pos: */
+		if (*name == '-'
 		 || *name == '.'
-		 || *name == '@'
-		 || (*name == '$' && !*(name + 1))
+		/* $ is allowed if it's the last char: */
+		 || (*name == '$' && !name[1])
 		) {
 			continue;
 		}
-		bb_error_msg_and_die("illegal character '%c'", *name);
+ skip:
+		ch = *name;
+		if (ch == '_'
+		/* || ch == '@' -- we disallow this too. Think about "user@host" */
+		/* open-coded isalnum: */
+		 || (ch >= '0' && ch <= '9')
+		 || ((ch|0x20) >= 'a' && (ch|0x20) <= 'z')
+		) {
+			continue;
+		}
+		bb_error_msg_and_die("illegal character with code %u at position %u",
+				(unsigned)ch, (unsigned)(name - start));
 	} while (*++name);
+
+	/* The minimum size of the login name is one char or two if
+	 * last char is the '$'. Violations of this are caught above.
+	 * The maximum size of the login name is LOGIN_NAME_MAX
+	 * including the terminating null byte.
+	 */
+	if (name - start >= LOGIN_NAME_MAX)
+		bb_error_msg_and_die("name is too long");
 }

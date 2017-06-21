@@ -44,7 +44,7 @@ Using busybox:
   run (I.E. "./busybox ls -l /proc").
 
   The "standalone shell" mode is an easy way to try out busybox; this is a
-  command shell that calls the builtin applets without needing them to be
+  command shell that calls the built-in applets without needing them to be
   installed in the path.  (Note that this requires /proc to be mounted, if
   testing from a boot floppy or in a chroot environment.)
 
@@ -66,11 +66,11 @@ Downloading the current source code:
 
   You can browse the up to the minute source code and change history online.
 
-    http://www.busybox.net/cgi-bin/viewcvs.cgi/trunk/busybox/
+    http://git.busybox.net/busybox/
 
-  Anonymous SVN access is available.  For instructions, check out:
+  Anonymous GIT access is available.  For instructions, check out:
 
-    http://busybox.net/subversion.html
+    http://www.busybox.net/source.html
 
   For those that are actively contributing and would like to check files in,
   see:
@@ -78,16 +78,16 @@ Downloading the current source code:
     http://busybox.net/developer.html
 
   The developers also have a bug and patch tracking system
-  (http://bugs.busybox.net) although posting a bug/patch to the mailing list
+  (https://bugs.busybox.net) although posting a bug/patch to the mailing list
   is generally a faster way of getting it fixed, and the complete archive of
-  what happened is the subversion changelog.
+  what happened is the git changelog.
 
   Note: if you want to compile busybox in a busybox environment you must
-  select ENABLE_DESKTOP.
+  select CONFIG_DESKTOP.
 
 ----------------
 
-getting help:
+Getting help:
 
   when you find you need help, you can check out the busybox mailing list
   archives at http://busybox.net/lists/busybox/ or even join
@@ -95,7 +95,7 @@ getting help:
 
 ----------------
 
-bugs:
+Bugs:
 
   if you find bugs, please submit a detailed bug report to the busybox mailing
   list at busybox@busybox.net.  a well-written bug report should include a
@@ -169,7 +169,7 @@ Portability:
   MacOS X, Solaris, Cygwin, or the BSD Fork Du Jour).  This generally involves
   a different kernel and a different C library at the same time.  While it
   should be possible to port the majority of the code to work in one of
-  these environments, don't be suprised if it doesn't work out of the box.  If
+  these environments, don't be surprised if it doesn't work out of the box.  If
   you're into that sort of thing, start small (selecting just a few applets)
   and work your way up.
 
@@ -185,7 +185,7 @@ Supported hardware:
   Under 2.4 Linux kernels, kernel module loading was implemented in a
   platform-specific manner.  Busybox's insmod utility has been reported to
   work under ARM, CRIS, H8/300, x86, ia64, x86_64, m68k, MIPS, PowerPC, S390,
-  SH3/4/5, Sparc, v850e, and x86_64.  Anything else probably won't work.
+  SH3/4/5, Sparc, and v850e.  Anything else probably won't work.
 
   The module loading mechanism for the 2.6 kernel is much more generic, and
   we believe 2.6.x kernel module loading support should work on all
@@ -194,6 +194,11 @@ Supported hardware:
 ----------------
 
 Please feed suggestions, bug reports, insults, and bribes back to the busybox
-maintainer:
+mailing list:
+
+	busybox@busybox.net
+
+and/or maintainer:
+
 	Denys Vlasenko
-        <vda.linux@googlemail.com>
+	<vda.linux@googlemail.com>

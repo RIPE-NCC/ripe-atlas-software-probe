@@ -4,9 +4,27 @@
  *
  * Copyright (C) 2006 by Rob Sullivan, with ideas from code by Walter Harms
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details. */
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
+ */
+//config:config CKSUM
+//config:	bool "cksum"
+//config:	default y
+//config:	help
+//config:	  cksum is used to calculate the CRC32 checksum of a file.
+
+//applet:IF_CKSUM(APPLET_NOEXEC(cksum, cksum, BB_DIR_USR_BIN, BB_SUID_DROP, cksum))
+
+//kbuild:lib-$(CONFIG_CKSUM) += cksum.o
+
+//usage:#define cksum_trivial_usage
+//usage:       "FILES..."
+//usage:#define cksum_full_usage "\n\n"
+//usage:       "Calculate the CRC32 checksums of FILES"
 
 #include "libbb.h"
+#include "common_bufsiz.h"
+
+/* This is a NOEXEC applet. Be very careful! */
 
 int cksum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int cksum_main(int argc UNUSED_PARAM, char **argv)
@@ -15,7 +33,7 @@ int cksum_main(int argc UNUSED_PARAM, char **argv)
 	uint32_t crc;
 	off_t length, filesize;
 	int bytes_read;
-	uint8_t *cp;
+	int exit_code = EXIT_SUCCESS;
 
 #if ENABLE_DESKTOP
 	getopt32(argv, ""); /* coreutils 6.9 compat */
@@ -24,21 +42,21 @@ int cksum_main(int argc UNUSED_PARAM, char **argv)
 	argv++;
 #endif
 
+	setup_common_bufsiz();
 	do {
 		int fd = open_or_warn_stdin(*argv ? *argv : bb_msg_standard_input);
 
-		if (fd < 0)
+		if (fd < 0) {
+			exit_code = EXIT_FAILURE;
 			continue;
+		}
 		crc = 0;
 		length = 0;
 
 #define read_buf bb_common_bufsiz1
-		while ((bytes_read = safe_read(fd, read_buf, sizeof(read_buf))) > 0) {
-			cp = (uint8_t *) read_buf;
+		while ((bytes_read = safe_read(fd, read_buf, COMMON_BUFSIZE)) > 0) {
 			length += bytes_read;
-			do {
-				crc = (crc << 8) ^ crc32_table[(crc >> 24) ^ *cp++];
-			} while (--bytes_read);
+			crc = crc32_block_endian1(crc, read_buf, bytes_read, crc32_table);
 		}
 		close(fd);
 
@@ -60,5 +78,5 @@ int cksum_main(int argc UNUSED_PARAM, char **argv)
 				crc, filesize, *argv);
 	} while (*argv && *++argv);
 
-	fflush_stdout_and_exit(EXIT_SUCCESS);
+	fflush_stdout_and_exit(exit_code);
 }

@@ -8,8 +8,31 @@
  * Correct default name server display and explicit name server option
  * added by Ben Zeckel <bzeckel@hmc.edu> June 2001
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config NSLOOKUP
+//config:	bool "nslookup"
+//config:	default y
+//config:	help
+//config:	  nslookup is a tool to query Internet name servers.
+
+//applet:IF_NSLOOKUP(APPLET(nslookup, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_NSLOOKUP) += nslookup.o
+
+//usage:#define nslookup_trivial_usage
+//usage:       "[HOST] [SERVER]"
+//usage:#define nslookup_full_usage "\n\n"
+//usage:       "Query the nameserver for the IP address of the given HOST\n"
+//usage:       "optionally using a specified DNS server"
+//usage:
+//usage:#define nslookup_example_usage
+//usage:       "$ nslookup localhost\n"
+//usage:       "Server:     default\n"
+//usage:       "Address:    default\n"
+//usage:       "\n"
+//usage:       "Name:       debian\n"
+//usage:       "Address:    127.0.0.1\n"
 
 #include <resolv.h>
 #include "libbb.h"
@@ -66,7 +89,7 @@ static int print_host(const char *hostname, const char *header)
 	// hint.ai_flags = AI_CANONNAME;
 	rc = getaddrinfo(hostname, NULL /*service*/, &hint, &result);
 
-	if (!rc) {
+	if (rc == 0) {
 		struct addrinfo *cur = result;
 		unsigned cnt = 0;
 
@@ -94,7 +117,7 @@ static int print_host(const char *hostname, const char *header)
 		bb_error_msg("can't resolve '%s'", hostname);
 #endif
 	}
-	if (ENABLE_FEATURE_CLEAN_UP)
+	if (ENABLE_FEATURE_CLEAN_UP && result)
 		freeaddrinfo(result);
 	return (rc != 0);
 }
@@ -103,14 +126,15 @@ static int print_host(const char *hostname, const char *header)
 static void server_print(void)
 {
 	char *server;
+	struct sockaddr *sa;
 
-	server = xmalloc_sockaddr2dotted_noport((struct sockaddr*)&_res.nsaddr_list[0]);
-	/* I honestly don't know what to do if DNS server has _IPv6 address_.
-	 * Probably it is listed in
-	 * _res._u._ext_.nsaddrs[MAXNS] (of type "struct sockaddr_in6*" each)
-	 * but how to find out whether resolver uses
-	 * _res.nsaddr_list[] or _res._u._ext_.nsaddrs[], or both?
-	 * Looks like classic design from hell, BIND-grade. Hard to surpass. */
+#if ENABLE_FEATURE_IPV6
+	sa = (struct sockaddr*)_res._u._ext.nsaddrs[0];
+	if (!sa)
+#endif
+		sa = (struct sockaddr*)&_res.nsaddr_list[0];
+	server = xmalloc_sockaddr2dotted_noport(sa);
+
 	print_host(server, "Server:");
 	if (ENABLE_FEATURE_CLEAN_UP)
 		free(server);
@@ -119,14 +143,36 @@ static void server_print(void)
 
 /* alter the global _res nameserver structure to use
    an explicit dns server instead of what is in /etc/resolv.conf */
-static void set_default_dns(char *server)
+static void set_default_dns(const char *server)
 {
-	struct in_addr server_in_addr;
+	len_and_sockaddr *lsa;
 
-	if (inet_pton(AF_INET, server, &server_in_addr) > 0) {
+	if (!server)
+		return;
+
+	/* NB: this works even with, say, "[::1]:5353"! :) */
+	lsa = xhost2sockaddr(server, 53);
+
+	if (lsa->u.sa.sa_family == AF_INET) {
 		_res.nscount = 1;
-		_res.nsaddr_list[0].sin_addr = server_in_addr;
+		/* struct copy */
+		_res.nsaddr_list[0] = lsa->u.sin;
 	}
+#if ENABLE_FEATURE_IPV6
+	/* Hoped libc can cope with IPv4 address there too.
+	 * No such luck, glibc 2.4 segfaults even with IPv6,
+	 * maybe I misunderstand how to make glibc use IPv6 addr?
+	 * (uclibc 0.9.31+ should work) */
+	if (lsa->u.sa.sa_family == AF_INET6) {
+		// glibc neither SEGVs nor sends any dgrams with this
+		// (strace shows no socket ops):
+		//_res.nscount = 0;
+		_res._u._ext.nscount = 1;
+		/* store a pointer to part of malloc'ed lsa */
+		_res._u._ext.nsaddrs[0] = &lsa->u.sin6;
+		/* must not free(lsa)! */
+	}
+#endif
 }
 
 int nslookup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -147,9 +193,17 @@ int nslookup_main(int argc, char **argv)
 	/* (but it also says "may be enabled in /etc/resolv.conf") */
 	/*_res.options |= RES_USE_INET6;*/
 
-	if (argv[2])
-		set_default_dns(argv[2]);
+	set_default_dns(argv[2]);
 
 	server_print();
+
+	/* getaddrinfo and friends are free to request a resolver
+	 * reinitialization. Just in case, set_default_dns() again
+	 * after getaddrinfo (in server_print). This reportedly helps
+	 * with bug 675 "nslookup does not properly use second argument"
+	 * at least on Debian Wheezy and Openwrt AA (eglibc based).
+	 */
+	set_default_dns(argv[2]);
+
 	return print_host(argv[1], "Name:");
 }

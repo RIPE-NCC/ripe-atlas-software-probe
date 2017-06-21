@@ -10,7 +10,7 @@
  *              Fred N. van Kempen, <waltje@uwalt.nl.mugnet.org>
  *              (derived from FvK's 'route.c     1.70    01/04/94')
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
  *
  * displayroute() code added by Vladimir N. Oleynik <dzo@simtreas.ru>
@@ -24,6 +24,24 @@
  * Rewritten to fix several bugs, add additional error checking, and
  * remove ridiculous amounts of bloat.
  */
+//config:config ROUTE
+//config:	bool "route"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	help
+//config:	  Route displays or manipulates the kernel's IP routing tables.
+
+//applet:IF_ROUTE(APPLET(route, BB_DIR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_ROUTE) += route.o
+
+//usage:#define route_trivial_usage
+//usage:       "[{add|del|delete}]"
+//usage:#define route_full_usage "\n\n"
+//usage:       "Edit kernel routing tables\n"
+//usage:     "\n	-n	Don't resolve names"
+//usage:     "\n	-e	Display other/more information"
+//usage:     "\n	-A inet" IF_FEATURE_IPV6("{6}") "	Select address family"
 
 #include <net/route.h>
 #include <net/if.h>
@@ -47,6 +65,7 @@
 #define RTF_WINDOW      0x0080	/* per route window clamping    */
 #define RTF_IRTT        0x0100	/* Initial round trip time      */
 #define RTF_REJECT      0x0200	/* Reject route                 */
+#define RTF_NONEXTHOP   0x00200000 /* route with no nexthop	*/
 #endif
 
 #if defined(SIOCADDRTOLD) || defined(RTF_IRTT)	/* route */
@@ -120,7 +139,7 @@ static const char tbl_ipvx[] ALIGN1 =
 	"\013\043reinstate"			/* Since last, we can save a byte. */
 ;
 
-static const int flags_ipvx[] = { /* MUST match tbl_ipvx[] values above. */
+static const uint16_t flags_ipvx[] = { /* MUST match tbl_ipvx[] values above. */
 #ifdef RTF_REJECT
 	RTF_REJECT,
 #endif
@@ -151,9 +170,12 @@ static int kw_lookup(const char *kwtbl, char ***pargs)
 
 /* Add or delete a route, depending on action. */
 
-static void INET_setroute(int action, char **args)
+static NOINLINE void INET_setroute(int action, char **args)
 {
-	struct rtentry rt;
+	/* char buffer instead of bona-fide struct avoids aliasing warning */
+	char rt_buf[sizeof(struct rtentry)];
+	struct rtentry *const rt = (void *)rt_buf;
+
 	const char *netmask = NULL;
 	int skfd, isnet, xflag;
 
@@ -166,7 +188,7 @@ static void INET_setroute(int action, char **args)
 	}
 
 	/* Clean out the RTREQ structure. */
-	memset(&rt, 0, sizeof(rt));
+	memset(rt, 0, sizeof(*rt));
 
 	{
 		const char *target = *args++;
@@ -178,17 +200,17 @@ static void INET_setroute(int action, char **args)
 			int prefix_len;
 
 			prefix_len = xatoul_range(prefix+1, 0, 32);
-			mask_in_addr(rt) = htonl( ~ (0xffffffffUL >> prefix_len));
+			mask_in_addr(*rt) = htonl( ~(0xffffffffUL >> prefix_len));
 			*prefix = '\0';
 #if HAVE_NEW_ADDRT
-			rt.rt_genmask.sa_family = AF_INET;
+			rt->rt_genmask.sa_family = AF_INET;
 #endif
 		} else {
 			/* Default netmask. */
-			netmask = bb_str_default;
+			netmask = "default";
 		}
 		/* Prefer hostname lookup is -host flag (xflag==1) was given. */
-		isnet = INET_resolve(target, (struct sockaddr_in *) &rt.rt_dst,
+		isnet = INET_resolve(target, (struct sockaddr_in *) &rt->rt_dst,
 							 (xflag & HOST_FLAG));
 		if (isnet < 0) {
 			bb_error_msg_and_die("resolving %s", target);
@@ -204,20 +226,20 @@ static void INET_setroute(int action, char **args)
 	}
 
 	/* Fill in the other fields. */
-	rt.rt_flags = ((isnet) ? RTF_UP : (RTF_UP | RTF_HOST));
+	rt->rt_flags = ((isnet) ? RTF_UP : (RTF_UP | RTF_HOST));
 
 	while (*args) {
 		int k = kw_lookup(tbl_ipvx, &args);
 		const char *args_m1 = args[-1];
 
 		if (k & KW_IPVx_FLAG_ONLY) {
-			rt.rt_flags |= flags_ipvx[k & 3];
+			rt->rt_flags |= flags_ipvx[k & 3];
 			continue;
 		}
 
 #if HAVE_NEW_ADDRT
 		if (k == KW_IPVx_METRIC) {
-			rt.rt_metric = xatoul(args_m1) + 1;
+			rt->rt_metric = xatoul(args_m1) + 1;
 			continue;
 		}
 #endif
@@ -225,7 +247,7 @@ static void INET_setroute(int action, char **args)
 		if (k == KW_IPVx_NETMASK) {
 			struct sockaddr mask;
 
-			if (mask_in_addr(rt)) {
+			if (mask_in_addr(*rt)) {
 				bb_show_usage();
 			}
 
@@ -234,18 +256,18 @@ static void INET_setroute(int action, char **args)
 			if (isnet < 0) {
 				bb_error_msg_and_die("resolving %s", netmask);
 			}
-			rt.rt_genmask = full_mask(mask);
+			rt->rt_genmask = full_mask(mask);
 			continue;
 		}
 
 		if (k == KW_IPVx_GATEWAY) {
-			if (rt.rt_flags & RTF_GATEWAY) {
+			if (rt->rt_flags & RTF_GATEWAY) {
 				bb_show_usage();
 			}
 
 			isnet = INET_resolve(args_m1,
-								 (struct sockaddr_in *) &rt.rt_gateway, 1);
-			rt.rt_flags |= RTF_GATEWAY;
+						(struct sockaddr_in *) &rt->rt_gateway, 1);
+			rt->rt_flags |= RTF_GATEWAY;
 
 			if (isnet) {
 				if (isnet < 0) {
@@ -257,24 +279,24 @@ static void INET_setroute(int action, char **args)
 		}
 
 		if (k == KW_IPVx_MSS) {	/* Check valid MSS bounds. */
-			rt.rt_flags |= RTF_MSS;
-			rt.rt_mss = xatoul_range(args_m1, 64, 32768);
+			rt->rt_flags |= RTF_MSS;
+			rt->rt_mss = xatoul_range(args_m1, 64, 32768);
 			continue;
 		}
 
 		if (k == KW_IPVx_WINDOW) {	/* Check valid window bounds. */
-			rt.rt_flags |= RTF_WINDOW;
-			rt.rt_window = xatoul_range(args_m1, 128, INT_MAX);
+			rt->rt_flags |= RTF_WINDOW;
+			rt->rt_window = xatoul_range(args_m1, 128, INT_MAX);
 			continue;
 		}
 
 #ifdef RTF_IRTT
 		if (k == KW_IPVx_IRTT) {
-			rt.rt_flags |= RTF_IRTT;
-			rt.rt_irtt = xatoul(args_m1);
-			rt.rt_irtt *= (sysconf(_SC_CLK_TCK) / 100);	/* FIXME */
+			rt->rt_flags |= RTF_IRTT;
+			rt->rt_irtt = xatoul(args_m1);
+			rt->rt_irtt *= (bb_clk_tck() / 100);	/* FIXME */
 #if 0					/* FIXME: do we need to check anything of this? */
-			if (rt.rt_irtt < 1 || rt.rt_irtt > (120 * HZ)) {
+			if (rt->rt_irtt < 1 || rt->rt_irtt > (120 * HZ)) {
 				bb_error_msg_and_die("bad irtt");
 			}
 #endif
@@ -283,10 +305,10 @@ static void INET_setroute(int action, char **args)
 #endif
 
 		/* Device is special in that it can be the last arg specified
-		 * and doesn't requre the dev/device keyword in that case. */
-		if (!rt.rt_dev && ((k == KW_IPVx_DEVICE) || (!k && !*++args))) {
+		 * and doesn't require the dev/device keyword in that case. */
+		if (!rt->rt_dev && ((k == KW_IPVx_DEVICE) || (!k && !*++args))) {
 			/* Don't use args_m1 here since args may have changed! */
-			rt.rt_dev = args[-1];
+			rt->rt_dev = args[-1];
 			continue;
 		}
 
@@ -295,48 +317,48 @@ static void INET_setroute(int action, char **args)
 	}
 
 #ifdef RTF_REJECT
-	if ((rt.rt_flags & RTF_REJECT) && !rt.rt_dev) {
-		rt.rt_dev = (char*)"lo";
+	if ((rt->rt_flags & RTF_REJECT) && !rt->rt_dev) {
+		rt->rt_dev = (char*)"lo";
 	}
 #endif
 
 	/* sanity checks.. */
-	if (mask_in_addr(rt)) {
-		uint32_t mask = mask_in_addr(rt);
+	if (mask_in_addr(*rt)) {
+		uint32_t mask = mask_in_addr(*rt);
 
 		mask = ~ntohl(mask);
-		if ((rt.rt_flags & RTF_HOST) && mask != 0xffffffff) {
+		if ((rt->rt_flags & RTF_HOST) && mask != 0xffffffff) {
 			bb_error_msg_and_die("netmask %.8x and host route conflict",
 								 (unsigned int) mask);
 		}
 		if (mask & (mask + 1)) {
 			bb_error_msg_and_die("bogus netmask %s", netmask);
 		}
-		mask = ((struct sockaddr_in *) &rt.rt_dst)->sin_addr.s_addr;
-		if (mask & ~(uint32_t)mask_in_addr(rt)) {
+		mask = ((struct sockaddr_in *) &rt->rt_dst)->sin_addr.s_addr;
+		if (mask & ~(uint32_t)mask_in_addr(*rt)) {
 			bb_error_msg_and_die("netmask and route address conflict");
 		}
 	}
 
 	/* Fill out netmask if still unset */
-	if ((action == RTACTION_ADD) && (rt.rt_flags & RTF_HOST)) {
-		mask_in_addr(rt) = 0xffffffff;
+	if ((action == RTACTION_ADD) && (rt->rt_flags & RTF_HOST)) {
+		mask_in_addr(*rt) = 0xffffffff;
 	}
 
 	/* Create a socket to the INET kernel. */
 	skfd = xsocket(AF_INET, SOCK_DGRAM, 0);
 
 	if (action == RTACTION_ADD)
-		xioctl(skfd, SIOCADDRT, &rt);
+		xioctl(skfd, SIOCADDRT, rt);
 	else
-		xioctl(skfd, SIOCDELRT, &rt);
+		xioctl(skfd, SIOCDELRT, rt);
 
 	if (ENABLE_FEATURE_CLEAN_UP) close(skfd);
 }
 
 #if ENABLE_FEATURE_IPV6
 
-static void INET6_setroute(int action, char **args)
+static NOINLINE void INET6_setroute(int action, char **args)
 {
 	struct sockaddr_in6 sa6;
 	struct in6_rtmsg rt;
@@ -346,7 +368,7 @@ static void INET6_setroute(int action, char **args)
 		/* We know args isn't NULL from the check in route_main. */
 		const char *target = *args++;
 
-		if (strcmp(target, bb_str_default) == 0) {
+		if (strcmp(target, "default") == 0) {
 			prefix_len = 0;
 			memset(&sa6, 0, sizeof(sa6));
 		} else {
@@ -398,13 +420,13 @@ static void INET6_setroute(int action, char **args)
 				bb_error_msg_and_die("resolving %s", args_m1);
 			}
 			memcpy(&rt.rtmsg_gateway, sa6.sin6_addr.s6_addr,
-				   sizeof(struct in6_addr));
+					sizeof(struct in6_addr));
 			rt.rtmsg_flags |= RTF_GATEWAY;
 			continue;
 		}
 
 		/* Device is special in that it can be the last arg specified
-		 * and doesn't requre the dev/device keyword in that case. */
+		 * and doesn't require the dev/device keyword in that case. */
 		if (!devname && ((k == KW_IPVx_DEVICE) || (!k && !*++args))) {
 			/* Don't use args_m1 here since args may have changed! */
 			devname = args[-1];
@@ -423,8 +445,8 @@ static void INET6_setroute(int action, char **args)
 	if (devname) {
 		struct ifreq ifr;
 		memset(&ifr, 0, sizeof(ifr));
-		strncpy(ifr.ifr_name, devname, sizeof(ifr.ifr_name));
-		xioctl(skfd, SIOGIFINDEX, &ifr);
+		strncpy_IFNAMSIZ(ifr.ifr_name, devname);
+		xioctl(skfd, SIOCGIFINDEX, &ifr);
 		rt.rtmsg_ifindex = ifr.ifr_ifindex;
 	}
 
@@ -438,7 +460,11 @@ static void INET6_setroute(int action, char **args)
 }
 #endif
 
-static const unsigned flagvals[] = { /* Must agree with flagchars[]. */
+static const
+IF_NOT_FEATURE_IPV6(uint16_t)
+IF_FEATURE_IPV6(unsigned)
+flagvals[] = { /* Must agree with flagchars[]. */
+	RTF_UP,
 	RTF_GATEWAY,
 	RTF_HOST,
 	RTF_REINSTATE,
@@ -447,26 +473,24 @@ static const unsigned flagvals[] = { /* Must agree with flagchars[]. */
 #if ENABLE_FEATURE_IPV6
 	RTF_DEFAULT,
 	RTF_ADDRCONF,
-	RTF_CACHE
+	RTF_CACHE,
+	RTF_REJECT,
+	RTF_NONEXTHOP, /* this one doesn't fit into 16 bits */
 #endif
 };
-
-#define IPV4_MASK (RTF_GATEWAY|RTF_HOST|RTF_REINSTATE|RTF_DYNAMIC|RTF_MODIFIED)
-#define IPV6_MASK (RTF_GATEWAY|RTF_HOST|RTF_DEFAULT|RTF_ADDRCONF|RTF_CACHE)
-
 /* Must agree with flagvals[]. */
 static const char flagchars[] ALIGN1 =
-	"GHRDM"
+	"UGHRDM"
 #if ENABLE_FEATURE_IPV6
-	"DAC"
+	"DAC!n"
 #endif
 ;
+#define IPV4_MASK (RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_REINSTATE|RTF_DYNAMIC|RTF_MODIFIED)
+#define IPV6_MASK (RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_DEFAULT|RTF_ADDRCONF|RTF_CACHE|RTF_REJECT|RTF_NONEXTHOP)
 
 static void set_flags(char *flagstr, int flags)
 {
 	int i;
-
-	*flagstr++ = 'U';
 
 	for (i = 0; (*flagstr = flagchars[i]) != 0; i++) {
 		if (flags & flagvals[i]) {
@@ -480,6 +504,7 @@ void FAST_FUNC bb_displayroutes(int noresolve, int netstatfmt)
 {
 	char devname[64], flags[16], *sdest, *sgw;
 	unsigned long d, g, m;
+	int r;
 	int flgs, ref, use, metric, mtu, win, ir;
 	struct sockaddr_in s_addr;
 	struct in_addr mask;
@@ -487,23 +512,27 @@ void FAST_FUNC bb_displayroutes(int noresolve, int netstatfmt)
 	FILE *fp = xfopen_for_read("/proc/net/route");
 
 	printf("Kernel IP routing table\n"
-	       "Destination     Gateway         Genmask         Flags %s Iface\n",
+		"Destination     Gateway         Genmask         Flags %s Iface\n",
 			netstatfmt ? "  MSS Window  irtt" : "Metric Ref    Use");
 
-	if (fscanf(fp, "%*[^\n]\n") < 0) { /* Skip the first line. */
-		goto ERROR;		   /* Empty or missing line, or read error. */
+	/* Skip the first line. */
+	r = fscanf(fp, "%*[^\n]\n");
+	if (r < 0) {
+		/* Empty line, read error, or EOF. Yes, if routing table
+		 * is completely empty, /proc/net/route has no header.
+		 */
+		goto ERROR;
 	}
 	while (1) {
-		int r;
 		r = fscanf(fp, "%63s%lx%lx%X%d%d%d%lx%d%d%d\n",
-				   devname, &d, &g, &flgs, &ref, &use, &metric, &m,
-				   &mtu, &win, &ir);
+				devname, &d, &g, &flgs, &ref, &use, &metric, &m,
+				&mtu, &win, &ir);
 		if (r != 11) {
+ ERROR:
 			if ((r < 0) && feof(fp)) { /* EOF with no (nonspace) chars read. */
 				break;
 			}
- ERROR:
-			bb_error_msg_and_die("fscanf");
+			bb_perror_msg_and_die(bb_msg_read_error);
 		}
 
 		if (!(flgs & RTF_UP)) { /* Skip interfaces that are down. */
@@ -534,6 +563,7 @@ void FAST_FUNC bb_displayroutes(int noresolve, int netstatfmt)
 			printf("%-6d %-2d %7d %s\n", metric, ref, use, devname);
 		}
 	}
+	fclose(fp);
 }
 
 #if ENABLE_FEATURE_IPV6
@@ -555,20 +585,20 @@ static void INET6_displayroutes(void)
 	FILE *fp = xfopen_for_read("/proc/net/ipv6_route");
 
 	printf("Kernel IPv6 routing table\n%-44s%-40s"
-			  "Flags Metric Ref    Use Iface\n",
-			  "Destination", "Next Hop");
+			"Flags Metric Ref    Use Iface\n",
+			"Destination", "Next Hop");
 
 	while (1) {
 		int r;
 		r = fscanf(fp, "%32s%x%*s%x%32s%x%x%x%x%s\n",
 				addr6x+14, &prefix_len, &slen, addr6x+40+7,
-				&metric, &use, &refcnt, &iflags, iface);
+				&metric, &refcnt, &use, &iflags, iface);
 		if (r != 9) {
 			if ((r < 0) && feof(fp)) { /* EOF with no (nonspace) chars read. */
 				break;
 			}
  ERROR:
-			bb_error_msg_and_die("fscanf");
+			bb_perror_msg_and_die(bb_msg_read_error);
 		}
 
 		/* Do the addr6x shift-and-insert changes to ':'-delimit addresses.
@@ -594,20 +624,16 @@ static void INET6_displayroutes(void)
 			} while (i < 40+28+7);
 		}
 
-		if (!(iflags & RTF_UP)) { /* Skip interfaces that are down. */
-			continue;
-		}
-
 		set_flags(flags, (iflags & IPV6_MASK));
 
 		r = 0;
-		do {
+		while (1) {
 			inet_pton(AF_INET6, addr6x + r,
 					  (struct sockaddr *) &snaddr6.sin6_addr);
 			snaddr6.sin6_family = AF_INET6;
 			naddr6 = INET6_rresolve((struct sockaddr_in6 *) &snaddr6,
-						   0x0fff /* Apparently, upstream never resolves. */
-						   );
+						0x0fff /* Apparently, upstream never resolves. */
+						);
 
 			if (!r) {			/* 1st pass */
 				snprintf(addr6, sizeof(addr6), "%s/%d", naddr6, prefix_len);
@@ -620,8 +646,9 @@ static void INET6_displayroutes(void)
 				free(naddr6);
 				break;
 			}
-		} while (1);
+		}
 	}
+	fclose(fp);
 }
 
 #endif

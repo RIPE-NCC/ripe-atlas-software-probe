@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:### lib-$(CONFIG_FEATURE_VOLUMEID_MSDOS) += msdos.o
+
+//config:
+//config:### config FEATURE_VOLUMEID_MSDOS
+//config:###	bool "msdos filesystem"
+//config:###	default y
+//config:###	depends on VOLUMEID
+//config:###	help
+//config:###	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct msdos_partition_entry {
@@ -31,7 +42,7 @@ struct msdos_partition_entry {
 	uint8_t		end_cyl;
 	uint32_t	start_sect;
 	uint32_t	nr_sects;
-} __attribute__((packed));
+} PACKED;
 
 #define MSDOS_PARTTABLE_OFFSET		0x1be
 #define MSDOS_SIG_OFF			0x1fe
@@ -47,7 +58,7 @@ struct msdos_partition_entry {
 #define is_raid(type) \
 	(type == LINUX_RAID_PARTITION)
 
-int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
 {
 	const uint8_t *buf;
 	int i;
@@ -73,9 +84,11 @@ int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
 	/* check flags on all entries for a valid partition table */
 	part = (struct msdos_partition_entry*) &buf[MSDOS_PARTTABLE_OFFSET];
 	for (i = 0; i < 4; i++) {
-		if (part[i].boot_ind != 0 &&
-		    part[i].boot_ind != 0x80)
+		if (part[i].boot_ind != 0
+		 && part[i].boot_ind != 0x80
+		) {
 			return -1;
+		}
 
 		if (part[i].nr_sects != 0)
 			empty = 0;
@@ -107,7 +120,7 @@ int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
 				extended = off + poff;
 		} else {
 			dbg("found 0x%x data partition at 0x%llx, len 0x%llx",
-			    part[i].sys_ind, (unsigned long long) poff, (unsigned long long) plen);
+				part[i].sys_ind, (unsigned long long) poff, (unsigned long long) plen);
 
 //			if (is_raid(part[i].sys_ind))
 //				volume_id_set_usage_part(p, VOLUME_ID_RAID);
@@ -163,7 +176,7 @@ int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
 				if (id->partition_count < 4)
 					id->partition_count = 4;
 
-				p = &id->partitions[id->partition_count];
+//				p = &id->partitions[id->partition_count];
 
 //				if (is_raid(part[i].sys_ind))
 //					volume_id_set_usage_part(p, VOLUME_ID_RAID);

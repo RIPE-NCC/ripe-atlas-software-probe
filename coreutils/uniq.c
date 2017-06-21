@@ -4,99 +4,129 @@
  *
  * Copyright (C) 2005  Manuel Novoa III  <mjn3@codepoet.org>
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config UNIQ
+//config:	bool "uniq"
+//config:	default y
+//config:	help
+//config:	  uniq is used to remove duplicate lines from a sorted file.
+
+//applet:IF_UNIQ(APPLET(uniq, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_UNIQ) += uniq.o
 
 /* BB_AUDIT SUSv3 compliant */
 /* http://www.opengroup.org/onlinepubs/007904975/utilities/uniq.html */
 
+//usage:#define uniq_trivial_usage
+//usage:       "[-cdu][-f,s,w N] [INPUT [OUTPUT]]"
+//usage:#define uniq_full_usage "\n\n"
+//usage:       "Discard duplicate lines\n"
+//usage:     "\n	-c	Prefix lines by the number of occurrences"
+//usage:     "\n	-d	Only print duplicate lines"
+//usage:     "\n	-u	Only print unique lines"
+//usage:     "\n	-f N	Skip first N fields"
+//usage:     "\n	-s N	Skip first N chars (after any skipped fields)"
+//usage:     "\n	-w N	Compare N characters in line"
+//usage:
+//usage:#define uniq_example_usage
+//usage:       "$ echo -e \"a\\na\\nb\\nc\\nc\\na\" | sort | uniq\n"
+//usage:       "a\n"
+//usage:       "b\n"
+//usage:       "c\n"
+
 #include "libbb.h"
-
-static FILE *xgetoptfile_uniq_s(char **argv, int read0write2)
-{
-	const char *n;
-
-	n = *argv;
-	if (n != NULL) {
-		if ((*n != '-') || n[1]) {
-			return xfopen(n, "r\0w" + read0write2);
-		}
-	}
-	return (read0write2) ? stdout : stdin;
-}
 
 int uniq_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int uniq_main(int argc UNUSED_PARAM, char **argv)
 {
-	FILE *in, *out;
-	const char *s0, *e0, *s1, *e1, *input_filename;
-	unsigned long dups;
+	const char *input_filename;
 	unsigned skip_fields, skip_chars, max_chars;
 	unsigned opt;
-	unsigned i;
+	char *cur_line;
+	const char *cur_compare;
 
 	enum {
 		OPT_c = 0x1,
-		OPT_d = 0x2,
-		OPT_u = 0x4,
+		OPT_d = 0x2, /* print only dups */
+		OPT_u = 0x4, /* print only uniq */
 		OPT_f = 0x8,
 		OPT_s = 0x10,
 		OPT_w = 0x20,
 	};
 
 	skip_fields = skip_chars = 0;
-	max_chars = -1;
+	max_chars = INT_MAX;
 
-	opt_complementary = "f+:s+:w+";
-	opt = getopt32(argv, "cduf:s:w:", &skip_fields, &skip_chars, &max_chars);
+	opt = getopt32(argv, "cduf:+s:+w:+", &skip_fields, &skip_chars, &max_chars);
 	argv += optind;
 
-	input_filename = *argv;
+	input_filename = argv[0];
+	if (input_filename) {
+		const char *output;
 
-	in = xgetoptfile_uniq_s(argv, 0);
-	if (*argv) {
-		++argv;
-	}
-	out = xgetoptfile_uniq_s(argv, 2);
-	if (*argv && argv[1]) {
-		bb_show_usage();
+		if (input_filename[0] != '-' || input_filename[1]) {
+			close(STDIN_FILENO); /* == 0 */
+			xopen(input_filename, O_RDONLY); /* fd will be 0 */
+		}
+		output = argv[1];
+		if (output) {
+			if (argv[2])
+				bb_show_usage();
+			if (output[0] != '-' || output[1]) {
+				// Won't work with "uniq - FILE" and closed stdin:
+				//close(STDOUT_FILENO);
+				//xopen(output, O_WRONLY | O_CREAT | O_TRUNC);
+				xmove_fd(xopen(output, O_WRONLY | O_CREAT | O_TRUNC), STDOUT_FILENO);
+			}
+		}
 	}
 
-	s1 = e1 = NULL; /* prime the pump */
+	cur_compare = cur_line = NULL; /* prime the pump */
 
 	do {
-		s0 = s1;
-		e0 = e1;
+		unsigned i;
+		unsigned long dups;
+		char *old_line;
+		const char *old_compare;
+
+		old_line = cur_line;
+		old_compare = cur_compare;
 		dups = 0;
 
 		/* gnu uniq ignores newlines */
-		while ((s1 = xmalloc_fgetline(in)) != NULL) {
-			e1 = s1;
+		while ((cur_line = xmalloc_fgetline(stdin)) != NULL) {
+			cur_compare = cur_line;
 			for (i = skip_fields; i; i--) {
-				e1 = skip_whitespace(e1);
-				e1 = skip_non_whitespace(e1);
+				cur_compare = skip_whitespace(cur_compare);
+				cur_compare = skip_non_whitespace(cur_compare);
 			}
-			for (i = skip_chars; *e1 && i; i--) {
-				++e1;
+			for (i = skip_chars; *cur_compare && i; i--) {
+				++cur_compare;
 			}
 
-			if (!s0 || strncmp(e0, e1, max_chars)) {
+			if (!old_line || strncmp(old_compare, cur_compare, max_chars)) {
 				break;
 			}
 
-			++dups;	 /* note: testing for overflow seems excessive. */
+			free(cur_line);
+			++dups;  /* testing for overflow seems excessive */
 		}
 
-		if (s0) {
-			if (!(opt & (OPT_d << !!dups))) { /* (if dups, opt & OPT_e) */
-				fprintf(out, "\0%ld " + (opt & 1), dups + 1); /* 1 == OPT_c */
-				fprintf(out, "%s\n", s0);
+		if (old_line) {
+			if (!(opt & (OPT_d << !!dups))) { /* (if dups, opt & OPT_u) */
+				if (opt & OPT_c) {
+					/* %7lu matches GNU coreutils 6.9 */
+					printf("%7lu ", dups + 1);
+				}
+				puts(old_line);
 			}
-			free((void *)s0);
+			free(old_line);
 		}
-	} while (s1);
+	} while (cur_line);
 
-	die_if_ferror(in, input_filename);
+	die_if_ferror(stdin, input_filename);
 
 	fflush_stdout_and_exit(EXIT_SUCCESS);
 }

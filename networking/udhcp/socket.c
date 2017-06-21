@@ -1,6 +1,6 @@
 /* vi: set sw=4 ts=4: */
 /*
- * socket.c -- DHCP server client/server socket creation
+ * DHCP server client/server socket creation
  *
  * udhcp client/server
  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
@@ -22,61 +22,52 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-#include <net/if.h>
-#include <features.h>
-#if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#else
-#include <asm/types.h>
-#include <linux/if_packet.h>
-#include <linux/if_ether.h>
-#endif
-
 #include "common.h"
+#include <net/if.h>
 
-
-int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp)
+int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *mac)
 {
+	/* char buffer instead of bona-fide struct avoids aliasing warning */
+	char ifr_buf[sizeof(struct ifreq)];
+	struct ifreq *const ifr = (void *)ifr_buf;
+
 	int fd;
-	struct ifreq ifr;
 	struct sockaddr_in *our_ip;
 
-	memset(&ifr, 0, sizeof(ifr));
+	memset(ifr, 0, sizeof(*ifr));
 	fd = xsocket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
-	ifr.ifr_addr.sa_family = AF_INET;
-	strncpy(ifr.ifr_name, interface, sizeof(ifr.ifr_name));
-	if (addr) {
-		if (ioctl_or_perror(fd, SIOCGIFADDR, &ifr,
+	ifr->ifr_addr.sa_family = AF_INET;
+	strncpy_IFNAMSIZ(ifr->ifr_name, interface);
+	if (nip) {
+		if (ioctl_or_perror(fd, SIOCGIFADDR, ifr,
 			"is interface %s up and configured?", interface)
 		) {
 			close(fd);
 			return -1;
 		}
-		our_ip = (struct sockaddr_in *) &ifr.ifr_addr;
-		*addr = our_ip->sin_addr.s_addr;
-		DEBUG("%s (our ip) = %s", ifr.ifr_name, inet_ntoa(our_ip->sin_addr));
+		our_ip = (struct sockaddr_in *) &ifr->ifr_addr;
+		*nip = our_ip->sin_addr.s_addr;
+		log1("IP %s", inet_ntoa(our_ip->sin_addr));
 	}
 
 	if (ifindex) {
-		if (ioctl_or_warn(fd, SIOCGIFINDEX, &ifr) != 0) {
+		if (ioctl_or_warn(fd, SIOCGIFINDEX, ifr) != 0) {
 			close(fd);
 			return -1;
 		}
-		DEBUG("adapter index %d", ifr.ifr_ifindex);
-		*ifindex = ifr.ifr_ifindex;
+		log1("adapter index %d", ifr->ifr_ifindex);
+		*ifindex = ifr->ifr_ifindex;
 	}
 
-	if (arp) {
-		if (ioctl_or_warn(fd, SIOCGIFHWADDR, &ifr) != 0) {
+	if (mac) {
+		if (ioctl_or_warn(fd, SIOCGIFHWADDR, ifr) != 0) {
 			close(fd);
 			return -1;
 		}
-		memcpy(arp, ifr.ifr_hwaddr.sa_data, 6);
-		DEBUG("adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
-			arp[0], arp[1], arp[2], arp[3], arp[4], arp[5]);
+		memcpy(mac, ifr->ifr_hwaddr.sa_data, 6);
+		log1("MAC %02x:%02x:%02x:%02x:%02x:%02x",
+			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	}
 
 	close(fd);
@@ -89,17 +80,25 @@ int FAST_FUNC udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf)
 {
 	int fd;
 	struct sockaddr_in addr;
+	char *colon;
 
-	DEBUG("Opening listen socket on *:%d %s", port, inf);
+	log1("opening listen socket on *:%d %s", port, inf);
 	fd = xsocket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
 	setsockopt_reuseaddr(fd);
 	if (setsockopt_broadcast(fd) == -1)
 		bb_perror_msg_and_die("SO_BROADCAST");
 
-	/* NB: bug 1032 says this doesn't work on ethernet aliases (ethN:M) */
+	/* SO_BINDTODEVICE doesn't work on ethernet aliases (ethN:M) */
+	colon = strrchr(inf, ':');
+	if (colon)
+		*colon = '\0';
+
 	if (setsockopt_bindtodevice(fd, inf))
 		xfunc_die(); /* warning is already printed */
+
+	if (colon)
+		*colon = ':';
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;

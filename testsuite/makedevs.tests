@@ -1,8 +1,17 @@
 #!/bin/sh
 # Copyright 2008 by Denys Vlasenko
-# Licensed under GPL v2, see file LICENSE for details.
+# Licensed under GPLv2, see file LICENSE in this source tree.
 
-. testing.sh
+. ./testing.sh
+
+test x"`id -u`" = x"0" || {
+	echo "SKIPPED: makedevs (must be root to test this)"
+	exit 0
+}
+
+unset LANG
+unset LC_COLLATE
+unset LC_ALL
 
 # ls -ln is showing date. Need to remove that, it's variable
 # sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
@@ -16,6 +25,7 @@ FILTER_LS2="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-4,9-"
 rm -rf makedevs.testdir
 mkdir makedevs.testdir
 
+optional FEATURE_MAKEDEVS_TABLE FEATURE_FIND_NOT FEATURE_FIND_TYPE FEATURE_LS_RECURSIVE FEATURE_LS_SORTFILES FEATURE_LS_TIMESTAMPS
 testing "makedevs -d ../makedevs.device_table.txt ." \
 	"(cd makedevs.testdir && makedevs -d ../makedevs.device_table.txt . 2>&1);
 	find makedevs.testdir ! -type d | sort | xargs ls -lnR | $FILTER_LS" \
@@ -132,6 +142,7 @@ crw-rw-rw- 1 0 0 1,9 makedevs.testdir/dev/urandom
 crw-rw-rw- 1 0 0 1,5 makedevs.testdir/dev/zero
 " \
 	"" ""
+SKIP=
 
 # clean up
 rm -rf makedevs.testdir

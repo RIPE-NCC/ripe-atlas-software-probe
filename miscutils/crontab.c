@@ -7,48 +7,56 @@
  * Copyright 1994 Matthew Dillon (dillon@apollo.west.oic.com)
  * Vladimir Oleynik <dzo@simtreas.ru> (C) 2002
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config CRONTAB
+//config:	bool "crontab"
+//config:	default y
+//config:	help
+//config:	  Crontab manipulates the crontab for a particular user. Only
+//config:	  the superuser may specify a different user and/or crontab directory.
+//config:	  Note that Busybox binary must be setuid root for this applet to
+//config:	  work properly.
+
+/* Needs to be run by root or be suid root - needs to change /var/spool/cron* files: */
+//applet:IF_CRONTAB(APPLET(crontab, BB_DIR_USR_BIN, BB_SUID_REQUIRE))
+
+//kbuild:lib-$(CONFIG_CRONTAB) += crontab.o
+
+//usage:#define crontab_trivial_usage
+//usage:       "[-c DIR] [-u USER] [-ler]|[FILE]"
+//usage:#define crontab_full_usage "\n\n"
+//usage:       "	-c	Crontab directory"
+//usage:     "\n	-u	User"
+//usage:     "\n	-l	List crontab"
+//usage:     "\n	-e	Edit crontab"
+//usage:     "\n	-r	Delete crontab"
+//usage:     "\n	FILE	Replace crontab by FILE ('-': stdin)"
 
 #include "libbb.h"
 
-#ifndef CRONTABS
-#define CRONTABS        "/var/spool/cron/crontabs"
-#endif
+#define CRONTABS        CONFIG_FEATURE_CROND_DIR "/crontabs"
 #ifndef CRONUPDATE
 #define CRONUPDATE      "cron.update"
 #endif
 
-static void change_user(const struct passwd *pas)
-{
-	xsetenv("USER", pas->pw_name);
-	xsetenv("HOME", pas->pw_dir);
-	xsetenv("SHELL", DEFAULT_SHELL);
-
-	/* initgroups, setgid, setuid */
-	change_identity(pas);
-
-	if (chdir(pas->pw_dir) < 0) {
-		bb_perror_msg("chdir(%s) by %s failed",
-				pas->pw_dir, pas->pw_name);
-		xchdir("/tmp");
-	}
-}
-
 static void edit_file(const struct passwd *pas, const char *file)
 {
 	const char *ptr;
-	int pid = vfork();
+	pid_t pid;
 
-	if (pid < 0) /* failure */
-		bb_perror_msg_and_die("vfork");
+	pid = xvfork();
 	if (pid) { /* parent */
 		wait4pid(pid);
 		return;
 	}
 
 	/* CHILD - change user and run editor */
-	change_user(pas);
+	/* initgroups, setgid, setuid */
+	change_identity(pas);
+	setup_environment(pas->pw_shell,
+			SETUP_ENV_CHANGEENV | SETUP_ENV_TO_TMP,
+			pas);
 	ptr = getenv("VISUAL");
 	if (!ptr) {
 		ptr = getenv("EDITOR");
@@ -57,31 +65,7 @@ static void edit_file(const struct passwd *pas, const char *file)
 	}
 
 	BB_EXECLP(ptr, ptr, file, NULL);
-	bb_perror_msg_and_die("exec %s", ptr);
-}
-
-static int open_as_user(const struct passwd *pas, const char *file)
-{
-	pid_t pid;
-	char c;
-
-	pid = vfork();
-	if (pid < 0) /* ERROR */
-		bb_perror_msg_and_die("vfork");
-	if (pid) { /* PARENT */
-		if (wait4pid(pid) == 0) {
-			/* exitcode 0: child says it can read */
-			return open(file, O_RDONLY);
-		}
-		return -1;
-	}
-
-	/* CHILD */
-	/* initgroups, setgid, setuid */
-	change_identity(pas);
-	/* We just try to read one byte. If it works, file is readable
-	 * under this user. We signal that by exiting with 0. */
-	_exit(safe_read(xopen(file, O_RDONLY), &c, 1) < 0);
+	bb_perror_msg_and_die("can't execute '%s'", ptr);
 }
 
 int crontab_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -120,21 +104,15 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
 	argv += optind;
 
 	if (sanitize_env_if_suid()) { /* Clears dangerous stuff, sets PATH */
-		/* run by non-root? */
+		/* Run by non-root */
 		if (opt_ler & (OPT_u|OPT_c))
-			bb_error_msg_and_die("only root can use -c or -u");
+			bb_error_msg_and_die(bb_msg_you_must_be_root);
 	}
 
 	if (opt_ler & OPT_u) {
-		pas = getpwnam(user_name);
-		if (!pas)
-			bb_error_msg_and_die("user %s is not known", user_name);
+		pas = xgetpwnam(user_name);
 	} else {
-/* XXX: xgetpwuid */
-		uid_t my_uid = getuid();
-		pas = getpwuid(my_uid);
-		if (!pas)
-			bb_perror_msg_and_die("unknown uid %d", (int)my_uid);
+		pas = xgetpwuid(getuid());
 	}
 
 #define user_name DONT_USE_ME_BEYOND_THIS_POINT
@@ -150,10 +128,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
 		if (!argv[0])
 			bb_show_usage();
 		if (NOT_LONE_DASH(argv[0])) {
-			src_fd = open_as_user(pas, argv[0]);
-			if (src_fd < 0)
-				bb_error_msg_and_die("user %s cannot read %s",
-						pas->pw_name, argv[0]);
+			src_fd = xopen_as_uid_gid(argv[0], O_RDONLY, pas->pw_uid, pas->pw_gid);
 		}
 	}
 
@@ -201,14 +176,13 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
 			close(fd);
 			xrename(new_fname, pas->pw_name);
 		} else {
-			bb_error_msg("cannot create %s/%s",
+			bb_error_msg("can't create %s/%s",
 					crontab_dir, new_fname);
 		}
 		if (tmp_fname)
 			unlink(tmp_fname);
 		/*free(tmp_fname);*/
 		/*free(new_fname);*/
-
 	} /* switch */
 
 	/* Bump notification file.  Handle window where crond picks file up
@@ -228,7 +202,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
 		/* loop */
 	}
 	if (fd < 0) {
-		bb_error_msg("cannot append to %s/%s",
+		bb_error_msg("can't append to %s/%s",
 				crontab_dir, CRONUPDATE);
 	}
 	return 0;

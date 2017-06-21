@@ -6,7 +6,7 @@
  * Copyright (C) 2006 Rob Landley
  * Copyright (C) 2006 Denys Vlasenko
  *
- * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 /* We need to have separate xfuncs.c and xfuncs_printf.c because
@@ -27,141 +27,65 @@
 /* Turn on nonblocking I/O on a fd */
 int FAST_FUNC ndelay_on(int fd)
 {
-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) | O_NONBLOCK);
+	int flags = fcntl(fd, F_GETFL);
+	if (flags & O_NONBLOCK)
+		return flags;
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	return flags;
 }
 
 int FAST_FUNC ndelay_off(int fd)
 {
-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) & ~O_NONBLOCK);
+	int flags = fcntl(fd, F_GETFL);
+	if (!(flags & O_NONBLOCK))
+		return flags;
+	fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+	return flags;
 }
 
-int FAST_FUNC close_on_exec_on(int fd)
+void FAST_FUNC close_on_exec_on(int fd)
 {
-	return fcntl(fd, F_SETFD, FD_CLOEXEC);
+	fcntl(fd, F_SETFD, FD_CLOEXEC);
 }
 
-/* Convert unsigned long long value into compact 4-char
- * representation. Examples: "1234", "1.2k", " 27M", "123T"
- * String is not terminated (buf[4] is untouched) */
-void FAST_FUNC smart_ulltoa4(unsigned long long ul, char buf[5], const char *scale)
+char* FAST_FUNC strncpy_IFNAMSIZ(char *dst, const char *src)
 {
-	const char *fmt;
-	char c;
-	unsigned v, u, idx = 0;
-
-	if (ul > 9999) { // do not scale if 9999 or less
-		ul *= 10;
-		do {
-			ul /= 1024;
-			idx++;
-		} while (ul >= 10000);
-	}
-	v = ul; // ullong divisions are expensive, avoid them
-
-	fmt = " 123456789";
-	u = v / 10;
-	v = v % 10;
-	if (!idx) {
-		// 9999 or less: use "1234" format
-		// u is value/10, v is last digit
-		c = buf[0] = " 123456789"[u/100];
-		if (c != ' ') fmt = "0123456789";
-		c = buf[1] = fmt[u/10%10];
-		if (c != ' ') fmt = "0123456789";
-		buf[2] = fmt[u%10];
-		buf[3] = "0123456789"[v];
-	} else {
-		// u is value, v is 1/10ths (allows for 9.2M format)
-		if (u >= 10) {
-			// value is >= 10: use "123M', " 12M" formats
-			c = buf[0] = " 123456789"[u/100];
-			if (c != ' ') fmt = "0123456789";
-			v = u % 10;
-			u = u / 10;
-			buf[1] = fmt[u%10];
-		} else {
-			// value is < 10: use "9.2M" format
-			buf[0] = "0123456789"[u];
-			buf[1] = '.';
-		}
-		buf[2] = "0123456789"[v];
-		buf[3] = scale[idx]; /* typically scale = " kmgt..." */
-	}
-}
-
-/* Convert unsigned long long value into compact 5-char representation.
- * String is not terminated (buf[5] is untouched) */
-void FAST_FUNC smart_ulltoa5(unsigned long long ul, char buf[6], const char *scale)
-{
-	const char *fmt;
-	char c;
-	unsigned v, u, idx = 0;
-
-	if (ul > 99999) { // do not scale if 99999 or less
-		ul *= 10;
-		do {
-			ul /= 1024;
-			idx++;
-		} while (ul >= 100000);
-	}
-	v = ul; // ullong divisions are expensive, avoid them
-
-	fmt = " 123456789";
-	u = v / 10;
-	v = v % 10;
-	if (!idx) {
-		// 99999 or less: use "12345" format
-		// u is value/10, v is last digit
-		c = buf[0] = " 123456789"[u/1000];
-		if (c != ' ') fmt = "0123456789";
-		c = buf[1] = fmt[u/100%10];
-		if (c != ' ') fmt = "0123456789";
-		c = buf[2] = fmt[u/10%10];
-		if (c != ' ') fmt = "0123456789";
-		buf[3] = fmt[u%10];
-		buf[4] = "0123456789"[v];
-	} else {
-		// value has been scaled into 0..9999.9 range
-		// u is value, v is 1/10ths (allows for 92.1M format)
-		if (u >= 100) {
-			// value is >= 100: use "1234M', " 123M" formats
-			c = buf[0] = " 123456789"[u/1000];
-			if (c != ' ') fmt = "0123456789";
-			c = buf[1] = fmt[u/100%10];
-			if (c != ' ') fmt = "0123456789";
-			v = u % 10;
-			u = u / 10;
-			buf[2] = fmt[u%10];
-		} else {
-			// value is < 100: use "92.1M" format
-			c = buf[0] = " 123456789"[u/10];
-			if (c != ' ') fmt = "0123456789";
-			buf[1] = fmt[u%10];
-			buf[2] = '.';
-		}
-		buf[3] = "0123456789"[v];
-		buf[4] = scale[idx]; /* typically scale = " kmgt..." */
-	}
+#ifndef IFNAMSIZ
+	enum { IFNAMSIZ = 16 };
+#endif
+	return strncpy(dst, src, IFNAMSIZ);
 }
 
 
-// Convert unsigned integer to ascii, writing into supplied buffer.
-// A truncated result contains the first few digits of the result ala strncpy.
-// Returns a pointer past last generated digit, does _not_ store NUL.
-void BUG_sizeof_unsigned_not_4(void);
+/* Convert unsigned integer to ascii, writing into supplied buffer.
+ * A truncated result contains the first few digits of the result ala strncpy.
+ * Returns a pointer past last generated digit, does _not_ store NUL.
+ */
+void BUG_sizeof(void);
 char* FAST_FUNC utoa_to_buf(unsigned n, char *buf, unsigned buflen)
 {
 	unsigned i, out, res;
-	if (sizeof(unsigned) != 4)
-		BUG_sizeof_unsigned_not_4();
+
 	if (buflen) {
 		out = 0;
-		for (i = 1000000000; i; i /= 10) {
+		if (sizeof(n) == 4)
+		// 2^32-1 = 4294967295
+			i = 1000000000;
+#if UINT_MAX > 4294967295 /* prevents warning about "const too large" */
+		else
+		if (sizeof(n) == 8)
+		// 2^64-1 = 18446744073709551615
+			i = 10000000000000000000;
+#endif
+		else
+			BUG_sizeof();
+		for (; i; i /= 10) {
 			res = n / i;
+			n = n % i;
 			if (res || out || i == 1) {
-				if (!--buflen) break;
+				if (--buflen == 0)
+					break;
 				out++;
-				n -= res*i;
 				*buf++ = '0' + res;
 			}
 		}
@@ -172,7 +96,9 @@ char* FAST_FUNC utoa_to_buf(unsigned n, char *buf, unsigned buflen)
 /* Convert signed integer to ascii, like utoa_to_buf() */
 char* FAST_FUNC itoa_to_buf(int n, char *buf, unsigned buflen)
 {
-	if (buflen && n < 0) {
+	if (!buflen)
+		return buf;
+	if (n < 0) {
 		n = -n;
 		*buf++ = '-';
 		buflen--;
@@ -183,16 +109,16 @@ char* FAST_FUNC itoa_to_buf(int n, char *buf, unsigned buflen)
 // The following two functions use a static buffer, so calling either one a
 // second time will overwrite previous results.
 //
-// The largest 32 bit integer is -2 billion plus null terminator, or 12 bytes.
-// It so happens that sizeof(int) * 3 is enough for 32+ bits.
+// The largest 32 bit integer is -2 billion plus NUL, or 1+10+1=12 bytes.
+// It so happens that sizeof(int) * 3 is enough for 32+ bit ints.
 // (sizeof(int) * 3 + 2 is correct for any width, even 8-bit)
 
 static char local_buf[sizeof(int) * 3];
 
-// Convert unsigned integer to ascii using a static buffer (returned).
+/* Convert unsigned integer to ascii using a static buffer (returned). */
 char* FAST_FUNC utoa(unsigned n)
 {
-	*(utoa_to_buf(n, local_buf, sizeof(local_buf))) = '\0';
+	*(utoa_to_buf(n, local_buf, sizeof(local_buf) - 1)) = '\0';
 
 	return local_buf;
 }
@@ -200,7 +126,7 @@ char* FAST_FUNC utoa(unsigned n)
 /* Convert signed integer to ascii using a static buffer (returned). */
 char* FAST_FUNC itoa(int n)
 {
-	*(itoa_to_buf(n, local_buf, sizeof(local_buf))) = '\0';
+	*(itoa_to_buf(n, local_buf, sizeof(local_buf) - 1)) = '\0';
 
 	return local_buf;
 }
@@ -216,6 +142,41 @@ char* FAST_FUNC bin2hex(char *p, const char *cp, int count)
 		count--;
 	}
 	return p;
+}
+
+/* Convert "[x]x[:][x]x[:][x]x[:][x]x" hex string to binary, no more than COUNT bytes */
+char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
+{
+	errno = EINVAL;
+	while (*str && count) {
+		uint8_t val;
+		uint8_t c = *str++;
+		if (isdigit(c))
+			val = c - '0';
+		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+			val = (c|0x20) - ('a' - 10);
+		else
+			return NULL;
+		val <<= 4;
+		c = *str;
+		if (isdigit(c))
+			val |= c - '0';
+		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+			val |= (c|0x20) - ('a' - 10);
+		else if (c == ':' || c == '\0')
+			val >>= 4;
+		else
+			return NULL;
+
+		*dst++ = val;
+		if (c != '\0')
+			str++;
+		if (*str == ':')
+			str++;
+		count--;
+	}
+	errno = (*str ? ERANGE : 0);
+	return dst;
 }
 
 /* Return how long the file at fd is, if there's any way to determine it. */
@@ -246,7 +207,6 @@ off_t FAST_FUNC fdlength(int fd)
 			else bottom = pos;
 
 		// If we can't, it's smaller.
-
 		} else {
 			if (bottom == top) {
 				if (!top) return 0;
@@ -260,37 +220,139 @@ off_t FAST_FUNC fdlength(int fd)
 }
 #endif
 
+int FAST_FUNC bb_putchar_stderr(char ch)
+{
+	return write(STDERR_FILENO, &ch, 1);
+}
+
+ssize_t FAST_FUNC full_write1_str(const char *str)
+{
+	return full_write(STDOUT_FILENO, str, strlen(str));
+}
+
+ssize_t FAST_FUNC full_write2_str(const char *str)
+{
+	return full_write(STDERR_FILENO, str, strlen(str));
+}
+
+static int wh_helper(int value, int def_val, const char *env_name, int *err)
+{
+	/* Envvars override even if "value" from ioctl is valid (>0).
+	 * Rationale: it's impossible to guess what user wants.
+	 * For example: "man CMD | ...": should "man" format output
+	 * to stdout's width? stdin's width? /dev/tty's width? 80 chars?
+	 * We _cant_ know it. If "..." saves text for e.g. email,
+	 * then it's probably 80 chars.
+	 * If "..." is, say, "grep -v DISCARD | $PAGER", then user
+	 * would prefer his tty's width to be used!
+	 *
+	 * Since we don't know, at least allow user to do this:
+	 * "COLUMNS=80 man CMD | ..."
+	 */
+	char *s = getenv(env_name);
+	if (s) {
+		value = atoi(s);
+		/* If LINES/COLUMNS are set, pretend that there is
+		 * no error getting w/h, this prevents some ugly
+		 * cursor tricks by our callers */
+		*err = 0;
+	}
+
+	if (value <= 1 || value >= 30000)
+		value = def_val;
+	return value;
+}
+
 /* It is perfectly ok to pass in a NULL for either width or for
  * height, in which case that value will not be set.  */
 int FAST_FUNC get_terminal_width_height(int fd, unsigned *width, unsigned *height)
 {
-	struct winsize win = { 0, 0, 0, 0 };
-	int ret = ioctl(fd, TIOCGWINSZ, &win);
+	struct winsize win;
+	int err;
+	int close_me = -1;
 
-	if (height) {
-		if (!win.ws_row) {
-			char *s = getenv("LINES");
-			if (s) win.ws_row = atoi(s);
-		}
-		if (win.ws_row <= 1 || win.ws_row >= 30000)
-			win.ws_row = 24;
-		*height = (int) win.ws_row;
+	if (fd == -1) {
+		if (isatty(STDOUT_FILENO))
+			fd = STDOUT_FILENO;
+		else
+		if (isatty(STDERR_FILENO))
+			fd = STDERR_FILENO;
+		else
+		if (isatty(STDIN_FILENO))
+			fd = STDIN_FILENO;
+		else
+			close_me = fd = open("/dev/tty", O_RDONLY);
 	}
 
-	if (width) {
-		if (!win.ws_col) {
-			char *s = getenv("COLUMNS");
-			if (s) win.ws_col = atoi(s);
-		}
-		if (win.ws_col <= 1 || win.ws_col >= 30000)
-			win.ws_col = 80;
-		*width = (int) win.ws_col;
-	}
+	win.ws_row = 0;
+	win.ws_col = 0;
+	/* I've seen ioctl returning 0, but row/col is (still?) 0.
+	 * We treat that as an error too.  */
+	err = ioctl(fd, TIOCGWINSZ, &win) != 0 || win.ws_row == 0;
+	if (height)
+		*height = wh_helper(win.ws_row, 24, "LINES", &err);
+	if (width)
+		*width = wh_helper(win.ws_col, 80, "COLUMNS", &err);
 
-	return ret;
+	if (close_me >= 0)
+		close(close_me);
+
+	return err;
+}
+int FAST_FUNC get_terminal_width(int fd)
+{
+	unsigned width;
+	get_terminal_width_height(fd, &width, NULL);
+	return width;
 }
 
 int FAST_FUNC tcsetattr_stdin_TCSANOW(const struct termios *tp)
 {
 	return tcsetattr(STDIN_FILENO, TCSANOW, tp);
+}
+
+pid_t FAST_FUNC safe_waitpid(pid_t pid, int *wstat, int options)
+{
+	pid_t r;
+
+	do
+		r = waitpid(pid, wstat, options);
+	while ((r == -1) && (errno == EINTR));
+	return r;
+}
+
+pid_t FAST_FUNC wait_any_nohang(int *wstat)
+{
+	return safe_waitpid(-1, wstat, WNOHANG);
+}
+
+// Wait for the specified child PID to exit, returning child's error return.
+int FAST_FUNC wait4pid(pid_t pid)
+{
+	int status;
+
+	if (pid <= 0) {
+		/*errno = ECHILD; -- wrong. */
+		/* we expect errno to be already set from failed [v]fork/exec */
+		return -1;
+	}
+	if (safe_waitpid(pid, &status, 0) == -1)
+		return -1;
+	if (WIFEXITED(status))
+		return WEXITSTATUS(status);
+	if (WIFSIGNALED(status))
+		return WTERMSIG(status) + 0x180;
+	return 0;
+}
+
+// Useful when we do know that pid is valid, and we just want to wait
+// for it to exit. Not existing pid is fatal. waitpid() status is not returned.
+int FAST_FUNC wait_for_exitstatus(pid_t pid)
+{
+	int exit_status, n;
+
+	n = safe_waitpid(pid, &exit_status, 0);
+	if (n < 0)
+		bb_perror_msg_and_die("waitpid");
+	return exit_status;
 }

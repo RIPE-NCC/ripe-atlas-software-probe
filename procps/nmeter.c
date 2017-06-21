@@ -1,9 +1,44 @@
 /*
-** Licensed under the GPL v2, see the file LICENSE in this tarball
-**
-** Based on nanotop.c from floppyfw project
-**
-** Contact me: vda.linux@googlemail.com */
+ * Licensed under GPLv2, see file LICENSE in this source tree.
+ *
+ * Based on nanotop.c from floppyfw project
+ *
+ * Contact me: vda.linux@googlemail.com
+ */
+
+//config:config NMETER
+//config:	bool "nmeter"
+//config:	default y
+//config:	help
+//config:	  Prints selected system stats continuously, one line per update.
+
+//applet:IF_NMETER(APPLET(nmeter, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_NMETER) += nmeter.o
+
+//usage:#define nmeter_trivial_usage
+//usage:       "[-d MSEC] FORMAT_STRING"
+//usage:#define nmeter_full_usage "\n\n"
+//usage:       "Monitor system in real time"
+//usage:     "\n"
+//usage:     "\n -d MSEC	Milliseconds between updates, default:1000, none:-1"
+//usage:     "\n"
+//usage:     "\nFormat specifiers:"
+//usage:     "\n %Nc or %[cN]	CPU. N - bar size (default:10)"
+//usage:     "\n		(displays: S:system U:user N:niced D:iowait I:irq i:softirq)"
+//usage:     "\n %[nINTERFACE]	Network INTERFACE"
+//usage:     "\n %m		Allocated memory"
+//usage:     "\n %[mf]		Free memory"
+//usage:     "\n %[mt]		Total memory"
+//usage:     "\n %s		Allocated swap"
+//usage:     "\n %f		Number of used file descriptors"
+//usage:     "\n %Ni		Total/specific IRQ rate"
+//usage:     "\n %x		Context switch rate"
+//usage:     "\n %p		Forks"
+//usage:     "\n %[pn]		# of processes"
+//usage:     "\n %b		Block io"
+//usage:     "\n %Nt		Time (with N decimal points)"
+//usage:     "\n %r		Print <cr> instead of <lf> at EOL"
 
 //TODO:
 // simplify code
@@ -17,8 +52,8 @@
 //  totalram=2107416576, freeram=211525632, sharedram=0, bufferram=157204480}
 //  totalswap=134209536, freeswap=134209536, procs=157})
 
-#include <time.h>
 #include "libbb.h"
+#include "common_bufsiz.h"
 
 typedef unsigned long long ullong;
 
@@ -49,10 +84,10 @@ struct globals {
 	smallint is26;
 	// 1 if sample delay is not an integer fraction of a second
 	smallint need_seconds;
+	char final_char;
 	char *cur_outbuf;
-	const char *final_str;
 	int delta;
-	int deltanz;
+	unsigned deltanz;
 	struct timeval tv;
 #define first_proc_file proc_stat
 	proc_file proc_stat;	// Must match the order of proc_name's!
@@ -67,9 +102,6 @@ struct globals {
 #define is26               (G.is26              )
 #define need_seconds       (G.need_seconds      )
 #define cur_outbuf         (G.cur_outbuf        )
-#define final_str          (G.final_str         )
-#define delta              (G.delta             )
-#define deltanz            (G.deltanz           )
 #define tv                 (G.tv                )
 #define proc_stat          (G.proc_stat         )
 #define proc_loadavg       (G.proc_loadavg      )
@@ -77,15 +109,14 @@ struct globals {
 #define proc_meminfo       (G.proc_meminfo      )
 #define proc_diskstats     (G.proc_diskstats    )
 #define proc_sys_fs_filenr (G.proc_sys_fs_filenr)
+#define outbuf bb_common_bufsiz1
 #define INIT_G() do { \
+	setup_common_bufsiz(); \
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
 	cur_outbuf = outbuf; \
-	final_str = "\n"; \
-	deltanz = delta = 1000000; \
+	G.final_char = '\n'; \
+	G.deltanz = G.delta = 1000000; \
 } while (0)
-
-// We depend on this being a char[], not char* - we take sizeof() of it
-#define outbuf bb_common_bufsiz1
 
 static inline void reset_outbuf(void)
 {
@@ -108,16 +139,16 @@ static void print_outbuf(void)
 
 static void put(const char *s)
 {
-	int sz = strlen(s);
-	if (sz > outbuf + sizeof(outbuf) - cur_outbuf)
-		sz = outbuf + sizeof(outbuf) - cur_outbuf;
-	memcpy(cur_outbuf, s, sz);
-	cur_outbuf += sz;
+	char *p = cur_outbuf;
+	int sz = outbuf + COMMON_BUFSIZE - p;
+	while (*s && --sz >= 0)
+		*p++ = *s++;
+	cur_outbuf = p;
 }
 
 static void put_c(char c)
 {
-	if (cur_outbuf < outbuf + sizeof(outbuf))
+	if (cur_outbuf < outbuf + COMMON_BUFSIZE)
 		*cur_outbuf++ = c;
 }
 
@@ -174,96 +205,107 @@ static ullong read_after_slash(const char *p)
 	return strtoull(p+1, NULL, 10);
 }
 
-enum conv_type { conv_decimal, conv_slash };
+enum conv_type {
+	conv_decimal = 0,
+	conv_slash = 1
+};
 
 // Reads decimal values from line. Values start after key, for example:
 // "cpu  649369 0 341297 4336769..." - key is "cpu" here.
-// Values are stored in vec[]. arg_ptr has list of positions
-// we are interested in: for example: 1,2,5 - we want 1st, 2nd and 5th value.
-static int vrdval(const char* p, const char* key,
-	enum conv_type conv, ullong *vec, va_list arg_ptr)
+// Values are stored in vec[].
+// posbits is a bit lit of positions we are interested in.
+// for example: 00100110 - we want 1st, 2nd and 5th value.
+// posbits.bit0 encodes conversion type.
+static int rdval(const char* p, const char* key, ullong *vec, long posbits)
 {
-	int indexline;
-	int indexnext;
+	unsigned curpos;
 
 	p = strstr(p, key);
 	if (!p) return 1;
 
 	p += strlen(key);
-	indexline = 1;
-	indexnext = va_arg(arg_ptr, int);
+	curpos = 1 << 1;
 	while (1) {
 		while (*p == ' ' || *p == '\t') p++;
 		if (*p == '\n' || *p == '\0') break;
 
-		if (indexline == indexnext) { // read this value
-			*vec++ = conv==conv_decimal ?
+		if (curpos & posbits) { // read this value
+			*vec++ = (posbits & 1) == conv_decimal ?
 				strtoull(p, NULL, 10) :
 				read_after_slash(p);
-			indexnext = va_arg(arg_ptr, int);
+			posbits -= curpos;
+			if (posbits <= 1)
+				return 0;
 		}
-		while (*p > ' ') p++; // skip over value
-		indexline++;
+		while (*p > ' ') // skip over the value
+			p++;
+		curpos <<= 1;
 	}
 	return 0;
 }
 
-// Parses files with lines like "cpu0 21727 0 15718 1813856 9461 10485 0 0":
-// rdval(file_contents, "string_to_find", result_vector, value#, value#...)
-// value# start with 1
-static int rdval(const char* p, const char* key, ullong *vec, ...)
-{
-	va_list arg_ptr;
-	int result;
-
-	va_start(arg_ptr, vec);
-	result = vrdval(p, key, conv_decimal, vec, arg_ptr);
-	va_end(arg_ptr);
-
-	return result;
-}
-
 // Parses files with lines like "... ... ... 3/148 ...."
-static int rdval_loadavg(const char* p, ullong *vec, ...)
+static int rdval_loadavg(const char* p, ullong *vec, long posbits)
 {
-	va_list arg_ptr;
 	int result;
-
-	va_start(arg_ptr, vec);
-	result = vrdval(p, "", conv_slash, vec, arg_ptr);
-	va_end(arg_ptr);
-
+	result = rdval(p, "", vec, posbits | conv_slash);
 	return result;
 }
 
 // Parses /proc/diskstats
-//   1  2 3   4	 5        6(rd)  7      8     9     10(wr) 11     12 13     14
+//   1  2 3   4     5     6(rd)  7      8     9     10(wr) 11     12 13     14
 //   3  0 hda 51292 14441 841783 926052 25717 79650 843256 3029804 0 148459 3956933
 //   3  1 hda1 0 0 0 0 <- ignore if only 4 fields
+// Linux 3.0 (maybe earlier) started printing full stats for hda1 too.
+// Had to add code which skips such devices.
 static int rdval_diskstats(const char* p, ullong *vec)
 {
-	ullong rd = rd; // for compiler
-	int indexline = 0;
+	char devname[32];
+	unsigned devname_len = 0;
+	int value_idx = 0;
+
 	vec[0] = 0;
 	vec[1] = 0;
 	while (1) {
-		indexline++;
-		while (*p == ' ' || *p == '\t') p++;
-		if (*p == '\0') break;
+		value_idx++;
+		while (*p == ' ' || *p == '\t')
+			p++;
+		if (*p == '\0')
+			break;
 		if (*p == '\n') {
-			indexline = 0;
+			value_idx = 0;
 			p++;
 			continue;
 		}
-		if (indexline == 6) {
-			rd = strtoull(p, NULL, 10);
-		} else if (indexline == 10) {
-			vec[0] += rd;  // TODO: *sectorsize (don't know how to find out sectorsize)
+		if (value_idx == 3) {
+			char *end = strchrnul(p, ' ');
+			/* If this a hda1-like device (same prefix as last one + digit)? */
+			if (devname_len && strncmp(devname, p, devname_len) == 0 && isdigit(p[devname_len])) {
+				p = end;
+				goto skip_line; /* skip entire line */
+			}
+			/* It is not. Remember the name for future checks */
+			devname_len = end - p;
+			if (devname_len > sizeof(devname)-1)
+				devname_len = sizeof(devname)-1;
+			strncpy(devname, p, devname_len);
+			/* devname[devname_len] = '\0'; - not really needed */
+			p = end;
+		} else
+		if (value_idx == 6) {
+			// TODO: *sectorsize (don't know how to find out sectorsize)
+			vec[0] += strtoull(p, NULL, 10);
+		} else
+		if (value_idx == 10) {
+			// TODO: *sectorsize (don't know how to find out sectorsize)
 			vec[1] += strtoull(p, NULL, 10);
-			while (*p != '\n' && *p != '\0') p++;
+ skip_line:
+			while (*p != '\n' && *p != '\0')
+				p++;
 			continue;
 		}
-		while (*p > ' ') p++; // skip over value
+		while ((unsigned char)(*p) > ' ') // skip over value
+			p++;
 	}
 	return 0;
 }
@@ -273,23 +315,21 @@ static void scale(ullong ul)
 	char buf[5];
 
 	/* see http://en.wikipedia.org/wiki/Tera */
-	smart_ulltoa4(ul, buf, " kmgtpezy");
-	buf[4] = '\0';
+	smart_ulltoa4(ul, buf, " kmgtpezy")[0] = '\0';
 	put(buf);
 }
-
 
 #define S_STAT(a) \
 typedef struct a { \
 	struct s_stat *next; \
-	void (*collect)(struct a *s); \
+	void (*collect)(struct a *s) FAST_FUNC; \
 	const char *label;
 #define S_STAT_END(a) } a;
 
 S_STAT(s_stat)
 S_STAT_END(s_stat)
 
-static void collect_literal(s_stat *s UNUSED_PARAM)
+static void FAST_FUNC collect_literal(s_stat *s UNUSED_PARAM)
 {
 }
 
@@ -300,20 +340,11 @@ static s_stat* init_literal(void)
 	return (s_stat*)s;
 }
 
-static s_stat* init_delay(const char *param)
-{
-	delta = strtoul(param, NULL, 0) * 1000; /* param can be "" */
-	deltanz = delta > 0 ? delta : 1;
-	need_seconds = (1000000%deltanz) != 0;
-	return NULL;
-}
-
 static s_stat* init_cr(const char *param UNUSED_PARAM)
 {
-	final_str = "\r";
-	return (s_stat*)0;
+	G.final_char = '\r';
+	return NULL;
 }
-
 
 //     user nice system idle  iowait irq  softirq (last 3 only in 2.6)
 //cpu  649369 0 341297 4336769 11640 7122 1183
@@ -322,11 +353,10 @@ enum { CPU_FIELDCNT = 7 };
 S_STAT(cpu_stat)
 	ullong old[CPU_FIELDCNT];
 	int bar_sz;
-	char *bar;
+	char bar[1];
 S_STAT_END(cpu_stat)
 
-
-static void collect_cpu(cpu_stat *s)
+static void FAST_FUNC collect_cpu(cpu_stat *s)
 {
 	ullong data[CPU_FIELDCNT] = { 0, 0, 0, 0, 0, 0, 0 };
 	unsigned frac[CPU_FIELDCNT] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -336,7 +366,15 @@ static void collect_cpu(cpu_stat *s)
 	char *bar = s->bar;
 	int i;
 
-	if (rdval(get_file(&proc_stat), "cpu ", data, 1, 2, 3, 4, 5, 6, 7)) {
+	if (rdval(get_file(&proc_stat), "cpu ", data, 0
+	    | (1 << 1)
+	    | (1 << 2)
+	    | (1 << 3)
+	    | (1 << 4)
+	    | (1 << 5)
+	    | (1 << 6)
+	    | (1 << 7))
+	) {
 		put_question_marks(bar_sz);
 		return;
 	}
@@ -379,33 +417,31 @@ static void collect_cpu(cpu_stat *s)
 	put(s->bar);
 }
 
-
 static s_stat* init_cpu(const char *param)
 {
 	int sz;
-	cpu_stat *s = xzalloc(sizeof(*s));
-	s->collect = collect_cpu;
+	cpu_stat *s;
 	sz = strtoul(param, NULL, 0); /* param can be "" */
 	if (sz < 10) sz = 10;
 	if (sz > 1000) sz = 1000;
-	s->bar = xzalloc(sz+1);
+	s = xzalloc(sizeof(*s) + sz);
 	/*s->bar[sz] = '\0'; - xzalloc did it */
 	s->bar_sz = sz;
+	s->collect = collect_cpu;
 	return (s_stat*)s;
 }
-
 
 S_STAT(int_stat)
 	ullong old;
 	int no;
 S_STAT_END(int_stat)
 
-static void collect_int(int_stat *s)
+static void FAST_FUNC collect_int(int_stat *s)
 {
 	ullong data[1];
 	ullong old;
 
-	if (rdval(get_file(&proc_stat), "intr", data, s->no)) {
+	if (rdval(get_file(&proc_stat), "intr", data, 1 << s->no)) {
 		put_question_marks(4);
 		return;
 	}
@@ -423,23 +459,22 @@ static s_stat* init_int(const char *param)
 	if (param[0] == '\0') {
 		s->no = 1;
 	} else {
-		int n = xatoi_u(param);
+		int n = xatoi_positive(param);
 		s->no = n + 2;
 	}
 	return (s_stat*)s;
 }
 
-
 S_STAT(ctx_stat)
 	ullong old;
 S_STAT_END(ctx_stat)
 
-static void collect_ctx(ctx_stat *s)
+static void FAST_FUNC collect_ctx(ctx_stat *s)
 {
 	ullong data[1];
 	ullong old;
 
-	if (rdval(get_file(&proc_stat), "ctxt", data, 1)) {
+	if (rdval(get_file(&proc_stat), "ctxt", data, 1 << 1)) {
 		put_question_marks(4);
 		return;
 	}
@@ -457,13 +492,12 @@ static s_stat* init_ctx(const char *param UNUSED_PARAM)
 	return (s_stat*)s;
 }
 
-
 S_STAT(blk_stat)
 	const char* lookfor;
 	ullong old[2];
 S_STAT_END(blk_stat)
 
-static void collect_blk(blk_stat *s)
+static void FAST_FUNC collect_blk(blk_stat *s)
 {
 	ullong data[2];
 	int i;
@@ -471,7 +505,10 @@ static void collect_blk(blk_stat *s)
 	if (is26) {
 		i = rdval_diskstats(get_file(&proc_diskstats), data);
 	} else {
-		i = rdval(get_file(&proc_stat), s->lookfor, data, 1, 2);
+		i = rdval(get_file(&proc_stat), s->lookfor, data, 0
+				| (1 << 1)
+				| (1 << 2)
+		);
 		// Linux 2.4 reports bio in Kbytes, convert to sectors:
 		data[0] *= 2;
 		data[1] *= 2;
@@ -500,28 +537,27 @@ static s_stat* init_blk(const char *param UNUSED_PARAM)
 	return (s_stat*)s;
 }
 
-
 S_STAT(fork_stat)
 	ullong old;
 S_STAT_END(fork_stat)
 
-static void collect_thread_nr(fork_stat *s UNUSED_PARAM)
+static void FAST_FUNC collect_thread_nr(fork_stat *s UNUSED_PARAM)
 {
 	ullong data[1];
 
-	if (rdval_loadavg(get_file(&proc_loadavg), data, 4)) {
+	if (rdval_loadavg(get_file(&proc_loadavg), data, 1 << 4)) {
 		put_question_marks(4);
 		return;
 	}
 	scale(data[0]);
 }
 
-static void collect_fork(fork_stat *s)
+static void FAST_FUNC collect_fork(fork_stat *s)
 {
 	ullong data[1];
 	ullong old;
 
-	if (rdval(get_file(&proc_stat), "processes", data, 1)) {
+	if (rdval(get_file(&proc_stat), "processes", data, 1 << 1)) {
 		put_question_marks(4);
 		return;
 	}
@@ -543,19 +579,23 @@ static s_stat* init_fork(const char *param)
 	return (s_stat*)s;
 }
 
-
 S_STAT(if_stat)
 	ullong old[4];
 	const char *device;
 	char *device_colon;
 S_STAT_END(if_stat)
 
-static void collect_if(if_stat *s)
+static void FAST_FUNC collect_if(if_stat *s)
 {
 	ullong data[4];
 	int i;
 
-	if (rdval(get_file(&proc_net_dev), s->device_colon, data, 1, 3, 9, 11)) {
+	if (rdval(get_file(&proc_net_dev), s->device_colon, data, 0
+	    | (1 << 1)
+	    | (1 << 3)
+	    | (1 << 9)
+	    | (1 << 11))
+	) {
 		put_question_marks(10);
 		return;
 	}
@@ -584,7 +624,6 @@ static s_stat* init_if(const char *device)
 	s->device_colon = xasprintf("%s:", device);
 	return (s_stat*)s;
 }
-
 
 S_STAT(mem_stat)
 	char opt;
@@ -625,7 +664,7 @@ S_STAT_END(mem_stat)
 //HugePages_Total:     0
 //HugePages_Free:      0
 //Hugepagesize:     4096 kB
-static void collect_mem(mem_stat *s)
+static void FAST_FUNC collect_mem(mem_stat *s)
 {
 	ullong m_total = 0;
 	ullong m_free = 0;
@@ -633,7 +672,7 @@ static void collect_mem(mem_stat *s)
 	ullong m_cached = 0;
 	ullong m_slab = 0;
 
-	if (rdval(get_file(&proc_meminfo), "MemTotal:", &m_total, 1)) {
+	if (rdval(get_file(&proc_meminfo), "MemTotal:", &m_total, 1 << 1)) {
 		put_question_marks(4);
 		return;
 	}
@@ -642,10 +681,10 @@ static void collect_mem(mem_stat *s)
 		return;
 	}
 
-	if (rdval(proc_meminfo.file, "MemFree:", &m_free  , 1)
-	 || rdval(proc_meminfo.file, "Buffers:", &m_bufs  , 1)
-	 || rdval(proc_meminfo.file, "Cached:",  &m_cached, 1)
-	 || rdval(proc_meminfo.file, "Slab:",    &m_slab  , 1)
+	if (rdval(proc_meminfo.file, "MemFree:", &m_free  , 1 << 1)
+	 || rdval(proc_meminfo.file, "Buffers:", &m_bufs  , 1 << 1)
+	 || rdval(proc_meminfo.file, "Cached:",  &m_cached, 1 << 1)
+	 || rdval(proc_meminfo.file, "Slab:",    &m_slab  , 1 << 1)
 	) {
 		put_question_marks(4);
 		return;
@@ -668,16 +707,15 @@ static s_stat* init_mem(const char *param)
 	return (s_stat*)s;
 }
 
-
 S_STAT(swp_stat)
 S_STAT_END(swp_stat)
 
-static void collect_swp(swp_stat *s UNUSED_PARAM)
+static void FAST_FUNC collect_swp(swp_stat *s UNUSED_PARAM)
 {
 	ullong s_total[1];
 	ullong s_free[1];
-	if (rdval(get_file(&proc_meminfo), "SwapTotal:", s_total, 1)
-	 || rdval(proc_meminfo.file,       "SwapFree:" , s_free,  1)
+	if (rdval(get_file(&proc_meminfo), "SwapTotal:", s_total, 1 << 1)
+	 || rdval(proc_meminfo.file,       "SwapFree:" , s_free,  1 << 1)
 	) {
 		put_question_marks(4);
 		return;
@@ -692,15 +730,17 @@ static s_stat* init_swp(const char *param UNUSED_PARAM)
 	return (s_stat*)s;
 }
 
-
 S_STAT(fd_stat)
 S_STAT_END(fd_stat)
 
-static void collect_fd(fd_stat *s UNUSED_PARAM)
+static void FAST_FUNC collect_fd(fd_stat *s UNUSED_PARAM)
 {
 	ullong data[2];
 
-	if (rdval(get_file(&proc_sys_fs_filenr), "", data, 1, 2)) {
+	if (rdval(get_file(&proc_sys_fs_filenr), "", data, 0
+	    | (1 << 1)
+	    | (1 << 2))
+	) {
 		put_question_marks(4);
 		return;
 	}
@@ -715,17 +755,16 @@ static s_stat* init_fd(const char *param UNUSED_PARAM)
 	return (s_stat*)s;
 }
 
-
 S_STAT(time_stat)
-	int prec;
-	int scale;
+	unsigned prec;
+	unsigned scale;
 S_STAT_END(time_stat)
 
-static void collect_time(time_stat *s)
+static void FAST_FUNC collect_time(time_stat *s)
 {
 	char buf[sizeof("12:34:56.123456")];
 	struct tm* tm;
-	int us = tv.tv_usec + s->scale/2;
+	unsigned us = tv.tv_usec + s->scale/2;
 	time_t t = tv.tv_sec;
 
 	if (us >= 1000000) {
@@ -756,7 +795,7 @@ static s_stat* init_time(const char *param)
 	return (s_stat*)s;
 }
 
-static void collect_info(s_stat *s)
+static void FAST_FUNC collect_info(s_stat *s)
 {
 	gen ^= 1;
 	while (s) {
@@ -766,10 +805,9 @@ static void collect_info(s_stat *s)
 	}
 }
 
-
 typedef s_stat* init_func(const char *param);
 
-static const char options[] ALIGN1 = "ncmsfixptbdr";
+static const char options[] ALIGN1 = "ncmsfixptbr";
 static init_func *const init_functions[] = {
 	init_if,
 	init_cpu,
@@ -781,34 +819,41 @@ static init_func *const init_functions[] = {
 	init_fork,
 	init_time,
 	init_blk,
-	init_delay,
 	init_cr
 };
 
 int nmeter_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int nmeter_main(int argc, char **argv)
+int nmeter_main(int argc UNUSED_PARAM, char **argv)
 {
 	char buf[32];
 	s_stat *first = NULL;
 	s_stat *last = NULL;
 	s_stat *s;
+	char *opt_d;
 	char *cur, *prev;
 
 	INIT_G();
 
 	xchdir("/proc");
 
-	if (argc != 2)
-		bb_show_usage();
-
 	if (open_read_close("version", buf, sizeof(buf)-1) > 0) {
 		buf[sizeof(buf)-1] = '\0';
 		is26 = (strstr(buf, " 2.4.") == NULL);
 	}
 
-	// Can use argv[1] directly, but this will mess up
+	if (getopt32(argv, "d:", &opt_d)) {
+		G.delta = xatoi(opt_d) * 1000;
+		G.deltanz = G.delta > 0 ? G.delta : 1;
+		need_seconds = (1000000 % G.deltanz) != 0;
+	}
+	argv += optind;
+
+	if (!argv[0])
+		bb_show_usage();
+
+	// Can use argv[0] directly, but this will mess up
 	// parameters as seen by e.g. ps. Making a copy...
-	cur = xstrdup(argv[1]);
+	cur = xstrdup(argv[0]);
 	while (1) {
 		char *param, *p;
 		prev = cur;
@@ -855,8 +900,8 @@ int nmeter_main(int argc, char **argv)
 				last->next = s;
 			last = s;
 		} else {
-			// %NNNNd or %r option. remove it from string
-			strcpy(prev + strlen(prev), cur);
+			// %r option. remove it from string
+			overlapping_strcpy(prev + strlen(prev), cur);
 			cur = prev;
 		}
 	}
@@ -874,15 +919,15 @@ int nmeter_main(int argc, char **argv)
 	// Generate first samples but do not print them, they're bogus
 	collect_info(first);
 	reset_outbuf();
-	if (delta >= 0) {
+	if (G.delta >= 0) {
 		gettimeofday(&tv, NULL);
-		usleep(delta > 1000000 ? 1000000 : delta - tv.tv_usec%deltanz);
+		usleep(G.delta > 1000000 ? 1000000 : G.delta - tv.tv_usec % G.deltanz);
 	}
 
 	while (1) {
 		gettimeofday(&tv, NULL);
 		collect_info(first);
-		put(final_str);
+		put_c(G.final_char);
 		print_outbuf();
 
 		// Negative delta -> no usleep at all
@@ -890,18 +935,18 @@ int nmeter_main(int argc, char **argv)
 		// time resolution ;)
 		// TODO: detect and avoid useless updates
 		// (like: nothing happens except time)
-		if (delta >= 0) {
+		if (G.delta >= 0) {
 			int rem;
 			// can be commented out, will sacrifice sleep time precision a bit
 			gettimeofday(&tv, NULL);
 			if (need_seconds)
-				rem = delta - ((ullong)tv.tv_sec*1000000 + tv.tv_usec) % deltanz;
+				rem = G.delta - ((ullong)tv.tv_sec*1000000 + tv.tv_usec) % G.deltanz;
 			else
-				rem = delta - tv.tv_usec%deltanz;
+				rem = G.delta - (unsigned)tv.tv_usec % G.deltanz;
 			// Sometimes kernel wakes us up just a tiny bit earlier than asked
 			// Do not go to very short sleep in this case
-			if (rem < delta/128) {
-				rem += delta;
+			if (rem < (unsigned)G.delta / 128) {
+				rem += G.delta;
 			}
 			usleep(rem);
 		}

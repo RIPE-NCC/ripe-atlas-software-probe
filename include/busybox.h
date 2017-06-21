@@ -1,54 +1,36 @@
 /* vi: set sw=4 ts=4: */
 /*
- * Busybox main internal header file
- *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
-#ifndef	_BB_INTERNAL_H_
-#define	_BB_INTERNAL_H_    1
+#ifndef BUSYBOX_H
+#define BUSYBOX_H 1
 
 #include "libbb.h"
+/* BB_DIR_foo and BB_SUID_bar constants: */
+#include "applet_metadata.h"
 
-#if __GNUC_PREREQ(4,1)
-# pragma GCC visibility push(hidden)
-#endif
-
-/* order matters: used as index into "install_dir[]" in appletlib.c */
-typedef enum bb_install_loc_t {
-	_BB_DIR_ROOT = 0,
-	_BB_DIR_BIN,
-	_BB_DIR_SBIN,
-	_BB_DIR_USR_BIN,
-	_BB_DIR_USR_SBIN
-} bb_install_loc_t;
-
-typedef enum bb_suid_t {
-	_BB_SUID_NEVER = 0,
-	_BB_SUID_MAYBE,
-	_BB_SUID_ALWAYS
-} bb_suid_t;
-
+PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 
 /* Defined in appletlib.c (by including generated applet_tables.h) */
 /* Keep in sync with applets/applet_tables.c! */
-extern const char applet_names[];
+extern const char applet_names[] ALIGN1;
 extern int (*const applet_main[])(int argc, char **argv);
-extern const uint16_t applet_nameofs[];
-extern const uint8_t applet_install_loc[];
+extern const uint8_t applet_flags[] ALIGN1;
+extern const uint8_t applet_suid[] ALIGN1;
+extern const uint8_t applet_install_loc[] ALIGN1;
 
-#if ENABLE_FEATURE_SUID || ENABLE_FEATURE_PREFER_APPLETS
-#define APPLET_NAME(i) (applet_names + (applet_nameofs[i] & 0x0fff))
+#if ENABLE_FEATURE_PREFER_APPLETS \
+ || ENABLE_FEATURE_SH_STANDALONE \
+ || ENABLE_FEATURE_SH_NOFORK
+# define APPLET_IS_NOFORK(i) (applet_flags[(i)/4] & (1 << (2 * ((i)%4))))
+# define APPLET_IS_NOEXEC(i) (applet_flags[(i)/4] & (1 << ((2 * ((i)%4))+1)))
 #else
-#define APPLET_NAME(i) (applet_names + applet_nameofs[i])
-#endif
-
-#if ENABLE_FEATURE_PREFER_APPLETS
-#define APPLET_IS_NOFORK(i) (applet_nameofs[i] & (1 << 12))
-#define APPLET_IS_NOEXEC(i) (applet_nameofs[i] & (1 << 13))
+# define APPLET_IS_NOFORK(i) 0
+# define APPLET_IS_NOEXEC(i) 0
 #endif
 
 #if ENABLE_FEATURE_SUID
-#define APPLET_SUID(i) ((applet_nameofs[i] >> 14) & 0x3)
+# define APPLET_SUID(i) ((applet_suid[(i)/4] >> (2 * ((i)%4)) & 3))
 #endif
 
 #if ENABLE_FEATURE_INSTALLER
@@ -71,8 +53,6 @@ int lbb_main(char **argv);
 #endif
 #endif
 
-#if __GNUC_PREREQ(4,1)
-# pragma GCC visibility pop
-#endif
+POP_SAVED_FUNCTION_VISIBILITY
 
-#endif	/* _BB_INTERNAL_H_ */
+#endif

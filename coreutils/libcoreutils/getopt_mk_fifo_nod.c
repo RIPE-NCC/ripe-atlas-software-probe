@@ -31,9 +31,11 @@ mode_t FAST_FUNC getopt_mk_fifo_nod(char **argv)
 	security_context_t scontext;
 #endif
 	int opt;
-	opt = getopt32(argv, "m:" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
+	opt = getopt32(argv, "m:" IF_SELINUX("Z:"), &smode IF_SELINUX(,&scontext));
 	if (opt & 1) {
-		if (bb_parse_mode(smode, &mode))
+		mode = bb_parse_mode(smode, mode);
+		if (mode != (mode_t)-1) /* if mode is valid */
+			/* make future mknod/mkfifo set mode bits exactly */
 			umask(0);
 	}
 
