@@ -826,26 +826,6 @@ int tftp_main(int argc UNUSED_PARAM, char **argv)
 #endif /* ENABLE_TFTP */
 
 #if ENABLE_TFTPD
-<<<<<<< HEAD
-
-/* TODO: libbb candidate? */
-#if 0
-static len_and_sockaddr *get_sock_lsa(int s)
-{
-	len_and_sockaddr *lsa;
-	socklen_t len = 0;
-
-	if (getsockname(s, NULL, &len) != 0)
-		return NULL;
-	lsa = xzalloc(LSA_LEN_SIZE + len);
-	lsa->len = len;
-	getsockname(s, &lsa->u.sa, &lsa->len);
-	return lsa;
-}
-#endif
-
-=======
->>>>>>> busybox-base-1-26-2
 int tftpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int tftpd_main(int argc UNUSED_PARAM, char **argv)
 {

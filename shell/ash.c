@@ -420,7 +420,6 @@ static void trace_vprintf(const char *fmt, va_list va);
 # define TRACEV(param)
 #endif
 
-static int testadd_main(char **argv);
 
 /* ============ Utility functions */
 #define is_name(c)      ((c) == '_' || isalpha((unsigned char)(c)))
@@ -9298,31 +9297,6 @@ static int ulimitcmd(int, char **) FAST_FUNC;
 #define BUILTIN_REG_ASSG        "6"
 #define BUILTIN_SPEC_REG_ASSG   "7"
 
-<<<<<<< HEAD
-/* We do not handle [[ expr ]] bashism bash-compatibly,
- * we make it a synonym of [ expr ].
- * Basically, word splitting and pathname expansion should NOT be performed
- * Examples:
- * no word splitting:     a="a b"; [[ $a = "a b" ]]; echo $? should print "0"
- * no pathname expansion: [[ /bin/m* = "/bin/m*" ]]; echo $? should print "0"
- * Additional operators:
- * || and && should work as -o and -a
- * =~ regexp match
- * Apart from the above, [[ expr ]] should work as [ expr ]
- */
-
-#define echocmd   echo_main
-#define printfcmd printf_main
-#define testcmd   test_main
-#define testadd   testadd_main
-
-/* Keep these in proper order since it is searched via bsearch() */
-static const struct builtincmd builtintab[] = {
-	{ BUILTIN_SPEC_REG      ".", dotcmd },
-	{ BUILTIN_SPEC_REG      ":", truecmd },
-	{ BUILTIN_REGULAR       "[", testadd },
-	{ BUILTIN_REGULAR       "[[", testadd },
-=======
 /* Stubs for calling non-FAST_FUNC's */
 #if ENABLE_ASH_BUILTIN_ECHO
 static int FAST_FUNC echocmd(int argc, char **argv)   { return echo_main(argc, argv); }
@@ -9338,7 +9312,6 @@ static int FAST_FUNC testcmd(int argc, char **argv)   { return test_main(argc, a
 static const struct builtincmd builtintab[] = {
 	{ BUILTIN_SPEC_REG      "."       , dotcmd     },
 	{ BUILTIN_SPEC_REG      ":"       , truecmd    },
->>>>>>> busybox-base-1-26-2
 #if ENABLE_ASH_BUILTIN_TEST
 	{ BUILTIN_REGULAR       "["       , testcmd    },
 # if ENABLE_ASH_BASH_COMPAT
@@ -9388,18 +9361,6 @@ static const struct builtincmd builtintab[] = {
 #endif
 	{ BUILTIN_ASSIGN        "local"   , localcmd   },
 #if ENABLE_ASH_BUILTIN_PRINTF
-<<<<<<< HEAD
-	{ BUILTIN_REGULAR       "printf", printfcmd },
-#endif
-	{ BUILTIN_NOSPEC        "pwd", pwdcmd },
-	{ BUILTIN_REGULAR       "read", readcmd },
-	{ BUILTIN_SPEC_REG_ASSG "readonly", exportcmd },
-	{ BUILTIN_SPEC_REG      "return", returncmd },
-	{ BUILTIN_SPEC_REG      "set", setcmd },
-	{ BUILTIN_SPEC_REG      "shift", shiftcmd },
-	{ BUILTIN_SPEC_REG      "source", dotcmd },
-	{ BUILTIN_REGULAR       "test", testadd },
-=======
 	{ BUILTIN_REGULAR       "printf"  , printfcmd  },
 #endif
 	{ BUILTIN_NOSPEC        "pwd"     , pwdcmd     },
@@ -9411,7 +9372,6 @@ static const struct builtincmd builtintab[] = {
 #if ENABLE_ASH_BASH_COMPAT
 	{ BUILTIN_SPEC_REG      "source"  , dotcmd     },
 #endif
->>>>>>> busybox-base-1-26-2
 #if ENABLE_ASH_BUILTIN_TEST
 	{ BUILTIN_REGULAR       "test"    , testcmd    },
 #endif
@@ -13636,18 +13596,3 @@ int ash_main(int argc UNUSED_PARAM, char **argv)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-
-static int testadd_main(char **argv)
-{
-        char *p;
-        int r1;
-        int r2;
-        char * opnd1;
-        char * opnd2;
-        opnd1 = argv[1];
-        opnd2 = argv[2];
-        r1 = strtol(opnd1, &p, 10);
-        r2 = strtol(opnd2, &p, 10);
-        return ((r1+r2));
-}

@@ -243,7 +243,6 @@
 # include <malloc.h>   /* for malloc_trim */
 #endif
 #include <glob.h>
-#include <stdlib.h>
 /* #include <dmalloc.h> */
 #if ENABLE_HUSH_CASE
 # include <fnmatch.h>
@@ -263,9 +262,6 @@
 #ifndef F_DUPFD_CLOEXEC
 # define F_DUPFD_CLOEXEC F_DUPFD
 #endif
-<<<<<<< HEAD
-#include <sys/reboot.h>
-=======
 #ifndef PIPE_BUF
 # define PIPE_BUF 4096  /* amount of buffering in a pipe */
 #endif
@@ -290,7 +286,6 @@
  * So far ${var%...} ops are always enabled:
  */
 #define ENABLE_HUSH_DOLLAR_OPS 1
->>>>>>> busybox-base-1-26-2
 
 
 #if BUILD_AS_NOMMU
@@ -323,15 +318,6 @@
 # define ENABLE_FEATURE_EDITING_SAVE_ON_EXIT 0
 #endif
 
-<<<<<<< HEAD
-
-/* Keep unconditionally on for now */
-#define HUSH_DEBUG 1
-/* In progress... */
-#define ENABLE_HUSH_FUNCTIONS 0
-
-#define DBQ(str) "\"" #str "\""
-=======
 /* Do we support ANY keywords? */
 #if ENABLE_HUSH_IF || ENABLE_HUSH_LOOPS || ENABLE_HUSH_CASE
 # define HAS_KEYWORDS 1
@@ -342,7 +328,6 @@
 # define IF_HAS_KEYWORDS(...)
 # define IF_HAS_NO_KEYWORDS(...) __VA_ARGS__
 #endif
->>>>>>> busybox-base-1-26-2
 
 /* If you comment out one of these below, it will be #defined later
  * to perform debug printfs to stderr: */
@@ -772,12 +757,6 @@ struct globals {
 #if ENABLE_HUSH_LOOPS
 	smallint flag_break_continue;
 #endif
-<<<<<<< HEAD
-	smallint fake_mode;
-	/* these three support $?, $#, and $1 */
-	smalluint last_return_code;
-	/* is global_argv and global_argv[1..n] malloced? (note: not [0]) */
-=======
 #if ENABLE_HUSH_FUNCTIONS
 	/* 0: outside of a function (or sourced file)
 	 * -1: inside of a function, ok to use return builtin
@@ -792,17 +771,13 @@ struct globals {
 	/* These four support $?, $#, and $1 */
 	smalluint last_exitcode;
 	/* are global_argv and global_argv[1..n] malloced? (note: not [0]) */
->>>>>>> busybox-base-1-26-2
 	smalluint global_args_malloced;
 	/* how many non-NULL argv's we have. NB: $# + 1 */
 	int global_argc;
 	char **global_argv;
-<<<<<<< HEAD
-=======
 #if !BB_MMU
 	char *argv0_for_re_execing;
 #endif
->>>>>>> busybox-base-1-26-2
 #if ENABLE_HUSH_LOOPS
 	unsigned depth_break_continue;
 	unsigned depth_of_loop;
@@ -1253,19 +1228,6 @@ static char **add_string_to_strings(char **strings, char *add)
 	v[0] = add;
 	v[1] = NULL;
 	return add_strings_to_strings(strings, v, /*dup:*/ 0);
-<<<<<<< HEAD
-}
-
-static void putenv_all(char **strings)
-{
-	if (!strings)
-		return;
-	while (*strings) {
-		debug_printf_env("putenv '%s'\n", *strings);
-		putenv(*strings++);
-	}
-=======
->>>>>>> busybox-base-1-26-2
 }
 #if LEAK_HUNTING
 static char **xx_add_string_to_strings(int lineno, char **strings, char *add)
@@ -1292,134 +1254,6 @@ static void free_strings(char **strings)
 	free(strings);
 }
 
-<<<<<<< HEAD
-static void free_strings(char **strings)
-{
-	free_strings_and_unsetenv(strings, 0);
-}
-
-
-/* Function prototypes for builtins */
-static int builtin_cd(char **argv);
-static int builtin_echo(char **argv);
-static int builtin_eval(char **argv);
-static int builtin_exec(char **argv);
-static int builtin_exit(char **argv);
-static int builtin_export(char **argv);
-#if ENABLE_HUSH_JOB
-static int builtin_fg_bg(char **argv);
-static int builtin_jobs(char **argv);
-#endif
-#if ENABLE_HUSH_HELP
-static int builtin_help(char **argv);
-#endif
-static int builtin_pwd(char **argv);
-static int builtin_read(char **argv);
-static int builtin_test(char **argv);
-static int builtin_add(char **argv);
-static int builtin_sub(char **argv);
-static int builtin_rchoose(char **argv);
-static int builtin_findpid(char **argv);
-static int builtin_sleepkick(char **argv);
-static int builtin_buddyinfo(char **argv);
-static int builtin_epoch(char **argv);
-static int builtin_condmv(char **argv);
-static int builtin_dfrm(char **argv);
-static int builtin_rxtxrpt(char **argv);
-static int builtin_rptaddrs(char **argv);
-static int builtin_rptuptime(char **argv);
-static int builtin_onlyuptime(char **argv);
-static int builtin_reboot_probe(char **argv);
-static int builtin_true(char **argv);
-static int builtin_set(char **argv);
-static int builtin_shift(char **argv);
-static int builtin_source(char **argv);
-static int builtin_umask(char **argv);
-static int builtin_unset(char **argv);
-#if ENABLE_HUSH_LOOPS
-static int builtin_break(char **argv);
-static int builtin_continue(char **argv);
-#endif
-//static int builtin_not_written(char **argv);
-
-/* Table of built-in functions.  They can be forked or not, depending on
- * context: within pipes, they fork.  As simple commands, they do not.
- * When used in non-forking context, they can change global variables
- * in the parent shell process.  If forked, of course they cannot.
- * For example, 'unset foo | whatever' will parse and run, but foo will
- * still be set at the end. */
-struct built_in_command {
-	const char *cmd;
-	int (*function)(char **argv);
-#if ENABLE_HUSH_HELP
-	const char *descr;
-#define BLTIN(cmd, func, help) { cmd, func, help }
-#else
-#define BLTIN(cmd, func, help) { cmd, func }
-#endif
-};
-
-/* For now, echo and test are unconditionally enabled.
- * Maybe make it configurable? */
-static const struct built_in_command bltins[] = {
-	BLTIN("."     , builtin_source, "Run commands in a file"),
-	BLTIN(":"     , builtin_true, "No-op"),
-	BLTIN("["     , builtin_test, "Test condition"),
-	BLTIN("[["    , builtin_test, "Test condition"),
-	BLTIN("["     , builtin_add, "Add two integers"),
-	BLTIN("[["    , builtin_add, "Add two integers"), 
-	BLTIN("["     , builtin_sub, "Substract two integers"),
-	BLTIN("[["    , builtin_sub, "Substract two integers"),
-
-#if ENABLE_HUSH_JOB
-	BLTIN("bg"    , builtin_fg_bg, "Resume a job in the background"),
-#endif
-#if ENABLE_HUSH_LOOPS
-	BLTIN("break" , builtin_break, "Exit from a loop"),
-#endif
-	BLTIN("cd"    , builtin_cd, "Change directory"),
-#if ENABLE_HUSH_LOOPS
-	BLTIN("continue", builtin_continue, "Start new loop iteration"),
-#endif
-	BLTIN("rchoose"  , builtin_rchoose, "return a random one from the args"),
-	BLTIN("findpid"  , builtin_findpid, "find process /proc/"),
-	BLTIN("buddyinfo"  , builtin_buddyinfo, "print /proc/buddyinfo"),
-	BLTIN("sleepkick"  , builtin_sleepkick, "sleep and kick the watchdog"),
-	BLTIN("epoch"  , builtin_epoch, "UNIX epoch"),
-	BLTIN("condmv" , builtin_condmv, "conditional move"),
-	BLTIN("dfrm"  , builtin_dfrm, "cleanup if free space gets too low"),
-	BLTIN("rxtxrpt"  , builtin_rxtxrpt, "report RX and TX"),
-	BLTIN("rptaddrs"  , builtin_rptaddrs, "report address(es), route(s), and dns"),
-	BLTIN("rptuptime"  , builtin_rptuptime, "report uptime"),
-	BLTIN("onlyuptime"  , builtin_onlyuptime, "report uptime in seconds"),
-	BLTIN("reboot_probe"  , builtin_reboot_probe, "built-in reboot command"),
-	BLTIN("echo"  , builtin_echo, "Write to stdout"),
-	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
-	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
-	BLTIN("exit"  , builtin_exit, "Exit"),
-	BLTIN("export", builtin_export, "Set environment variable"),
-#if ENABLE_HUSH_JOB
-	BLTIN("fg"    , builtin_fg_bg, "Bring job into the foreground"),
-	BLTIN("jobs"  , builtin_jobs, "List active jobs"),
-#endif
-	BLTIN("pwd"   , builtin_pwd, "Print current directory"),
-	BLTIN("read"  , builtin_read, "Input environment variable"),
-//	BLTIN("return", builtin_not_written, "Return from a function"),
-	BLTIN("set"   , builtin_set, "Set/unset shell local variables"),
-	BLTIN("shift" , builtin_shift, "Shift positional parameters"),
-//	BLTIN("trap"  , builtin_not_written, "Trap signals"),
-	BLTIN("test"  , builtin_test, "Test condition"),
-	BLTIN("add"   , builtin_add, "Add two integers."),
-	BLTIN("sub"   , builtin_sub, "Subtract two integers."),
-//	BLTIN("ulimit", builtin_not_written, "Control resource limits"),
-	BLTIN("umask" , builtin_umask, "Set file creation mask"),
-	BLTIN("unset" , builtin_unset, "Unset environment variable"),
-#if ENABLE_HUSH_HELP
-	BLTIN("help"  , builtin_help, "List shell built-in commands"),
-#endif
-};
-=======
->>>>>>> busybox-base-1-26-2
 
 static int xdup_and_close(int fd, int F_DUPFD_maybe_CLOEXEC)
 {
@@ -1958,22 +1792,6 @@ static int check_and_run_traps(void)
 	return last_sig;
 }
 
-<<<<<<< HEAD
-/* If o->o_glob == 1, glob the string so far remembered.
- * Otherwise, just finish current list[] and start new */
-static int o_save_ptr(o_string *o, int n)
-{
-	if (o->o_glob) { /* if globbing is requested */
-		/* If o->has_empty_slot, list[n] was already globbed
-		 * (if it was requested back then when it was filled)
-		 * so don't do that again! */
-		if (!o->has_empty_slot)
-			return o_glob(o, n); /* o_save_ptr_helper is inside */
-	}
-	return o_save_ptr_helper(o, n);
-}
-=======
->>>>>>> busybox-base-1-26-2
 
 static const char *get_cwd(int force)
 {
@@ -8546,11 +8364,6 @@ int hush_main(int argc, char **argv)
 				G.root_ppid = getppid();
 			}
 			G.global_argv = argv + optind;
-			if (!argv[optind]) {
-				/* -c 'script' (no params): prevent empty $0 */
-				*--G.global_argv = argv[0];
-				optind--;
-			} /* else -c 'script' PAR0 PAR1: $0 is PAR0 */
 			G.global_argc = argc - optind;
 			if (builtin_argc) {
 				/* -c 'builtin' [BARGV...] "" ARG0 [ARG1...] */
@@ -9124,395 +8937,6 @@ static int FAST_FUNC builtin_unset(char **argv)
 	int ret;
 	unsigned opts;
 
-<<<<<<< HEAD
-static int builtin_sleepkick (char **argv)
-{
-#define WATCHDOGDEV "/dev/watchdog"
-	unsigned duration;
-	unsigned watchdog;
-	int modDuration = 0;
-	if (argv[1] == NULL) 
-		return (1);
-	
-	duration = xatou(argv[1]);
-
-	if(argv[2])
-	{ 
-		int fd;         /* File handler for watchdog */
-		int i = 0;
-		int iMax = 0;
-
-		watchdog =  xatou(argv[2]);
-		iMax =   (int) (duration / watchdog);
-
-		if( duration >= watchdog)
-		{
-			modDuration =   duration % watchdog;
-		}
-		else {
-			modDuration  = duration;
-		}
-
-		fd = open(WATCHDOGDEV, O_RDWR);
-		for( i = 0; i < iMax; i++)
-		{
-			write(fd, "1", 1);
-			sleep(watchdog);	
-		}
-		if(modDuration)
-		{
-			write(fd, "1", 1);
-			sleep(modDuration);
-			write(fd, "1", 1);
-		}
- 		close(fd);
-	}
-	else 
-	{
-		sleep(duration);
-	}
-	return 0;
-}
-
-static int builtin_add(char **argv)
-{
-	char *p;
-	int r1;
-	int r2;
-	char * opnd1;
-	char * opnd2;
-	opnd1 = argv[1];
-	opnd2 = argv[2];
-	r1 = strtol(opnd1, &p, 10);
-	r2 = strtol(opnd2, &p, 10);
-	return ((r1+r2));
-} 
-
-static int builtin_epoch (char **argv)
-{ 
-	char *p;
-        int r1 = 0;
-        char * opnd1;
-        opnd1 = argv[1];
-	if(argv[1])
-        	r1 = strtol(opnd1, &p, 10);
-	if(r1 > 0 )
-	{
-		int r2  = time(0) - r1;
-		printf("%d\n", r2);
-		return EXIT_SUCCESS;
-	}
-	printf ("%ld\n", (time(0)));
-	return EXIT_SUCCESS;
-}
-
-#define NEW_FORMAT
-
-#ifdef NEW_FORMAT
-static int builtin_buddyinfo(char **argv) 
-{
-	char *lowmemChar;
-	unsigned lowmem = 0;
-	FILE *fp = xfopen_for_read("/proc/buddyinfo");
-	char aa[10];
-	char *my_mac ;
-	int i = 0;
-	int j = 0;
-	int memBlock = 4;
-	int need_reboot = 0; // don't reboot 
-	int freeMem = 0;
-	int jMax = 64; // enough
-	struct sysinfo info; 
-
-	lowmemChar =  argv[1];
-
-	if(lowmemChar) 
-		lowmem = xatou(lowmemChar);
-        fscanf(fp, "%s", aa); 
-        fscanf(fp, "%s", aa);
-        fscanf(fp, "%s", aa);
-        fscanf(fp, "%s", aa);
-
-        my_mac = getenv("ETHER_SCANNED");
-
-	if (lowmem >= 4 ) 
-	{
-		/* We need to reboot unless we find a big enough chunk
-		 * of memory.
-		 */
-		need_reboot = 1;
-	}
-        printf ("RESULT { " DBQ(id) ": " DBQ(9001) ", " DBQ(time) ": %lld",
-		(long long)time(0));
-	if (my_mac !=  NULL)
-		printf(", " DBQ(macaddr) ": " DBQ(%s), my_mac);
-
-	/* get uptime and print it */
-	sysinfo(&info);
- 	printf (", " DBQ(uptime) ": %ld", info.uptime );
-	
-	printf(", " DBQ(buddyinfo) ": [ ");
-        for (j=0; j < jMax; j++)  
-        {
-                if (fscanf(fp, "%d", &i) != 1)
-			break;
-		printf("%s%d", j == 0 ? "" : ", ", i);
-		freeMem += ( memBlock * i);
-		if (i > 0 && lowmem >= 4 && memBlock >= lowmem)
-		{
-			/* Found a big enough chunk */
-			need_reboot = 0;
-		}
-		memBlock  *= 2; 
-        }
-
-	/* now print it */
-	printf (" ], " DBQ(freemem) ": %d }\n" ,  freeMem);
-
-	fclose (fp);
-
-	if(need_reboot)
-	{
-		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
-		return (EXIT_FAILURE);
-	}
-	return 0;
-}
-#else /* !NEW_FORMAT */
-static int builtin_buddyinfo(char **argv) 
-{
-	char *lowmemChar;
-	unsigned lowmem = 0;
-	FILE *fp = xfopen_for_read("/proc/buddyinfo");
-        FILE *fp1 = xfopen_for_read("/proc/buddyinfo");
-	char aa[10];
-	char *my_mac ;
-	int i = 0;
-	int j = 0;
-	int memBlock = 4;
-	int fReboot = 1; // don't reboot 
-	int freeMem = 0;
-	int jMax = 64; // enough
-	struct sysinfo info; 
-
-	lowmemChar =  argv[1];
-
-	if(lowmemChar) 
-		lowmem = xatou(lowmemChar);
-        fscanf(fp, "%s", aa); 
-        fscanf(fp, "%s", aa);
-        fscanf(fp, "%s", aa);
-        fscanf(fp, "%s", aa);
-
-        my_mac = getenv("ETHER_SCANNED");
-
-	if (lowmem >= 4 ) 
-	{
-		fReboot = 0; // env variable is set sow we check for low thershhold
-	}
-        printf ("RESULT 9001 ongoing %d ", (int)time(0));
-	if (my_mac !=  NULL)
-		printf("%s ", my_mac);
-	else
-		printf( "AAAAAABBBBBB ");
-	/* get uptime and print it */
-	sysinfo(&info);
- 	printf ("%-7ld", info.uptime );
-	
-        for (j=0; j < jMax; j++)  
-        {
-                if (fscanf(fp, "%d", &i) != 1)
-			break;
-		freeMem += ( memBlock * i);
-		if ( lowmem >= 4) 
-		{
-			if(  memBlock >=  lowmem)
-			{
-		 		if(fReboot == 0)
-				{ 
-			  		if (i > 0 )
-						{
-							fReboot = 1;
-							
-						}
-				} 
-			}
-		}
-		memBlock  *= 2; 
-        }
-
-	/* now print it */
-
-	printf (" %-5d " ,  freeMem);
-
-	fclose (fp);
-        fscanf(fp1, "%s", aa);
-        fscanf(fp1, "%s", aa);
-        fscanf(fp1, "%s", aa);
-        fscanf(fp1, "%s", aa);
-
-
-        for (j=0; j < jMax ; j++)  
-        {
-                if (fscanf(fp1, "%d", &i) != 1)
-			break;
-                printf("%-3d ", i);
-        }
-
-        printf ("\n"); 
-        fclose(fp1);
-	if(fReboot == 0 )
-	{
-		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
-		return (EXIT_FAILURE);
-	}
-	return 0;
-}
-#endif /* NEW_FORMAT */
-
-static int builtin_findpid(char **argv)
-{
-	procps_status_t* p = NULL;
-	int found = 0;
-
-	if (argv[1])
-	{
-		while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN)))
-		{
-			if (comm_match(p, argv[1])
-                /* or we require argv0 to match (essential for matching reexeced
- /proc/self/exe)*/
-                 	|| (p->argv0 && strcmp(bb_basename(p->argv0), *argv) == 0)
-                /* TODO: we can also try /proc/NUM/exe link, do we want that? */
-                ) 
-			{
-				found = 1;  /* found the match  but return at the end */
-					    /* otherwise free_procps won't be called 
-					       d will remain open */
-                	}
-		}
-	}
-	return !found;	/* exit 0 is success */
-}
-
-int condmv_main(int argc, char *argv[]);
-
-static int builtin_condmv(char **argv) 
-{
-	int argc;
-
-	for (argc= 0; argv[argc] != 0; argc++)
-		;
-	return condmv_main(argc, argv);
-}
-
-int dfrm_main(int argc, char *argv[]);
-
-static int builtin_dfrm(char **argv) 
-{
-	int argc;
-
-	for (argc= 0; argv[argc] != 0; argc++)
-		;
-	return dfrm_main(argc, argv);
-}
-
-int rxtxrpt_main(int argc, char *argv[]);
-
-static int builtin_rxtxrpt(char **argv) 
-{
-	int argc;
-
-	for (argc= 0; argv[argc] != 0; argc++)
-		;
-	return rxtxrpt_main(argc, argv);
-}
-
-int rptaddrs_main(int argc, char *argv[]);
-
-static int builtin_rptaddrs(char **argv) 
-{
-	int argc;
-
-	for (argc= 0; argv[argc] != 0; argc++)
-		;
-	return rptaddrs_main(argc, argv);
-}
-
-#define DBQ(str) "\"" #str "\""
-static int builtin_rptuptime(char **argv __attribute((unused))) 
-{
-	struct sysinfo info; 
-
-	printf("RESULT { " DBQ(id) ": " DBQ(7001) ", ");
-	printf(DBQ(fw) ": %d, ", get_atlas_fw_version());
-	printf(DBQ(time) ": %ld, ", (long)time(NULL));
-	printf(DBQ(lts) ": %d, ", get_timesync());
-	sysinfo(&info);
-	printf(DBQ(uptime) ": %ld }\n", (long)info.uptime);
-
-	return 0;
-}
-
-static int builtin_onlyuptime(char **argv __attribute((unused))) 
-{
-	struct sysinfo info; 
-
-	sysinfo(&info);
-	printf("%ld\n", (long)info.uptime);
-
-	return 0;
-}
-
-static int builtin_reboot_probe(char **argv __attribute((unused))) 
-{
-	int r;
-
-	sync();
-	r= reboot(RB_AUTOBOOT);
-	return r;
-}
-
-static int builtin_rchoose(char **argv)
-{
-	int argc = 0;
-	int r;
-
-	srandom (time (0));
-	r = random();
-        while (*argv) {
-                argc++;
-                argv++;
-        }
-	argv -= argc;
-	argv++;
-	r %= (argc - 1);
-	printf ("%s\n", argv[r]);
-	return fflush(stdout);
-}
-
-static int builtin_sub(char **argv)
-{
-	char *p;
-	int r1;
-	int r2;
-	char * opnd1;
-	char * opnd2;
-	opnd1 = argv[1];
-	opnd2 = argv[2];
-	r1 = strtol(opnd1, &p, 10);
-	r2 = strtol(opnd2, &p, 10);
-	printf ("%d\n", (r1-r2));
-	return (fflush(stdout));
-}
-
-static int builtin_test(char **argv)
-{
-	int argc = 0;
-	while (*argv) {
-		argc++;
-		argv++;
-=======
 	/* "!": do not abort on errors */
 	/* "+": stop at 1st non-option */
 	opts = getopt32(argv, "!+vf");
@@ -9521,7 +8945,6 @@ static int builtin_test(char **argv)
 	if (opts == 3) {
 		bb_error_msg("unset: -v and -f are exclusive");
 		return EXIT_FAILURE;
->>>>>>> busybox-base-1-26-2
 	}
 	argv += optind;
 
@@ -10003,69 +9426,6 @@ static int FAST_FUNC builtin_pwd(char **argv UNUSED_PARAM)
 	return EXIT_SUCCESS;
 }
 
-<<<<<<< HEAD
-/* built-in 'set' handler
- * SUSv3 says:
- * set [-abCefmnuvx] [-h] [-o option] [argument...]
- * set [+abCefmnuvx] [+h] [+o option] [argument...]
- * set -- [argument...]
- * set -o
- * set +o
- * Implementations shall support the options in both their hyphen and
- * plus-sign forms. These options can also be specified as options to sh.
- * Examples:
- * Write out all variables and their values: set
- * Set $1, $2, and $3 and set "$#" to 3: set c a b
- * Turn on the -x and -v options: set -xv
- * Unset all positional parameters: set --
- * Set $1 to the value of x, even if it begins with '-' or '+': set -- "$x"
- * Set the positional parameters to the expansion of x, even if x expands
- * with a leading '-' or '+': set -- $x
- *
- * So far, we only support "set -- [argument...]" by ignoring all options
- * (also, "-o option" will be mishandled by taking "option" as parameter #1).
- */
-static int builtin_set(char **argv)
-{
-	struct variable *e;
-	char **pp;
-	char *arg = *++argv;
-
-	if (arg == NULL) {
-		for (e = G.top_var; e; e = e->next)
-			puts(e->varstr);
-	} else {
-		/* NB: G.global_argv[0] ($0) is never freed/changed */
-
-		if (G.global_args_malloced) {
-			pp = G.global_argv;
-			while (*++pp)
-				free(*pp);
-			G.global_argv[1] = NULL;
-		} else {
-			G.global_args_malloced = 1;
-			pp = xzalloc(sizeof(pp[0]) * 2);
-			pp[0] = G.global_argv[0]; /* retain $0 */
-			G.global_argv = pp;
-		}
-		do  {
-			if (arg[0] == '+')
-				continue;
-			if (arg[0] != '-')
-				break;
-			if (arg[1] == '-' && arg[2] == '\0') {
-				argv++;
-				break;
-			}
-		} while ((arg = *++argv) != NULL);
-		/* Now argv[0] is 1st argument */
-
-		/* This realloc's G.global_argv */
-		G.global_argv = pp = add_strings_to_strings(G.global_argv, argv, /*dup:*/ 1);
-		G.global_argc = 1;
-		while (*++pp)
-			G.global_argc++;
-=======
 static int FAST_FUNC builtin_source(char **argv)
 {
 	char *arg_path, *filename;
@@ -10095,7 +9455,6 @@ static int FAST_FUNC builtin_source(char **argv)
 		 * not merely fail. So far no one complained :)
 		 */
 		return EXIT_FAILURE;
->>>>>>> busybox-base-1-26-2
 	}
 
 #if ENABLE_HUSH_FUNCTIONS
@@ -10122,22 +9481,6 @@ static int FAST_FUNC builtin_source(char **argv)
 
 static int FAST_FUNC builtin_umask(char **argv)
 {
-<<<<<<< HEAD
-	int n = 1;
-	if (argv[1]) {
-		n = atoi(argv[1]);
-	}
-	if (n >= 0 && n < G.global_argc) {
-		if (G.global_args_malloced) {
-			int m = 1;
-			while (m <= n)
-				free(G.global_argv[m++]);
-		}
-		G.global_argc -= n;
-		memmove(&G.global_argv[1], &G.global_argv[n+1],
-				G.global_argc * sizeof(G.global_argv[0]));
-		return EXIT_SUCCESS;
-=======
 	int rc;
 	mode_t mask;
 
@@ -10167,7 +9510,6 @@ static int FAST_FUNC builtin_umask(char **argv)
 		/* Mimic bash */
 		printf("%04o\n", (unsigned) mask);
 		/* fall through and restore mask which we set to 0 */
->>>>>>> busybox-base-1-26-2
 	}
 	umask(mask);
 

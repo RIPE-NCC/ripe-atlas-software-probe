@@ -299,40 +299,15 @@
 //usage:     "\n	-t N	Type-of-service in probe packets (default 0)"
 //usage:     "\n	-w SEC	Time wait for a response (default 3)"
 
-#define ATLAS 1
-
 #define TRACEROUTE_SO_DEBUG 0
-#define WATCHDOGDEV "/dev/watchdog"
 
-<<<<<<< HEAD
-/* TODO: undefs were uncommented - ??! we have config system for that! */
-/* probably ok to remove altogether */
-//#undef CONFIG_FEATURE_TRACEROUTE_VERBOSE
-//#define CONFIG_FEATURE_TRACEROUTE_VERBOSE
-//#undef CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE
-//#define CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE
-//#undef CONFIG_FEATURE_TRACEROUTE_USE_ICMP
-//#define CONFIG_FEATURE_TRACEROUTE_USE_ICMP
-
-#define ENABLE_FEATURE_TRACEROUTE_IPV6 1
-#ifndef USE_FEATURE_TRACEROUTE_IPV6
-#define USE_FEATURE_TRACEROUTE_IPV6(x) x
-#endif
-
-
-=======
->>>>>>> busybox-base-1-26-2
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_FEATURE_IPV6
->>>>>>> busybox-base-1-26-2
 # include <netinet/ip6.h>
 # include <netinet/icmp6.h>
 # ifndef SOL_IPV6
@@ -343,17 +318,6 @@
 #include "libbb.h"
 #include "inet_common.h"
 
-<<<<<<< HEAD
-#if !STANDALONE_BUSYBOX
-#define uh_sport source
-#define uh_dport dest
-#define uh_ulen len
-#define uh_sum check
-#endif
-
-
-=======
->>>>>>> busybox-base-1-26-2
 #ifndef IPPROTO_ICMP
 # define IPPROTO_ICMP 1
 #endif
@@ -361,39 +325,6 @@
 # define IPPROTO_IP 0
 #endif
 
-<<<<<<< HEAD
-#define OPT_STRING "!FIlnrdvxt:i:m:p:q:s:w:z:f:A:D" \
-                    USE_FEATURE_TRACEROUTE_SOURCE_ROUTE("g:") \
-                    "4" USE_FEATURE_TRACEROUTE_IPV6("6")
-enum {
-	OPT_DONT_FRAGMNT = (1 << 0),    /* F */
-	OPT_USE_ICMP     = (1 << 1) * ENABLE_FEATURE_TRACEROUTE_USE_ICMP, /* I */
-	OPT_TTL_FLAG     = (1 << 2),    /* l */
-	OPT_ADDR_NUM     = (1 << 3),    /* n */
-	OPT_BYPASS_ROUTE = (1 << 4),    /* r */
-	OPT_DEBUG        = (1 << 5),    /* d */
-	OPT_VERBOSE      = (1 << 6) * ENABLE_FEATURE_TRACEROUTE_VERBOSE, /* v */
-	OPT_IP_CHKSUM    = (1 << 7),    /* x */
-	OPT_TOS          = (1 << 8),    /* t */
-	OPT_DEVICE       = (1 << 9),    /* i */
-	OPT_MAX_TTL      = (1 << 10),   /* m */
-	OPT_PORT         = (1 << 11),   /* p */
-	OPT_NPROBES      = (1 << 12),   /* q */
-	OPT_SOURCE       = (1 << 13),   /* s */
-	OPT_WAITTIME     = (1 << 14),   /* w */
-	OPT_PAUSE_MS     = (1 << 15),   /* z */
-	OPT_FIRST_TTL    = (1 << 16),   /* f */
-	OPT_A    	 = (1 << 17),   /* A */
-	OPT_D_WATCHDOG   = (1 << 18),   /* D */
-	OPT_SOURCE_ROUTE = (1 << 19) * ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE, /* g */
-	OPT_IPV4         = (1 << (19+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)),   /* 4 */
-	OPT_IPV6         = (1 << (20+ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE)) * ENABLE_FEATURE_TRACEROUTE_IPV6, /* 6 */
-};
-#define verbose (option_mask32 & OPT_VERBOSE)
-
-enum {
-	SIZEOF_ICMP_HDR = 8,
-=======
 
 #define OPT_STRING \
 	"FIlnrdvxt:i:m:p:q:s:w:z:f:" \
@@ -425,7 +356,6 @@ enum {
 	SIZEOF_ICMP_HDR = 8,
 	rcvsock = 3, /* receive (icmp) socket file descriptor */
 	sndsock = 4, /* send (udp/icmp) socket file descriptor */
->>>>>>> busybox-base-1-26-2
 };
 
 /* Data section of the probe packet */
@@ -436,11 +366,7 @@ struct outdata_t {
 	struct timeval tv_UNUSED PACKED; /* time packet left */
 };
 
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 struct outdata6_t {
 	uint32_t ident6;
 	uint32_t seq6;
@@ -449,43 +375,18 @@ struct outdata6_t {
 #endif
 
 struct globals {
-<<<<<<< HEAD
-	struct ip *outip;
-	struct outdata_t *outdata;
-=======
 	/* Pointer to entire malloced IP packet, "packlen" bytes long: */
 	struct ip *outip;
 	/* Pointer to ICMP or UDP payload (not header): */
 	struct outdata_t *outdata;
 
->>>>>>> busybox-base-1-26-2
 	len_and_sockaddr *dest_lsa;
 	int packlen;                    /* total length of packet */
 	int pmtu;                       /* Path MTU Discovery (RFC1191) */
 	uint32_t ident;
-<<<<<<< HEAD
-	uint16_t port; // 32768 + 666;  /* start udp dest port # for probe packets */
-	int waittime; // 5;             /* time to wait for response (in seconds) */
-	int rcvsock;
-	int sndsock;
-	int got_timeout;
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-	int optlen;                     /* length of ip options */
-#else
-#define optlen 0
-#endif
-	unsigned char recv_pkt[512];    /* last inbound (icmp) packet */
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-	/* Maximum number of gateways (include room for one noop) */
-#define NGATEWAYS ((int)((MAX_IPOPTLEN - IPOPT_MINOFF - 1) / sizeof(uint32_t)))
-	/* loose source route gateway list (including room for final destination) */
-	uint32_t gwlist[NGATEWAYS + 1];
-#endif
-=======
 	uint16_t port; // 33434;        /* start udp dest port # for probe packets */
 	int waittime; // 5;             /* time to wait for response (in seconds) */
 	unsigned char recv_pkt[512];    /* last inbound (icmp) packet */
->>>>>>> busybox-base-1-26-2
 };
 
 #define G (*ptr_to_globals)
@@ -497,109 +398,26 @@ struct globals {
 #define ident     (G.ident    )
 #define port      (G.port     )
 #define waittime  (G.waittime )
-<<<<<<< HEAD
-#define rcvsock   (G.rcvsock  )
-#define sndsock   (G.sndsock  )
-#define got_timeout (G.got_timeout  )
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-# define optlen   (G.optlen   )
-#endif
-=======
->>>>>>> busybox-base-1-26-2
 #define recv_pkt  (G.recv_pkt )
 #define gwlist    (G.gwlist   )
 #define INIT_G() do { \
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
-<<<<<<< HEAD
-	port = 32768 + 666; \
-	waittime = 5; \
-	rcvsock = -1; \
-	sndsock = -1; \
-	got_timeout = 0; \
-=======
 	port = 33434; \
 	waittime = 5; \
->>>>>>> busybox-base-1-26-2
 } while (0)
 
 #define outicmp ((struct icmp *)(outip + 1))
 #define outudp  ((struct udphdr *)(outip + 1))
 
-<<<<<<< HEAD
-#ifdef ATLAS
-#define xsendto(fd, buf, len, addr, addrlen) \
-	xrsendto(fd, buf, len, addr, addrlen, traceroute_report_err)
-#define xconnect(fd, addr, addrlen) \
-	xrconnect(fd, addr, addrlen, traceroute_report_err)
-
-static void resolver_timeout(int __attribute((unused)) sig);
-#endif /* ATLAS */
-
-/* libbb candidate? tftp uses this idiom too */
-static len_and_sockaddr* dup_sockaddr(const len_and_sockaddr *lsa)
-{
-	len_and_sockaddr *new_lsa = xzalloc(LSA_LEN_SIZE + lsa->len);
-	memcpy(new_lsa, lsa, LSA_LEN_SIZE + lsa->len);
-	return new_lsa;
-}
-
-
-static int
-wait_for_reply(len_and_sockaddr *from_lsa, struct sockaddr *to)
-=======
 
 static int
 wait_for_reply(len_and_sockaddr *from_lsa, struct sockaddr *to, unsigned *timestamp_us, int *left_ms)
->>>>>>> busybox-base-1-26-2
 {
 	struct pollfd pfd[1];
 	int read_len = 0;
 
 	pfd[0].fd = rcvsock;
 	pfd[0].events = POLLIN;
-<<<<<<< HEAD
-	if (safe_poll(pfd, 1, waittime * 1000) > 0) {
-		read_len = recv_from_to(rcvsock,
-				recv_pkt, sizeof(recv_pkt),
-				/*flags:*/ 0,
-				&from_lsa->u.sa, to, from_lsa->len);
-	}
-
-	return read_len;
-}
-
-/*
- * Checksum routine for Internet Protocol family headers (C Version)
- */
-static uint16_t
-in_cksum(uint16_t *addr, int len)
-{
-	int nleft = len;
-	uint16_t *w = addr;
-	uint16_t answer;
-	int sum = 0;
-
-	/*
-	 * Our algorithm is simple, using a 32 bit accumulator (sum),
-	 * we add sequential 16 bit words to it, and at the end, fold
-	 * back all the carry bits from the top 16 bits into the lower
-	 * 16 bits.
-	 */
-	while (nleft > 1) {
-		sum += *w++;
-		nleft -= 2;
-	}
-
-	/* mop up an odd byte, if necessary */
-	if (nleft == 1)
-		sum += *(unsigned char *)w;
-
-	/* add back carry outs from top 16 bits to low 16 bits */
-	sum = (sum >> 16) + (sum & 0xffff);     /* add hi 16 to low 16 */
-	sum += (sum >> 16);                     /* add carry */
-	answer = ~sum;                          /* truncate to 16 bits */
-	return answer;
-=======
 	if (*left_ms >= 0 && safe_poll(pfd, 1, *left_ms) > 0) {
 		unsigned t;
 
@@ -613,7 +431,6 @@ in_cksum(uint16_t *addr, int len)
 	}
 
 	return read_len;
->>>>>>> busybox-base-1-26-2
 }
 
 static void
@@ -623,15 +440,9 @@ send_probe(int seq, int ttl)
 	void *out;
 
 	/* Payload */
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	if (dest_lsa->u.sa.sa_family == AF_INET6) {
-		struct outdata6_t *pkt = (struct outdata6_t *) outip;
-=======
 #if ENABLE_TRACEROUTE6
 	if (dest_lsa->u.sa.sa_family == AF_INET6) {
 		struct outdata6_t *pkt = (struct outdata6_t *) outdata;
->>>>>>> busybox-base-1-26-2
 		pkt->ident6 = htonl(ident);
 		pkt->seq6   = htonl(seq);
 		/*gettimeofday(&pkt->tv, &tz);*/
@@ -648,15 +459,10 @@ send_probe(int seq, int ttl)
 
 			/* Always calculate checksum for icmp packets */
 			outicmp->icmp_cksum = 0;
-<<<<<<< HEAD
-			outicmp->icmp_cksum = in_cksum((uint16_t *)outicmp,
-						packlen - (sizeof(*outip) + optlen));
-=======
 			outicmp->icmp_cksum = inet_cksum(
 					(uint16_t *)outicmp,
 					((char*)outip + packlen) - (char*)outicmp
 			);
->>>>>>> busybox-base-1-26-2
 			if (outicmp->icmp_cksum == 0)
 				outicmp->icmp_cksum = 0xffff;
 		}
@@ -688,49 +494,16 @@ send_probe(int seq, int ttl)
 	}
 #endif
 
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	if (dest_lsa->u.sa.sa_family == AF_INET6) {
-		res = setsockopt(sndsock, SOL_IPV6, IPV6_UNICAST_HOPS, &ttl, sizeof(ttl));
-		if (res < 0)
-			bb_perror_msg_and_die("setsockopt UNICAST_HOPS %d", ttl);
-		out = outip;
-		len = packlen;
-=======
 	out = outdata;
 #if ENABLE_TRACEROUTE6
 	if (dest_lsa->u.sa.sa_family == AF_INET6) {
 		res = setsockopt_int(sndsock, SOL_IPV6, IPV6_UNICAST_HOPS, ttl);
 		if (res != 0)
 			bb_perror_msg_and_die("setsockopt(%s) %d", "UNICAST_HOPS", ttl);
->>>>>>> busybox-base-1-26-2
 	} else
 #endif
 	{
 #if defined IP_TTL
-<<<<<<< HEAD
-		res = setsockopt(sndsock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
-		if (res < 0)
-			bb_perror_msg_and_die("setsockopt ttl %d", ttl);
-#endif
-		out = outicmp;
-		len = packlen - sizeof(*outip);
-		if (!(option_mask32 & OPT_USE_ICMP)) {
-			out = outdata;
-			len -= sizeof(*outudp);
-			set_nport(dest_lsa, htons(port + seq));
-		}
-	}
-
-	res = sendto(sndsock, out, len, 0, &dest_lsa->u.sa, dest_lsa->len);
-	if (res == -1)
-	{
-		printf(" errno %d", errno);
-		return;
-	}
-	if (res != len)
-		bb_info_msg("sent %d octets, ret=%d", len, res);
-=======
 		res = setsockopt_int(sndsock, IPPROTO_IP, IP_TTL, ttl);
 		if (res != 0)
 			bb_perror_msg_and_die("setsockopt(%s) %d", "TTL", ttl);
@@ -746,7 +519,6 @@ send_probe(int seq, int ttl)
 	res = xsendto(sndsock, out, len, &dest_lsa->u.sa, dest_lsa->len);
 	if (res != len)
 		bb_error_msg("sent %d octets, ret=%d", len, res);
->>>>>>> busybox-base-1-26-2
 }
 
 #if ENABLE_FEATURE_TRACEROUTE_VERBOSE
@@ -763,11 +535,7 @@ pr_type(unsigned char t)
 	"Param Problem", "Timestamp",   "Timestamp Reply", "Info Request",
 	"Info Reply",   "Mask Request", "Mask Reply"
 	};
-<<<<<<< HEAD
-# if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 # if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 	static const char *const ttab6[] = {
 [0]	"Error", "Dest Unreachable", "Packet Too Big", "Time Exceeded",
 [4]	"Param Problem",
@@ -858,11 +626,7 @@ packet4_ok(int read_len, const struct sockaddr_in *from, int seq)
 // but defer it to kernel, we can't set source port,
 // and thus can't check it here in the reply
 			/* && up->source == htons(ident) */
-<<<<<<< HEAD
-			 && up->uh_dport == htons(port + seq)
-=======
 			 && up->dest == htons(port + seq)
->>>>>>> busybox-base-1-26-2
 			) {
 				return (type == ICMP_TIMXCEED ? -1 : code + 1);
 			}
@@ -885,11 +649,7 @@ packet4_ok(int read_len, const struct sockaddr_in *from, int seq)
 	return 0;
 }
 
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 # if !ENABLE_FEATURE_TRACEROUTE_VERBOSE
 #define packet_ok(read_len, from_lsa, to, seq) \
 	packet_ok(read_len, from_lsa, seq)
@@ -936,10 +696,6 @@ packet_ok(int read_len, len_and_sockaddr *from_lsa,
 				return (type == ICMP6_TIME_EXCEEDED ? -1 : (code<<8)+1);
 			}
 		}
-<<<<<<< HEAD
-
-=======
->>>>>>> busybox-base-1-26-2
 	}
 
 # if ENABLE_FEATURE_TRACEROUTE_VERBOSE
@@ -959,11 +715,7 @@ packet_ok(int read_len, len_and_sockaddr *from_lsa,
 			type, pr_type(type), icp->icmp6_code);
 
 		read_len -= sizeof(struct icmp6_hdr);
-<<<<<<< HEAD
-		for (i = 0; i < read_len ; i++) {
-=======
 		for (i = 0; i < read_len; i++) {
->>>>>>> busybox-base-1-26-2
 			if (i % 16 == 0)
 				printf("%04x:", i);
 			if (i % 4 == 0)
@@ -978,17 +730,10 @@ packet_ok(int read_len, len_and_sockaddr *from_lsa,
 
 	return 0;
 }
-<<<<<<< HEAD
-#else /* !ENABLE_FEATURE_TRACEROUTE_IPV6 */
-static ALWAYS_INLINE int
-packet_ok(int read_len,
-		len_and_sockaddr *from_lsa UNUSED_PARAM,
-=======
 #else /* !ENABLE_TRACEROUTE6 */
 static ALWAYS_INLINE int
 packet_ok(int read_len,
 		len_and_sockaddr *from_lsa IF_NOT_FEATURE_TRACEROUTE_VERBOSE(UNUSED_PARAM),
->>>>>>> busybox-base-1-26-2
 		struct sockaddr *to UNUSED_PARAM,
 		int seq)
 {
@@ -1030,22 +775,14 @@ print(int read_len, const struct sockaddr *from, const struct sockaddr *to)
 
 	if (verbose) {
 		char *ina = xmalloc_sockaddr2dotted_noport(to);
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 		if (to->sa_family == AF_INET6) {
 			read_len -= sizeof(struct ip6_hdr);
 		} else
 #endif
 		{
-<<<<<<< HEAD
-			read_len -= ((struct ip*)recv_pkt)->ip_hl << 2;
-=======
 			struct ip *ip4packet = (struct ip*)recv_pkt;
 			read_len -= ip4packet->ip_hl << 2;
->>>>>>> busybox-base-1-26-2
 		}
 		printf(" %d bytes to %s", read_len, ina);
 		free(ina);
@@ -1065,28 +802,16 @@ print_delta_ms(unsigned t1p, unsigned t2p)
  * [-w waittime] [-z pausemsecs] host [packetlen]"
  */
 static int
-<<<<<<< HEAD
-common_traceroute_main(uint32_t op, char **argv)
-{
-	int i;
-	int minpacket;
-	int tos = 0;
-=======
 common_traceroute_main(int op, char **argv)
 {
 	int minpacket;
 #ifdef IP_TOS
 	int tos = 0;
 #endif
->>>>>>> busybox-base-1-26-2
 	int max_ttl = 30;
 	int nprobes = 3;
 	int first_ttl = 1;
 	unsigned pausemsecs = 0;
-<<<<<<< HEAD
-	char *str_Atlas;
-=======
->>>>>>> busybox-base-1-26-2
 	char *source;
 	char *device;
 	char *tos_str;
@@ -1096,68 +821,33 @@ common_traceroute_main(int op, char **argv)
 	char *waittime_str;
 	char *pausemsecs_str;
 	char *first_ttl_str;
-<<<<<<< HEAD
-	int fd ;
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-	llist_t *source_route_list = NULL;
-	int lsrr = 0;
-#endif
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	sa_family_t af;
-#else
-	enum { af = AF_INET };
-#endif
-=======
 	char *dest_str;
 #if ENABLE_TRACEROUTE6
 	sa_family_t af;
 #else
 	enum { af = AF_INET };
 #endif
->>>>>>> busybox-base-1-26-2
 	int ttl;
 	int seq;
 	len_and_sockaddr *from_lsa;
 	struct sockaddr *lastaddr;
 	struct sockaddr *to;
-<<<<<<< HEAD
 
 	INIT_G();
 
-=======
-
-	INIT_G();
-
->>>>>>> busybox-base-1-26-2
 	/* minimum 1 arg */
 	opt_complementary = "-1:x-x";
 	op |= getopt32(argv, OPT_STRING
 		, &tos_str, &device, &max_ttl_str, &port_str, &nprobes_str
 		, &source, &waittime_str, &pausemsecs_str, &first_ttl_str
-<<<<<<< HEAD
-		, &str_Atlas
-//#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-//	, &source_route_list
-//#endif
 	);
 	argv += optind;
 
-	if (op == (uint32_t)-1)
-		return 1;
-
-=======
-	);
-	argv += optind;
-
->>>>>>> busybox-base-1-26-2
 #if 0 /* IGNORED */
 	if (op & OPT_IP_CHKSUM)
 		bb_error_msg("warning: ip checksums disabled");
 #endif
-<<<<<<< HEAD
-=======
 #ifdef IP_TOS
->>>>>>> busybox-base-1-26-2
 	if (op & OPT_TOS)
 		tos = xatou_range(tos_str, 0, 255);
 #endif
@@ -1173,11 +863,7 @@ common_traceroute_main(int op, char **argv)
 		 * probe (e.g., on a multi-homed host).
 		 */
 		if (getuid() != 0)
-<<<<<<< HEAD
-			bb_error_msg_and_die("you must be root");
-=======
 			bb_error_msg_and_die(bb_msg_you_must_be_root);
->>>>>>> busybox-base-1-26-2
 	}
 	if (op & OPT_WAITTIME)
 		waittime = xatou_range(waittime_str, 1, 24 * 60 * 60);
@@ -1185,78 +871,6 @@ common_traceroute_main(int op, char **argv)
 		pausemsecs = xatou_range(pausemsecs_str, 0, 60 * 60 * 1000);
 	if (op & OPT_FIRST_TTL)
 		first_ttl = xatou_range(first_ttl_str, 1, max_ttl);
-<<<<<<< HEAD
-
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
-	if (source_route_list) {
-		while (source_route_list) {
-			len_and_sockaddr *lsa;
-
-			if (lsrr >= NGATEWAYS)
-				bb_error_msg_and_die("no more than %d gateways", NGATEWAYS);
-			lsa = xhost_and_af2sockaddr(llist_pop(&source_route_list), 0, AF_INET);
-			gwlist[lsrr] = lsa->u.sin.sin_addr.s_addr;
-			free(lsa);
-			++lsrr;
-		}
-		optlen = (lsrr + 1) * sizeof(gwlist[0]);
-	}
-#endif
-
-	/* Process destination and optional packet size */
-	minpacket = sizeof(*outip) + SIZEOF_ICMP_HDR + sizeof(*outdata) + optlen;
-	if (!(op & OPT_USE_ICMP))
-		minpacket += sizeof(*outudp) - SIZEOF_ICMP_HDR;
-
-#ifdef ATLAS
-	if (option_mask32 & OPT_A)
-	{	
-		time_t mytime;
-        	mytime = time(NULL);
-		printf("%s %lu ", str_Atlas, mytime);
-	}
-
-	signal(SIGALRM, resolver_timeout);
-	alarm(10);
-#endif /* ATLAS */
-
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	af = AF_UNSPEC;
-	if (op & OPT_IPV4)
-		af = AF_INET;
-	if (op & OPT_IPV6)
-		af = AF_INET6;
-#ifdef ATLAS
-	dest_lsa = host_and_af2sockaddr(argv[0], port, af);
-	if (dest_lsa)
-		af = dest_lsa->u.sa.sa_family;
-#else
-	dest_lsa = xhost_and_af2sockaddr(argv[0], port, af);
-	af = dest_lsa->u.sa.sa_family;
-#endif /* ATLAS */
-	if (af == AF_INET6)
-		minpacket = sizeof(struct outdata6_t);
-#else
-#ifdef ATLAS
-	dest_lsa = host2sockaddr(argv[0], port);
-#else
-	dest_lsa = xhost2sockaddr(argv[0], port);
-#endif /* ATLAS */
-#endif
-
-#ifdef ATLAS
-	alarm(0);
-	signal(SIGALRM, SIG_DFL);
-
-	if (!dest_lsa) {
-		printf("traceroute to %s (%s)\n", argv[0], 
-			got_timeout ? "dns-timeout" : "bad-hostname");
-		free(ptr_to_globals);
-		return 1;
-	}
-#endif
-
-=======
 
 	/* Process destination and optional packet size */
 	minpacket = sizeof(struct ip)
@@ -1281,7 +895,6 @@ common_traceroute_main(int op, char **argv)
 #else
 	dest_lsa = xhost2sockaddr(argv[0], port);
 #endif
->>>>>>> busybox-base-1-26-2
 	packlen = minpacket;
 	if (argv[1])
 		packlen = xatoul_range(argv[1], minpacket, 32 * 1024);
@@ -1289,19 +902,6 @@ common_traceroute_main(int op, char **argv)
 	/* Ensure the socket fds won't be 0, 1 or 2 */
 	bb_sanitize_stdio();
 
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	if (af == AF_INET6) {
-		rcvsock= xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-# ifdef IPV6_RECVPKTINFO
-		setsockopt(rcvsock, SOL_IPV6, IPV6_RECVPKTINFO,
-				&const_int_1, sizeof(const_int_1));
-		setsockopt(rcvsock, SOL_IPV6, IPV6_2292PKTINFO,
-				&const_int_1, sizeof(const_int_1));
-# else
-		setsockopt(rcvsock, SOL_IPV6, IPV6_PKTINFO,
-				&const_int_1, sizeof(const_int_1));
-=======
 #if ENABLE_TRACEROUTE6
 	if (af == AF_INET6) {
 		xmove_fd(xsocket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6), rcvsock);
@@ -1310,16 +910,11 @@ common_traceroute_main(int op, char **argv)
 		setsockopt_1(rcvsock, SOL_IPV6, IPV6_2292PKTINFO);
 # else
 		setsockopt_1(rcvsock, SOL_IPV6, IPV6_PKTINFO);
->>>>>>> busybox-base-1-26-2
 # endif
 	} else
 #endif
 	{
-<<<<<<< HEAD
-		rcvsock= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-=======
 		xmove_fd(xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP), rcvsock);
->>>>>>> busybox-base-1-26-2
 	}
 
 #if TRACEROUTE_SO_DEBUG
@@ -1327,17 +922,6 @@ common_traceroute_main(int op, char **argv)
 		setsockopt_SOL_SOCKET_1(rcvsock, SO_DEBUG);
 #endif
 	if (op & OPT_BYPASS_ROUTE)
-<<<<<<< HEAD
-		setsockopt(rcvsock, SOL_SOCKET, SO_DONTROUTE,
-				&const_int_1, sizeof(const_int_1));
-
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-	if (af == AF_INET6) {
-		static const int two = 2;
-		if (setsockopt(rcvsock, SOL_RAW, IPV6_CHECKSUM, &two, sizeof(two)) < 0)
-			bb_perror_msg_and_die("setsockopt RAW_CHECKSUM");
-		sndsock= xsocket(af, SOCK_DGRAM, 0);
-=======
 		setsockopt_SOL_SOCKET_1(rcvsock, SO_DONTROUTE);
 
 #if ENABLE_TRACEROUTE6
@@ -1345,44 +929,13 @@ common_traceroute_main(int op, char **argv)
 		if (setsockopt_int(rcvsock, SOL_RAW, IPV6_CHECKSUM, 2) != 0)
 			bb_perror_msg_and_die("setsockopt(%s)", "IPV6_CHECKSUM");
 		xmove_fd(xsocket(af, SOCK_DGRAM, 0), sndsock);
->>>>>>> busybox-base-1-26-2
 	} else
 #endif
 	{
 		if (op & OPT_USE_ICMP)
-<<<<<<< HEAD
-			sndsock= xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-		else
-			sndsock= xsocket(AF_INET, SOCK_DGRAM, 0);
-#if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE && defined IP_OPTIONS
-		if (lsrr > 0) {
-			unsigned char optlist[MAX_IPOPTLEN];
-
-			/* final hop */
-			gwlist[lsrr] = dest_lsa->u.sin.sin_addr.s_addr;
-			++lsrr;
-
-			/* force 4 byte alignment */
-			optlist[0] = IPOPT_NOP;
-			/* loose source route option */
-			optlist[1] = IPOPT_LSRR;
-			i = lsrr * sizeof(gwlist[0]);
-			optlist[2] = i + 3;
-			/* pointer to LSRR addresses */
-			optlist[3] = IPOPT_MINOFF;
-			memcpy(optlist + 4, gwlist, i);
-
-			if (setsockopt(sndsock, IPPROTO_IP, IP_OPTIONS,
-					(char *)optlist, i + sizeof(gwlist[0])) < 0) {
-				bb_perror_msg_and_die("IP_OPTIONS");
-			}
-		}
-#endif
-=======
 			xmove_fd(xsocket(AF_INET, SOCK_RAW, IPPROTO_ICMP), sndsock);
 		else
 			xmove_fd(xsocket(AF_INET, SOCK_DGRAM, 0), sndsock);
->>>>>>> busybox-base-1-26-2
 	}
 
 #ifdef SO_SNDBUF
@@ -1391,45 +944,26 @@ common_traceroute_main(int op, char **argv)
 	}
 #endif
 #ifdef IP_TOS
-<<<<<<< HEAD
-	if ((op & OPT_TOS) && setsockopt(sndsock, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) < 0) {
-		bb_perror_msg_and_die("setsockopt tos %d", tos);
-=======
 	if ((op & OPT_TOS) && setsockopt_int(sndsock, IPPROTO_IP, IP_TOS, tos) != 0) {
 		bb_perror_msg_and_die("setsockopt(%s) %d", "TOS", tos);
->>>>>>> busybox-base-1-26-2
 	}
 #endif
 #ifdef IP_DONTFRAG
 	if (op & OPT_DONT_FRAGMNT)
-<<<<<<< HEAD
-		setsockopt(sndsock, IPPROTO_IP, IP_DONTFRAG,
-				&const_int_1, sizeof(const_int_1));
-=======
 		setsockopt_1(sndsock, IPPROTO_IP, IP_DONTFRAG);
->>>>>>> busybox-base-1-26-2
 #endif
 #if TRACEROUTE_SO_DEBUG
 	if (op & OPT_DEBUG)
 		setsockopt_SOL_SOCKET_1(sndsock, SO_DEBUG);
 #endif
 	if (op & OPT_BYPASS_ROUTE)
-<<<<<<< HEAD
-		setsockopt(sndsock, SOL_SOCKET, SO_DONTROUTE,
-				&const_int_1, sizeof(const_int_1));
-=======
 		setsockopt_SOL_SOCKET_1(sndsock, SO_DONTROUTE);
->>>>>>> busybox-base-1-26-2
 
 	outip = xzalloc(packlen);
 
 	ident = getpid();
 
-<<<<<<< HEAD
-	if (af == AF_INET) {
-=======
 	if (!ENABLE_TRACEROUTE6 || af == AF_INET) {
->>>>>>> busybox-base-1-26-2
 		if (op & OPT_USE_ICMP) {
 			ident |= 0x8000;
 			outicmp->icmp_type = ICMP_ECHO;
@@ -1452,11 +986,7 @@ common_traceroute_main(int op, char **argv)
 		setsockopt_bindtodevice(sndsock, device);
 
 	if (op & OPT_SOURCE) {
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 // TODO: need xdotted_and_af2sockaddr?
 		len_and_sockaddr *source_lsa = xhost_and_af2sockaddr(source, 0, af);
 #else
@@ -1472,11 +1002,7 @@ common_traceroute_main(int op, char **argv)
 		xbind(sndsock, &source_lsa->u.sa, source_lsa->len);
 		free(source_lsa);
 	}
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 	else if (af == AF_INET6) {
 //TODO: why we don't do it for IPv4?
 		len_and_sockaddr *source_lsa;
@@ -1484,49 +1010,6 @@ common_traceroute_main(int op, char **argv)
 		int probe_fd = xsocket(af, SOCK_DGRAM, 0);
 		if (op & OPT_DEVICE)
 			setsockopt_bindtodevice(probe_fd, device);
-<<<<<<< HEAD
-		set_nport(dest_lsa, htons(1025));
-		/* dummy connect. makes kernel pick source IP (and port) */
-		if (connect(probe_fd, &dest_lsa->u.sa, dest_lsa->len) == -1)
-		{
-			int s_errno= errno;
-			char *tmpstr= 
-				xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa);
-
-			printf("traceroute to %s (%s), errno %d\n",
-				argv[0], tmpstr, s_errno);
-			free(tmpstr);
-
-			if (rcvsock != -1)
-			{
-				close(rcvsock);
-				rcvsock= -1;
-			}
-			if (sndsock != -1)
-			{
-				close(sndsock);
-				sndsock= -1;
-			}
-
-			close(probe_fd);
-			/* Is this all, nothing more the clean up? */
-			return 1; 
-		}
-		set_nport(dest_lsa, htons(port));
-
-		/* read IP and port */
-		source_lsa = get_sock_lsa(probe_fd);
-		if (source_lsa == NULL)
-			bb_error_msg_and_die("can't get probe addr");
-
-		close(probe_fd);
-
-		/* bind our sockets to this IP (but not port) */
-		set_nport(source_lsa, 0);
-		xbind(sndsock, &source_lsa->u.sa, source_lsa->len);
-		xbind(rcvsock, &source_lsa->u.sa, source_lsa->len);
-
-=======
 		set_nport(&dest_lsa->u.sa, htons(1025));
 		/* dummy connect. makes kernel pick source IP (and port) */
 		xconnect(probe_fd, &dest_lsa->u.sa, dest_lsa->len);
@@ -1544,7 +1027,6 @@ common_traceroute_main(int op, char **argv)
 		xbind(sndsock, &source_lsa->u.sa, source_lsa->len);
 		xbind(rcvsock, &source_lsa->u.sa, source_lsa->len);
 
->>>>>>> busybox-base-1-26-2
 		free(source_lsa);
 	}
 #endif
@@ -1553,19 +1035,6 @@ common_traceroute_main(int op, char **argv)
 	xsetgid(getgid());
 	xsetuid(getuid());
 
-<<<<<<< HEAD
-	{
-		char *tmpstr= 
-			xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa);
-		printf("traceroute to %s (%s)", argv[0], tmpstr);
-		free(tmpstr);
-	}
-	if (op & OPT_SOURCE)
-		printf(" from %s", source);
-	printf(", %d hops max, %d byte packets NEWLINE", max_ttl, packlen);
-
-	from_lsa = dup_sockaddr(dest_lsa);
-=======
 	dest_str = xmalloc_sockaddr2dotted_noport(&dest_lsa->u.sa);
 	printf("traceroute to %s (%s)", argv[0], dest_str);
 	if (ENABLE_FEATURE_CLEAN_UP) {
@@ -1577,7 +1046,6 @@ common_traceroute_main(int op, char **argv)
 	printf(", %d hops max, %d byte packets\n", max_ttl, packlen);
 
 	from_lsa = xmemdup(dest_lsa, LSA_LEN_SIZE + dest_lsa->len);
->>>>>>> busybox-base-1-26-2
 	lastaddr = xzalloc(dest_lsa->len);
 	to = xzalloc(dest_lsa->len);
 	seq = 0;
@@ -1586,10 +1054,6 @@ common_traceroute_main(int op, char **argv)
 		int unreachable = 0; /* counter */
 		int gotlastaddr = 0; /* flags */
 		int got_there = 0;
-<<<<<<< HEAD
-		int first = 1;
-=======
->>>>>>> busybox-base-1-26-2
 
 		printf("%2d", ttl);
 		for (probe = 0; probe < nprobes; ++probe) {
@@ -1598,28 +1062,7 @@ common_traceroute_main(int op, char **argv)
 			unsigned t2;
 			int left_ms;
 			struct ip *ip;
-	
-			if (option_mask32 & OPT_D_WATCHDOG) {
-				fd = open(WATCHDOGDEV, O_RDWR);
-                		write(fd, "1", 1);
-                		close(fd);
 
-<<<<<<< HEAD
-			}
-			if (!first && pausemsecs > 0)
-				usleep(pausemsecs * 1000);
-			//fflush_all();
-			fflush(stdout);
-			
-
-			t1 = monotonic_us();
-			send_probe(++seq, ttl);
-
-			first = 0;
-			while ((read_len = wait_for_reply(from_lsa, to)) != 0) {
-				t2 = monotonic_us();
-				i = packet_ok(read_len, from_lsa, to, seq);
-=======
 			fflush_all();
 			if (probe != 0 && pausemsecs > 0)
 				usleep(pausemsecs * 1000);
@@ -1637,7 +1080,6 @@ common_traceroute_main(int op, char **argv)
 				if (read_len < 0)
 					continue;
 				icmp_code = packet_ok(read_len, from_lsa, to, seq);
->>>>>>> busybox-base-1-26-2
 				/* Skip short packet */
 				if (icmp_code == 0)
 					continue;
@@ -1660,15 +1102,9 @@ common_traceroute_main(int op, char **argv)
 				/* time exceeded in transit */
 				if (icmp_code == -1)
 					break;
-<<<<<<< HEAD
-				i--;
-				switch (i) {
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 				icmp_code--;
 				switch (icmp_code) {
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 				case ICMP6_DST_UNREACH_NOPORT << 8:
 					got_there = 1;
 					break;
@@ -1680,22 +1116,14 @@ common_traceroute_main(int op, char **argv)
 					break;
 
 				case ICMP_UNREACH_NET:
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6 && (ICMP6_DST_UNREACH_NOROUTE != ICMP_UNREACH_NET)
-=======
 #if ENABLE_TRACEROUTE6 && (ICMP6_DST_UNREACH_NOROUTE != ICMP_UNREACH_NET)
->>>>>>> busybox-base-1-26-2
 				case ICMP6_DST_UNREACH_NOROUTE << 8:
 #endif
 					printf(" !N");
 					++unreachable;
 					break;
 				case ICMP_UNREACH_HOST:
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 				case ICMP6_DST_UNREACH_ADDR << 8:
 #endif
 					printf(" !H");
@@ -1710,11 +1138,7 @@ common_traceroute_main(int op, char **argv)
 					++unreachable;
 					break;
 				case ICMP_UNREACH_SRCFAIL:
-<<<<<<< HEAD
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 				case ICMP6_DST_UNREACH_ADMIN << 8:
 #endif
 					printf(" !S");
@@ -1752,24 +1176,11 @@ common_traceroute_main(int op, char **argv)
 					++unreachable;
 					break;
 				default:
-<<<<<<< HEAD
-					printf(" !<%d>", i);
-=======
 					printf(" !<%d>", icmp_code);
->>>>>>> busybox-base-1-26-2
 					++unreachable;
 					break;
 				}
 				break;
-<<<<<<< HEAD
-			}
-			/* there was no packet at all? */
-			if (read_len == 0)
-				printf("  *");
-		}
-		//AATLAS bb_putchar('\n');
-		printf (" NEWLINE ");
-=======
 			} /* while (wait and read a packet) */
 
 			/* there was no packet at all? */
@@ -1778,37 +1189,11 @@ common_traceroute_main(int op, char **argv)
 		} /* for (nprobes) */
 
 		bb_putchar('\n');
->>>>>>> busybox-base-1-26-2
 		if (got_there
 		 || (unreachable > 0 && unreachable >= nprobes - 1)
 		) {
 			break;
 		}
-<<<<<<< HEAD
-	}
-	printf ("\n");
-
-	if (rcvsock != -1)
-	{
-		close(rcvsock);
-		rcvsock= -1;
-	}
-	if (sndsock != -1)
-	{
-		close(sndsock);
-		sndsock= -1;
-	}
-
-	free(dest_lsa);
-	free(from_lsa);
-	free(lastaddr);
-	free(to);
-	free(outip);
-	free(ptr_to_globals);
-	return 0;
-}
-
-=======
 	}
 
 	if (ENABLE_FEATURE_CLEAN_UP) {
@@ -1821,34 +1206,17 @@ common_traceroute_main(int op, char **argv)
 }
 
 #if ENABLE_TRACEROUTE
->>>>>>> busybox-base-1-26-2
 int traceroute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int traceroute_main(int argc UNUSED_PARAM, char **argv)
 {
 	return common_traceroute_main(0, argv);
 }
-<<<<<<< HEAD
-
-#if ENABLE_FEATURE_TRACEROUTE_IPV6
-=======
 #endif
 
 #if ENABLE_TRACEROUTE6
->>>>>>> busybox-base-1-26-2
 int traceroute6_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int traceroute6_main(int argc UNUSED_PARAM, char **argv)
 {
 	return common_traceroute_main(OPT_IPV6, argv);
 }
 #endif
-<<<<<<< HEAD
-
-#ifdef ATLAS
-static void resolver_timeout(int __attribute((unused)) sig)
-{
-	got_timeout= 1;
-	alarm(1);
-}
-#endif
-=======
->>>>>>> busybox-base-1-26-2
