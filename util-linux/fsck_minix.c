@@ -4,7 +4,7 @@
  *
  * (C) 1991, 1992 Linus Torvalds.
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 /*
@@ -13,7 +13,7 @@
  * 10.11.91  -  updated, does checking, no repairs yet.
  *		Sent out to the mailing-list for testing.
  *
- * 14.11.91  -	Testing seems to have gone well. Added some
+ * 14.11.91  -  Testing seems to have gone well. Added some
  *		correction-code, and changed some functions.
  *
  * 15.11.91  -  More correction code. Hopefully it notices most
@@ -22,11 +22,10 @@
  * 16.11.91  -  More corrections (thanks to Mika Jalava). Most
  *		things seem to work now. Yeah, sure.
  *
- *
- * 19.04.92  -	Had to start over again from this old version, as a
+ * 19.04.92  -  Had to start over again from this old version, as a
  *		kernel bug ate my enhanced fsck in february.
  *
- * 28.02.93  -	added support for different directory entry sizes..
+ * 28.02.93  -  added support for different directory entry sizes..
  *
  * Sat Mar  6 18:59:42 1993, faith@cs.unc.edu: Output namelen with
  *                           superblock information
@@ -35,31 +34,31 @@
  *                           to that required by fsutil
  *
  * Mon Jan  3 11:06:52 1994 - Dr. Wettstein (greg%wind.uucp@plains.nodak.edu)
- *			      Added support for file system valid flag.  Also
- *			      added program_version variable and output of
- *			      program name and version number when program
- *			      is executed.
+ *                            Added support for file system valid flag.  Also
+ *                            added program_version variable and output of
+ *                            program name and version number when program
+ *                            is executed.
  *
- * 30.10.94 - added support for v2 filesystem
- *            (Andreas Schwab, schwab@issan.informatik.uni-dortmund.de)
+ * 30.10.94  - added support for v2 filesystem
+ *             (Andreas Schwab, schwab@issan.informatik.uni-dortmund.de)
  *
- * 10.12.94  -  added test to prevent checking of mounted fs adapted
- *              from Theodore Ts'o's (tytso@athena.mit.edu) e2fsck
- *              program.  (Daniel Quinlan, quinlan@yggdrasil.com)
+ * 10.12.94  - added test to prevent checking of mounted fs adapted
+ *             from Theodore Ts'o's (tytso@athena.mit.edu) e2fsck
+ *             program.  (Daniel Quinlan, quinlan@yggdrasil.com)
  *
  * 01.07.96  - Fixed the v2 fs stuff to use the right #defines and such
- *	       for modern libcs (janl@math.uio.no, Nicolai Langfeldt)
+ *             for modern libcs (janl@math.uio.no, Nicolai Langfeldt)
  *
  * 02.07.96  - Added C bit fiddling routines from rmk@ecs.soton.ac.uk
  *             (Russell King).  He made them for ARM.  It would seem
- *	       that the ARM is powerful enough to do this in C whereas
+ *             that the ARM is powerful enough to do this in C whereas
  *             i386 and m64k must use assembly to get it fast >:-)
- *	       This should make minix fsck system-independent.
- *	       (janl@math.uio.no, Nicolai Langfeldt)
+ *             This should make minix fsck system-independent.
+ *             (janl@math.uio.no, Nicolai Langfeldt)
  *
  * 04.11.96  - Added minor fixes from Andreas Schwab to avoid compiler
  *             warnings.  Added mc68k bitops from
- *	       Joerg Dorchain <dorchain@mpi-sb.mpg.de>.
+ *             Joerg Dorchain <dorchain@mpi-sb.mpg.de>.
  *
  * 06.11.96  - Added v2 code submitted by Joerg Dorchain, but written by
  *             Andreas Schwab.
@@ -86,6 +85,32 @@
  * The device may be a block device or a image of one, but this isn't
  * enforced (but it's not much fun on a character device :-).
  */
+//config:config FSCK_MINIX
+//config:	bool "fsck_minix"
+//config:	default y
+//config:	help
+//config:	  The minix filesystem is a nice, small, compact, read-write filesystem
+//config:	  with little overhead. It is not a journaling filesystem however and
+//config:	  can experience corruption if it is not properly unmounted or if the
+//config:	  power goes off in the middle of a write. This utility allows you to
+//config:	  check for and attempt to repair any corruption that occurs to a minix
+//config:	  filesystem.
+
+//applet:IF_FSCK_MINIX(APPLET_ODDNAME(fsck.minix, fsck_minix, BB_DIR_SBIN, BB_SUID_DROP, fsck_minix))
+
+//kbuild:lib-$(CONFIG_FSCK_MINIX) += fsck_minix.o
+
+//usage:#define fsck_minix_trivial_usage
+//usage:       "[-larvsmf] BLOCKDEV"
+//usage:#define fsck_minix_full_usage "\n\n"
+//usage:       "Check MINIX filesystem\n"
+//usage:     "\n	-l	List all filenames"
+//usage:     "\n	-r	Perform interactive repairs"
+//usage:     "\n	-a	Perform automatic repairs"
+//usage:     "\n	-v	Verbose"
+//usage:     "\n	-s	Output superblock information"
+//usage:     "\n	-m	Show \"mode not cleared\" warnings"
+//usage:     "\n	-f	Force file system check"
 
 #include <mntent.h>
 #include "libbb.h"
@@ -151,13 +176,12 @@ struct globals {
 	char superblock_buffer[BLOCK_SIZE];
 	char add_zone_ind_blk[BLOCK_SIZE];
 	char add_zone_dind_blk[BLOCK_SIZE];
-	USE_FEATURE_MINIX2(char add_zone_tind_blk[BLOCK_SIZE];)
+	IF_FEATURE_MINIX2(char add_zone_tind_blk[BLOCK_SIZE];)
 	char check_file_blk[BLOCK_SIZE];
 
 	/* File-name data */
 	char current_name[MAX_DEPTH * MINIX_NAME_MAX];
 };
-
 #define G (*ptr_to_globals)
 #if ENABLE_FEATURE_MINIX2
 #define version2           (G.version2           )
@@ -341,27 +365,29 @@ static int ask(const char *string, int def)
 	}
 	printf(def ? "%s (y/n)? " : "%s (n/y)? ", string);
 	for (;;) {
-		fflush(stdout);
+		fflush_all();
 		c = getchar();
 		if (c == EOF) {
 			if (!def)
 				errors_uncorrected = 1;
 			return def;
 		}
-		c = toupper(c);
-		if (c == 'Y') {
+		if (c == '\n')
+			break;
+		c |= 0x20; /* tolower */
+		if (c == 'y') {
 			def = 1;
 			break;
-		} else if (c == 'N') {
+		}
+		if (c == 'n') {
 			def = 0;
 			break;
-		} else if (c == ' ' || c == '\n')
-			break;
+		}
 	}
 	if (def)
-		printf("y\n");
+		puts("y");
 	else {
-		printf("n\n");
+		puts("n");
 		errors_uncorrected = 1;
 	}
 	return def;
@@ -374,38 +400,28 @@ static int ask(const char *string, int def)
  */
 static void check_mount(void)
 {
-	FILE *f;
-	struct mntent *mnt;
-	int cont;
-	int fd;
-//XXX:FIXME use find_mount_point()
-	f = setmntent(MOUNTED, "r");
-	if (f == NULL)
-		return;
-	while ((mnt = getmntent(f)) != NULL)
-		if (strcmp(device_name, mnt->mnt_fsname) == 0)
-			break;
-	endmntent(f);
-	if (!mnt)
-		return;
+	if (find_mount_point(device_name, 0)) {
+		int cont;
+#if ENABLE_FEATURE_MTAB_SUPPORT
+		/*
+		 * If the root is mounted read-only, then /etc/mtab is
+		 * probably not correct; so we won't issue a warning based on
+		 * it.
+		 */
+		int fd = open(bb_path_mtab_file, O_RDWR);
 
-	/*
-	 * If the root is mounted read-only, then /etc/mtab is
-	 * probably not correct; so we won't issue a warning based on
-	 * it.
-	 */
-	fd = open(MOUNTED, O_RDWR);
-	if (fd < 0 && errno == EROFS)
-		return;
-	close(fd);
-
-	printf("%s is mounted. ", device_name);
-	cont = 0;
-	if (isatty(0) && isatty(1))
-		cont = ask("Do you really want to continue", 0);
-	if (!cont) {
-		printf("Check aborted\n");
-		exit(EXIT_SUCCESS);
+		if (fd < 0 && errno == EROFS)
+			return;
+		close(fd);
+#endif
+		printf("%s is mounted. ", device_name);
+		cont = 0;
+		if (isatty(0) && isatty(1))
+			cont = ask("Do you really want to continue", 0);
+		if (!cont) {
+			puts("Check aborted");
+			exit(EXIT_SUCCESS);
+		}
 	}
 }
 
@@ -468,8 +484,8 @@ static void write_block(unsigned nr, void *addr)
 	if (!nr)
 		return;
 	if (nr < FIRSTZONE || nr >= ZONES) {
-		printf("Internal error: trying to write bad block\n"
-			   "Write request ignored\n");
+		puts("Internal error: trying to write bad block\n"
+			"Write request ignored");
 		errors_uncorrected = 1;
 		return;
 	}
@@ -573,7 +589,7 @@ static void write_superblock(void)
 
 	xlseek(dev_fd, BLOCK_SIZE, SEEK_SET);
 	if (BLOCK_SIZE != full_write(dev_fd, superblock_buffer, BLOCK_SIZE))
-		die("cannot write superblock");
+		die("can't write superblock");
 }
 
 static void write_tables(void)
@@ -581,11 +597,11 @@ static void write_tables(void)
 	write_superblock();
 
 	if (IMAPS * BLOCK_SIZE != write(dev_fd, inode_map, IMAPS * BLOCK_SIZE))
-		die("cannot write inode map");
+		die("can't write inode map");
 	if (ZMAPS * BLOCK_SIZE != write(dev_fd, zone_map, ZMAPS * BLOCK_SIZE))
-		die("cannot write zone map");
+		die("can't write zone map");
 	if (INODE_BUFFER_SIZE != write(dev_fd, inode_buffer, INODE_BUFFER_SIZE))
-		die("cannot write inodes");
+		die("can't write inodes");
 }
 
 static void get_dirsize(void)
@@ -615,7 +631,7 @@ static void read_superblock(void)
 {
 	xlseek(dev_fd, BLOCK_SIZE, SEEK_SET);
 	if (BLOCK_SIZE != full_read(dev_fd, superblock_buffer, BLOCK_SIZE))
-		die("cannot read superblock");
+		die("can't read superblock");
 	/* already initialized to:
 	namelen = 14;
 	dirsize = 16;
@@ -651,13 +667,13 @@ static void read_tables(void)
 	inode_count = xmalloc(INODES + 1);
 	zone_count = xmalloc(ZONES);
 	if (IMAPS * BLOCK_SIZE != read(dev_fd, inode_map, IMAPS * BLOCK_SIZE))
-		die("cannot read inode map");
+		die("can't read inode map");
 	if (ZMAPS * BLOCK_SIZE != read(dev_fd, zone_map, ZMAPS * BLOCK_SIZE))
-		die("cannot read zone map");
+		die("can't read zone map");
 	if (INODE_BUFFER_SIZE != read(dev_fd, inode_buffer, INODE_BUFFER_SIZE))
-		die("cannot read inodes");
+		die("can't read inodes");
 	if (NORM_FIRSTZONE != FIRSTZONE) {
-		printf("warning: firstzone!=norm_firstzone\n");
+		puts("warning: firstzone!=norm_firstzone");
 		errors_uncorrected = 1;
 	}
 	get_dirsize();
@@ -684,7 +700,7 @@ static void get_inode_common(unsigned nr, uint16_t i_mode)
 	total++;
 	if (!inode_count[nr]) {
 		if (!inode_in_use(nr)) {
-			printf("Inode %d is marked as 'unused', but it is used "
+			printf("Inode %u is marked as 'unused', but it is used "
 					"for file '%s'\n", nr, current_name);
 			if (OPT_repair) {
 				if (ask("Mark as 'in use'", 1))
@@ -711,7 +727,7 @@ static void get_inode_common(unsigned nr, uint16_t i_mode)
 	} else
 		links++;
 	if (!++inode_count[nr]) {
-		printf("Warning: inode count too big\n");
+		puts("Warning: inode count too big");
 		inode_count[nr]--;
 		errors_uncorrected = 1;
 	}
@@ -906,8 +922,12 @@ static void check_zones(unsigned i)
 	if (inode_count[i] > 1)		/* have we counted this file already? */
 		return;
 	inode = Inode1 + i;
-	if (!S_ISDIR(inode->i_mode) && !S_ISREG(inode->i_mode) &&
-		!S_ISLNK(inode->i_mode)) return;
+	if (!S_ISDIR(inode->i_mode)
+	 && !S_ISREG(inode->i_mode)
+	 && !S_ISLNK(inode->i_mode)
+	) {
+		return;
+	}
 	for (i = 0; i < 7; i++)
 		add_zone(i + inode->i_zone, &changed);
 	add_zone_ind(7 + inode->i_zone, &changed);
@@ -1124,7 +1144,7 @@ static void check_counts(void)
 			continue;
 		}
 		printf("Zone %d: %sin use, counted=%d\n",
-			   i, zone_in_use(i) ? "" : "not ", zone_count[i]);
+			i, zone_in_use(i) ? "" : "not ", zone_count[i]);
 	}
 }
 
@@ -1176,7 +1196,7 @@ static void check_counts2(void)
 			continue;
 		}
 		printf("Zone %d: %sin use, counted=%d\n",
-			   i, zone_in_use(i) ? "" : "not ", zone_count[i]);
+			i, zone_in_use(i) ? "" : "not ", zone_count[i]);
 	}
 }
 #endif
@@ -1246,7 +1266,7 @@ int fsck_minix_main(int argc UNUSED_PARAM, char **argv)
 		printf("Forcing filesystem check on %s\n", device_name);
 	else if (OPT_repair)
 		printf("Filesystem on %s is dirty, needs checking\n",
-			   device_name);
+			device_name);
 
 	read_tables();
 
@@ -1273,27 +1293,27 @@ int fsck_minix_main(int argc UNUSED_PARAM, char **argv)
 			if (!inode_in_use(i))
 				free_cnt++;
 		printf("\n%6u inodes used (%u%%)\n", (INODES - free_cnt),
-			   100 * (INODES - free_cnt) / INODES);
+			100 * (INODES - free_cnt) / INODES);
 		for (i = FIRSTZONE, free_cnt = 0; i < ZONES; i++)
 			if (!zone_in_use(i))
 				free_cnt++;
 		printf("%6u zones used (%u%%)\n\n"
-			   "%6u regular files\n"
-			   "%6u directories\n"
-			   "%6u character device files\n"
-			   "%6u block device files\n"
-			   "%6u links\n"
-			   "%6u symbolic links\n"
-			   "------\n"
-			   "%6u files\n",
-			   (ZONES - free_cnt), 100 * (ZONES - free_cnt) / ZONES,
-			   regular, directory, chardev, blockdev,
-			   links - 2 * directory + 1, symlinks,
-			   total - 2 * directory + 1);
+			"%6u regular files\n"
+			"%6u directories\n"
+			"%6u character device files\n"
+			"%6u block device files\n"
+			"%6u links\n"
+			"%6u symbolic links\n"
+			"------\n"
+			"%6u files\n",
+			(ZONES - free_cnt), 100 * (ZONES - free_cnt) / ZONES,
+			regular, directory, chardev, blockdev,
+			links - 2 * directory + 1, symlinks,
+			total - 2 * directory + 1);
 	}
 	if (changed) {
 		write_tables();
-		printf("FILE SYSTEM HAS BEEN CHANGED\n");
+		puts("FILE SYSTEM HAS BEEN CHANGED");
 		sync();
 	} else if (OPT_repair)
 		write_superblock();

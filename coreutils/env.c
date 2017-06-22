@@ -3,24 +3,19 @@
  * env implementation for busybox
  *
  * Copyright (c) 1988, 1993, 1994
- *	The Regents of the University of California.  All rights reserved.
+ * The Regents of the University of California.  All rights reserved.
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
  * Original copyright notice is retained at the end of this file.
  *
  * Modified for BusyBox by Erik Andersen <andersen@codepoet.org>
  */
-
-/* BB_AUDIT SUSv3 compliant */
-/* http://www.opengroup.org/onlinepubs/007904975/utilities/env.html */
-
 /* Mar 16, 2003      Manuel Novoa III   (mjn3@codepoet.org)
  *
  * Fixed bug involving exit return codes if execvp fails.  Also added
  * output error checking.
  */
-
 /*
  * Modified by Vladimir Oleynik <dzo@simtreas.ru> (C) 2003
  * - correct "-" option usage
@@ -28,8 +23,35 @@
  * - GNU long option support
  * - use xfunc_error_retval
  */
+//config:config ENV
+//config:	bool "env"
+//config:	default y
+//config:	help
+//config:	  env is used to set an environment variable and run
+//config:	  a command; without options it displays the current
+//config:	  environment.
+//config:
+//config:config FEATURE_ENV_LONG_OPTIONS
+//config:	bool "Enable long options"
+//config:	default y
+//config:	depends on ENV && LONG_OPTS
+//config:	help
+//config:	  Support long options for the env applet.
 
-/* This is a NOEXEC applet. Be very careful! */
+//applet:IF_ENV(APPLET_NOEXEC(env, env, BB_DIR_USR_BIN, BB_SUID_DROP, env))
+
+//kbuild:lib-$(CONFIG_ENV) += env.o
+
+/* BB_AUDIT SUSv3 compliant */
+/* http://www.opengroup.org/onlinepubs/007904975/utilities/env.html */
+
+//usage:#define env_trivial_usage
+//usage:       "[-iu] [-] [name=value]... [PROG ARGS]"
+//usage:#define env_full_usage "\n\n"
+//usage:       "Print the current environment or run PROG after setting up\n"
+//usage:       "the specified environment\n"
+//usage:     "\n	-, -i	Start with an empty environment"
+//usage:     "\n	-u	Remove variable from the environment"
 
 #include "libbb.h"
 
@@ -43,29 +65,29 @@ static const char env_longopts[] ALIGN1 =
 int env_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int env_main(int argc UNUSED_PARAM, char **argv)
 {
-	/* cleanenv was static - why? */
-	char *cleanenv[1];
-	char **ep;
-	unsigned opt;
+	unsigned opts;
 	llist_t *unset_env = NULL;
 
-	opt_complementary = "u::";
 #if ENABLE_FEATURE_ENV_LONG_OPTIONS
 	applet_long_options = env_longopts;
 #endif
-	opt = getopt32(argv, "+iu:", &unset_env);
+	opts = getopt32(argv, "+iu:+", &unset_env);
 	argv += optind;
-	if (*argv && LONE_DASH(argv[0])) {
-		opt |= 1;
+	if (argv[0] && LONE_DASH(argv[0])) {
+		opts |= 1;
 		++argv;
 	}
-	if (opt & 1) {
-		cleanenv[0] = NULL;
-		environ = cleanenv;
-	} else {
-		while (unset_env) {
-			unsetenv(llist_pop(&unset_env));
-		}
+	if (opts & 1) {
+		clearenv();
+	}
+	while (unset_env) {
+		char *var = llist_pop(&unset_env);
+		/* This does not handle -uVAR=VAL
+		 * (coreutils _sets_ the variable in that case): */
+		/*unsetenv(var);*/
+		/* This does, but uses somewhan undocumented feature that
+		 * putenv("name_without_equal_sign") unsets the variable: */
+		putenv(var);
 	}
 
 	while (*argv && (strchr(*argv, '=') != NULL)) {
@@ -75,15 +97,15 @@ int env_main(int argc UNUSED_PARAM, char **argv)
 		++argv;
 	}
 
-	if (*argv) {
-		BB_EXECVP(*argv, argv);
-		/* SUSv3-mandated exit codes. */
-		xfunc_error_retval = (errno == ENOENT) ? 127 : 126;
-		bb_simple_perror_msg_and_die(*argv);
+	if (argv[0]) {
+		BB_EXECVP_or_die(argv);
 	}
 
-	for (ep = environ; *ep; ep++) {
-		puts(*ep);
+	if (environ) { /* clearenv() may set environ == NULL! */
+		char **ep;
+		for (ep = environ; *ep; ep++) {
+			puts(*ep);
+		}
 	}
 
 	fflush_stdout_and_exit(EXIT_SUCCESS);
@@ -102,8 +124,8 @@ int env_main(int argc UNUSED_PARAM, char **argv)
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * 3. <BSD Advertising Clause omitted per the July 22, 1999 licensing change
- *		ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change>
+ * 3. BSD Advertising Clause omitted per the July 22, 1999 licensing change
+ *    ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
  *
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software

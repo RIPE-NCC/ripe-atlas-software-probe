@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_LINUXRAID) += linux_raid.o
+
+//config:
+//config:config FEATURE_VOLUMEID_LINUXRAID
+//config:	bool "linuxraid"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct mdp_super_block {
@@ -37,13 +48,15 @@ struct mdp_super_block {
 	uint32_t	set_uuid1;
 	uint32_t	set_uuid2;
 	uint32_t	set_uuid3;
-} __attribute__((packed));
+} PACKED;
 
 #define MD_RESERVED_BYTES		0x10000
 #define MD_MAGIC			0xa92b4efc
 
-int volume_id_probe_linux_raid(struct volume_id *id, uint64_t off, uint64_t size)
+int FAST_FUNC volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size)
 {
+	typedef uint32_t aliased_uint32_t FIX_ALIASING;
+#define off ((uint64_t)0)
 	uint64_t sboff;
 	uint8_t uuid[16];
 	struct mdp_super_block *mdp;
@@ -62,18 +75,18 @@ int volume_id_probe_linux_raid(struct volume_id *id, uint64_t off, uint64_t size
 	if (mdp->md_magic != cpu_to_le32(MD_MAGIC))
 		return -1;
 
-	memcpy(uuid, &mdp->set_uuid0, 4);
+	*(aliased_uint32_t*)uuid = mdp->set_uuid0;
 	memcpy(&uuid[4], &mdp->set_uuid1, 12);
 	volume_id_set_uuid(id, uuid, UUID_DCE);
 
 //	snprintf(id->type_version, sizeof(id->type_version)-1, "%u.%u.%u",
-//		 le32_to_cpu(mdp->major_version),
-//		 le32_to_cpu(mdp->minor_version),
-//		 le32_to_cpu(mdp->patch_version));
+//		le32_to_cpu(mdp->major_version),
+//		le32_to_cpu(mdp->minor_version),
+//		le32_to_cpu(mdp->patch_version));
 
 	dbg("found raid signature");
 //	volume_id_set_usage(id, VOLUME_ID_RAID);
-//	id->type = "linux_raid_member";
+	IF_FEATURE_BLKID_TYPE(id->type = "linux_raid_member";)
 
 	return 0;
 }

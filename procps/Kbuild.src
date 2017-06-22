@@ -1,0 +1,13 @@
+# Makefile for busybox
+#
+# Copyright (C) 1999-2005 by Erik Andersen <andersen@codepoet.org>
+#
+# Licensed under GPLv2, see file LICENSE in this source tree.
+
+lib-y:=
+
+INSERT
+
+lib-$(CONFIG_ASH) += kill.o  # used for built-in kill by ash
+lib-$(CONFIG_SH_IS_ASH) += kill.o  # used for built-in kill by ash
+lib-$(CONFIG_BASH_IS_ASH) += kill.o  # used for built-in kill by ash

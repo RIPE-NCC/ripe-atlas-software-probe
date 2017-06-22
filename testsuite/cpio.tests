@@ -1,13 +1,16 @@
 #!/bin/sh
 # Copyright 2008 by Denys Vlasenko
-# Licensed under GPL v2, see file LICENSE for details.
+# Licensed under GPLv2, see file LICENSE in this source tree.
 
-. testing.sh
+. ./testing.sh
+
+umask 022
 
 # ls -ln shows date. Need to remove that, it's variable.
 # sed: coalesce spaces
 # cut: remove date
-FILTER_LS="sed 's/  */ /g' | cut -d' ' -f 1-5,9-"
+# grep: remove "total NNN" lines
+FILTER_LS="sed 's/  */ /g' | cut -d' ' -f 1-5,9- | grep -v '^total '"
 
 
 # newc cpio archive of directory cpio.testdir with empty x and y hardlinks
@@ -30,29 +33,33 @@ rm -rf cpio.testdir cpio.testdir2 2>/dev/null
 
 # testing "test name" "command" "expected result" "file input" "stdin"
 
+optional FEATURE_LS_SORTFILES FEATURE_LS_TIMESTAMPS
 testing "cpio extracts zero-sized hardlinks" \
-"$ECHO -ne '$hexdump' | bzcat | cpio -i; echo \$?;
+"$ECHO -ne '$hexdump' | bzcat | cpio -i 2>&1; echo \$?;
 ls -ln cpio.testdir | $FILTER_LS" \
 "\
 1 blocks
 0
 -rw-r--r-- 2 $user $group 0 x
 -rw-r--r-- 2 $user $group 0 y
-" \
-	"" ""
+" "" ""
+SKIP=
 
-# Currently fails. Numerous: "1 blocks" versus "1 block",
-# "1 block" must go to stderr, does not list cpio.testdir/x and cpio.testdir/y
+
+test x"$SKIP_KNOWN_BUGS" = x"" && {
+# Currently fails. Numerous buglets: "1 blocks" versus "1 block",
+# does not list cpio.testdir/x and cpio.testdir/y
 testing "cpio lists hardlinks" \
 "$ECHO -ne '$hexdump' | bzcat | cpio -t 2>&1; echo \$?" \
 "\
-1 block
 cpio.testdir
 cpio.testdir/x
 cpio.testdir/y
+1 blocks
 0
-" \
-	"" ""
+" "" ""
+}
+
 
 # More complex case
 rm -rf cpio.testdir cpio.testdir2 2>/dev/null
@@ -64,18 +71,88 @@ ln cpio.testdir/empty cpio.testdir/empty1
 ln cpio.testdir/nonempty cpio.testdir/nonempty1
 mkdir cpio.testdir2
 
+optional FEATURE_CPIO_O LONG_OPTS FEATURE_LS_SORTFILES FEATURE_LS_TIMESTAMPS
 testing "cpio extracts zero-sized hardlinks 2" \
-"find cpio.testdir | cpio -H newc --create | (cd cpio.testdir2 && cpio -i); echo \$?;
+"find cpio.testdir | cpio -H newc --create | (cd cpio.testdir2 && cpio -i 2>&1); echo \$?;
 ls -ln cpio.testdir2/cpio.testdir | $FILTER_LS" \
 "\
+2 blocks
 0
 -rw-r--r-- 2 $user $group 0 empty
 -rw-r--r-- 2 $user $group 0 empty1
 -rw-r--r-- 2 $user $group 2 nonempty
 -rw-r--r-- 2 $user $group 2 nonempty1
 -rw-r--r-- 1 $user $group 0 solo
-" \
-	"" ""
+" "" ""
+SKIP=
+
+# Was trying to create "/usr/bin", correct is "usr/bin".
+rm -rf cpio.testdir
+optional FEATURE_CPIO_P
+testing "cpio -p with absolute paths" \
+"echo /usr/bin | cpio -dp cpio.testdir 2>&1; echo \$?;
+ls cpio.testdir" \
+"\
+1 blocks
+0
+usr
+" "" ""
+SKIP=
+
+# chown on a link was affecting file, dropping its suid/sgid bits
+rm -rf cpio.testdir
+optional FEATURE_CPIO_O FEATURE_STAT_FORMAT
+mkdir cpio.testdir
+touch cpio.testdir/file
+chmod 6755 cpio.testdir/file  # sets suid/sgid bits
+ln -sf file cpio.testdir/link
+testing "cpio restores suid/sgid bits" \
+"cd cpio.testdir && { echo file; echo link; } | cpio -ovHnewc >pack.cpio && rm ???? && cpio -idmvu <pack.cpio 2>/dev/null;
+ stat -c '%a %n' file" \
+"\
+file
+link
+6755 file
+" "" ""
+SKIP=
+
+# avoid 'not created: newer or same age file exists' message for directories
+rm -rf cpio.testdir cpio.testdir2 2>/dev/null
+mkdir cpio.testdir
+testing "cpio extracts in existing directory" \
+"$ECHO -ne '$hexdump' | bzcat | cpio -id 2>&1; echo \$?" \
+"\
+1 blocks
+0
+" "" ""
+SKIP=
+
+optional FEATURE_CPIO_O
+testing "cpio uses by default uid/gid" \
+"echo $0 | cpio -o -H newc | cpio -tv 2>&1 | tail -n +2 | awk ' { print \$2 } '; echo \$?" \
+"\
+$user/$group
+0
+" "" ""
+SKIP=
+
+optional FEATURE_CPIO_O
+testing "cpio -R with create" \
+"echo $0 | cpio -o -H newc -R 1234:5678 | cpio -tv 2>&1 | tail -n +2 | awk ' { print \$2 } '; echo \$?" \
+"\
+1234/5678
+0
+" "" ""
+SKIP=
+
+optional FEATURE_CPIO_O
+testing "cpio -R with extract" \
+"echo $0 | cpio -o -H newc | cpio -tv -R 8765:4321 2>&1 | tail -n +2 | awk ' { print \$2 } '; echo \$?" \
+"\
+8765/4321
+0
+" "" ""
+SKIP=
 
 # Clean up
 rm -rf cpio.testdir cpio.testdir2 2>/dev/null

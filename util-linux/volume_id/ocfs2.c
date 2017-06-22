@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_OCFS2) += ocfs2.o
+
+//config:
+//config:config FEATURE_VOLUMEID_OCFS2
+//config:	bool "ocfs2 filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 /* All these values are taken from ocfs2-tools's ocfs2_fs.h */
@@ -78,10 +89,11 @@ struct ocfs2_super_block {
 	uint64_t	s_first_cluster_group;		/* Block offset of 1st cluster group header */
 	uint8_t		s_label[OCFS2_MAX_VOL_LABEL_LEN];	/* Label for mounting, etc. */
 	uint8_t		s_uuid[OCFS2_VOL_UUID_LEN];	/* 128-bit uuid */
-} __attribute__((__packed__));
+} PACKED;
 
-int volume_id_probe_ocfs2(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	struct ocfs2_super_block *os;
 
 	dbg("probing at offset 0x%llx", (unsigned long long) off);
@@ -100,6 +112,6 @@ int volume_id_probe_ocfs2(struct volume_id *id, uint64_t off)
 	volume_id_set_label_string(id, os->s_label, OCFS2_MAX_VOL_LABEL_LEN < VOLUME_ID_LABEL_SIZE ?
 					OCFS2_MAX_VOL_LABEL_LEN : VOLUME_ID_LABEL_SIZE);
 	volume_id_set_uuid(id, os->s_uuid, UUID_DCE);
-//	id->type = "ocfs2";
+	IF_FEATURE_BLKID_TYPE(id->type = "ocfs2";)
 	return 0;
 }

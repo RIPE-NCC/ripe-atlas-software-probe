@@ -6,120 +6,157 @@
  * Copyright (C) 1999,2000,2001 by John Beppu <beppu@codepoet.org>
  * Copyright (C) 2007 by Tito Ragusa <farmatito@tiscali.it>
  *
- * Licensed under GPL version 2, see file LICENSE in this tarball for details.
- *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+//config:config DELUSER
+//config:	bool "deluser"
+//config:	default y
+//config:	help
+//config:	  Utility for deleting a user account.
+//config:
+//config:config DELGROUP
+//config:	bool "delgroup"
+//config:	default y
+//config:	help
+//config:	  Utility for deleting a group account.
+//config:
+//config:config FEATURE_DEL_USER_FROM_GROUP
+//config:	bool "Support for removing users from groups"
+//config:	default y
+//config:	depends on DELGROUP
+//config:	help
+//config:	  If called with two non-option arguments, deluser
+//config:	  or delgroup will remove an user from a specified group.
+
+//applet:IF_DELUSER(APPLET(deluser, BB_DIR_USR_SBIN, BB_SUID_DROP))
+//applet:IF_DELGROUP(APPLET_ODDNAME(delgroup, deluser, BB_DIR_USR_SBIN, BB_SUID_DROP, delgroup))
+
+//kbuild:lib-$(CONFIG_DELUSER) += deluser.o
+//kbuild:lib-$(CONFIG_DELGROUP) += deluser.o
+
+//usage:#define deluser_trivial_usage
+//usage:       IF_LONG_OPTS("[--remove-home] ") "USER"
+//usage:#define deluser_full_usage "\n\n"
+//usage:       "Delete USER from the system"
+//	--remove-home is self-explanatory enough to put it in --help
+
+//usage:#define delgroup_trivial_usage
+//usage:	IF_FEATURE_DEL_USER_FROM_GROUP("[USER] ")"GROUP"
+//usage:#define delgroup_full_usage "\n\n"
+//usage:       "Delete group GROUP from the system"
+//usage:	IF_FEATURE_DEL_USER_FROM_GROUP(" or user USER from group GROUP")
 
 #include "libbb.h"
-
-/* Status */
-#define STATUS_OK            0
-#define NAME_NOT_FOUND       1
-#define MEMBER_NOT_FOUND     2
-
-static void del_line_matching(char **args,
-		const char *filename,
-		FILE* FAST_FUNC (*fopen_func)(const char *fileName, const char *mode))
-{
-	FILE *passwd;
-	smallint error = NAME_NOT_FOUND;
-	char *name = (ENABLE_FEATURE_DEL_USER_FROM_GROUP && args[2]) ? args[2] : args[1];
-	char *line, *del;
-	char *new = xzalloc(1);
-
-	passwd = fopen_func(filename, "r");
-	if (passwd) {
-		while ((line = xmalloc_fgets(passwd))) {
-			int len = strlen(name);
-
-			if (strncmp(line, name, len) == 0
-			 && line[len] == ':'
-			) {
-				error = STATUS_OK;
-				if (ENABLE_FEATURE_DEL_USER_FROM_GROUP) {
-					struct group *gr;
-					char *p;
-					if (args[2]
-					 /* There were two args on commandline */
-					 && (gr = getgrnam(name))
-					 /* The group was not deleted in the meanwhile */
-					 && (p = strrchr(line, ':'))
-					 /* We can find a pointer to the last ':' */
-					) {
-						error = MEMBER_NOT_FOUND;
-						/* Move past ':' (worst case to '\0') and cut the line */
-						p[1] = '\0';
-						/* Reuse p */
-						for (p = xzalloc(1); *gr->gr_mem != NULL; gr->gr_mem++) {
-							/* Add all the other group members */
-							if (strcmp(args[1], *gr->gr_mem) != 0) {
-								del = p;
-								p = xasprintf("%s%s%s", p, p[0] ? "," : "", *gr->gr_mem);
-								free(del);
-							} else
-								error = STATUS_OK;
-						}
-						/* Recompose the line */
-						line = xasprintf("%s%s\n", line, p);
-						if (ENABLE_FEATURE_CLEAN_UP) free(p);
-					} else
-						goto skip;
-				}
-			}
-			del = new;
-			new = xasprintf("%s%s", new, line);
-			free(del);
- skip:
-			free(line);
-		}
-
-		if (ENABLE_FEATURE_CLEAN_UP) fclose(passwd);
-
-		if (error) {
-			if (ENABLE_FEATURE_DEL_USER_FROM_GROUP && error == MEMBER_NOT_FOUND) {
-				/* Set the correct values for error message */
-				filename = name;
-				name = args[1];
-			}
-			bb_error_msg("can't find %s in %s", name, filename);
-		} else {
-			passwd = fopen_func(filename, "w");
-			if (passwd) {
-				fputs(new, passwd);
-				if (ENABLE_FEATURE_CLEAN_UP) fclose(passwd);
-			}
-		}
-	}
-	free(new);
-}
 
 int deluser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int deluser_main(int argc, char **argv)
 {
-	if (argc == 2
-	 || (ENABLE_FEATURE_DEL_USER_FROM_GROUP
-	    && (applet_name[3] == 'g' && argc == 3))
-	) {
-		if (geteuid())
-			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+	/* User or group name */
+	char *name;
+	/* Username (non-NULL only in "delgroup USER GROUP" case) */
+	char *member;
+	/* Name of passwd or group file */
+	const char *pfile;
+	/* Name of shadow or gshadow file */
+	const char *sfile;
+	/* Are we deluser or delgroup? */
+	int do_deluser = (ENABLE_DELUSER && (!ENABLE_DELGROUP || applet_name[3] == 'u'));
 
-		if ((ENABLE_FEATURE_DEL_USER_FROM_GROUP && argc != 3)
-		 || ENABLE_DELUSER
-		 || (ENABLE_DELGROUP && ENABLE_DESKTOP)
-		) {
-			if (ENABLE_DELUSER
-			 && (!ENABLE_DELGROUP || applet_name[3] == 'u')
-			) {
-				del_line_matching(argv, bb_path_passwd_file, xfopen);
-				if (ENABLE_FEATURE_SHADOWPASSWDS)
-					del_line_matching(argv, bb_path_shadow_file, fopen_or_warn);
-			} else if (ENABLE_DESKTOP && ENABLE_DELGROUP && getpwnam(argv[1]))
-				bb_error_msg_and_die("can't remove primary group of user %s", argv[1]);
+#if !ENABLE_LONG_OPTS
+	const int opt_delhome = 0;
+#else
+	int opt_delhome = 0;
+	if (do_deluser) {
+		applet_long_options =
+			"remove-home\0" No_argument "\xff";
+		opt_delhome = getopt32(argv, "");
+		argv += opt_delhome;
+		argc -= opt_delhome;
+	}
+#endif
+
+	if (geteuid() != 0)
+		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+
+	name = argv[1];
+	member = NULL;
+
+	switch (argc) {
+	case 3:
+		if (!ENABLE_FEATURE_DEL_USER_FROM_GROUP || do_deluser)
+			break;
+		/* It's "delgroup USER GROUP" */
+		member = name;
+		name = argv[2];
+		/* Fallthrough */
+
+	case 2:
+		if (do_deluser) {
+			/* "deluser USER" */
+			struct passwd *pw;
+
+			pw = xgetpwnam(name); /* bail out if USER is wrong */
+			pfile = bb_path_passwd_file;
+			if (ENABLE_FEATURE_SHADOWPASSWDS)
+				sfile = bb_path_shadow_file;
+			if (opt_delhome)
+				remove_file(pw->pw_dir, FILEUTILS_RECUR);
+		} else {
+			struct group *gr;
+ do_delgroup:
+			/* "delgroup GROUP" or "delgroup USER GROUP" */
+			if (do_deluser < 0) { /* delgroup after deluser? */
+				gr = getgrnam(name);
+				if (!gr)
+					return EXIT_SUCCESS;
+			} else {
+				gr = xgetgrnam(name); /* bail out if GROUP is wrong */
+			}
+			if (!member) {
+				/* "delgroup GROUP" */
+				struct passwd *pw;
+				/* Check if the group is in use */
+				while ((pw = getpwent()) != NULL) {
+					if (pw->pw_gid == gr->gr_gid)
+						bb_error_msg_and_die("'%s' still has '%s' as their primary group!",
+							pw->pw_name, name);
+				}
+				//endpwent();
+			}
+			pfile = bb_path_group_file;
+			if (ENABLE_FEATURE_SHADOWPASSWDS)
+				sfile = bb_path_gshadow_file;
 		}
-		del_line_matching(argv, bb_path_group_file, xfopen);
-		if (ENABLE_FEATURE_SHADOWPASSWDS)
-			del_line_matching(argv, bb_path_gshadow_file, fopen_or_warn);
+
+		/* Modify pfile, then sfile */
+		do {
+			if (update_passwd(pfile, name, NULL, member) == -1)
+				return EXIT_FAILURE;
+			if (ENABLE_FEATURE_SHADOWPASSWDS) {
+				pfile = sfile;
+				sfile = NULL;
+			}
+		} while (ENABLE_FEATURE_SHADOWPASSWDS && pfile);
+
+		if (do_deluser > 0) {
+			/* Delete user from all groups */
+			if (update_passwd(bb_path_group_file, NULL, NULL, name) == -1)
+				return EXIT_FAILURE;
+
+			if (ENABLE_DELGROUP) {
+				/* "deluser USER" also should try to delete
+				 * same-named group. IOW: do "delgroup USER"
+				 */
+// On debian deluser is a perl script that calls userdel.
+// From man userdel:
+//  If USERGROUPS_ENAB is defined to yes in /etc/login.defs, userdel will
+//  delete the group with the same name as the user.
+				do_deluser = -1;
+				goto do_delgroup;
+			}
+		}
 		return EXIT_SUCCESS;
-	} else
-		bb_show_usage();
+	}
+	/* Reached only if number of command line args is wrong */
+	bb_show_usage();
 }

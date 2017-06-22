@@ -5,8 +5,28 @@
  * 01 Sept 2004 - Rodney Radford <rradford@mindspring.com>
  * Adapted for busybox from util-linux-2.12a.
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config IPCRM
+//config:	bool "ipcrm"
+//config:	default y
+//config:	help
+//config:	  The ipcrm utility allows the removal of System V interprocess
+//config:	  communication (IPC) objects and the associated data structures
+//config:	  from the system.
+
+//applet:IF_IPCRM(APPLET(ipcrm, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_IPCRM) += ipcrm.o
+
+//usage:#define ipcrm_trivial_usage
+//usage:       "[-MQS key] [-mqs id]"
+//usage:#define ipcrm_full_usage "\n\n"
+//usage:       "Upper-case options MQS remove an object by shmkey value.\n"
+//usage:       "Lower-case options remove an object by shmid value.\n"
+//usage:     "\n	-mM	Remove memory segment after last detach"
+//usage:     "\n	-qQ	Remove message queue"
+//usage:     "\n	-sS	Remove semaphore"
 
 #include "libbb.h"
 
@@ -40,21 +60,21 @@ typedef enum type_id {
 	MSG
 } type_id;
 
-static int remove_ids(type_id type, int argc, char **argv)
+static int remove_ids(type_id type, char **argv)
 {
 	unsigned long id;
-	int ret = 0;		/* silence gcc */
 	int nb_errors = 0;
 	union semun arg;
 
 	arg.val = 0;
 
-	while (argc) {
+	while (argv[0]) {
 		id = bb_strtoul(argv[0], NULL, 10);
 		if (errno || id > INT_MAX) {
 			bb_error_msg("invalid id: %s", argv[0]);
 			nb_errors++;
 		} else {
+			int ret = 0;
 			if (type == SEM)
 				ret = semctl(id, 0, IPC_RMID, arg);
 			else if (type == MSG)
@@ -63,11 +83,10 @@ static int remove_ids(type_id type, int argc, char **argv)
 				ret = shmctl(id, IPC_RMID, NULL);
 
 			if (ret) {
-				bb_perror_msg("cannot remove id %s", argv[0]);
+				bb_perror_msg("can't remove id %s", argv[0]);
 				nb_errors++;
 			}
 		}
-		argc--;
 		argv++;
 	}
 
@@ -92,14 +111,13 @@ int ipcrm_main(int argc, char **argv)
 		type_id what = 0; /* silence gcc */
 		char w;
 
-		w=argv[1][0];
+		w = argv[1][0];
 		if ( ((w == 'm' && argv[1][1] == 's' && argv[1][2] == 'g')
 		       || (argv[1][0] == 's'
-		           && ((w=argv[1][1]) == 'h' || w == 'e')
+		           && ((w = argv[1][1]) == 'h' || w == 'e')
 		           && argv[1][2] == 'm')
 		     ) && argv[1][3] == '\0'
 		) {
-
 			if (argc < 3)
 				bb_show_usage();
 
@@ -110,9 +128,9 @@ int ipcrm_main(int argc, char **argv)
 			else if (w == 'e')
 				what = SEM;
 
-			if (remove_ids(what, argc-2, &argv[2]))
+			if (remove_ids(what, &argv[2]))
 				fflush_stdout_and_exit(EXIT_FAILURE);
-			printf("resource(s) deleted\n");
+			puts("resource(s) deleted");
 			return 0;
 		}
 	}
@@ -122,7 +140,7 @@ int ipcrm_main(int argc, char **argv)
 	while ((c = getopt(argc, argv, "q:m:s:Q:M:S:h?")) != -1) {
 		int result;
 		int id = 0;
-		int iskey = (isupper)(c);
+		int iskey = isupper(c);
 
 		/* needed to delete semaphores */
 		union semun arg;
@@ -153,7 +171,7 @@ int ipcrm_main(int argc, char **argv)
 
 			/* convert key to id */
 			id = ((c == 'q') ? msgget(key, 0) :
-				  (c == 'm') ? shmget(key, 0, 0) : semget(key, 0, 0));
+				(c == 'm') ? shmget(key, 0, 0) : semget(key, 0, 0));
 
 			if (id < 0) {
 				const char *errmsg;
@@ -182,8 +200,8 @@ int ipcrm_main(int argc, char **argv)
 		}
 
 		result = ((c == 'q') ? msgctl(id, IPC_RMID, NULL) :
-				  (c == 'm') ? shmctl(id, IPC_RMID, NULL) :
-				  semctl(id, 0, IPC_RMID, arg));
+				(c == 'm') ? shmctl(id, IPC_RMID, NULL) :
+				semctl(id, 0, IPC_RMID, arg));
 
 		if (result) {
 			const char *errmsg;

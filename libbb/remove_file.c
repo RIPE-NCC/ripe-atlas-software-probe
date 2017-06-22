@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2001 Matt Kraai <kraai@alumni.carnegiemellon.edu>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
@@ -17,11 +17,11 @@ int FAST_FUNC remove_file(const char *path, int flags)
 
 	if (lstat(path, &path_stat) < 0) {
 		if (errno != ENOENT) {
-			bb_perror_msg("cannot stat '%s'", path);
+			bb_perror_msg("can't stat '%s'", path);
 			return -1;
 		}
 		if (!(flags & FILEUTILS_FORCE)) {
-			bb_perror_msg("cannot remove '%s'", path);
+			bb_perror_msg("can't remove '%s'", path);
 			return -1;
 		}
 		return 0;
@@ -33,7 +33,7 @@ int FAST_FUNC remove_file(const char *path, int flags)
 		int status = 0;
 
 		if (!(flags & FILEUTILS_RECUR)) {
-			bb_error_msg("%s: is a directory", path);
+			bb_error_msg("'%s' is a directory", path);
 			return -1;
 		}
 
@@ -63,7 +63,7 @@ int FAST_FUNC remove_file(const char *path, int flags)
 		}
 
 		if (closedir(dp) < 0) {
-			bb_perror_msg("cannot close '%s'", path);
+			bb_perror_msg("can't close '%s'", path);
 			return -1;
 		}
 
@@ -74,8 +74,12 @@ int FAST_FUNC remove_file(const char *path, int flags)
 		}
 
 		if (rmdir(path) < 0) {
-			bb_perror_msg("cannot remove '%s'", path);
+			bb_perror_msg("can't remove '%s'", path);
 			return -1;
+		}
+
+		if (flags & FILEUTILS_VERBOSE) {
+			printf("removed directory: '%s'\n", path);
 		}
 
 		return status;
@@ -94,8 +98,12 @@ int FAST_FUNC remove_file(const char *path, int flags)
 	}
 
 	if (unlink(path) < 0) {
-		bb_perror_msg("cannot remove '%s'", path);
+		bb_perror_msg("can't remove '%s'", path);
 		return -1;
+	}
+
+	if (flags & FILEUTILS_VERBOSE) {
+		printf("removed '%s'\n", path);
 	}
 
 	return 0;

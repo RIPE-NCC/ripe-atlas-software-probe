@@ -4,10 +4,8 @@
  *
  * Copyright (C) 2007 Denys Vlasenko <vda.linux@googlemail.com>
  *
- * Licensed under GPLv2, see file License in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
-
-#include <assert.h>
 #include "busybox.h"
 
 #if ENABLE_BUILD_LIBBUSYBOX

@@ -18,13 +18,24 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:### lib-$(CONFIG_FEATURE_VOLUMEID_MAC) += mac.o
+
+//config:
+//config:### config FEATURE_VOLUMEID_MAC
+//config:###	bool "mac filesystem"
+//config:###	default y
+//config:###	depends on VOLUMEID
+//config:###	help
+//config:###	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct mac_driver_desc {
 	uint8_t		signature[2];
 	uint16_t	block_size;
 	uint32_t	block_count;
-} __attribute__((__packed__));
+} PACKED;
 
 struct mac_partition {
 	uint8_t		signature[2];
@@ -34,9 +45,9 @@ struct mac_partition {
 	uint32_t	block_count;
 	uint8_t		name[32];
 	uint8_t		type[32];
-} __attribute__((__packed__));
+} PACKED;
 
-int volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off)
 {
 	const uint8_t *buf;
 	struct mac_driver_desc *driver;

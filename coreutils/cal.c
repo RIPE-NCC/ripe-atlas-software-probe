@@ -4,20 +4,36 @@
  *
  * See original copyright at the end of this file
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+/* Mar 16, 2003      Manuel Novoa III   (mjn3@codepoet.org)
+ *
+ * Major size reduction... over 50% (>1.5k) on i386.
+ */
+//config:config CAL
+//config:	bool "cal"
+//config:	default y
+//config:	help
+//config:	  cal is used to display a monthly calendar.
+
+//applet:IF_CAL(APPLET(cal, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_CAL) += cal.o
 
 /* BB_AUDIT SUSv3 compliant with -j and -y extensions (from util-linux). */
 /* BB_AUDIT BUG: The output of 'cal -j 1752' is incorrect.  The upstream
  * BB_AUDIT BUG: version in util-linux seems to be broken as well. */
 /* http://www.opengroup.org/onlinepubs/007904975/utilities/cal.html */
 
-/* Mar 16, 2003      Manuel Novoa III   (mjn3@codepoet.org)
- *
- * Major size reduction... over 50% (>1.5k) on i386.
- */
+//usage:#define cal_trivial_usage
+//usage:       "[-jy] [[MONTH] YEAR]"
+//usage:#define cal_full_usage "\n\n"
+//usage:       "Display a calendar\n"
+//usage:     "\n	-j	Use julian dates"
+//usage:     "\n	-y	Display the entire year"
 
 #include "libbb.h"
+#include "unicode.h"
 
 /* We often use "unsigned" intead of "int", it's easier to div on most CPUs */
 
@@ -35,7 +51,7 @@ static const unsigned char days_in_month[] ALIGN1 = {
 };
 
 static const unsigned char sep1752[] ALIGN1 = {
-		 1,	2,	14,	15,	16,
+		1,	2,	14,	15,	16,
 	17,	18,	19,	20,	21,	22,	23,
 	24,	25,	26,	27,	28,	29,	30
 };
@@ -77,37 +93,46 @@ static char *build_row(char *p, unsigned *dp);
 #define	HEAD_SEP	2		/* spaces between day headings */
 
 int cal_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int cal_main(int argc, char **argv)
+int cal_main(int argc UNUSED_PARAM, char **argv)
 {
-	struct tm *local_time;
 	struct tm zero_tm;
 	time_t now;
 	unsigned month, year, flags, i;
 	char *month_names[12];
-	char day_headings[28];	/* 28 for julian, 21 for nonjulian */
+	/* normal heading: */
+	/* "Su Mo Tu We Th Fr Sa" */
+	/* -j heading: */
+	/* " Su  Mo  Tu  We  Th  Fr  Sa" */
+	char day_headings[ENABLE_UNICODE_SUPPORT ? 28 * 6 : 28];
+	IF_UNICODE_SUPPORT(char *hp = day_headings;)
 	char buf[40];
+
+	init_unicode();
 
 	flags = getopt32(argv, "jy");
 	/* This sets julian = flags & 1: */
 	option_mask32 &= 1;
 	month = 0;
 	argv += optind;
-	argc -= optind;
 
-	if (argc > 2) {
-		bb_show_usage();
-	}
+	if (!argv[0]) {
+		struct tm *ptm;
 
-	if (!argc) {
 		time(&now);
-		local_time = localtime(&now);
-		year = local_time->tm_year + 1900;
+		ptm = localtime(&now);
+		year = ptm->tm_year + 1900;
 		if (!(flags & 2)) { /* no -y */
-			month = local_time->tm_mon + 1;
+			month = ptm->tm_mon + 1;
 		}
 	} else {
-		if (argc == 2) {
-			month = xatou_range(*argv++, 1, 12);
+		if (argv[1]) {
+			if (argv[2]) {
+				bb_show_usage();
+			}
+			if (!(flags & 2)) { /* no -y */
+				month = xatou_range(*argv, 1, 12);
+			}
+			argv++;
 		}
 		year = xatou_range(*argv, 1, 9999);
 	}
@@ -117,15 +142,30 @@ int cal_main(int argc, char **argv)
 	i = 0;
 	do {
 		zero_tm.tm_mon = i;
+		/* full month name according to locale */
 		strftime(buf, sizeof(buf), "%B", &zero_tm);
 		month_names[i] = xstrdup(buf);
 
 		if (i < 7) {
 			zero_tm.tm_wday = i;
+			/* abbreviated weekday name according to locale */
 			strftime(buf, sizeof(buf), "%a", &zero_tm);
+#if ENABLE_UNICODE_SUPPORT
+			if (julian)
+				*hp++ = ' ';
+			{
+				char *two_wchars = unicode_conv_to_printable_fixedwidth(/*NULL,*/ buf, 2);
+				strcpy(hp, two_wchars);
+				free(two_wchars);
+			}
+			hp += strlen(hp);
+			*hp++ = ' ';
+#else
 			strncpy(day_headings + i * (3+julian) + julian, buf, 2);
+#endif
 		}
 	} while (++i < 12);
+	IF_UNICODE_SUPPORT(hp[-1] = '\0';)
 
 	if (month) {
 		unsigned row, len, days[MAXDAYS];
@@ -133,10 +173,10 @@ int cal_main(int argc, char **argv)
 		char lineout[30];
 
 		day_array(month, year, dp);
-		len = sprintf(lineout, "%s %d", month_names[month - 1], year);
+		len = sprintf(lineout, "%s %u", month_names[month - 1], year);
 		printf("%*s%s\n%s\n",
-			   ((7*julian + WEEK_LEN) - len) / 2, "",
-			   lineout, day_headings);
+				((7*julian + WEEK_LEN) - len) / 2, "",
+				lineout, day_headings);
 		for (row = 0; row < 6; row++) {
 			build_row(lineout, dp)[0] = '\0';
 			dp += 7;
@@ -147,12 +187,13 @@ int cal_main(int argc, char **argv)
 		unsigned *dp;
 		char lineout[80];
 
-		sprintf(lineout, "%d", year);
+		sprintf(lineout, "%u", year);
 		center(lineout,
-			   (WEEK_LEN * 3 + HEAD_SEP * 2)
-			   + julian * (J_WEEK_LEN * 2 + HEAD_SEP
-						   - (WEEK_LEN * 3 + HEAD_SEP * 2)),
-			   0);
+				(WEEK_LEN * 3 + HEAD_SEP * 2)
+				+ julian * (J_WEEK_LEN * 2 + HEAD_SEP
+						- (WEEK_LEN * 3 + HEAD_SEP * 2)),
+				0
+		);
 		puts("\n");		/* two \n's */
 		for (i = 0; i < 12; i++) {
 			day_array(i + 1, year, days[i]);
@@ -262,7 +303,7 @@ static void trim_trailing_spaces_and_print(char *s)
 	}
 	while (p != s) {
 		--p;
-		if (!(isspace)(*p)) {	/* We want the function... not the inline. */
+		if (!isspace(*p)) {
 			p[1] = '\0';
 			break;
 		}

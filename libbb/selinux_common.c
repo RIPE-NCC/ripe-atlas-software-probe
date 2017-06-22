@@ -3,12 +3,14 @@
  *   -- common SELinux utility functions
  *
  * Copyright 2007 KaiGai Kohei <kaigai@kaigai.gr.jp>
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 #include "libbb.h"
 #include <selinux/context.h>
 
 context_t FAST_FUNC set_security_context_component(security_context_t cur_context,
-					 char *user, char *role, char *type, char *range)
+			char *user, char *role, char *type, char *range)
 {
 	context_t con = context_new(cur_context);
 	if (!con)
@@ -34,7 +36,7 @@ void FAST_FUNC setfscreatecon_or_die(security_context_t scontext)
 	if (setfscreatecon(scontext) < 0) {
 		/* Can be NULL. All known printf implementations
 		 * display "(null)", "<null>" etc */
-		bb_perror_msg_and_die("cannot set default "
+		bb_perror_msg_and_die("can't set default "
 				"file creation context to %s", scontext);
 	}
 }
@@ -51,4 +53,3 @@ void FAST_FUNC selinux_preserve_fcontext(int fdesc)
 	setfscreatecon_or_die(context);
 	freecon(context);
 }
-

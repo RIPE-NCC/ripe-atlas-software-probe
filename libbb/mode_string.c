@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2003  Manuel Novoa III  <mjn3@codepoet.org>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /* Aug 13, 2003
@@ -87,9 +87,9 @@ const char* FAST_FUNC bb_mode_string(mode_t mode)
 
 /* The previous version used "0pcCd?bB-?l?s???".  However, the '0', 'C',
  * and 'B' types don't appear to be available on linux.  So I removed them. */
-static const char type_chars[16] = "?pc?d?b?-?l?s???";
+static const char type_chars[16] ALIGN1 = "?pc?d?b?-?l?s???";
 /********************************** 0123456789abcdef */
-static const char mode_chars[7] = "rwxSTst";
+static const char mode_chars[7] ALIGN1 = "rwxSTst";
 
 const char* FAST_FUNC bb_mode_string(mode_t mode)
 {

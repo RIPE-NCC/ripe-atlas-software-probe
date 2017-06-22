@@ -25,30 +25,72 @@
  *
  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
  *                  - based on coreutils-5.97 (in Fedora Core 6)
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
-#include <getopt.h>
+//config:config RUNCON
+//config:	bool "runcon"
+//config:	default n
+//config:	depends on SELINUX
+//config:	help
+//config:	  Enable support to run command in specified security context.
+//config:
+//config:config FEATURE_RUNCON_LONG_OPTIONS
+//config:	bool "Enable long options"
+//config:	default y
+//config:	depends on RUNCON && LONG_OPTS
+//config:	help
+//config:	  Support long options for the runcon applet.
+
+//applet:IF_RUNCON(APPLET(runcon, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_RUNCON) += runcon.o
+
+//usage:#define runcon_trivial_usage
+//usage:       "[-c] [-u USER] [-r ROLE] [-t TYPE] [-l RANGE] PROG ARGS\n"
+//usage:       "runcon CONTEXT PROG ARGS"
+//usage:#define runcon_full_usage "\n\n"
+//usage:       "Run PROG in a different security context\n"
+//usage:     "\n	CONTEXT		Complete security context\n"
+//usage:	IF_FEATURE_RUNCON_LONG_OPTIONS(
+//usage:     "\n	-c,--compute	Compute process transition context before modifying"
+//usage:     "\n	-t,--type=TYPE	Type (for same role as parent)"
+//usage:     "\n	-u,--user=USER	User identity"
+//usage:     "\n	-r,--role=ROLE	Role"
+//usage:     "\n	-l,--range=RNG	Levelrange"
+//usage:	)
+//usage:	IF_NOT_FEATURE_RUNCON_LONG_OPTIONS(
+//usage:     "\n	-c	Compute process transition context before modifying"
+//usage:     "\n	-t TYPE	Type (for same role as parent)"
+//usage:     "\n	-u USER	User identity"
+//usage:     "\n	-r ROLE	Role"
+//usage:     "\n	-l RNG	Levelrange"
+//usage:	)
+
 #include <selinux/context.h>
-#include <selinux/flask.h>
+/* from deprecated <selinux/flask.h>: */
+#undef  SECCLASS_PROCESS
+#define SECCLASS_PROCESS 2
 
 #include "libbb.h"
 
 static context_t runcon_compute_new_context(char *user, char *role, char *type, char *range,
-					    char *command, int compute_trans)
+			char *command, int compute_trans)
 {
 	context_t con;
 	security_context_t cur_context;
 
 	if (getcon(&cur_context))
-		bb_error_msg_and_die("cannot get current context");
+		bb_error_msg_and_die("can't get current context");
 
 	if (compute_trans) {
 		security_context_t file_context, new_context;
 
 		if (getfilecon(command, &file_context) < 0)
-			bb_error_msg_and_die("cannot retrieve attributes of '%s'",
-					     command);
+			bb_error_msg_and_die("can't retrieve attributes of '%s'",
+					command);
 		if (security_compute_create(cur_context, file_context,
-					    SECCLASS_PROCESS, &new_context))
+					SECCLASS_PROCESS, &new_context))
 			bb_error_msg_and_die("unable to compute a new context");
 		cur_context = new_context;
 	}
@@ -57,13 +99,13 @@ static context_t runcon_compute_new_context(char *user, char *role, char *type, 
 	if (!con)
 		bb_error_msg_and_die("'%s' is not a valid context", cur_context);
 	if (user && context_user_set(con, user))
-		bb_error_msg_and_die("failed to set new user '%s'", user);
+		bb_error_msg_and_die("can't set new user '%s'", user);
 	if (type && context_type_set(con, type))
-		bb_error_msg_and_die("failed to set new type '%s'", type);
+		bb_error_msg_and_die("can't set new type '%s'", type);
 	if (range && context_range_set(con, range))
-		bb_error_msg_and_die("failed to set new range '%s'", range);
+		bb_error_msg_and_die("can't set new range '%s'", range);
 	if (role && context_role_set(con, role))
-		bb_error_msg_and_die("failed to set new role '%s'", role);
+		bb_error_msg_and_die("can't set new role '%s'", role);
 
 	return con;
 }
@@ -124,13 +166,11 @@ int runcon_main(int argc UNUSED_PARAM, char **argv)
 
 	if (security_check_context(context_str(con)))
 		bb_error_msg_and_die("'%s' is not a valid context",
-				     context_str(con));
+				context_str(con));
 
 	if (setexeccon(context_str(con)))
-		bb_error_msg_and_die("cannot set up security context '%s'",
-				     context_str(con));
+		bb_error_msg_and_die("can't set up security context '%s'",
+				context_str(con));
 
-	execvp(argv[0], argv);
-
-	bb_perror_msg_and_die("cannot execute '%s'", argv[0]);
+	BB_EXECVP_or_die(argv);
 }

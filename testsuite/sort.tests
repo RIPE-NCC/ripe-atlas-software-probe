@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/sh
 
 # SUSv3 compliant sort tests.
 # Copyright 2005 by Rob Landley <rob@landley.net>
-# Licensed under GPL v2, see file LICENSE for details.
+# Licensed under GPLv2, see file LICENSE in this source tree.
 
-. testing.sh
+. ./testing.sh
 
 # The basic tests.  These should work even with the small busybox.
 
@@ -27,6 +27,8 @@ egg	1	2	papyrus
 999	3	0	algebra
 "
 
+# testing "description" "command(s)" "result" "infile" "stdin"
+
 # Sorting with keys
 
 testing "sort one key" "sort -k4,4 input" \
@@ -45,8 +47,6 @@ egg	1	2	papyrus
 999	3	0	algebra
 " "$data" ""
 
-# Busybox is definitely doing this one wrong just now.  FIXME
-
 testing "sort key range with numeric option and global reverse" \
 "sort -k2,3n -r input" \
 "egg	1	2	papyrus
@@ -55,8 +55,6 @@ testing "sort key range with numeric option and global reverse" \
 999	3	0	algebra
 7	3	42	soup
 " "$data" ""
-
-#
 
 testing "sort key range with multiple options" "sort -k2,3rn input" \
 "7	3	42	soup
@@ -100,6 +98,58 @@ testing "sort with non-default leading delim 3" "sort -n -k3 -t/ input" "\
 //b/1
 " ""
 
+testing "sort with non-default leading delim 4" "sort -t: -k1,1 input" "\
+a:b
+a/a:a
+" "\
+a/a:a
+a:b
+" ""
+
+testing "sort with ENDCHAR" "sort -t. -k1,1.1 -k2 input" "\
+ab.1
+aa.2
+" "\
+aa.2
+ab.1
+" ""
+
+testing "glibc build sort" "sort -t. -k 1,1 -k 2n,2n -k 3 input" "\
+GLIBC_2.1
+GLIBC_2.1.1
+GLIBC_2.2
+GLIBC_2.2.1
+GLIBC_2.10
+GLIBC_2.20
+GLIBC_2.21
+" "\
+GLIBC_2.21
+GLIBC_2.1.1
+GLIBC_2.2.1
+GLIBC_2.2
+GLIBC_2.20
+GLIBC_2.10
+GLIBC_2.1
+" ""
+
+testing "glibc build sort unique" "sort -u -t. -k 1,1 -k 2n,2n -k 3 input" "\
+GLIBC_2.1
+GLIBC_2.1.1
+GLIBC_2.2
+GLIBC_2.2.1
+GLIBC_2.10
+GLIBC_2.20
+GLIBC_2.21
+" "\
+GLIBC_2.10
+GLIBC_2.2.1
+GLIBC_2.1.1
+GLIBC_2.20
+GLIBC_2.2
+GLIBC_2.1
+GLIBC_2.21
+" ""
+
 testing "sort -u should consider field only when discarding" "sort -u -k2 input" "\
 a c
 " "\
@@ -115,5 +165,16 @@ one\0two\0three\0\
 
 testing "sort key doesn't strip leading blanks, disables fallback global sort" \
 "sort -n -k2 -t ' '" " a \n 1 \n 2 \n" "" " 2 \n 1 \n a \n"
+
+testing "sort file in place" \
+"sort -o input input && cat input" "\
+111
+222
+" "\
+222
+111
+" ""
+
+# testing "description" "command(s)" "result" "infile" "stdin"
 
 exit $FAILCOUNT

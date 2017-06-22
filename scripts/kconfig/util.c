@@ -44,14 +44,20 @@ int file_write_dep(const char *name)
 		else
 			fprintf(out, "\t%s\n", file->name);
 	}
-	fprintf(out, "\n.config include/autoconf.h: $(deps_config)\n\n$(deps_config):\n");
+	fprintf(out,
+		"\n"
+		".config include/autoconf.h: $(deps_config)\n"
+		"\n"
+		"include/autoconf.h: .config\n" /* bbox */
+		"\n"
+		"$(deps_config):\n");
 	fclose(out);
 	rename("..config.tmp", name);
 	return 0;
 }
 
 
-/* Allocate initial growable sting */
+/* Allocate initial growable string */
 struct gstr str_new(void)
 {
 	struct gstr gs;
@@ -73,8 +79,7 @@ struct gstr str_assign(const char *s)
 /* Free storage for growable string */
 void str_free(struct gstr *gs)
 {
-	if (gs->s)
-		free(gs->s);
+	free(gs->s);
 	gs->s = NULL;
 	gs->len = 0;
 }
@@ -106,4 +111,3 @@ const char *str_get(struct gstr *gs)
 {
 	return gs->s;
 }
-

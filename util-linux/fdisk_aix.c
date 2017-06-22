@@ -1,8 +1,8 @@
 #if ENABLE_FEATURE_AIX_LABEL
 /*
  * Copyright (C) Andreas Neuper, Sep 1998.
- *      This file may be redistributed under
- *      the terms of the GNU Public License.
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 typedef struct {
@@ -54,8 +54,9 @@ aix_info(void)
 static int
 check_aix_label(void)
 {
-	if (aixlabel->magic != AIX_LABEL_MAGIC &&
-		aixlabel->magic != AIX_LABEL_MAGIC_SWAPPED) {
+	if (aixlabel->magic != AIX_LABEL_MAGIC
+	 && aixlabel->magic != AIX_LABEL_MAGIC_SWAPPED
+	) {
 		current_label_type = 0;
 		aix_other_endian = 0;
 		return 0;

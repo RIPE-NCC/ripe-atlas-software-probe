@@ -9,10 +9,47 @@
  *
  * dos2unix filters reading input from stdin and writing output to stdout.
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
-*/
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
+ */
+//config:config DOS2UNIX
+//config:	bool "dos2unix"
+//config:	default y
+//config:	help
+//config:	  dos2unix is used to convert a text file from DOS format to
+//config:	  UNIX format, and vice versa.
+//config:
+//config:config UNIX2DOS
+//config:	bool "unix2dos"
+//config:	default y
+//config:	help
+//config:	  unix2dos is used to convert a text file from UNIX format to
+//config:	  DOS format, and vice versa.
+
+//applet:IF_DOS2UNIX(APPLET_NOEXEC(dos2unix, dos2unix, BB_DIR_USR_BIN, BB_SUID_DROP, dos2unix))
+//applet:IF_UNIX2DOS(APPLET_NOEXEC(unix2dos, dos2unix, BB_DIR_USR_BIN, BB_SUID_DROP, unix2dos))
+
+//kbuild:lib-$(CONFIG_DOS2UNIX) += dos2unix.o
+//kbuild:lib-$(CONFIG_UNIX2DOS) += dos2unix.o
+
+//usage:#define dos2unix_trivial_usage
+//usage:       "[-ud] [FILE]"
+//usage:#define dos2unix_full_usage "\n\n"
+//usage:       "Convert FILE in-place from DOS to Unix format.\n"
+//usage:       "When no file is given, use stdin/stdout.\n"
+//usage:     "\n	-u	dos2unix"
+//usage:     "\n	-d	unix2dos"
+//usage:
+//usage:#define unix2dos_trivial_usage
+//usage:       "[-ud] [FILE]"
+//usage:#define unix2dos_full_usage "\n\n"
+//usage:       "Convert FILE in-place from Unix to DOS format.\n"
+//usage:       "When no file is given, use stdin/stdout.\n"
+//usage:     "\n	-u	dos2unix"
+//usage:     "\n	-d	unix2dos"
 
 #include "libbb.h"
+
+/* This is a NOEXEC applet. Be very careful! */
 
 enum {
 	CT_UNIX2DOS = 1,
@@ -23,7 +60,7 @@ enum {
 static void convert(char *fn, int conv_type)
 {
 	FILE *in, *out;
-	int i;
+	int ch;
 	char *temp_fn = temp_fn; /* for compiler */
 	char *resolved_fn = resolved_fn;
 
@@ -31,30 +68,30 @@ static void convert(char *fn, int conv_type)
 	out = stdout;
 	if (fn != NULL) {
 		struct stat st;
+		int fd;
 
 		resolved_fn = xmalloc_follow_symlinks(fn);
 		if (resolved_fn == NULL)
 			bb_simple_perror_msg_and_die(fn);
 		in = xfopen_for_read(resolved_fn);
-		fstat(fileno(in), &st);
+		xfstat(fileno(in), &st, resolved_fn);
 
 		temp_fn = xasprintf("%sXXXXXX", resolved_fn);
-		i = mkstemp(temp_fn);
-		if (i == -1
-		 || fchmod(i, st.st_mode) == -1
-		 || !(out = fdopen(i, "w+"))
-		) {
+		fd = xmkstemp(temp_fn);
+		if (fchmod(fd, st.st_mode) == -1)
 			bb_simple_perror_msg_and_die(temp_fn);
-		}
+		fchown(fd, st.st_uid, st.st_gid);
+
+		out = xfdopen_for_write(fd);
 	}
 
-	while ((i = fgetc(in)) != EOF) {
-		if (i == '\r')
+	while ((ch = fgetc(in)) != EOF) {
+		if (ch == '\r')
 			continue;
-		if (i == '\n')
+		if (ch == '\n')
 			if (conv_type == CT_UNIX2DOS)
 				fputc('\r', out);
-		fputc(i, out);
+		fputc(ch, out);
 	}
 
 	if (fn != NULL) {
@@ -69,14 +106,17 @@ static void convert(char *fn, int conv_type)
 }
 
 int dos2unix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int dos2unix_main(int argc, char **argv)
+int dos2unix_main(int argc UNUSED_PARAM, char **argv)
 {
 	int o, conv_type;
 
 	/* See if we are supposed to be doing dos2unix or unix2dos */
-	conv_type = CT_UNIX2DOS;
-	if (applet_name[0] == 'd') {
+	if (ENABLE_DOS2UNIX
+	 && (!ENABLE_UNIX2DOS || applet_name[0] == 'd')
+	) {
 		conv_type = CT_DOS2UNIX;
+	} else {
+		conv_type = CT_UNIX2DOS;
 	}
 
 	/* -u convert to unix, -d convert to dos */
@@ -88,11 +128,11 @@ int dos2unix_main(int argc, char **argv)
 	if (o)
 		conv_type = o;
 
+	argv += optind;
 	do {
 		/* might be convert(NULL) if there is no filename given */
-		convert(argv[optind], conv_type);
-		optind++;
-	} while (optind < argc);
+		convert(*argv, conv_type);
+	} while (*argv && *++argv);
 
 	return 0;
 }

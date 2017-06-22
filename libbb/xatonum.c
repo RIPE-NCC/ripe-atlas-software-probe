@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2003  Manuel Novoa III  <mjn3@codepoet.org>
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
 
 #include "libbb.h"
@@ -59,7 +59,7 @@ unsigned bb_strtoui(const char *str, char **end, int b)
 
 /* A few special cases */
 
-int FAST_FUNC xatoi_u(const char *numstr)
+int FAST_FUNC xatoi_positive(const char *numstr)
 {
 	return xatou_range(numstr, 0, INT_MAX);
 }
@@ -68,3 +68,50 @@ uint16_t FAST_FUNC xatou16(const char *numstr)
 {
 	return xatou_range(numstr, 0, 0xffff);
 }
+
+const struct suffix_mult bkm_suffixes[] = {
+	{ "b", 512 },
+	{ "k", 1024 },
+	{ "m", 1024*1024 },
+	{ "", 0 }
+};
+
+const struct suffix_mult cwbkMG_suffixes[] = {
+	{ "c", 1 },
+	{ "w", 2 },
+	{ "b", 512 },
+	{ "kB", 1000 },
+	{ "kD", 1000 },
+	{ "k", 1024 },
+	{ "KB", 1000 }, /* compat with coreutils dd */
+	{ "KD", 1000 }, /* compat with coreutils dd */
+	{ "K", 1024 },  /* compat with coreutils dd */
+	{ "MB", 1000000 },
+	{ "MD", 1000000 },
+	{ "M", 1024*1024 },
+	{ "GB", 1000000000 },
+	{ "GD", 1000000000 },
+	{ "G", 1024*1024*1024 },
+	/* "D" suffix for decimal is not in coreutils manpage, looks like it's deprecated */
+	/* coreutils also understands TPEZY suffixes for tera- and so on, with B suffix for decimal */
+	{ "", 0 }
+};
+
+const struct suffix_mult kmg_i_suffixes[] = {
+	{ "KiB", 1024 },
+	{ "kiB", 1024 },
+	{ "K", 1024 },
+	{ "k", 1024 },
+	{ "MiB", 1048576 },
+	{ "miB", 1048576 },
+	{ "M", 1048576 },
+	{ "m", 1048576 },
+	{ "GiB", 1073741824 },
+	{ "giB", 1073741824 },
+	{ "G", 1073741824 },
+	{ "g", 1073741824 },
+	{ "KB", 1000 },
+	{ "MB", 1000000 },
+	{ "GB", 1000000000 },
+	{ "", 0 }
+};

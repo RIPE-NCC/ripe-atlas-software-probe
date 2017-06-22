@@ -7,10 +7,46 @@
  * Original idea and code:
  *      Walter Harms <WHarms@bfs.de>
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  *
  * See RFC 1179 for protocol description.
  */
+//config:config LPR
+//config:	bool "lpr"
+//config:	default y
+//config:	help
+//config:	  lpr sends files (or standard input) to a print spooling daemon.
+//config:
+//config:config LPQ
+//config:	bool "lpq"
+//config:	default y
+//config:	help
+//config:	  lpq is a print spool queue examination and manipulation program.
+
+//applet:IF_LPQ(APPLET_ODDNAME(lpq, lpqr, BB_DIR_USR_BIN, BB_SUID_DROP, lpq))
+//applet:IF_LPR(APPLET_ODDNAME(lpr, lpqr, BB_DIR_USR_BIN, BB_SUID_DROP, lpr))
+
+//kbuild:lib-$(CONFIG_LPR) += lpr.o
+//kbuild:lib-$(CONFIG_LPQ) += lpr.o
+
+//usage:#define lpr_trivial_usage
+//usage:       "-P queue[@host[:port]] -U USERNAME -J TITLE -Vmh [FILE]..."
+/* -C CLASS exists too, not shown.
+ * CLASS is supposed to be printed on banner page, if one is requested */
+//usage:#define lpr_full_usage "\n\n"
+//usage:       "	-P	lp service to connect to (else uses $PRINTER)"
+//usage:     "\n	-m	Send mail on completion"
+//usage:     "\n	-h	Print banner page too"
+//usage:     "\n	-V	Verbose"
+//usage:
+//usage:#define lpq_trivial_usage
+//usage:       "[-P queue[@host[:port]]] [-U USERNAME] [-d JOBID]... [-fs]"
+//usage:#define lpq_full_usage "\n\n"
+//usage:       "	-P	lp service to connect to (else uses $PRINTER)"
+//usage:     "\n	-d	Delete jobs"
+//usage:     "\n	-f	Force any waiting job to be printed"
+//usage:     "\n	-s	Short display"
+
 #include "libbb.h"
 
 /*
@@ -65,10 +101,14 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 	const char *server = "localhost"; // server[:port] of printer queue
 	char *hostname;
 	// N.B. IMHO getenv("USER") can be way easily spoofed!
-	const char *user = bb_getpwuid(NULL, -1, getuid());
+	const char *user = xuid2uname(getuid());
 	unsigned job;
 	unsigned opts;
 	int fd;
+
+	queue = getenv("PRINTER");
+	if (!queue)
+		queue = "lp";
 
 	// parse options
 	// TODO: set opt_complementary: s,d,f are mutually exclusive
@@ -79,16 +119,7 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 	);
 	argv += optind;
 
-	// if queue is not specified -> use $PRINTER
-	if (!(opts & OPT_P))
-		queue = getenv("PRINTER");
-	// if queue is still not specified ->
-	if (!queue) {
-		// ... queue defaults to "lp"
-		// server defaults to "localhost"
-		queue = "lp";
-	// if queue is specified ->
-	} else {
+	{
 		// queue name is to the left of '@'
 		char *s = strchr(queue, '@');
 		if (s) {
@@ -159,14 +190,23 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 		// if data file is stdin, we need to dump it first
 		if (LONE_DASH(*argv)) {
 			strcpy(tempfile, "/tmp/lprXXXXXX");
-			dfd = mkstemp(tempfile);
-			if (dfd < 0)
-				bb_perror_msg_and_die("mkstemp");
+			dfd = xmkstemp(tempfile);
 			bb_copyfd_eof(STDIN_FILENO, dfd);
 			xlseek(dfd, 0, SEEK_SET);
 			*argv = (char*)bb_msg_standard_input;
 		} else {
 			dfd = xopen(*argv, O_RDONLY);
+		}
+
+		st.st_size = 0; /* paranoia: fstat may theoretically fail */
+		fstat(dfd, &st);
+
+		/* Apparently, some servers are buggy and won't accept 0-sized jobs.
+		 * Standard lpr works around it by refusing to send such jobs:
+		 */
+		if (st.st_size == 0) {
+			bb_error_msg("nothing to print");
+			continue;
 		}
 
 		/* "The name ... should start with ASCII "cfA",
@@ -193,14 +233,11 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 			, (opts & LPR_m) ? user : ""
 			, remote_filename
 		);
-		// delete possible "\nX\n" patterns
+		// delete possible "\nX\n" (that is, one-char) patterns
 		c = controlfile;
-		cflen = (unsigned)strlen(controlfile);
 		while ((c = strchr(c, '\n')) != NULL) {
 			if (c[1] && c[2] == '\n') {
-				/* can't use strcpy, results are undefined */
-				memmove(c, c+2, cflen - (c-controlfile) - 1);
-				cflen -= 2;
+				overlapping_strcpy(c, c+2);
 			} else {
 				c++;
 			}
@@ -211,6 +248,7 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 			bb_error_msg("sending control file");
 		/* "Acknowledgement processing must occur as usual
 		 * after the command is sent." */
+		cflen = (unsigned)strlen(controlfile);
 		fdprintf(fd, "\x2" "%u c%s\n", cflen, remote_filename);
 		get_response_or_say_and_die(fd, "sending control file");
 		/* "Once all of the contents have
@@ -224,8 +262,6 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
 		// send data file, with name "dfaXXX"
 		if (opts & LPR_V)
 			bb_error_msg("sending data file");
-		st.st_size = 0; /* paranoia: fstat may theoretically fail */
-		fstat(dfd, &st);
 		fdprintf(fd, "\x3" "%"OFF_FMT"u d%s\n", st.st_size, remote_filename);
 		get_response_or_say_and_die(fd, "sending data file");
 		if (bb_copyfd_size(dfd, fd, st.st_size) != st.st_size) {

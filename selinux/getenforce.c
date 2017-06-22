@@ -4,7 +4,21 @@
  * Based on libselinux 1.33.1
  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
  *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+//config:config GETENFORCE
+//config:	bool "getenforce"
+//config:	default n
+//config:	depends on SELINUX
+//config:	help
+//config:	  Enable support to get the current mode of SELinux.
+
+//applet:IF_GETENFORCE(APPLET(getenforce, BB_DIR_USR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_GETENFORCE) += getenforce.o
+
+//usage:#define getenforce_trivial_usage NOUSAGE_STR
+//usage:#define getenforce_full_usage ""
 
 #include "libbb.h"
 

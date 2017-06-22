@@ -2,8 +2,13 @@
 # Build system
 # ==========================================================================
 
-busybox.links: $(srctree)/applets/busybox.mkll $(objtree)/include/autoconf.h $(srctree)/include/applets.h
-	$(Q)-$(SHELL) $^ >$@
+busybox.links: $(srctree)/applets/busybox.mkll $(objtree)/include/autoconf.h include/applets.h
+	$(Q)-$(SHELL) $^ > $@
+
+busybox.cfg.suid: $(srctree)/applets/busybox.mksuid $(objtree)/include/autoconf.h include/applets.h
+	$(Q)-SUID="yes" $(SHELL) $^ > $@
+busybox.cfg.nosuid: $(srctree)/applets/busybox.mksuid $(objtree)/include/autoconf.h include/applets.h
+	$(Q)-SUID="DROP" $(SHELL) $^ > $@
 
 .PHONY: install
 ifeq ($(CONFIG_INSTALL_APPLET_SYMLINKS),y)
@@ -22,6 +27,10 @@ endif
 ifeq ($(CONFIG_INSTALL_SH_APPLET_SCRIPT_WRAPPER),y)
 INSTALL_OPTS:= --scriptwrapper
 endif
+endif
+ifeq ($(CONFIG_FEATURE_INDIVIDUAL),y)
+INSTALL_OPTS:= --binaries
+LIBBUSYBOX_SONAME:= 0_lib/libbusybox.so.$(BB_VER)
 endif
 install: $(srctree)/applets/install.sh busybox busybox.links
 	$(Q)DO_INSTALL_LIBS="$(strip $(LIBBUSYBOX_SONAME) $(DO_INSTALL_LIBS))" \
@@ -50,7 +59,11 @@ endif
 # (cp -pPR is POSIX-compliant (cp -dpR or cp -a would not be))
 .PHONY: check
 .PHONY: test
+ifeq ($(CONFIG_UNIT_TEST),y)
+UNIT_CMD = ./busybox unit
+endif
 check test: busybox busybox.links
+	$(UNIT_CMD)
 	test -d $(objtree)/testsuite || cp -pPR $(srctree)/testsuite $(objtree)
 	bindir=$(objtree) srcdir=$(srctree)/testsuite \
 	$(SHELL) -c "cd $(objtree)/testsuite && $(srctree)/testsuite/runtest $(if $(KBUILD_VERBOSE:0=),-v)"
@@ -64,6 +77,14 @@ release: distclean
 		-name .svn \
 		-print \
 		-exec rm -r -f {} \; ; \
+	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type d \
+		-name .git \
+		-print \
+		-exec rm -r -f {} \; ; \
+	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type f \
+		-name .gitignore \
+		-print \
+		-exec rm -f {} \; ; \
 	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type f \
 		-name .\#* \
 		-print \
@@ -103,32 +124,38 @@ bigdata: busybox_unstripped
 
 # Documentation Targets
 .PHONY: doc
-doc: docs/busybox.pod docs/BusyBox.txt docs/BusyBox.1 docs/BusyBox.html
+doc: docs/busybox.pod docs/BusyBox.txt docs/busybox.1 docs/BusyBox.html
 
 # FIXME: Doesn't belong here
-disp_doc = \
-  @$(if $(quiet),echo "  DOC     $(@F)")
+       cmd_doc =
+ quiet_cmd_doc = $(Q)echo "  DOC     $(@F)"
+silent_cmd_doc =
+disp_doc       = $($(quiet)cmd_doc)
 
+# sed adds newlines after "Options:" etc,
+# this is needed in order to get good BusyBox.{1,txt,html}
 docs/busybox.pod: $(srctree)/docs/busybox_header.pod \
-		$(srctree)/include/usage.h \
+		include/usage.h \
 		$(srctree)/docs/busybox_footer.pod \
-		$(srctree)/docs/autodocifier.pl
+		applets/usage_pod
 	$(disp_doc)
 	$(Q)-mkdir -p docs
-	$(Q)-( cat $(srctree)/docs/busybox_header.pod ; \
-	    $(srctree)/docs/autodocifier.pl $(srctree)/include/usage.h ; \
-	    cat $(srctree)/docs/busybox_footer.pod ; ) > docs/busybox.pod
+	$(Q)-( \
+	    cat $(srctree)/docs/busybox_header.pod; \
+	    echo; \
+	    applets/usage_pod | sed 's/^[A-Za-z][A-Za-z ]*[a-z]:$$/&\n/'; \
+	    cat $(srctree)/docs/busybox_footer.pod; \
+	    ) > docs/busybox.pod
 
 docs/BusyBox.txt: docs/busybox.pod
 	$(disp_doc)
 	$(Q)-mkdir -p docs
 	$(Q)-pod2text $< > $@
 
-docs/BusyBox.1: docs/busybox.pod
+docs/busybox.1: docs/busybox.pod
 	$(disp_doc)
 	$(Q)-mkdir -p docs
-	$(Q)-pod2man --center=BusyBox --release="version $(VERSION)" \
-		$< > $@
+	$(Q)-pod2man --center=busybox --release="version $(KERNELVERSION)" $< > $@
 
 docs/BusyBox.html: docs/busybox.net/BusyBox.html
 	$(disp_doc)
@@ -138,8 +165,7 @@ docs/BusyBox.html: docs/busybox.net/BusyBox.html
 
 docs/busybox.net/BusyBox.html: docs/busybox.pod
 	$(Q)-mkdir -p docs/busybox.net
-	$(Q)-pod2html --noindex $< > \
-	    docs/busybox.net/BusyBox.html
+	$(Q)-pod2html --noindex $< > $@
 	$(Q)-rm -f pod2htm*
 
 # documentation, cross-reference

@@ -4,8 +4,20 @@
  *
  * Copyright (C) 2003 by Rob Landley <rob@landley.net>, Joey Hess
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+//config:config PIPE_PROGRESS
+//config:	bool "pipe_progress"
+//config:	default y
+//config:	help
+//config:	  Display a dot to indicate pipe activity.
+
+//applet:IF_PIPE_PROGRESS(APPLET(pipe_progress, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_PIPE_PROGRESS) += pipe_progress.o
+
+//usage:#define pipe_progress_trivial_usage NOUSAGE_STR
+//usage:#define pipe_progress_full_usage ""
 
 #include "libbb.h"
 
@@ -17,23 +29,20 @@
 int pipe_progress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int pipe_progress_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 {
-	RESERVE_CONFIG_BUFFER(buf, PIPE_PROGRESS_SIZE);
+	char buf[PIPE_PROGRESS_SIZE];
 	time_t t = time(NULL);
-	size_t len;
+	int len;
 
-	while ((len = fread(buf, 1, PIPE_PROGRESS_SIZE, stdin)) > 0) {
+	while ((len = safe_read(STDIN_FILENO, buf, PIPE_PROGRESS_SIZE)) > 0) {
 		time_t new_time = time(NULL);
 		if (new_time != t) {
 			t = new_time;
-			fputc('.', stderr);
+			bb_putchar_stderr('.');
 		}
-		fwrite(buf, len, 1, stdout);
+		full_write(STDOUT_FILENO, buf, len);
 	}
 
-	fputc('\n', stderr);
-
-	if (ENABLE_FEATURE_CLEAN_UP)
-		RELEASE_CONFIG_BUFFER(buf);
+	bb_putchar_stderr('\n');
 
 	return 0;
 }

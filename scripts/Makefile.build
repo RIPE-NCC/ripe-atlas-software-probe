@@ -13,8 +13,13 @@ __build:
 include scripts/Kbuild.include
 
 # The filename Kbuild has precedence over Makefile
+# bbox: we also try to include Kbuild file in obj tree first
 kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
-include $(if $(wildcard $(kbuild-dir)/Kbuild), $(kbuild-dir)/Kbuild, $(kbuild-dir)/Makefile)
+include $(if $(wildcard $(src)/Kbuild), $(src)/Kbuild, \
+		$(if $(wildcard $(kbuild-dir)/Kbuild), $(kbuild-dir)/Kbuild, \
+			$(kbuild-dir)/Makefile \
+		) \
+	)
 
 include scripts/Makefile.lib
 
@@ -250,8 +255,9 @@ $(sort $(subdir-obj-y)): $(subdir-ym) ;
 ifdef builtin-target
 quiet_cmd_link_o_target = LD      $@
 # If the list of objects to link is empty, just create an empty built-in.o
+# -nostdlib is added to make "make LD=gcc ..." work (some people use that)
 cmd_link_o_target = $(if $(strip $(obj-y)),\
-		$(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
+		$(LD) -nostdlib $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
 		rm -f $@; $(AR) rcs $@)
 
 $(builtin-target): $(obj-y) FORCE

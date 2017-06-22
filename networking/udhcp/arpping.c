@@ -1,17 +1,14 @@
 /* vi: set sw=4 ts=4: */
 /*
- * arpping.c
- *
  * Mostly stolen from: dhcpcd - DHCP client daemon
  * by Yoichi Hariguchi <yoichi@fore.com>
+ *
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
-
 #include <netinet/if_ether.h>
 #include <net/if_arp.h>
 
 #include "common.h"
-#include "dhcpd.h"
-
 
 struct arpMsg {
 	/* Ethernet header */
@@ -36,10 +33,13 @@ enum {
 	ARP_MSG_SIZE = 0x2a
 };
 
-
 /* Returns 1 if no reply received */
-
-int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface)
+int FAST_FUNC arpping(uint32_t test_nip,
+		const uint8_t *safe_mac,
+		uint32_t from_ip,
+		uint8_t *from_mac,
+		const char *interface,
+		unsigned timeo)
 {
 	int timeout_ms;
 	struct pollfd pfd[1];
@@ -48,6 +48,9 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
 	struct sockaddr addr;   /* for interface name */
 	struct arpMsg arp;
 
+	if (!timeo)
+		return 1;
+
 	s = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
 	if (s == -1) {
 		bb_perror_msg(bb_msg_can_not_create_raw_socket);
@@ -55,7 +58,7 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
 	}
 
 	if (setsockopt_broadcast(s) == -1) {
-		bb_perror_msg("cannot enable bcast on raw socket");
+		bb_perror_msg("can't enable bcast on raw socket");
 		goto ret;
 	}
 
@@ -71,8 +74,8 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
 	arp.operation = htons(ARPOP_REQUEST);           /* ARP op code */
 	memcpy(arp.sHaddr, from_mac, 6);                /* source hardware address */
 	memcpy(arp.sInaddr, &from_ip, sizeof(from_ip)); /* source IP address */
-	/* tHaddr is zero-fiiled */                     /* target hardware address */
-	memcpy(arp.tInaddr, &test_ip, sizeof(test_ip)); /* target IP address */
+	/* tHaddr is zero-filled */                     /* target hardware address */
+	memcpy(arp.tInaddr, &test_nip, sizeof(test_nip));/* target IP address */
 
 	memset(&addr, 0, sizeof(addr));
 	safe_strncpy(addr.sa_data, interface, sizeof(addr.sa_data));
@@ -83,34 +86,51 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
 	}
 
 	/* wait for arp reply, and check it */
-	timeout_ms = 2000;
+	timeout_ms = (int)timeo;
 	do {
+		typedef uint32_t aliased_uint32_t FIX_ALIASING;
 		int r;
-		unsigned prevTime = monotonic_us();
+		unsigned prevTime = monotonic_ms();
 
 		pfd[0].events = POLLIN;
 		r = safe_poll(pfd, 1, timeout_ms);
 		if (r < 0)
 			break;
 		if (r) {
-			r = read(s, &arp, sizeof(arp));
+			r = safe_read(s, &arp, sizeof(arp));
 			if (r < 0)
 				break;
+
+			//log3("sHaddr %02x:%02x:%02x:%02x:%02x:%02x",
+			//	arp.sHaddr[0], arp.sHaddr[1], arp.sHaddr[2],
+			//	arp.sHaddr[3], arp.sHaddr[4], arp.sHaddr[5]);
+
 			if (r >= ARP_MSG_SIZE
 			 && arp.operation == htons(ARPOP_REPLY)
 			 /* don't check it: Linux doesn't return proper tHaddr (fixed in 2.6.24?) */
 			 /* && memcmp(arp.tHaddr, from_mac, 6) == 0 */
-			 && *((uint32_t *) arp.sInaddr) == test_ip
+			 && *(aliased_uint32_t*)arp.sInaddr == test_nip
 			) {
-				rv = 0;
+				/* if ARP source MAC matches safe_mac
+				 * (which is client's MAC), then it's not a conflict
+				 * (client simply already has this IP and replies to ARPs!)
+				 */
+				if (!safe_mac || memcmp(safe_mac, arp.sHaddr, 6) != 0)
+					rv = 0;
+				//else log2("sHaddr == safe_mac");
 				break;
 			}
 		}
-		timeout_ms -= ((unsigned)monotonic_us() - prevTime) / 1000;
-	} while (timeout_ms > 0);
+		timeout_ms -= (unsigned)monotonic_ms() - prevTime + 1;
+
+		/* We used to check "timeout_ms > 0", but
+		 * this is more under/overflow-resistant
+		 * (people did see overflows here when system time jumps):
+		 */
+	} while ((unsigned)timeout_ms <= timeo);
 
  ret:
 	close(s);
-	DEBUG("%srp reply received for this address", rv ? "No a" : "A");
+	log1("%srp reply received for this address", rv ? "no a" : "A");
 	return rv;
 }

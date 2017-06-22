@@ -5,22 +5,92 @@
  *
  * Copyright (C) 2008 by Vladimir Dronnikov <dronnikov@gmail.com>
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
-#include "libbb.h"
+//config:config CHAT
+//config:	bool "chat"
+//config:	default y
+//config:	help
+//config:	  Simple chat utility.
+//config:
+//config:config FEATURE_CHAT_NOFAIL
+//config:	bool "Enable NOFAIL expect strings"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  When enabled expect strings which are started with a dash trigger
+//config:	  no-fail mode. That is when expectation is not met within timeout
+//config:	  the script is not terminated but sends next SEND string and waits
+//config:	  for next EXPECT string. This allows to compose far more flexible
+//config:	  scripts.
+//config:
+//config:config FEATURE_CHAT_TTY_HIFI
+//config:	bool "Force STDIN to be a TTY"
+//config:	depends on CHAT
+//config:	default n
+//config:	help
+//config:	  Original chat always treats STDIN as a TTY device and sets for it
+//config:	  so-called raw mode. This option turns on such behaviour.
+//config:
+//config:config FEATURE_CHAT_IMPLICIT_CR
+//config:	bool "Enable implicit Carriage Return"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  When enabled make chat to terminate all SEND strings with a "\r"
+//config:	  unless "\c" is met anywhere in the string.
+//config:
+//config:config FEATURE_CHAT_SWALLOW_OPTS
+//config:	bool "Swallow options"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  Busybox chat require no options. To make it not fail when used
+//config:	  in place of original chat (which has a bunch of options) turn
+//config:	  this on.
+//config:
+//config:config FEATURE_CHAT_SEND_ESCAPES
+//config:	bool "Support weird SEND escapes"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  Original chat uses some escape sequences in SEND arguments which
+//config:	  are not sent to device but rather performs special actions.
+//config:	  E.g. "\K" means to send a break sequence to device.
+//config:	  "\d" delays execution for a second, "\p" -- for a 1/100 of second.
+//config:	  Before turning this option on think twice: do you really need them?
+//config:
+//config:config FEATURE_CHAT_VAR_ABORT_LEN
+//config:	bool "Support variable-length ABORT conditions"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  Original chat uses fixed 50-bytes length ABORT conditions. Say N here.
+//config:
+//config:config FEATURE_CHAT_CLR_ABORT
+//config:	bool "Support revoking of ABORT conditions"
+//config:	depends on CHAT
+//config:	default y
+//config:	help
+//config:	  Support CLR_ABORT directive.
 
-/*
-#define ENABLE_FEATURE_CHAT_NOFAIL              1 // +126 bytes
-#define ENABLE_FEATURE_CHAT_TTY_HIFI            0 // + 70 bytes
-#define ENABLE_FEATURE_CHAT_IMPLICIT_CR         1 // + 44 bytes
-#define ENABLE_FEATURE_CHAT_SEND_ESCAPES        0 // +103 bytes
-#define ENABLE_FEATURE_CHAT_VAR_ABORT_LEN       0 // + 70 bytes
-#define ENABLE_FEATURE_CHAT_CLR_ABORT           0 // +113 bytes
-#define ENABLE_FEATURE_CHAT_SWALLOW_OPTS        0 // + 23 bytes
-*/
+//applet:IF_CHAT(APPLET(chat, BB_DIR_USR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_CHAT) += chat.o
+
+//usage:#define chat_trivial_usage
+//usage:       "EXPECT [SEND [EXPECT [SEND...]]]"
+//usage:#define chat_full_usage "\n\n"
+//usage:       "Useful for interacting with a modem connected to stdin/stdout.\n"
+//usage:       "A script consists of one or more \"expect-send\" pairs of strings,\n"
+//usage:       "each pair is a pair of arguments. Example:\n"
+//usage:       "chat '' ATZ OK ATD123456 CONNECT '' ogin: pppuser word: ppppass '~'"
+
+#include "libbb.h"
+#include "common_bufsiz.h"
 
 // default timeout: 45 sec
-#define	DEFAULT_CHAT_TIMEOUT 45*1000
+#define DEFAULT_CHAT_TIMEOUT 45*1000
 // max length of "abort string",
 // i.e. device reply which causes termination
 #define MAX_ABORT_LEN 50
@@ -37,8 +107,7 @@ enum {
 };
 
 // exit code
-// N.B> 10 bytes for volatile. Why all these signals?!
-static /*volatile*/ smallint exitcode;
+#define exitcode bb_got_signal
 
 // trap for critical signals
 static void signal_handler(UNUSED_PARAM int signo)
@@ -101,13 +170,10 @@ static size_t unescape(char *s, int *nocr)
 	return p - start;
 }
 
-
 int chat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int chat_main(int argc UNUSED_PARAM, char **argv)
 {
-// should we dump device output? to what fd? by default no.
-// this can be controlled later via ECHO {ON|OFF} chat directive
-//	int echo_fd;
+	int record_fd = -1;
 	bool echo = 0;
 	// collection of device replies which cause unconditional termination
 	llist_t *aborts = NULL;
@@ -132,6 +198,7 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 		DIR_TIMEOUT,
 		DIR_ECHO,
 		DIR_SAY,
+		DIR_RECORD,
 	};
 
 	// make x* functions fail with correct exitcode
@@ -166,14 +233,14 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 #if ENABLE_FEATURE_CHAT_CLR_ABORT
 			"CLR_ABORT\0"
 #endif
-			"TIMEOUT\0" "ECHO\0" "SAY\0"
+			"TIMEOUT\0" "ECHO\0" "SAY\0" "RECORD\0"
 			, *argv
 		);
 		if (key >= 0) {
 			// cache directive value
 			char *arg = *++argv;
-			// ON -> 1, anything else -> 0
-			bool onoff = !strcmp("ON", arg);
+			// OFF -> 0, anything else -> 1
+			bool onoff = (0 != strcmp("OFF", arg));
 			// process directive
 			if (DIR_HANGUP == key) {
 				// turn SIGHUP on/off
@@ -188,23 +255,24 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 				llist_add_to_end(&aborts, arg);
 #if ENABLE_FEATURE_CHAT_CLR_ABORT
 			} else if (DIR_CLR_ABORT == key) {
+				llist_t *l;
 				// remove the string from abort conditions
 				// N.B. gotta refresh maximum length too...
-#if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
+# if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
 				max_abort_len = 0;
-#endif
-				for (llist_t *l = aborts; l; l = l->link) {
-#if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
+# endif
+				for (l = aborts; l; l = l->link) {
+# if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
 					size_t len = strlen(l->data);
-#endif
-					if (!strcmp(arg, l->data)) {
+# endif
+					if (strcmp(arg, l->data) == 0) {
 						llist_unlink(&aborts, l);
 						continue;
 					}
-#if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
+# if ENABLE_FEATURE_CHAT_VAR_ABORT_LEN
 					if (len > max_abort_len)
 						max_abort_len = len;
-#endif
+# endif
 				}
 #endif
 			} else if (DIR_TIMEOUT == key) {
@@ -217,14 +285,20 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 					timeout = DEFAULT_CHAT_TIMEOUT;
 			} else if (DIR_ECHO == key) {
 				// turn echo on/off
-				// N.B. echo means dumping output
-				// from stdin (device) to stderr
+				// N.B. echo means dumping device input/output to stderr
 				echo = onoff;
-//TODO?				echo_fd = onoff * STDERR_FILENO;
-//TODO?				echo_fd = xopen(arg, O_WRONLY|O_CREAT|O_TRUNC);
+			} else if (DIR_RECORD == key) {
+				// turn record on/off
+				// N.B. record means dumping device input to a file
+					// close previous record_fd
+				if (record_fd > 0)
+					close(record_fd);
+				// N.B. do we have to die here on open error?
+				record_fd = (onoff) ? xopen(arg, O_WRONLY|O_CREAT|O_TRUNC) : -1;
 			} else if (DIR_SAY == key) {
 				// just print argument verbatim
-				fprintf(stderr, arg);
+				// TODO: should we use full_write() to avoid unistd/stdio conflict?
+				bb_error_msg("%s", arg);
 			}
 			// next, please!
 			argv++;
@@ -282,18 +356,25 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 			    && poll(&pfd, 1, timeout) > 0
 			    && (pfd.revents & POLLIN)
 			) {
-#define buf bb_common_bufsiz1
 				llist_t *l;
 				ssize_t delta;
+#define buf bb_common_bufsiz1
+				setup_common_bufsiz();
 
 				// read next char from device
 				if (safe_read(STDIN_FILENO, buf+buf_len, 1) > 0) {
-					// dump device output if ECHO ON or RECORD fname
-//TODO?					if (echo_fd > 0) {
-//TODO?						full_write(echo_fd, buf+buf_len, 1);
-//TODO?					}
-					if (echo > 0)
+					// dump device input if RECORD fname
+					if (record_fd > 0) {
+						full_write(record_fd, buf+buf_len, 1);
+					}
+					// dump device input if ECHO ON
+					if (echo) {
+//						if (buf[buf_len] < ' ') {
+//							full_write(STDERR_FILENO, "^", 1);
+//							buf[buf_len] += '@';
+//						}
 						full_write(STDERR_FILENO, buf+buf_len, 1);
+					}
 					buf_len++;
 					// move input frame if we've reached higher bound
 					if (buf_len > COMMON_BUFSIZE) {
@@ -320,7 +401,7 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 				if (delta >= 0 && !memcmp(buf+delta, expect, expect_len))
 					goto expect_done;
 #undef buf
-			}
+			} /* while (have data) */
 
 			// device timed out or unexpected reply received
 			exitcode = ERR_TIMEOUT;
@@ -365,21 +446,18 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 					trim(++buf);
 					buf = loaded = xmalloc_xopen_read_close(buf, NULL);
 				}
-
 				// expand escape sequences in command
 				len = unescape(buf, &nocr);
 
 				// send command
-#if ENABLE_FEATURE_CHAT_SEND_ESCAPES
+				alarm(timeout);
 				pfd.fd = STDOUT_FILENO;
 				pfd.events = POLLOUT;
 				while (len && !exitcode
-				    && poll(&pfd, 1, timeout) > 0
+				    && poll(&pfd, 1, -1) > 0
 				    && (pfd.revents & POLLOUT)
 				) {
-					// ugly! ugly! ugly!
-					// gotta send char by char to achieve this!
-					// Brrr...
+#if ENABLE_FEATURE_CHAT_SEND_ESCAPES
 					// "\\d" means 1 sec delay, "\\p" means 0.01 sec delay
 					// "\\K" means send BREAK
 					char c = *buf;
@@ -389,31 +467,28 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 							sleep(1);
 							len--;
 							continue;
-						} else if ('p' == c) {
+						}
+						if ('p' == c) {
 							usleep(10000);
 							len--;
 							continue;
-						} else if ('K' == c) {
+						}
+						if ('K' == c) {
 							tcsendbreak(STDOUT_FILENO, 0);
 							len--;
 							continue;
-						} else {
-							buf--;
 						}
+						buf--;
 					}
-					if (safe_write(STDOUT_FILENO, buf, 1) > 0) {
-						len--;
-						buf++;
-					} else
+					if (safe_write(STDOUT_FILENO, buf, 1) != 1)
 						break;
-				}
+					len--;
+					buf++;
 #else
-//				if (len) {
-					alarm(timeout);
 					len -= full_write(STDOUT_FILENO, buf, len);
-					alarm(0);
-//				}
 #endif
+				} /* while (can write) */
+				alarm(0);
 
 				// report I/O error if there still exists at least one non-sent char
 				if (len)
@@ -427,14 +502,12 @@ int chat_main(int argc UNUSED_PARAM, char **argv)
 				else if (!nocr)
 					xwrite(STDOUT_FILENO, "\r", 1);
 #endif
-
 				// bail out unless we sent command successfully
 				if (exitcode)
 					break;
-
-			}
+			} /* if (*argv) */
 		}
-	}
+	} /* while (*argv) */
 
 #if ENABLE_FEATURE_CHAT_TTY_HIFI
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tio0);

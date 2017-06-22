@@ -18,97 +18,50 @@
    02111-1307 USA.  */
 
 /*
- *	POSIX Standard: 9.2.2 User Database Access	<pwd.h>
+ * POSIX Standard: 9.2.2 User Database Access	<pwd.h>
  */
 
-#ifndef	BB_PWD_H
-#define	BB_PWD_H 1
+#ifndef BB_PWD_H
+#define BB_PWD_H 1
 
-#if __GNUC_PREREQ(4,1)
-# pragma GCC visibility push(hidden)
-#endif
+PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 
 /* This file is #included after #include <pwd.h>
  * We will use libc-defined structures, but will #define function names
  * so that function calls are directed to bb_internal_XXX replacements
  */
-
+#undef endpwent
 #define setpwent    bb_internal_setpwent
 #define endpwent    bb_internal_endpwent
 #define getpwent    bb_internal_getpwent
-#define fgetpwent   bb_internal_fgetpwent
-#define putpwent    bb_internal_putpwent
 #define getpwuid    bb_internal_getpwuid
 #define getpwnam    bb_internal_getpwnam
-#define getpwent_r  bb_internal_getpwent_r
-#define getpwuid_r  bb_internal_getpwuid_r
 #define getpwnam_r  bb_internal_getpwnam_r
-#define fgetpwent_r bb_internal_fgetpwent_r
-//#define getpw       bb_internal_getpw
-
 
 /* All function names below should be remapped by #defines above
  * in order to not collide with libc names. */
 
-
 /* Rewind the password-file stream.  */
-extern void setpwent(void);
+void FAST_FUNC setpwent(void);
 
 /* Close the password-file stream.  */
-extern void endpwent(void);
+void FAST_FUNC endpwent(void);
 
 /* Read an entry from the password-file stream, opening it if necessary.  */
-extern struct passwd *getpwent(void);
-
-/* Read an entry from STREAM.  */
-extern struct passwd *fgetpwent(FILE *__stream);
-
-/* Write the given entry onto the given stream.  */
-extern int putpwent(const struct passwd *__restrict __p,
-		     FILE *__restrict __f);
+struct passwd* FAST_FUNC getpwent(void);
 
 /* Search for an entry with a matching user ID.  */
-extern struct passwd *getpwuid(uid_t __uid);
+struct passwd* FAST_FUNC getpwuid(uid_t __uid);
 
 /* Search for an entry with a matching username.  */
-extern struct passwd *getpwnam(const char *__name);
+struct passwd* FAST_FUNC getpwnam(const char *__name);
 
-/* Reentrant versions of some of the functions above.
+/* Reentrant versions of some of the functions above. */
+int FAST_FUNC getpwnam_r(const char *__restrict __name,
+		struct passwd *__restrict __resultbuf,
+		char *__restrict __buffer, size_t __buflen,
+		struct passwd **__restrict __result);
 
-   PLEASE NOTE: the `getpwent_r' function is not (yet) standardized.
-   The interface may change in later versions of this library.  But
-   the interface is designed following the principals used for the
-   other reentrant functions so the chances are good this is what the
-   POSIX people would choose.  */
+POP_SAVED_FUNCTION_VISIBILITY
 
-extern int getpwent_r(struct passwd *__restrict __resultbuf,
-		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
-
-extern int getpwuid_r(uid_t __uid,
-		       struct passwd *__restrict __resultbuf,
-		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
-
-extern int getpwnam_r(const char *__restrict __name,
-		       struct passwd *__restrict __resultbuf,
-		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
-
-/* Read an entry from STREAM.  This function is not standardized and
-   probably never will.  */
-extern int fgetpwent_r(FILE *__restrict __stream,
-			struct passwd *__restrict __resultbuf,
-			char *__restrict __buffer, size_t __buflen,
-			struct passwd **__restrict __result);
-
-/* Re-construct the password-file line for the given uid
-   in the given buffer.  This knows the format that the caller
-   will expect, but this need not be the format of the password file.  */
-/* UNUSED extern int getpw(uid_t __uid, char *__buffer); */
-
-#if __GNUC_PREREQ(4,1)
-# pragma GCC visibility pop
 #endif
-
-#endif /* pwd.h  */

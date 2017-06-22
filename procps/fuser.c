@@ -4,11 +4,32 @@
  *
  * Copyright 2004 Tony J. White
  *
- * May be distributed under the conditions of the
- * GNU Library General Public License
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+//config:config FUSER
+//config:	bool "fuser"
+//config:	default y
+//config:	help
+//config:	  fuser lists all PIDs (Process IDs) that currently have a given
+//config:	  file open. fuser can also list all PIDs that have a given network
+//config:	  (TCP or UDP) port open.
+
+//applet:IF_FUSER(APPLET(fuser, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_FUSER) += fuser.o
+
+//usage:#define fuser_trivial_usage
+//usage:       "[OPTIONS] FILE or PORT/PROTO"
+//usage:#define fuser_full_usage "\n\n"
+//usage:       "Find processes which use FILEs or PORTs\n"
+//usage:     "\n	-m	Find processes which use same fs as FILEs"
+//usage:     "\n	-4,-6	Search only IPv4/IPv6 space"
+//usage:     "\n	-s	Don't display PIDs"
+//usage:     "\n	-k	Kill found processes"
+//usage:     "\n	-SIGNAL	Signal to send (default: KILL)"
 
 #include "libbb.h"
+#include "common_bufsiz.h"
 
 #define MAX_LINE 255
 
@@ -27,120 +48,47 @@ typedef struct inode_list {
 	dev_t dev;
 } inode_list;
 
-typedef struct pid_list {
-	struct pid_list *next;
-	pid_t pid;
-} pid_list;
+struct globals {
+	int recursion_depth;
+	pid_t mypid;
+	inode_list *inode_list_head;
+	smallint kill_failed;
+	int killsig;
+} FIX_ALIASING;
+#define G (*(struct globals*)bb_common_bufsiz1)
+#define INIT_G() do { \
+	setup_common_bufsiz(); \
+	G.mypid = getpid(); \
+	G.killsig = SIGKILL; \
+} while (0)
 
-static dev_t find_socket_dev(void)
+static void add_inode(const struct stat *st)
 {
-	int fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd >= 0) {
-		struct stat buf;
-		int r = fstat(fd, &buf);
-		close(fd);
-		if (r == 0)
-			return buf.st_dev;
-	}
-	return 0;
-}
+	inode_list **curr = &G.inode_list_head;
 
-static int file_to_dev_inode(const char *filename, dev_t *dev, ino_t *inode)
-{
-	struct stat f_stat;
-	if (stat(filename, &f_stat))
-		return 0;
-	*inode = f_stat.st_ino;
-	*dev = f_stat.st_dev;
-	return 1;
-}
-
-static char *parse_net_arg(const char *arg, unsigned *port)
-{
-	char path[20], tproto[5];
-
-	if (sscanf(arg, "%u/%4s", port, tproto) != 2)
-		return NULL;
-	sprintf(path, "/proc/net/%s", tproto);
-	if (access(path, R_OK) != 0)
-		return NULL;
-	return xstrdup(tproto);
-}
-
-static pid_list *add_pid(pid_list *plist, pid_t pid)
-{
-	pid_list *curr = plist;
-	while (curr != NULL) {
-		if (curr->pid == pid)
-			return plist;
-		curr = curr->next;
-	}
-	curr = xmalloc(sizeof(pid_list));
-	curr->pid = pid;
-	curr->next = plist;
-	return curr;
-}
-
-static inode_list *add_inode(inode_list *ilist, dev_t dev, ino_t inode)
-{
-	inode_list *curr = ilist;
-	while (curr != NULL) {
-		if (curr->inode == inode && curr->dev == dev)
-			return ilist;
-		curr = curr->next;
-	}
-	curr = xmalloc(sizeof(inode_list));
-	curr->dev = dev;
-	curr->inode = inode;
-	curr->next = ilist;
-	return curr;
-}
-
-static inode_list *scan_proc_net(const char *proto,
-				unsigned port, inode_list *ilist)
-{
-	char path[20], line[MAX_LINE + 1];
-	ino_t tmp_inode;
-	dev_t tmp_dev;
-	long long uint64_inode;
-	unsigned tmp_port;
-	FILE *f;
-
-	tmp_dev = find_socket_dev();
-
-	sprintf(path, "/proc/net/%s", proto);
-	f = fopen_for_read(path);
-	if (!f)
-		return ilist;
-
-	while (fgets(line, MAX_LINE, f)) {
-		char addr[68];
-		if (sscanf(line, "%*d: %64[0-9A-Fa-f]:%x %*x:%*x %*x %*x:%*x "
-				"%*x:%*x %*x %*d %*d %llu",
-				addr, &tmp_port, &uint64_inode) == 3
+	while (*curr) {
+		if ((*curr)->dev == st->st_dev
+		 && (*curr)->inode == st->st_ino
 		) {
-			int len = strlen(addr);
-			if (len == 8 && (option_mask32 & OPT_IP6))
-				continue;
-			if (len > 8 && (option_mask32 & OPT_IP4))
-				continue;
-			if (tmp_port == port) {
-				tmp_inode = uint64_inode;
-				ilist = add_inode(ilist, tmp_dev, tmp_inode);
-			}
+			return;
 		}
+		curr = &(*curr)->next;
 	}
-	fclose(f);
-	return ilist;
+
+	*curr = xzalloc(sizeof(inode_list));
+	(*curr)->dev = st->st_dev;
+	(*curr)->inode = st->st_ino;
 }
 
-static int search_dev_inode(inode_list *ilist, dev_t dev, ino_t inode)
+static smallint search_dev_inode(const struct stat *st)
 {
+	inode_list *ilist = G.inode_list_head;
+
 	while (ilist) {
-		if (ilist->dev == dev) {
+		if (ilist->dev == st->st_dev) {
 			if (option_mask32 & OPT_MOUNT)
 				return 1;
-			if (ilist->inode == inode)
+			if (ilist->inode == st->st_ino)
 				return 1;
 		}
 		ilist = ilist->next;
@@ -148,165 +96,202 @@ static int search_dev_inode(inode_list *ilist, dev_t dev, ino_t inode)
 	return 0;
 }
 
-static pid_list *scan_pid_maps(const char *fname, pid_t pid,
-				inode_list *ilist, pid_list *plist)
+enum {
+	PROC_NET = 0,
+	PROC_DIR,
+	PROC_DIR_LINKS,
+	PROC_SUBDIR_LINKS,
+};
+
+static smallint scan_proc_net_or_maps(const char *path, unsigned port)
 {
-	FILE *file;
-	char line[MAX_LINE + 1];
-	int major, minor;
-	ino_t inode;
+	FILE *f;
+	char line[MAX_LINE + 1], addr[68];
+	int major, minor, r;
 	long long uint64_inode;
-	dev_t dev;
+	unsigned tmp_port;
+	smallint retval;
+	struct stat statbuf;
+	const char *fmt;
+	void *fag, *sag;
 
-	file = fopen_for_read(fname);
-	if (!file)
-		return plist;
-	while (fgets(line, MAX_LINE, file)) {
-		if (sscanf(line, "%*s %*s %*s %x:%x %llu", &major, &minor, &uint64_inode) != 3)
-			continue;
-		inode = uint64_inode;
-		if (major == 0 && minor == 0 && inode == 0)
-			continue;
-		dev = makedev(major, minor);
-		if (search_dev_inode(ilist, dev, inode))
-			plist = add_pid(plist, pid);
+	f = fopen_for_read(path);
+	if (!f)
+		return 0;
+
+	if (G.recursion_depth == PROC_NET) {
+		int fd;
+
+		/* find socket dev */
+		statbuf.st_dev = 0;
+		fd = socket(AF_INET, SOCK_DGRAM, 0);
+		if (fd >= 0) {
+			fstat(fd, &statbuf);
+			close(fd);
+		}
+
+		fmt = "%*d: %64[0-9A-Fa-f]:%x %*x:%*x %*x "
+			"%*x:%*x %*x:%*x %*x %*d %*d %llu";
+		fag = addr;
+		sag = &tmp_port;
+	} else {
+		fmt = "%*s %*s %*s %x:%x %llu";
+		fag = &major;
+		sag = &minor;
 	}
-	fclose(file);
-	return plist;
-}
 
-static pid_list *scan_link(const char *lname, pid_t pid,
-				inode_list *ilist, pid_list *plist)
-{
-	ino_t inode;
-	dev_t dev;
-
-	if (!file_to_dev_inode(lname, &dev, &inode))
-		return plist;
-	if (search_dev_inode(ilist, dev, inode))
-		plist = add_pid(plist, pid);
-	return plist;
-}
-
-static pid_list *scan_dir_links(const char *dname, pid_t pid,
-				inode_list *ilist, pid_list *plist)
-{
-	DIR *d;
-	struct dirent *de;
-	char *lname;
-
-	d = opendir(dname);
-	if (!d)
-		return plist;
-	while ((de = readdir(d)) != NULL) {
-		lname = concat_subpath_file(dname, de->d_name);
-		if (lname == NULL)
+	retval = 0;
+	while (fgets(line, MAX_LINE, f)) {
+		r = sscanf(line, fmt, fag, sag, &uint64_inode);
+		if (r != 3)
 			continue;
-		plist = scan_link(lname, pid, ilist, plist);
-		free(lname);
-	}
-	closedir(d);
-	return plist;
-}
 
-/* NB: does chdir internally */
-static pid_list *scan_proc_pids(inode_list *ilist)
-{
-	DIR *d;
-	struct dirent *de;
-	pid_t pid;
-	pid_list *plist;
-
-	xchdir("/proc");
-	d = opendir("/proc");
-	if (!d)
-		return NULL;
-
-	plist = NULL;
-	while ((de = readdir(d)) != NULL) {
-		pid = (pid_t)bb_strtou(de->d_name, NULL, 10);
-		if (errno)
-			continue;
-		if (chdir(de->d_name) < 0)
-			continue;
-		plist = scan_link("cwd", pid, ilist, plist);
-		plist = scan_link("exe", pid, ilist, plist);
-		plist = scan_link("root", pid, ilist, plist);
-		plist = scan_dir_links("fd", pid, ilist, plist);
-		plist = scan_dir_links("lib", pid, ilist, plist);
-		plist = scan_dir_links("mmap", pid, ilist, plist);
-		plist = scan_pid_maps("maps", pid, ilist, plist);
-		xchdir("/proc");
-	}
-	closedir(d);
-	return plist;
-}
-
-static int print_pid_list(pid_list *plist)
-{
-	while (plist != NULL) {
-		printf("%u ", (unsigned)plist->pid);
-		plist = plist->next;
-	}
-	bb_putchar('\n');
-	return 1;
-}
-
-static int kill_pid_list(pid_list *plist, int sig)
-{
-	pid_t mypid = getpid();
-	int success = 1;
-
-	while (plist != NULL) {
-		if (plist->pid != mypid) {
-			if (kill(plist->pid, sig) != 0) {
-				bb_perror_msg("kill pid %u", (unsigned)plist->pid);
-				success = 0;
+		statbuf.st_ino = uint64_inode;
+		if (G.recursion_depth == PROC_NET) {
+			r = strlen(addr);
+			if (r == 8 && (option_mask32 & OPT_IP6))
+				continue;
+			if (r > 8 && (option_mask32 & OPT_IP4))
+				continue;
+			if (tmp_port == port)
+				add_inode(&statbuf);
+		} else {
+			if (major != 0 && minor != 0 && statbuf.st_ino != 0) {
+				statbuf.st_dev = makedev(major, minor);
+				retval = search_dev_inode(&statbuf);
+				if (retval)
+					break;
 			}
 		}
-		plist = plist->next;
 	}
-	return success;
+	fclose(f);
+
+	return retval;
+}
+
+static smallint scan_recursive(const char *path)
+{
+	DIR *d;
+	struct dirent *d_ent;
+	smallint stop_scan;
+	smallint retval;
+
+	d = opendir(path);
+	if (d == NULL)
+		return 0;
+
+	G.recursion_depth++;
+	retval = 0;
+	stop_scan = 0;
+	while (!stop_scan && (d_ent = readdir(d)) != NULL) {
+		struct stat statbuf;
+		pid_t pid;
+		char *subpath;
+
+		subpath = concat_subpath_file(path, d_ent->d_name);
+		if (subpath == NULL)
+			continue; /* . or .. */
+
+		switch (G.recursion_depth) {
+		case PROC_DIR:
+			pid = (pid_t)bb_strtou(d_ent->d_name, NULL, 10);
+			if (errno != 0
+			 || pid == G.mypid
+			/* "this PID doesn't use specified FILEs or PORT/PROTO": */
+			 || scan_recursive(subpath) == 0
+			) {
+				break;
+			}
+			if (option_mask32 & OPT_KILL) {
+				if (kill(pid, G.killsig) != 0) {
+					bb_perror_msg("kill pid %s", d_ent->d_name);
+					G.kill_failed = 1;
+				}
+			}
+			if (!(option_mask32 & OPT_SILENT))
+				printf("%s ", d_ent->d_name);
+			retval = 1;
+			break;
+
+		case PROC_DIR_LINKS:
+			switch (
+				index_in_substrings(
+					"cwd"  "\0" "exe"  "\0"
+					"root" "\0" "fd"   "\0"
+					"lib"  "\0" "mmap" "\0"
+					"maps" "\0",
+					d_ent->d_name
+				)
+			) {
+			enum {
+				CWD_LINK,
+				EXE_LINK,
+				ROOT_LINK,
+				FD_DIR_LINKS,
+				LIB_DIR_LINKS,
+				MMAP_DIR_LINKS,
+				MAPS,
+			};
+			case CWD_LINK:
+			case EXE_LINK:
+			case ROOT_LINK:
+				goto scan_link;
+			case FD_DIR_LINKS:
+			case LIB_DIR_LINKS:
+			case MMAP_DIR_LINKS:
+				stop_scan = scan_recursive(subpath);
+				if (stop_scan)
+					retval = stop_scan;
+				break;
+			case MAPS:
+				stop_scan = scan_proc_net_or_maps(subpath, 0);
+				if (stop_scan)
+					retval = stop_scan;
+			default:
+				break;
+			}
+			break;
+		case PROC_SUBDIR_LINKS:
+  scan_link:
+			if (stat(subpath, &statbuf) < 0)
+				break;
+			stop_scan = search_dev_inode(&statbuf);
+			if (stop_scan)
+				retval = stop_scan;
+		default:
+			break;
+		}
+		free(subpath);
+	}
+	closedir(d);
+	G.recursion_depth--;
+	return retval;
 }
 
 int fuser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int fuser_main(int argc UNUSED_PARAM, char **argv)
 {
-	pid_list *plist;
-	inode_list *ilist;
 	char **pp;
-	dev_t dev;
-	ino_t inode;
-	unsigned port;
-	int opt;
-	int success;
-	int killsig;
-/*
-fuser [options] FILEs or PORT/PROTOs
-Find processes which use FILEs or PORTs
-        -m      Find processes which use same fs as FILEs
-        -4      Search only IPv4 space
-        -6      Search only IPv6 space
-        -s      Silent: just exit with 0 if any processes are found
-        -k      Kill found processes (otherwise display PIDs)
-        -SIGNAL Signal to send (default: TERM)
-*/
+
+	INIT_G();
+
 	/* Handle -SIGNAL. Oh my... */
-	killsig = SIGTERM;
 	pp = argv;
 	while (*++pp) {
+		int sig;
 		char *arg = *pp;
+
 		if (arg[0] != '-')
 			continue;
 		if (arg[1] == '-' && arg[2] == '\0') /* "--" */
 			break;
 		if ((arg[1] == '4' || arg[1] == '6') && arg[2] == '\0')
 			continue; /* it's "-4" or "-6" */
-		opt = get_signum(&arg[1]);
-		if (opt < 0)
+		sig = get_signum(&arg[1]);
+		if (sig < 0)
 			continue;
 		/* "-SIGNAL" option found. Remove it and bail out */
-		killsig = opt;
+		G.killsig = sig;
 		do {
 			pp[0] = arg = pp[1];
 			pp++;
@@ -314,33 +299,36 @@ Find processes which use FILEs or PORTs
 		break;
 	}
 
-	opt = getopt32(argv, OPTION_STRING);
+	opt_complementary = "-1"; /* at least one param */
+	getopt32(argv, OPTION_STRING);
 	argv += optind;
 
-	ilist = NULL;
 	pp = argv;
 	while (*pp) {
-		char *proto = parse_net_arg(*pp, &port);
-		if (proto) { /* PORT/PROTO */
-			ilist = scan_proc_net(proto, port, ilist);
-			free(proto);
-		} else { /* FILE */
-			if (!file_to_dev_inode(*pp, &dev, &inode))
-				bb_perror_msg_and_die("can't open %s", *pp);
-			ilist = add_inode(ilist, dev, inode);
+		/* parse net arg */
+		unsigned port;
+		char path[sizeof("/proc/net/TCP6")];
+
+		strcpy(path, "/proc/net/");
+		if (sscanf(*pp, "%u/%4s", &port, path + sizeof("/proc/net/")-1) == 2
+		 && access(path, R_OK) == 0
+		) {
+			/* PORT/PROTO */
+			scan_proc_net_or_maps(path, port);
+		} else {
+			/* FILE */
+			struct stat statbuf;
+			xstat(*pp, &statbuf);
+			add_inode(&statbuf);
 		}
 		pp++;
 	}
 
-	plist = scan_proc_pids(ilist); /* changes dir to "/proc" */
-
-	if (!plist)
-		return EXIT_FAILURE;
-	success = 1;
-	if (opt & OPT_KILL) {
-		success = kill_pid_list(plist, killsig);
-	} else if (!(opt & OPT_SILENT)) {
-		success = print_pid_list(plist);
+	if (scan_recursive("/proc")) {
+		if (!(option_mask32 & OPT_SILENT))
+			bb_putchar('\n');
+		return G.kill_failed;
 	}
-	return (success != 1); /* 0 == success */
+
+	return EXIT_FAILURE;
 }

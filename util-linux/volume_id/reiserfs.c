@@ -19,6 +19,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:lib-$(CONFIG_FEATURE_VOLUMEID_REISERFS) += reiserfs.o
+
+//config:
+//config:config FEATURE_VOLUMEID_REISERFS
+//config:	bool "Reiser filesystem"
+//config:	default y
+//config:	depends on VOLUMEID
+//config:	help
+//config:	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct reiserfs_super_block {
@@ -35,7 +46,7 @@ struct reiserfs_super_block {
 	uint32_t	dummy4[5];
 	uint8_t		uuid[16];
 	uint8_t		label[16];
-} __attribute__((__packed__));
+} PACKED;
 
 struct reiser4_super_block {
 	uint8_t		magic[16];
@@ -43,13 +54,14 @@ struct reiser4_super_block {
 	uint8_t		uuid[16];
 	uint8_t		label[16];
 	uint64_t	dummy2;
-} __attribute__((__packed__));
+} PACKED;
 
 #define REISERFS1_SUPERBLOCK_OFFSET		0x2000
 #define REISERFS_SUPERBLOCK_OFFSET		0x10000
 
-int volume_id_probe_reiserfs(struct volume_id *id, uint64_t off)
+int FAST_FUNC volume_id_probe_reiserfs(struct volume_id *id /*,uint64_t off*/)
 {
+#define off ((uint64_t)0)
 	struct reiserfs_super_block *rs;
 	struct reiser4_super_block *rs4;
 
@@ -106,7 +118,7 @@ int volume_id_probe_reiserfs(struct volume_id *id, uint64_t off)
 
  found:
 //	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
-//	id->type = "reiserfs";
+	IF_FEATURE_BLKID_TYPE(id->type = "reiserfs";)
 
 	return 0;
 }

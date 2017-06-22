@@ -5,34 +5,60 @@
  * Copyright (C) 2004  Peter Willis <psyphreak@phreaker.net>
  * Copyright (C) 2005  Tito Ragusa <farmatito@tiscali.it>
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /*
  * This is a simple hack of eject based on something Erik posted in #uclibc.
  * Most of the dirty work blatantly ripped off from cat.c =)
  */
+//config:config EJECT
+//config:	bool "eject"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	help
+//config:	  Used to eject cdroms. (defaults to /dev/cdrom)
+//config:
+//config:config FEATURE_EJECT_SCSI
+//config:	bool "SCSI support"
+//config:	default y
+//config:	depends on EJECT
+//config:	help
+//config:	  Add the -s option to eject, this allows to eject SCSI-Devices and
+//config:	  usb-storage devices.
 
+//applet:IF_EJECT(APPLET(eject, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EJECT) += eject.o
+
+//usage:#define eject_trivial_usage
+//usage:       "[-t] [-T] [DEVICE]"
+//usage:#define eject_full_usage "\n\n"
+//usage:       "Eject DEVICE or default /dev/cdrom\n"
+//usage:	IF_FEATURE_EJECT_SCSI(
+//usage:     "\n	-s	SCSI device"
+//usage:	)
+//usage:     "\n	-t	Close tray"
+//usage:     "\n	-T	Open/close tray (toggle)"
+
+#include <sys/mount.h>
 #include "libbb.h"
-
-/* various defines swiped from linux/cdrom.h */
-#define CDROMCLOSETRAY            0x5319  /* pendant of CDROMEJECT  */
-#define CDROMEJECT                0x5309  /* Ejects the cdrom media */
-#define CDROM_DRIVE_STATUS        0x5326  /* Get tray position, etc. */
-/* drive status possibilities returned by CDROM_DRIVE_STATUS ioctl */
-#define CDS_TRAY_OPEN        2
+#if ENABLE_FEATURE_EJECT_SCSI
+/* Must be after libbb.h: they need size_t */
+# include "fix_u32.h"
+# include <scsi/sg.h>
+# include <scsi/scsi.h>
+#endif
 
 #define dev_fd 3
 
 /* Code taken from the original eject (http://eject.sourceforge.net/),
  * refactored it a bit for busybox (ne-bb@nicoerfurth.de) */
 
-#include <scsi/sg.h>
-#include <scsi/scsi.h>
-
+#if ENABLE_FEATURE_EJECT_SCSI
 static void eject_scsi(const char *dev)
 {
-	static const char sg_commands[3][6] = {
+	static const char sg_commands[3][6] ALIGN1 = {
 		{ ALLOW_MEDIUM_REMOVAL, 0, 0, 0, 0, 0 },
 		{ START_STOP, 0, 0, 0, 1, 0 },
 		{ START_STOP, 0, 0, 0, 2, 0 }
@@ -64,6 +90,16 @@ static void eject_scsi(const char *dev)
 	/* force kernel to reread partition table when new disc is inserted */
 	ioctl(dev_fd, BLKRRPART);
 }
+#else
+# define eject_scsi(dev) ((void)0)
+#endif
+
+/* various defines swiped from linux/cdrom.h */
+#define CDROMCLOSETRAY            0x5319  /* pendant of CDROMEJECT  */
+#define CDROMEJECT                0x5309  /* Ejects the cdrom media */
+#define CDROM_DRIVE_STATUS        0x5326  /* Get tray position, etc. */
+/* drive status possibilities returned by CDROM_DRIVE_STATUS ioctl */
+#define CDS_TRAY_OPEN        2
 
 #define FLAG_CLOSE  1
 #define FLAG_SMART  2
@@ -74,7 +110,7 @@ static void eject_cdrom(unsigned flags, const char *dev)
 	int cmd = CDROMEJECT;
 
 	if (flags & FLAG_CLOSE
-	 || (flags & FLAG_SMART && ioctl(dev_fd, CDROM_DRIVE_STATUS) == CDS_TRAY_OPEN)
+	 || ((flags & FLAG_SMART) && ioctl(dev_fd, CDROM_DRIVE_STATUS) == CDS_TRAY_OPEN)
 	) {
 		cmd = CDROMCLOSETRAY;
 	}
@@ -89,7 +125,7 @@ int eject_main(int argc UNUSED_PARAM, char **argv)
 	const char *device;
 
 	opt_complementary = "?1:t--T:T--t";
-	flags = getopt32(argv, "tT" USE_FEATURE_EJECT_SCSI("s"));
+	flags = getopt32(argv, "tT" IF_FEATURE_EJECT_SCSI("s"));
 	device = argv[optind] ? argv[optind] : "/dev/cdrom";
 
 	/* We used to do "umount <device>" here, but it was buggy
@@ -102,7 +138,7 @@ int eject_main(int argc UNUSED_PARAM, char **argv)
 	   eject /dev/cdrom
 	*/
 
-	xmove_fd(xopen(device, O_RDONLY|O_NONBLOCK), dev_fd);
+	xmove_fd(xopen_nonblocking(device), dev_fd);
 
 	if (ENABLE_FEATURE_EJECT_SCSI && (flags & FLAG_SCSI))
 		eject_scsi(device);

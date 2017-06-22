@@ -6,17 +6,16 @@
  *
  * Optimize and correcting OCRNL by Vladimir Oleynik <dzo@simtreas.ru>
  *
- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
-#include <sys/param.h>  /* MAXHOSTNAMELEN */
-#include <sys/utsname.h>
 #include "libbb.h"
+/* After libbb.h, since it needs sys/types.h on some systems */
+#include <sys/utsname.h>
 
 #define LOGIN " login: "
 
 static const char fmtstr_d[] ALIGN1 = "%A, %d %B %Y";
-static const char fmtstr_t[] ALIGN1 = "%H:%M:%S";
 
 void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 {
@@ -30,7 +29,7 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 	time(&t);
 	uname(&uts);
 
-	puts("\r");	/* start a new line */
+	puts("\r");  /* start a new line */
 
 	fp = fopen_for_read(issue_file);
 	if (!fp)
@@ -46,6 +45,45 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 		if (c == '\\' || c == '%') {
 			c = fgetc(fp);
 			switch (c) {
+//From getty manpage (* - supported by us)
+//========================================
+//4 or 4{interface}
+//  Insert the IPv4 address of the network interface (example: \4{eth0}).
+//  If the interface argument is not specified, then select the first
+//  fully configured (UP, non-LOOPBACK, RUNNING) interface.
+//6 or 6{interface} -- The same as \4 but for IPv6.
+//b -- Insert the baudrate of the current line.
+//*d -- Insert the current date.
+//*t -- Insert the current time.
+//e or e{name}
+//  Translate the human-readable name to an escape sequence and insert it
+//  (for example: \e{red}Alert text.\e{reset}).  If the name argument
+//  is not specified, then insert \033. The currently supported names are:
+//  black, blink, blue, bold, brown, cyan, darkgray, gray, green, halfbright,
+//  lightblue, lightcyan, lightgray, lightgreen, lightmagenta, lightred,
+//  magenta, red, reset, reverse, and yellow. Unknown names are ignored.
+//*s
+//  Insert the system name (the name of the operating system - `uname -s`)
+//*S or S{VARIABLE}
+//  Insert the VARIABLE data from /etc/os-release.
+//  If the VARIABLE argument is not specified, use PRETTY_NAME.
+//  If PRETTY_NAME is not in /etc/os-release, \S is the same as \s.
+//*l -- Insert the name of the current tty line.
+//*m -- Insert the architecture identifier of the machine: `uname -m`.
+//*n -- Insert the nodename of the machine: `uname -n`.
+//*o -- Insert the NIS domainname of the machine.  Same as `hostname -d'.
+//*O -- Insert the DNS domainname of the machine.
+//*r -- Insert the release number of the OS: `uname -r`.
+//u -- Insert the number of current users logged in.
+//U -- Insert the string "1 user" or "N users" (current users logged in).
+//*v -- Insert the version of the OS, e.g. the build-date etc: `uname -v`.
+//We also implement:
+//*D -- same as \O "DNS domainname"
+//*h -- same as \n "nodename"
+
+			case 'S':
+				/* minimal implementation, not reading /etc/os-release */
+				/*FALLTHROUGH*/
 			case 's':
 				outbuf = uts.sysname;
 				break;
@@ -62,15 +100,19 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 			case 'm':
 				outbuf = uts.machine;
 				break;
+/* The field domainname of struct utsname is Linux specific. */
+#if defined(__linux__)
 			case 'D':
 			case 'o':
+			case 'O':
 				outbuf = uts.domainname;
 				break;
+#endif
 			case 'd':
 				strftime(buf, sizeof(buf), fmtstr_d, localtime(&t));
 				break;
 			case 't':
-				strftime(buf, sizeof(buf), fmtstr_t, localtime(&t));
+				strftime_HHMMSS(buf, sizeof(buf), &t);
 				break;
 			case 'l':
 				outbuf = tty;
@@ -82,7 +124,7 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 		fputs(outbuf, stdout);
 	}
 	fclose(fp);
-	fflush(stdout);
+	fflush_all();
 }
 
 void FAST_FUNC print_login_prompt(void)
@@ -91,7 +133,7 @@ void FAST_FUNC print_login_prompt(void)
 
 	fputs(hostname, stdout);
 	fputs(LOGIN, stdout);
-	fflush(stdout);
+	fflush_all();
 	free(hostname);
 }
 

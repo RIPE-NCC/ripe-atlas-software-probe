@@ -6,7 +6,7 @@
  * Copyright (C) 2000 by Daniel Jacobowitz
  * Written by Daniel Jacobowitz <dan@debian.org>
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
 
 /* Coreutils 6.12 man page says:
@@ -30,7 +30,35 @@
  *        a  directory:  $TMPDIR, if set; else the directory specified via
  *        -p; else /tmp [deprecated]
  */
+//config:config MKTEMP
+//config:	bool "mktemp"
+//config:	default y
+//config:	help
+//config:	  mktemp is used to create unique temporary files
 
+//applet:IF_MKTEMP(APPLET(mktemp, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_MKTEMP) += mktemp.o
+
+//usage:#define mktemp_trivial_usage
+//usage:       "[-dt] [-p DIR] [TEMPLATE]"
+//usage:#define mktemp_full_usage "\n\n"
+//usage:       "Create a temporary file with name based on TEMPLATE and print its name.\n"
+//usage:       "TEMPLATE must end with XXXXXX (e.g. [/dir/]nameXXXXXX).\n"
+//usage:       "Without TEMPLATE, -t tmp.XXXXXX is assumed.\n"
+//usage:     "\n	-d	Make directory, not file"
+//usage:     "\n	-q	Fail silently on errors"
+//usage:     "\n	-t	Prepend base directory name to TEMPLATE"
+//usage:     "\n	-p DIR	Use DIR as a base directory (implies -t)"
+//usage:     "\n	-u	Do not create anything; print a name"
+//usage:     "\n"
+//usage:     "\nBase directory is: -p DIR, else $TMPDIR, else /tmp"
+//usage:
+//usage:#define mktemp_example_usage
+//usage:       "$ mktemp /tmp/temp.XXXXXX\n"
+//usage:       "/tmp/temp.mWiLjM\n"
+//usage:       "$ ls -la /tmp/temp.mWiLjM\n"
+//usage:       "-rw-------    1 andersen andersen        0 Apr 25 17:10 /tmp/temp.mWiLjM\n"
 
 #include "libbb.h"
 
@@ -39,31 +67,56 @@ int mktemp_main(int argc UNUSED_PARAM, char **argv)
 {
 	const char *path;
 	char *chp;
-	unsigned opt;
+	unsigned opts;
+	enum {
+		OPT_d = 1 << 0,
+		OPT_q = 1 << 1,
+		OPT_t = 1 << 2,
+		OPT_p = 1 << 3,
+		OPT_u = 1 << 4,
+	};
+
+	path = getenv("TMPDIR");
+	if (!path || path[0] == '\0')
+		path = "/tmp";
 
 	opt_complementary = "?1"; /* 1 argument max */
-	opt = getopt32(argv, "dqtp:", &path);
-	chp = argv[optind] ? argv[optind] : xstrdup("tmp.XXXXXX");
+	opts = getopt32(argv, "dqtp:u", &path);
 
-	if (opt & (4|8)) { /* -t and/or -p */
-		const char *dir = getenv("TMPDIR");
-		if (dir && *dir != '\0')
-			path = dir;
-		else if (!(opt & 8)) /* no -p */
-			path = "/tmp/";
-		/* else path comes from -p DIR */
-		chp = concat_path_file(path, chp);
+	chp = argv[optind];
+	if (!chp) {
+		/* GNU coreutils 8.4:
+		 * bare "mktemp" -> "mktemp -t tmp.XXXXXX"
+		 */
+		chp = xstrdup("tmp.XXXXXX");
+		opts |= OPT_t;
 	}
+#if 0
+	/* Don't allow directory separator in template */
+	if ((opts & OPT_t) && bb_basename(chp) != chp) {
+		errno = EINVAL;
+		goto error;
+	}
+#endif
+	if (opts & (OPT_t|OPT_p))
+		chp = concat_path_file(path, chp);
 
-	if (opt & 1) { /* -d */
+	if (opts & OPT_u) {
+		chp = mktemp(chp);
+		if (chp[0] == '\0')
+			goto error;
+	} else if (opts & OPT_d) {
 		if (mkdtemp(chp) == NULL)
-			return EXIT_FAILURE;
+			goto error;
 	} else {
 		if (mkstemp(chp) < 0)
-			return EXIT_FAILURE;
+			goto error;
 	}
-
 	puts(chp);
-
 	return EXIT_SUCCESS;
+ error:
+	if (opts & OPT_q)
+		return EXIT_FAILURE;
+	/* don't use chp as it gets mangled in case of error */
+	bb_perror_nomsg_and_die();
 }

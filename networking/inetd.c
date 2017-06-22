@@ -153,15 +153,84 @@
  *                      setgid(specified group)
  *                      setuid()
  */
+//config:config INETD
+//config:	bool "inetd"
+//config:	default y
+//config:	select FEATURE_SYSLOG
+//config:	help
+//config:	  Internet superserver daemon
+//config:
+//config:config FEATURE_INETD_SUPPORT_BUILTIN_ECHO
+//config:	bool "Support echo service"
+//config:	default y
+//config:	depends on INETD
+//config:	help
+//config:	  Echo received data internal inetd service
+//config:
+//config:config FEATURE_INETD_SUPPORT_BUILTIN_DISCARD
+//config:	bool "Support discard service"
+//config:	default y
+//config:	depends on INETD
+//config:	help
+//config:	  Internet /dev/null internal inetd service
+//config:
+//config:config FEATURE_INETD_SUPPORT_BUILTIN_TIME
+//config:	bool "Support time service"
+//config:	default y
+//config:	depends on INETD
+//config:	help
+//config:	  Return 32 bit time since 1900 internal inetd service
+//config:
+//config:config FEATURE_INETD_SUPPORT_BUILTIN_DAYTIME
+//config:	bool "Support daytime service"
+//config:	default y
+//config:	depends on INETD
+//config:	help
+//config:	  Return human-readable time internal inetd service
+//config:
+//config:config FEATURE_INETD_SUPPORT_BUILTIN_CHARGEN
+//config:	bool "Support chargen service"
+//config:	default y
+//config:	depends on INETD
+//config:	help
+//config:	  Familiar character generator internal inetd service
+//config:
+//config:config FEATURE_INETD_RPC
+//config:	bool "Support RPC services"
+//config:	default n  # very rarely used, and needs Sun RPC support in libc
+//config:	depends on INETD
+//config:	select FEATURE_HAVE_RPC
+//config:	help
+//config:	  Support Sun-RPC based services
+
+//applet:IF_INETD(APPLET(inetd, BB_DIR_USR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_INETD) += inetd.o
+
+//usage:#define inetd_trivial_usage
+//usage:       "[-fe] [-q N] [-R N] [CONFFILE]"
+//usage:#define inetd_full_usage "\n\n"
+//usage:       "Listen for network connections and launch programs\n"
+//usage:     "\n	-f	Run in foreground"
+//usage:     "\n	-e	Log to stderr"
+//usage:     "\n	-q N	Socket listen queue (default: 128)"
+//usage:     "\n	-R N	Pause services after N connects/min"
+//usage:     "\n		(default: 0 - disabled)"
 
 #include <syslog.h>
+#include <sys/resource.h> /* setrlimit */
+#include <sys/socket.h> /* un.h may need this */
 #include <sys/un.h>
 
 #include "libbb.h"
+#include "common_bufsiz.h"
 
 #if ENABLE_FEATURE_INETD_RPC
-#include <rpc/rpc.h>
-#include <rpc/pmap_clnt.h>
+# if defined(__UCLIBC__) && ! defined(__UCLIBC_HAS_RPC__)
+#  error "You need to build uClibc with UCLIBC_HAS_RPC for NFS support"
+# endif
+# include <rpc/rpc.h>
+# include <rpc/pmap_clnt.h>
 #endif
 
 #if !BB_MMU
@@ -170,8 +239,6 @@
 #undef  ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_CHARGEN
 #define ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_CHARGEN 0
 #endif
-
-#define _PATH_INETDPID  "/var/run/inetd.pid"
 
 #define CNT_INTERVAL    60      /* servers in CNT_INTERVAL sec. */
 #define RETRYTIME       60      /* retry after bind or server fail */
@@ -239,36 +306,36 @@ typedef struct servtab_t {
 #ifdef INETD_BUILTINS_ENABLED
 /* Echo received data */
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_ECHO
-static void echo_stream(int, servtab_t *);
-static void echo_dg(int, servtab_t *);
+static void FAST_FUNC echo_stream(int, servtab_t *);
+static void FAST_FUNC echo_dg(int, servtab_t *);
 #endif
 /* Internet /dev/null */
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_DISCARD
-static void discard_stream(int, servtab_t *);
-static void discard_dg(int, servtab_t *);
+static void FAST_FUNC discard_stream(int, servtab_t *);
+static void FAST_FUNC discard_dg(int, servtab_t *);
 #endif
 /* Return 32 bit time since 1900 */
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_TIME
-static void machtime_stream(int, servtab_t *);
-static void machtime_dg(int, servtab_t *);
+static void FAST_FUNC machtime_stream(int, servtab_t *);
+static void FAST_FUNC machtime_dg(int, servtab_t *);
 #endif
 /* Return human-readable time */
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_DAYTIME
-static void daytime_stream(int, servtab_t *);
-static void daytime_dg(int, servtab_t *);
+static void FAST_FUNC daytime_stream(int, servtab_t *);
+static void FAST_FUNC daytime_dg(int, servtab_t *);
 #endif
 /* Familiar character generator */
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_CHARGEN
-static void chargen_stream(int, servtab_t *);
-static void chargen_dg(int, servtab_t *);
+static void FAST_FUNC chargen_stream(int, servtab_t *);
+static void FAST_FUNC chargen_dg(int, servtab_t *);
 #endif
 
 struct builtin {
 	/* NB: not necessarily NUL terminated */
 	char bi_service7[7];      /* internally provided service name */
 	uint8_t bi_fork;          /* 1 if stream fn should run in child */
-	void (*bi_stream_fn)(int, servtab_t *);
-	void (*bi_dgram_fn)(int, servtab_t *);
+	void (*bi_stream_fn)(int, servtab_t *) FAST_FUNC;
+	void (*bi_dgram_fn)(int, servtab_t *) FAST_FUNC;
 };
 
 static const struct builtin builtins[] = {
@@ -295,7 +362,7 @@ struct globals {
 	struct rlimit rlim_ofile;
 	servtab_t *serv_list;
 	int global_queuelen;
-	int maxsock;		/* max fd# in allsock, -1: unknown */
+	int maxsock;         /* max fd# in allsock, -1: unknown */
 	/* whenever maxsock grows, prev_maxsock is set to new maxsock,
 	 * but if maxsock is set to -1, prev_maxsock is not changed */
 	int prev_maxsock;
@@ -313,12 +380,9 @@ struct globals {
 	fd_set allsock;
 	/* Used in next_line(), and as scratch read buffer */
 	char line[256];          /* _at least_ 256, see LINE_SIZE */
-};
-#define G (*(struct globals*)&bb_common_bufsiz1)
+} FIX_ALIASING;
+#define G (*(struct globals*)bb_common_bufsiz1)
 enum { LINE_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line) };
-struct BUG_G_too_big {
-	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
-};
 #define rlim_ofile_cur  (G.rlim_ofile_cur )
 #define rlim_ofile      (G.rlim_ofile     )
 #define serv_list       (G.serv_list      )
@@ -339,15 +403,33 @@ struct BUG_G_too_big {
 #define allsock         (G.allsock        )
 #define line            (G.line           )
 #define INIT_G() do { \
+	setup_common_bufsiz(); \
+	BUILD_BUG_ON(sizeof(G) > COMMON_BUFSIZE); \
 	rlim_ofile_cur = OPEN_MAX; \
 	global_queuelen = 128; \
 	config_filename = "/etc/inetd.conf"; \
 } while (0)
 
+#if 1
+# define dbg(...) ((void)0)
+#else
+# define dbg(...) \
+do { \
+	int dbg_fd = open("inetd_debug.log", O_WRONLY | O_CREAT | O_APPEND, 0666); \
+	if (dbg_fd >= 0) { \
+		fdprintf(dbg_fd, "%d: ", getpid()); \
+		fdprintf(dbg_fd, __VA_ARGS__); \
+		close(dbg_fd); \
+	} \
+} while (0)
+#endif
+
 static void maybe_close(int fd)
 {
-	if (fd >= 0)
+	if (fd >= 0) {
 		close(fd);
+		dbg("closed fd:%d\n", fd);
+	}
 }
 
 // TODO: move to libbb?
@@ -451,7 +533,9 @@ static void remove_fd_from_set(int fd)
 {
 	if (fd >= 0) {
 		FD_CLR(fd, &allsock);
+		dbg("stopped listening on fd:%d\n", fd);
 		maxsock = -1;
+		dbg("maxsock:%d\n", maxsock);
 	}
 }
 
@@ -459,8 +543,10 @@ static void add_fd_to_set(int fd)
 {
 	if (fd >= 0) {
 		FD_SET(fd, &allsock);
+		dbg("started listening on fd:%d\n", fd);
 		if (maxsock >= 0 && fd > maxsock) {
 			prev_maxsock = maxsock = fd;
+			dbg("maxsock:%d\n", maxsock);
 			if ((rlim_t)fd > rlim_ofile_cur - FD_MARGIN)
 				bump_nofile();
 		}
@@ -479,6 +565,7 @@ static void recalculate_maxsock(void)
 			maxsock = fd;
 		fd++;
 	}
+	dbg("recalculated maxsock:%d\n", maxsock);
 	prev_maxsock = maxsock;
 	if ((rlim_t)maxsock > rlim_ofile_cur - FD_MARGIN)
 		bump_nofile();
@@ -501,7 +588,7 @@ static void prepare_socket_fd(servtab_t *sep)
 
 		/* zero out the port for all RPC services; let bind()
 		 * find one. */
-		set_nport(sep->se_lsa, 0);
+		set_nport(&sep->se_lsa->u.sa, 0);
 
 		/* for RPC services, attempt to use a reserved port
 		 * if they are going to be running as root. */
@@ -536,8 +623,13 @@ static void prepare_socket_fd(servtab_t *sep)
 		rearm_alarm();
 		return;
 	}
-	if (sep->se_socktype == SOCK_STREAM)
+
+	if (sep->se_socktype == SOCK_STREAM) {
 		listen(fd, global_queuelen);
+		dbg("new sep->se_fd:%d (stream)\n", fd);
+	} else {
+		dbg("new sep->se_fd:%d (!stream)\n", fd);
+	}
 
 	add_fd_to_set(fd);
 	sep->se_fd = fd;
@@ -606,7 +698,7 @@ static servtab_t *dup_servtab(servtab_t *sep)
 }
 
 /* gcc generates much more code if this is inlined */
-static servtab_t *parse_one_line(void)
+static NOINLINE servtab_t *parse_one_line(void)
 {
 	int argc;
 	char *token[6+MAXARGV];
@@ -636,6 +728,8 @@ static servtab_t *parse_one_line(void)
 			 * default host for the following lines. */
 			free(default_local_hostname);
 			default_local_hostname = sep->se_local_hostname;
+			/*sep->se_local_hostname = NULL; - redundant */
+			/* (we'll overwrite this field anyway) */
 			goto more;
 		}
 	} else
@@ -649,16 +743,16 @@ static servtab_t *parse_one_line(void)
  parse_err:
 		bb_error_msg("parse error on line %u, line is ignored",
 				parser->lineno);
-		free_servtab_strings(sep);
 		/* Just "goto more" can make sep to carry over e.g.
 		 * "rpc"-ness (by having se_rpcver_lo != 0).
 		 * We will be more paranoid: */
+		free_servtab_strings(sep);
 		free(sep);
 		goto new;
 	}
 
 	{
-		static int8_t SOCK_xxx[] ALIGN1 = {
+		static const int8_t SOCK_xxx[] ALIGN1 = {
 			-1,
 			SOCK_STREAM, SOCK_DGRAM, SOCK_RDM,
 			SOCK_SEQPACKET, SOCK_RAW
@@ -686,7 +780,7 @@ static servtab_t *parse_one_line(void)
 			goto parse_err;
 #endif
 		}
-		if (strncmp(arg, "rpc/", 4) == 0) {
+		if (is_prefixed_with(arg, "rpc/")) {
 #if ENABLE_FEATURE_INETD_RPC
 			unsigned n;
 			arg += 4;
@@ -776,8 +870,14 @@ static servtab_t *parse_one_line(void)
 	}
 #endif
 	argc = 0;
-	while ((arg = token[6+argc]) != NULL && argc < MAXARGV)
+	while (argc < MAXARGV && (arg = token[6+argc]) != NULL)
 		sep->se_argv[argc++] = xstrdup(arg);
+	/* Some inetd.conf files have no argv's, not even argv[0].
+	 * Fix them up.
+	 * (Technically, programs can be execed with argv[0] = NULL,
+	 * but many programs do not like that at all) */
+	if (argc == 0)
+		sep->se_argv[0] = xstrdup(sep->se_program);
 
 	/* catch mixups. "<service> stream udp ..." == wtf */
 	if (sep->se_socktype == SOCK_STREAM) {
@@ -789,10 +889,10 @@ static servtab_t *parse_one_line(void)
 			goto parse_err;
 	}
 
-//	bb_info_msg(
-//		"ENTRY[%s][%s][%s][%d][%d][%d][%d][%d][%s][%s][%s]",
-//		sep->se_local_hostname, sep->se_service, sep->se_proto, sep->se_wait, sep->se_proto_no,
-//		sep->se_max, sep->se_count, sep->se_time, sep->se_user, sep->se_group, sep->se_program);
+	//bb_error_msg(
+	//	"ENTRY[%s][%s][%s][%d][%d][%d][%d][%d][%s][%s][%s]",
+	//	sep->se_local_hostname, sep->se_service, sep->se_proto, sep->se_wait, sep->se_proto_no,
+	//	sep->se_max, sep->se_count, sep->se_time, sep->se_user, sep->se_group, sep->se_program);
 
 	/* check if the hostname specifier is a comma separated list
 	 * of hostnames. we'll make new entries for each address. */
@@ -953,7 +1053,7 @@ static void reread_config_file(int sig UNUSED_PARAM)
 			}
 			if (LONE_CHAR(sep->se_local_hostname, '*')) {
 				lsa = xzalloc_lsa(sep->se_family);
-				set_nport(lsa, port);
+				set_nport(&lsa->u.sa, port);
 			} else {
 				lsa = host_and_af2sockaddr(sep->se_local_hostname,
 						ntohs(port), sep->se_family);
@@ -993,7 +1093,7 @@ static void reread_config_file(int sig UNUSED_PARAM)
 	 * new config file doesnt have them. */
 	block_CHLD_HUP_ALRM(&omask);
 	sepp = &serv_list;
-	while ((sep = *sepp)) {
+	while ((sep = *sepp) != NULL) {
 		if (sep->se_checked) {
 			sepp = &sep->se_next;
 			continue;
@@ -1031,10 +1131,10 @@ static void reap_child(int sig UNUSED_PARAM)
 				continue;
 			/* One of our "wait" services */
 			if (WIFEXITED(status) && WEXITSTATUS(status))
-				bb_error_msg("%s: exit status 0x%x",
+				bb_error_msg("%s: exit status %u",
 						sep->se_program, WEXITSTATUS(status));
 			else if (WIFSIGNALED(status))
-				bb_error_msg("%s: exit signal 0x%x",
+				bb_error_msg("%s: exit signal %u",
 						sep->se_program, WTERMSIG(status));
 			sep->se_wait = 1;
 			add_fd_to_set(sep->se_fd);
@@ -1085,7 +1185,7 @@ static void clean_up_and_exit(int sig UNUSED_PARAM)
 		if (ENABLE_FEATURE_CLEAN_UP)
 			close(sep->se_fd);
 	}
-	remove_pidfile(_PATH_INETDPID);
+	remove_pidfile(CONFIG_PID_FILE_PATH "/inetd.pid");
 	exit(EXIT_SUCCESS);
 }
 
@@ -1106,8 +1206,8 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 	if (real_uid != 0) /* run by non-root user */
 		config_filename = NULL;
 
-	opt_complementary = "R+:q+"; /* -q N, -R N */
-	opt = getopt32(argv, "R:feq:", &max_concurrency, &global_queuelen);
+	/* -q N, -R N */
+	opt = getopt32(argv, "R:+feq:+", &max_concurrency, &global_queuelen);
 	argv += optind;
 	//argc -= optind;
 	if (argv[0])
@@ -1119,7 +1219,12 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 	else
 		bb_sanitize_stdio();
 	if (!(opt & 4)) {
-		openlog(applet_name, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
+		/* LOG_NDELAY: connect to syslog daemon NOW.
+		 * Otherwise, we may open syslog socket
+		 * in vforked child, making opened fds and syslog()
+		 * internal state inconsistent.
+		 * This was observed to leak file descriptors. */
+		openlog(applet_name, LOG_PID | LOG_NDELAY, LOG_DAEMON);
 		logmode = LOGMODE_SYSLOG;
 	}
 
@@ -1129,7 +1234,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 		setgroups(1, &gid);
 	}
 
-	write_pidfile(_PATH_INETDPID);
+	write_pidfile(CONFIG_PID_FILE_PATH "/inetd.pid");
 
 	/* never fails under Linux (except if you pass it bad arguments) */
 	getrlimit(RLIMIT_NOFILE, &rlim_ofile);
@@ -1142,12 +1247,17 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 	sigaddset(&sa.sa_mask, SIGALRM);
 	sigaddset(&sa.sa_mask, SIGCHLD);
 	sigaddset(&sa.sa_mask, SIGHUP);
+//FIXME: explain why no SA_RESTART
+//FIXME: retry_network_setup is unsafe to run in signal handler (many reasons)!
 	sa.sa_handler = retry_network_setup;
 	sigaction_set(SIGALRM, &sa);
+//FIXME: reread_config_file is unsafe to run in signal handler(many reasons)!
 	sa.sa_handler = reread_config_file;
 	sigaction_set(SIGHUP, &sa);
+//FIXME: reap_child is unsafe to run in signal handler (uses stdio)!
 	sa.sa_handler = reap_child;
 	sigaction_set(SIGCHLD, &sa);
+//FIXME: clean_up_and_exit is unsafe to run in signal handler (uses stdio)!
 	sa.sa_handler = clean_up_and_exit;
 	sigaction_set(SIGTERM, &sa);
 	sa.sa_handler = clean_up_and_exit;
@@ -1177,11 +1287,13 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 			}
 			continue;
 		}
+		dbg("ready_fd_cnt:%d\n", ready_fd_cnt);
 
 		for (sep = serv_list; ready_fd_cnt && sep; sep = sep->se_next) {
 			if (sep->se_fd == -1 || !FD_ISSET(sep->se_fd, &readable))
 				continue;
 
+			dbg("ready fd:%d\n", sep->se_fd);
 			ready_fd_cnt--;
 			ctrl = sep->se_fd;
 			accepted_fd = -1;
@@ -1189,6 +1301,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 			if (!sep->se_wait) {
 				if (sep->se_socktype == SOCK_STREAM) {
 					ctrl = accepted_fd = accept(sep->se_fd, NULL, NULL);
+					dbg("accepted_fd:%d\n", accepted_fd);
 					if (ctrl < 0) {
 						if (errno != EINTR)
 							bb_perror_msg("accept (for %s)", sep->se_service);
@@ -1209,19 +1322,22 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
  * (can create many copies of same child, etc).
  * Parent must create and use new socket instead. */
 					new_udp_fd = socket(sep->se_family, SOCK_DGRAM, 0);
+					dbg("new_udp_fd:%d\n", new_udp_fd);
 					if (new_udp_fd < 0) { /* error: eat packet, forget about it */
  udp_err:
 						recv(sep->se_fd, line, LINE_SIZE, MSG_DONTWAIT);
 						continue;
 					}
 					setsockopt_reuseaddr(new_udp_fd);
-					/* TODO: better do bind after vfork in parent,
+					/* TODO: better do bind after fork in parent,
 					 * so that we don't have two wildcard bound sockets
 					 * even for a brief moment? */
 					if (bind(new_udp_fd, &sep->se_lsa->u.sa, sep->se_lsa->len) < 0) {
+						dbg("bind(new_udp_fd) failed\n");
 						close(new_udp_fd);
 						goto udp_err;
 					}
+					dbg("bind(new_udp_fd) succeeded\n");
 				}
 			}
 
@@ -1249,6 +1365,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 							sep->se_count = 0;
 							rearm_alarm(); /* will revive it in RETRYTIME sec */
 							restore_sigmask(&omask);
+							maybe_close(new_udp_fd);
 							maybe_close(accepted_fd);
 							continue; /* -> check next fd in fd set */
 						}
@@ -1266,20 +1383,21 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 					pid = vfork();
 
 				if (pid < 0) { /* fork error */
-					bb_perror_msg("fork");
+					bb_perror_msg("vfork"+1);
 					sleep(1);
 					restore_sigmask(&omask);
+					maybe_close(new_udp_fd);
 					maybe_close(accepted_fd);
 					continue; /* -> check next fd in fd set */
 				}
 				if (pid == 0)
 					pid--; /* -1: "we did fork and we are child" */
 			}
-			/* if pid == 0 here, we never forked */
+			/* if pid == 0 here, we didn't fork */
 
 			if (pid > 0) { /* parent */
 				if (sep->se_wait) {
-					/* tcp wait: we passed listening socket to child,
+					/* wait: we passed socket to child,
 					 * will wait for child to terminate */
 					sep->se_wait = pid;
 					remove_fd_from_set(sep->se_fd);
@@ -1288,25 +1406,27 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 					/* udp nowait: child connected the socket,
 					 * we created and will use new, unconnected one */
 					xmove_fd(new_udp_fd, sep->se_fd);
+					dbg("moved new_udp_fd:%d to sep->se_fd:%d\n", new_udp_fd, sep->se_fd);
 				}
 				restore_sigmask(&omask);
 				maybe_close(accepted_fd);
 				continue; /* -> check next fd in fd set */
 			}
 
-			/* we are either child or didn't vfork at all */
+			/* we are either child or didn't fork at all */
 #ifdef INETD_BUILTINS_ENABLED
 			if (sep->se_builtin) {
-				if (pid) { /* "pid" is -1: we did vfork */
+				if (pid) { /* "pid" is -1: we did fork */
 					close(sep->se_fd); /* listening socket */
-					logmode = 0; /* make xwrite etc silent */
+					dbg("closed sep->se_fd:%d\n", sep->se_fd);
+					logmode = LOGMODE_NONE; /* make xwrite etc silent */
 				}
 				restore_sigmask(&omask);
 				if (sep->se_socktype == SOCK_STREAM)
 					sep->se_builtin->bi_stream_fn(ctrl, sep);
 				else
 					sep->se_builtin->bi_dgram_fn(ctrl, sep);
-				if (pid) /* we did vfork */
+				if (pid) /* we did fork */
 					_exit(EXIT_FAILURE);
 				maybe_close(accepted_fd);
 				continue; /* -> check next fd in fd set */
@@ -1316,9 +1436,14 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 			setsid();
 			/* "nowait" udp */
 			if (new_udp_fd >= 0) {
-				len_and_sockaddr *lsa = xzalloc_lsa(sep->se_family);
+				len_and_sockaddr *lsa;
+				int r;
+
+				close(new_udp_fd);
+				dbg("closed new_udp_fd:%d\n", new_udp_fd);
+				lsa = xzalloc_lsa(sep->se_family);
 				/* peek at the packet and remember peer addr */
-				int r = recvfrom(ctrl, NULL, 0, MSG_PEEK|MSG_DONTWAIT,
+				r = recvfrom(ctrl, NULL, 0, MSG_PEEK|MSG_DONTWAIT,
 					&lsa->u.sa, &lsa->len);
 				if (r < 0)
 					goto do_exit1;
@@ -1326,6 +1451,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 				 * only packets from this peer will be recv'ed,
 				 * and bare write()/send() will work on it */
 				connect(ctrl, &lsa->u.sa, lsa->len);
+				dbg("connected ctrl:%d to remote peer\n", ctrl);
 				free(lsa);
 			}
 			/* prepare env and exec program */
@@ -1343,7 +1469,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 				bb_error_msg("non-root must run services as himself");
 				goto do_exit1;
 			}
-			if (pwd->pw_uid) {
+			if (pwd->pw_uid != 0) {
 				if (sep->se_group)
 					pwd->pw_gid = grp->gr_gid;
 				/* initgroups, setgid, setuid: */
@@ -1355,18 +1481,29 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
 			if (rlim_ofile.rlim_cur != rlim_ofile_cur)
 				if (setrlimit(RLIMIT_NOFILE, &rlim_ofile) < 0)
 					bb_perror_msg("setrlimit");
-			closelog();
-			xmove_fd(ctrl, 0);
-			xdup2(0, 1);
-			xdup2(0, 2);
-			/* NB: among others, this loop closes listening socket
+
+			/* closelog(); - WRONG. we are after vfork,
+			 * this may confuse syslog() internal state.
+			 * Let's hope libc sets syslog fd to CLOEXEC...
+			 */
+			xmove_fd(ctrl, STDIN_FILENO);
+			xdup2(STDIN_FILENO, STDOUT_FILENO);
+			dbg("moved ctrl:%d to fd 0,1[,2]\n", ctrl);
+			/* manpages of inetd I managed to find either say
+			 * that stderr is also redirected to the network,
+			 * or do not talk about redirection at all (!) */
+			if (!sep->se_wait) /* only for usual "tcp nowait" */
+				xdup2(STDIN_FILENO, STDERR_FILENO);
+			/* NB: among others, this loop closes listening sockets
 			 * for nowait stream children */
 			for (sep2 = serv_list; sep2; sep2 = sep2->se_next)
-				maybe_close(sep2->se_fd);
+				if (sep2->se_fd != ctrl)
+					maybe_close(sep2->se_fd);
 			sigaction_set(SIGPIPE, &saved_pipe_handler);
 			restore_sigmask(&omask);
+			dbg("execing:'%s'\n", sep->se_program);
 			BB_EXECVP(sep->se_program, sep->se_argv);
-			bb_perror_msg("exec %s", sep->se_program);
+			bb_perror_msg("can't execute '%s'", sep->se_program);
  do_exit1:
 			/* eat packet in udp case */
 			if (sep->se_socktype != SOCK_STREAM)
@@ -1386,7 +1523,7 @@ static const char *const cat_args[] = { "cat", NULL };
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_ECHO
 /* Echo service -- echo data back. */
 /* ARGSUSED */
-static void echo_stream(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC echo_stream(int s, servtab_t *sep UNUSED_PARAM)
 {
 #if BB_MMU
 	while (1) {
@@ -1407,7 +1544,7 @@ static void echo_stream(int s, servtab_t *sep UNUSED_PARAM)
 	/* on failure we return to main, which does exit(EXIT_FAILURE) */
 #endif
 }
-static void echo_dg(int s, servtab_t *sep)
+static void FAST_FUNC echo_dg(int s, servtab_t *sep)
 {
 	enum { BUFSIZE = 12*1024 }; /* for jumbo sized packets! :) */
 	char *buf = xmalloc(BUFSIZE); /* too big for stack */
@@ -1427,7 +1564,7 @@ static void echo_dg(int s, servtab_t *sep)
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_DISCARD
 /* Discard service -- ignore data. */
 /* ARGSUSED */
-static void discard_stream(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC discard_stream(int s, servtab_t *sep UNUSED_PARAM)
 {
 #if BB_MMU
 	while (safe_read(s, line, LINE_SIZE) > 0)
@@ -1446,7 +1583,7 @@ static void discard_stream(int s, servtab_t *sep UNUSED_PARAM)
 #endif
 }
 /* ARGSUSED */
-static void discard_dg(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC discard_dg(int s, servtab_t *sep UNUSED_PARAM)
 {
 	/* dgram builtins are non-forking - DONT BLOCK! */
 	recv(s, line, LINE_SIZE, MSG_DONTWAIT);
@@ -1461,13 +1598,12 @@ static void init_ring(void)
 	int i;
 
 	end_ring = ring;
-	for (i = 0; i <= 128; ++i)
-		if (isprint(i))
-			*end_ring++ = i;
+	for (i = ' '; i < 127; i++)
+		*end_ring++ = i;
 }
 /* Character generator. MMU arches only. */
 /* ARGSUSED */
-static void chargen_stream(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC chargen_stream(int s, servtab_t *sep UNUSED_PARAM)
 {
 	char *rs;
 	int len;
@@ -1495,7 +1631,7 @@ static void chargen_stream(int s, servtab_t *sep UNUSED_PARAM)
 	}
 }
 /* ARGSUSED */
-static void chargen_dg(int s, servtab_t *sep)
+static void FAST_FUNC chargen_dg(int s, servtab_t *sep)
 {
 	int len;
 	char text[LINESIZ + 2];
@@ -1544,14 +1680,14 @@ static uint32_t machtime(void)
 	return htonl((uint32_t)(tv.tv_sec + 2208988800));
 }
 /* ARGSUSED */
-static void machtime_stream(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC machtime_stream(int s, servtab_t *sep UNUSED_PARAM)
 {
 	uint32_t result;
 
 	result = machtime();
 	full_write(s, &result, sizeof(result));
 }
-static void machtime_dg(int s, servtab_t *sep)
+static void FAST_FUNC machtime_dg(int s, servtab_t *sep)
 {
 	uint32_t result;
 	len_and_sockaddr *lsa = alloca(LSA_LEN_SIZE + sep->se_lsa->len);
@@ -1569,14 +1705,14 @@ static void machtime_dg(int s, servtab_t *sep)
 #if ENABLE_FEATURE_INETD_SUPPORT_BUILTIN_DAYTIME
 /* Return human-readable time of day */
 /* ARGSUSED */
-static void daytime_stream(int s, servtab_t *sep UNUSED_PARAM)
+static void FAST_FUNC daytime_stream(int s, servtab_t *sep UNUSED_PARAM)
 {
 	time_t t;
 
-	t = time(NULL);
+	time(&t);
 	fdprintf(s, "%.24s\r\n", ctime(&t));
 }
-static void daytime_dg(int s, servtab_t *sep)
+static void FAST_FUNC daytime_dg(int s, servtab_t *sep)
 {
 	time_t t;
 	len_and_sockaddr *lsa = alloca(LSA_LEN_SIZE + sep->se_lsa->len);

@@ -18,6 +18,17 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+//kbuild:### lib-$(CONFIG_FEATURE_VOLUMEID_ISWRAID) += isw_raid.o
+
+//config:
+//config:### config FEATURE_VOLUMEID_ISWRAID
+//config:###	bool "intel raid"
+//config:###	default y
+//config:###	depends on VOLUMEID
+//config:###	help
+//config:###	  TODO
+//config:
+
 #include "volume_id_internal.h"
 
 struct isw_meta {
@@ -26,12 +37,12 @@ struct isw_meta {
 	uint32_t	mpb_size;
 	uint32_t	family_num;
 	uint32_t	generation_num;
-} __attribute__((packed));
+} PACKED;
 
 #define ISW_SIGNATURE		"Intel Raid ISM Cfg Sig. "
 
 
-int volume_id_probe_intel_software_raid(struct volume_id *id, uint64_t off, uint64_t size)
+int FAST_FUNC volume_id_probe_intel_software_raid(struct volume_id *id, uint64_t off, uint64_t size)
 {
 	uint64_t meta_off;
 	struct isw_meta *isw;

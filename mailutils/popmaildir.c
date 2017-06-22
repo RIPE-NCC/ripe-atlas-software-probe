@@ -7,25 +7,81 @@
  *
  * Copyright (C) 2008 by Vladimir Dronnikov <dronnikov@gmail.com>
  *
- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+//config:config POPMAILDIR
+//config:	bool "popmaildir"
+//config:	default y
+//config:	help
+//config:	  Simple yet powerful POP3 mail popper. Delivers content
+//config:	  of remote mailboxes to local Maildir.
+//config:
+//config:config FEATURE_POPMAILDIR_DELIVERY
+//config:	bool "Allow message filters and custom delivery program"
+//config:	default y
+//config:	depends on POPMAILDIR
+//config:	help
+//config:	  Allow to use a custom program to filter the content
+//config:	  of the message before actual delivery (-F "prog [args...]").
+//config:	  Allow to use a custom program for message actual delivery
+//config:	  (-M "prog [args...]").
+
+//applet:IF_POPMAILDIR(APPLET(popmaildir, BB_DIR_USR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_POPMAILDIR) += popmaildir.o mail.o
+
+//usage:#define popmaildir_trivial_usage
+//usage:       "[OPTIONS] MAILDIR [CONN_HELPER ARGS]"
+//usage:#define popmaildir_full_usage "\n\n"
+//usage:       "Fetch content of remote mailbox to local maildir\n"
+/* //usage:  "\n	-b		Binary mode. Ignored" */
+/* //usage:  "\n	-d		Debug. Ignored" */
+/* //usage:  "\n	-m		Show used memory. Ignored" */
+/* //usage:  "\n	-V		Show version. Ignored" */
+/* //usage:  "\n	-c		Use tcpclient. Ignored" */
+/* //usage:  "\n	-a		Use APOP protocol. Implied. If server supports APOP -> use it" */
+//usage:     "\n	-s		Skip authorization"
+//usage:     "\n	-T		Get messages with TOP instead of RETR"
+//usage:     "\n	-k		Keep retrieved messages on the server"
+//usage:     "\n	-t SEC		Network timeout"
+//usage:	IF_FEATURE_POPMAILDIR_DELIVERY(
+//usage:     "\n	-F \"PROG ARGS\"	Filter program (may be repeated)"
+//usage:     "\n	-M \"PROG ARGS\"	Delivery program"
+//usage:	)
+//usage:     "\n"
+//usage:     "\nFetch from plain POP3 server:"
+//usage:     "\npopmaildir -k DIR nc pop3.server.com 110 <user_and_pass.txt"
+//usage:     "\nFetch from SSLed POP3 server and delete fetched emails:"
+//usage:     "\npopmaildir DIR -- openssl s_client -quiet -connect pop3.server.com:995 <user_and_pass.txt"
+/* //usage:  "\n	-R BYTES	Remove old messages on the server >= BYTES. Ignored" */
+/* //usage:  "\n	-Z N1-N2	Remove messages from N1 to N2 (dangerous). Ignored" */
+/* //usage:  "\n	-L BYTES	Don't retrieve new messages >= BYTES. Ignored" */
+/* //usage:  "\n	-H LINES	Type first LINES of a message. Ignored" */
+//usage:
+//usage:#define popmaildir_example_usage
+//usage:       "$ popmaildir -k ~/Maildir -- nc pop.drvv.ru 110 [<password_file]\n"
+//usage:       "$ popmaildir ~/Maildir -- openssl s_client -quiet -connect pop.gmail.com:995 [<password_file]\n"
+
 #include "libbb.h"
 #include "mail.h"
 
 static void pop3_checkr(const char *fmt, const char *param, char **ret)
 {
-	const char *msg = command(fmt, param);
+	char *msg = send_mail_command(fmt, param);
 	char *answer = xmalloc_fgetline(stdin);
-	if (answer && '+' == *answer) {
+	if (answer && '+' == answer[0]) {
+		free(msg);
 		if (timeout)
 			alarm(0);
-		if (ret)
-			*ret = answer+4; // skip "+OK "
-		else if (ENABLE_FEATURE_CLEAN_UP)
+		if (ret) {
+			// skip "+OK "
+			memmove(answer, answer + 4, strlen(answer) - 4);
+			*ret = answer;
+		} else
 			free(answer);
 		return;
 	}
-	bb_error_msg_and_die("%s failed: %s", msg, answer);
+	bb_error_msg_and_die("%s failed, reply was: %s", msg, answer);
 }
 
 static void pop3_check(const char *fmt, const char *param)
@@ -69,11 +125,11 @@ int popmaildir_main(int argc UNUSED_PARAM, char **argv)
 	INIT_G();
 
 	// parse options
-	opt_complementary = "-1:dd:t+:R+:L+:H+";
+	opt_complementary = "-1:dd";
 	opts = getopt32(argv,
-		"bdmVcasTkt:" "R:Z:L:H:" USE_FEATURE_POPMAILDIR_DELIVERY("M:F:"),
+		"bdmVcasTkt:+" "R:+Z:L:+H:+" IF_FEATURE_POPMAILDIR_DELIVERY("M:F:"),
 		&timeout, NULL, NULL, NULL, &opt_nlines
-		USE_FEATURE_POPMAILDIR_DELIVERY(, &delivery, &delivery) // we treat -M and -F the same
+		IF_FEATURE_POPMAILDIR_DELIVERY(, &delivery, &delivery) // we treat -M and -F the same
 	);
 	//argc -= optind;
 	argv += optind;
@@ -94,31 +150,28 @@ int popmaildir_main(int argc UNUSED_PARAM, char **argv)
 
 	// authenticate (if no -s given)
 	if (!(opts & OPT_s)) {
-		// server supports APOP and we want it? -> use it
-		if ('<' == *buf && (opts & OPT_a)) {
-			md5_ctx_t md5;
-			// yes! compose <stamp><password>
+		// server supports APOP and we want it?
+		if ('<' == buf[0] && (opts & OPT_a)) {
+			union { // save a bit of stack
+				md5_ctx_t ctx;
+				char hex[16 * 2 + 1];
+			} md5;
+			uint32_t res[16 / 4];
+
 			char *s = strchr(buf, '>');
 			if (s)
-				strcpy(s+1, G.pass);
-			s = buf;
-			// get md5 sum of <stamp><password>
-			md5_begin(&md5);
-			md5_hash(s, strlen(s), &md5);
-			md5_end(s, &md5);
-			// NOTE: md5 struct contains enough space
-			// so we reuse md5 space instead of xzalloc(16*2+1)
-#define md5_hex ((uint8_t *)&md5)
-//			uint8_t *md5_hex = (uint8_t *)&md5;
-			*bin2hex((char *)md5_hex, s, 16) = '\0';
+				s[1] = '\0';
+			// get md5 sum of "<stamp>password" string
+			md5_begin(&md5.ctx);
+			md5_hash(&md5.ctx, buf, strlen(buf));
+			md5_hash(&md5.ctx, G.pass, strlen(G.pass));
+			md5_end(&md5.ctx, res);
+			*bin2hex(md5.hex, (char*)res, 16) = '\0';
 			// APOP
-			s = xasprintf("%s %s", G.user, md5_hex);
-#undef md5_hex
+			s = xasprintf("%s %s", G.user, md5.hex);
 			pop3_check("APOP %s", s);
-			if (ENABLE_FEATURE_CLEAN_UP) {
-				free(s);
-				free(buf-4); // buf is "+OK " away from malloc'ed string
-			}
+			free(s);
+			free(buf);
 		// server ignores APOP -> use simple text authentication
 		} else {
 			// USER
@@ -141,8 +194,7 @@ int popmaildir_main(int argc UNUSED_PARAM, char **argv)
 	// if atoi fails to convert buf into number it returns 0
 	// in this case the following loop simply will not be executed
 	nmsg = atoi(buf);
-	if (ENABLE_FEATURE_CLEAN_UP)
-		free(buf-4); // buf is "+OK " away from malloc'ed string
+	free(buf);
 
 	// loop through messages
 	retr = (opts & OPT_T) ? xasprintf("TOP %%u %u", opt_nlines) : "RETR %u";

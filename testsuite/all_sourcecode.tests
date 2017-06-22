@@ -2,10 +2,10 @@
 
 # Tests for the sourcecode base itself.
 # Copyright 2006 by Mike Frysinger <vapier@gentoo.org>
-# Licensed under GPL v2, see file LICENSE for details.
+# Licensed under GPLv2, see file LICENSE in this source tree.
 
 [ -n "$srcdir" ] || srcdir=$(pwd)
-. testing.sh
+. ./testing.sh
 
 
 #
@@ -33,7 +33,7 @@ rm -f src.usage.escaped
 # verify the applet order is correct in applets.h, otherwise
 # applets won't be called properly.
 #
-sed -n -e '/^USE_[A-Z]*(APPLET/{s:,.*::;s:.*(::;s:"::g;p}' \
+sed -n -e 's:^//::' -e '/^IF_[A-Z]*(APPLET/{s:,.*::;s:.*(::;s:"::g;p}' \
 	$srcdir/../include/applets.h > applet.order.current
 LC_ALL=C sort applet.order.current > applet.order.correct
 testing "Applet order" "diff -u applet.order.current applet.order.correct" "" "" ""
@@ -73,7 +73,7 @@ rm -f src.typos
 # don't allow obsolete functions
 #
 find $srcdir/.. '(' -name '*.c' -o -name '*.h' ')' -print0 | xargs -0 \
-	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utimes|sigblock|siggetmask|sigsetmask)\>[[:space:]]*\(' \
+	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utime|sigblock|siggetmask|sigsetmask)\>[[:space:]]*\(' \
 	| sed -e "s:^$srcdir/\.\./::g" > src.obsolete.funcs
 testing "Obsolete function usage" "cat src.obsolete.funcs" "" "" ""
 rm -f src.obsolete.funcs

@@ -2,11 +2,11 @@
 
 # unit test for sum.
 # Copyright 2007 by Bernhard Reutner-Fischer
-# Licensed under GPL v2 or later, see file LICENSE for details.
+# Licensed under GPLv2 or later, see file LICENSE in this source tree.
 
 # AUDIT: Unit tests for sum
 
-. testing.sh
+. ./testing.sh
 
 # testing "test name" "options" "expected result" "file input" "stdin"
 #   file input will be file called "input"

@@ -1,19 +1,17 @@
 /* vi: set sw=4 ts=4: */
 /*
- * iproute.c		"ip route".
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
- *
- * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
- *
+ * Authors: Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
  * Changes:
  *
- * Rani Assaf <rani@magic.metawire.com> 980929:	resolve addresses
+ * Rani Assaf <rani@magic.metawire.com> 980929: resolve addresses
  * Kunihiro Ishiguro <kunihiro@zebra.org> 001102: rtnh_ifindex was not initialized
  */
 
-#include "ip_common.h"	/* #include "libbb.h" is inside */
+#include "ip_common.h"  /* #include "libbb.h" is inside */
+#include "common_bufsiz.h"
 #include "rt_names.h"
 #include "utils.h"
 
@@ -22,84 +20,72 @@
 #endif
 
 
-typedef struct filter_t {
+struct filter_t {
 	int tb;
 	smallint flushed;
 	char *flushb;
 	int flushp;
 	int flushe;
 	struct rtnl_handle *rth;
-	int protocol, protocolmask;
-	int scope, scopemask;
-	int type, typemask;
-	int tos, tosmask;
-	int iif, iifmask;
-	int oif, oifmask;
-	int realm, realmmask;
-	inet_prefix rprefsrc;
+	//int protocol, protocolmask; - write-only fields?!
+	//int scope, scopemask; - unused
+	//int type; - read-only
+	//int typemask; - unused
+	//int tos, tosmask; - unused
+	int iif;
+	int oif;
+	//int realm, realmmask; - unused
+	//inet_prefix rprefsrc; - read-only
 	inet_prefix rvia;
 	inet_prefix rdst;
 	inet_prefix mdst;
 	inet_prefix rsrc;
 	inet_prefix msrc;
-} filter_t;
+} FIX_ALIASING;
+typedef struct filter_t filter_t;
 
-#define filter (*(filter_t*)&bb_common_bufsiz1)
+#define G_filter (*(filter_t*)bb_common_bufsiz1)
+#define INIT_G() do { setup_common_bufsiz(); } while (0)
 
 static int flush_update(void)
 {
-	if (rtnl_send(filter.rth, filter.flushb, filter.flushp) < 0) {
-		bb_perror_msg("failed to send flush request");
+	if (rtnl_send(G_filter.rth, G_filter.flushb, G_filter.flushp) < 0) {
+		bb_perror_msg("can't send flush request");
 		return -1;
 	}
-	filter.flushp = 0;
+	G_filter.flushp = 0;
 	return 0;
 }
 
-static unsigned get_hz(void)
-{
-	static unsigned hz_internal;
-	FILE *fp;
-
-	if (hz_internal)
-		return hz_internal;
-
-	fp = fopen_for_read("/proc/net/psched");
-	if (fp) {
-		unsigned nom, denom;
-
-		if (fscanf(fp, "%*08x%*08x%08x%08x", &nom, &denom) == 2)
-			if (nom == 1000000)
-				hz_internal = denom;
-		fclose(fp);
-	}
-	if (!hz_internal)
-		hz_internal = sysconf(_SC_CLK_TCK);
-	return hz_internal;
-}
-
-static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 		struct nlmsghdr *n, void *arg UNUSED_PARAM)
 {
 	struct rtmsg *r = NLMSG_DATA(n);
 	int len = n->nlmsg_len;
-	struct rtattr * tb[RTA_MAX+1];
-	char abuf[256];
+	struct rtattr *tb[RTA_MAX+1];
 	inet_prefix dst;
 	inet_prefix src;
 	int host_len = -1;
-	SPRINT_BUF(b1);
+	uint32_t tid;
 
 	if (n->nlmsg_type != RTM_NEWROUTE && n->nlmsg_type != RTM_DELROUTE) {
 		fprintf(stderr, "Not a route: %08x %08x %08x\n",
 			n->nlmsg_len, n->nlmsg_type, n->nlmsg_flags);
 		return 0;
 	}
-	if (filter.flushb && n->nlmsg_type != RTM_NEWROUTE)
+	if (G_filter.flushb && n->nlmsg_type != RTM_NEWROUTE)
 		return 0;
 	len -= NLMSG_LENGTH(sizeof(*r));
 	if (len < 0)
 		bb_error_msg_and_die("wrong nlmsg len %d", len);
+
+	memset(tb, 0, sizeof(tb));
+	parse_rtattr(tb, RTA_MAX, RTM_RTA(r), len);
+
+	if (tb[RTA_TABLE])
+		tid = *(uint32_t *)RTA_DATA(tb[RTA_TABLE]);
+	else
+		tid = r->rtm_table;
 
 	if (r->rtm_family == AF_INET6)
 		host_len = 128;
@@ -107,8 +93,8 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 		host_len = 32;
 
 	if (r->rtm_family == AF_INET6) {
-		if (filter.tb) {
-			if (filter.tb < 0) {
+		if (G_filter.tb) {
+			if (G_filter.tb < 0) {
 				if (!(r->rtm_flags & RTM_F_CLONED)) {
 					return 0;
 				}
@@ -116,11 +102,11 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 				if (r->rtm_flags & RTM_F_CLONED) {
 					return 0;
 				}
-				if (filter.tb == RT_TABLE_LOCAL) {
+				if (G_filter.tb == RT_TABLE_LOCAL) {
 					if (r->rtm_type != RTN_LOCAL) {
 						return 0;
 					}
-				} else if (filter.tb == RT_TABLE_MAIN) {
+				} else if (G_filter.tb == RT_TABLE_MAIN) {
 					if (r->rtm_type == RTN_LOCAL) {
 						return 0;
 					}
@@ -130,89 +116,125 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 			}
 		}
 	} else {
-		if (filter.tb > 0 && filter.tb != r->rtm_table) {
+		if (G_filter.tb > 0 && G_filter.tb != tid) {
 			return 0;
 		}
 	}
-	if (filter.rdst.family &&
-	    (r->rtm_family != filter.rdst.family || filter.rdst.bitlen > r->rtm_dst_len)) {
+	if (G_filter.rdst.family
+	 && (r->rtm_family != G_filter.rdst.family || G_filter.rdst.bitlen > r->rtm_dst_len)
+	) {
 		return 0;
 	}
-	if (filter.mdst.family &&
-	    (r->rtm_family != filter.mdst.family ||
-	     (filter.mdst.bitlen >= 0 && filter.mdst.bitlen < r->rtm_dst_len))) {
+	if (G_filter.mdst.family
+	 && (r->rtm_family != G_filter.mdst.family
+	    || (G_filter.mdst.bitlen >= 0 && G_filter.mdst.bitlen < r->rtm_dst_len)
+	    )
+	) {
 		return 0;
 	}
-	if (filter.rsrc.family &&
-	    (r->rtm_family != filter.rsrc.family || filter.rsrc.bitlen > r->rtm_src_len)) {
+	if (G_filter.rsrc.family
+	 && (r->rtm_family != G_filter.rsrc.family || G_filter.rsrc.bitlen > r->rtm_src_len)
+	) {
 		return 0;
 	}
-	if (filter.msrc.family &&
-	    (r->rtm_family != filter.msrc.family ||
-	     (filter.msrc.bitlen >= 0 && filter.msrc.bitlen < r->rtm_src_len))) {
+	if (G_filter.msrc.family
+	 && (r->rtm_family != G_filter.msrc.family
+	    || (G_filter.msrc.bitlen >= 0 && G_filter.msrc.bitlen < r->rtm_src_len)
+	    )
+	) {
 		return 0;
 	}
 
-	memset(tb, 0, sizeof(tb));
-	parse_rtattr(tb, RTA_MAX, RTM_RTA(r), len);
+	memset(&src, 0, sizeof(src));
+	memset(&dst, 0, sizeof(dst));
 
-	if (filter.rdst.family && inet_addr_match(&dst, &filter.rdst, filter.rdst.bitlen))
-		return 0;
-	if (filter.mdst.family && filter.mdst.bitlen >= 0 &&
-	    inet_addr_match(&dst, &filter.mdst, r->rtm_dst_len))
-		return 0;
+	if (tb[RTA_SRC]) {
+		src.bitlen = r->rtm_src_len;
+		src.bytelen = (r->rtm_family == AF_INET6 ? 16 : 4);
+		memcpy(src.data, RTA_DATA(tb[RTA_SRC]), src.bytelen);
+	}
+	if (tb[RTA_DST]) {
+		dst.bitlen = r->rtm_dst_len;
+		dst.bytelen = (r->rtm_family == AF_INET6 ? 16 : 4);
+		memcpy(dst.data, RTA_DATA(tb[RTA_DST]), dst.bytelen);
+	}
 
-	if (filter.rsrc.family && inet_addr_match(&src, &filter.rsrc, filter.rsrc.bitlen))
+	if (G_filter.rdst.family
+	 && inet_addr_match(&dst, &G_filter.rdst, G_filter.rdst.bitlen)
+	) {
 		return 0;
-	if (filter.msrc.family && filter.msrc.bitlen >= 0 &&
-	    inet_addr_match(&src, &filter.msrc, r->rtm_src_len))
+	}
+	if (G_filter.mdst.family
+	 && G_filter.mdst.bitlen >= 0
+	 && inet_addr_match(&dst, &G_filter.mdst, r->rtm_dst_len)
+	) {
 		return 0;
+	}
+	if (G_filter.rsrc.family
+	 && inet_addr_match(&src, &G_filter.rsrc, G_filter.rsrc.bitlen)
+	) {
+		return 0;
+	}
+	if (G_filter.msrc.family && G_filter.msrc.bitlen >= 0
+	 && inet_addr_match(&src, &G_filter.msrc, r->rtm_src_len)
+	) {
+		return 0;
+	}
+	if (G_filter.oif != 0) {
+		if (!tb[RTA_OIF])
+			return 0;
+		if (G_filter.oif != *(int*)RTA_DATA(tb[RTA_OIF]))
+			return 0;
+	}
 
-	if (filter.flushb &&
-	    r->rtm_family == AF_INET6 &&
-	    r->rtm_dst_len == 0 &&
-	    r->rtm_type == RTN_UNREACHABLE &&
-	    tb[RTA_PRIORITY] &&
-	    *(int*)RTA_DATA(tb[RTA_PRIORITY]) == -1)
-		return 0;
-
-	if (filter.flushb) {
+	if (G_filter.flushb) {
 		struct nlmsghdr *fn;
-		if (NLMSG_ALIGN(filter.flushp) + n->nlmsg_len > filter.flushe) {
-			if (flush_update())
-				bb_error_msg_and_die("flush");
+
+		/* We are creating route flush commands */
+
+		if (r->rtm_family == AF_INET6
+		 && r->rtm_dst_len == 0
+		 && r->rtm_type == RTN_UNREACHABLE
+		 && tb[RTA_PRIORITY]
+		 && *(int*)RTA_DATA(tb[RTA_PRIORITY]) == -1
+		) {
+			return 0;
 		}
-		fn = (struct nlmsghdr*)(filter.flushb + NLMSG_ALIGN(filter.flushp));
+
+		if (NLMSG_ALIGN(G_filter.flushp) + n->nlmsg_len > G_filter.flushe) {
+			if (flush_update())
+				xfunc_die();
+		}
+		fn = (void*)(G_filter.flushb + NLMSG_ALIGN(G_filter.flushp));
 		memcpy(fn, n, n->nlmsg_len);
 		fn->nlmsg_type = RTM_DELROUTE;
 		fn->nlmsg_flags = NLM_F_REQUEST;
-		fn->nlmsg_seq = ++filter.rth->seq;
-		filter.flushp = (((char*)fn) + n->nlmsg_len) - filter.flushb;
-		filter.flushed = 1;
+		fn->nlmsg_seq = ++G_filter.rth->seq;
+		G_filter.flushp = (((char*)fn) + n->nlmsg_len) - G_filter.flushb;
+		G_filter.flushed = 1;
 		return 0;
 	}
+
+	/* We are printing routes */
 
 	if (n->nlmsg_type == RTM_DELROUTE) {
 		printf("Deleted ");
 	}
-	if (r->rtm_type != RTN_UNICAST && !filter.type) {
-		printf("%s ", rtnl_rtntype_n2a(r->rtm_type, b1, sizeof(b1)));
+	if (r->rtm_type != RTN_UNICAST /* && !G_filter.type - always 0 */) {
+		printf("%s ", rtnl_rtntype_n2a(r->rtm_type));
 	}
 
 	if (tb[RTA_DST]) {
 		if (r->rtm_dst_len != host_len) {
-			printf("%s/%u ", rt_addr_n2a(r->rtm_family,
-						RTA_PAYLOAD(tb[RTA_DST]),
-						RTA_DATA(tb[RTA_DST]),
-						abuf, sizeof(abuf)),
-					r->rtm_dst_len
-					);
+			printf("%s/%u ",
+				rt_addr_n2a(r->rtm_family, RTA_DATA(tb[RTA_DST])),
+				r->rtm_dst_len
+			);
 		} else {
 			printf("%s ", format_host(r->rtm_family,
 						RTA_PAYLOAD(tb[RTA_DST]),
-						RTA_DATA(tb[RTA_DST]),
-						abuf, sizeof(abuf))
-					);
+						RTA_DATA(tb[RTA_DST]))
+			);
 		}
 	} else if (r->rtm_dst_len) {
 		printf("0/%d ", r->rtm_dst_len);
@@ -221,44 +243,58 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 	}
 	if (tb[RTA_SRC]) {
 		if (r->rtm_src_len != host_len) {
-			printf("from %s/%u ", rt_addr_n2a(r->rtm_family,
-						RTA_PAYLOAD(tb[RTA_SRC]),
-						RTA_DATA(tb[RTA_SRC]),
-						abuf, sizeof(abuf)),
-					r->rtm_src_len
-					);
+			printf("from %s/%u ",
+				rt_addr_n2a(r->rtm_family, RTA_DATA(tb[RTA_SRC])),
+				r->rtm_src_len
+			);
 		} else {
 			printf("from %s ", format_host(r->rtm_family,
 						RTA_PAYLOAD(tb[RTA_SRC]),
-						RTA_DATA(tb[RTA_SRC]),
-						abuf, sizeof(abuf))
-					);
+						RTA_DATA(tb[RTA_SRC]))
+			);
 		}
 	} else if (r->rtm_src_len) {
 		printf("from 0/%u ", r->rtm_src_len);
 	}
-	if (tb[RTA_GATEWAY] && filter.rvia.bitlen != host_len) {
+	if (tb[RTA_GATEWAY] && G_filter.rvia.bitlen != host_len) {
 		printf("via %s ", format_host(r->rtm_family,
 					RTA_PAYLOAD(tb[RTA_GATEWAY]),
-					RTA_DATA(tb[RTA_GATEWAY]),
-					abuf, sizeof(abuf)));
+					RTA_DATA(tb[RTA_GATEWAY]))
+		);
 	}
-	if (tb[RTA_OIF] && filter.oifmask != -1) {
+	if (tb[RTA_OIF]) {
 		printf("dev %s ", ll_index_to_name(*(int*)RTA_DATA(tb[RTA_OIF])));
 	}
+#if ENABLE_FEATURE_IP_RULE
+	if (tid && tid != RT_TABLE_MAIN && !G_filter.tb)
+		printf("table %s ", rtnl_rttable_n2a(tid));
+#endif
 
-	if (tb[RTA_PREFSRC] && filter.rprefsrc.bitlen != host_len) {
+	/* Todo: parse & show "proto kernel", "scope link" here */
+
+	if (tb[RTA_PREFSRC] && /*G_filter.rprefsrc.bitlen - always 0*/ 0 != host_len) {
 		/* Do not use format_host(). It is our local addr
 		   and symbolic name will not be useful.
 		 */
 		printf(" src %s ", rt_addr_n2a(r->rtm_family,
-					RTA_PAYLOAD(tb[RTA_PREFSRC]),
-					RTA_DATA(tb[RTA_PREFSRC]),
-					abuf, sizeof(abuf)));
+					RTA_DATA(tb[RTA_PREFSRC])));
 	}
 	if (tb[RTA_PRIORITY]) {
 		printf(" metric %d ", *(uint32_t*)RTA_DATA(tb[RTA_PRIORITY]));
 	}
+	if (r->rtm_flags & RTNH_F_DEAD) {
+		printf("dead ");
+	}
+	if (r->rtm_flags & RTNH_F_ONLINK) {
+		printf("onlink ");
+	}
+	if (r->rtm_flags & RTNH_F_PERVASIVE) {
+		printf("pervasive ");
+	}
+	if (r->rtm_flags & RTM_F_NOTIFY) {
+		printf("notify ");
+	}
+
 	if (r->rtm_family == AF_INET6) {
 		struct rta_cacheinfo *ci = NULL;
 		if (tb[RTA_CACHEINFO]) {
@@ -279,7 +315,7 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 				printf(" error %d", ci->rta_error);
 		}
 	}
-	if (tb[RTA_IIF] && filter.iifmask != -1) {
+	if (tb[RTA_IIF] && G_filter.iif == 0) {
 		printf(" iif %s", ll_index_to_name(*(int*)RTA_DATA(tb[RTA_IIF])));
 	}
 	bb_putchar('\n');
@@ -290,18 +326,20 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 static int iproute_modify(int cmd, unsigned flags, char **argv)
 {
 	static const char keywords[] ALIGN1 =
-		"src\0""via\0""mtu\0""lock\0""protocol\0"USE_FEATURE_IP_RULE("table\0")
-		"dev\0""oif\0""to\0""metric\0";
+		"src\0""via\0""mtu\0""lock\0""scope\0""protocol\0"IF_FEATURE_IP_RULE("table\0")
+		"dev\0""oif\0""to\0""metric\0""onlink\0";
 	enum {
 		ARG_src,
 		ARG_via,
 		ARG_mtu, PARM_lock,
+		ARG_scope,
 		ARG_protocol,
-USE_FEATURE_IP_RULE(ARG_table,)
+IF_FEATURE_IP_RULE(ARG_table,)
 		ARG_dev,
 		ARG_oif,
 		ARG_to,
 		ARG_metric,
+		ARG_onlink,
 	};
 	enum {
 		gw_ok = 1 << 0,
@@ -311,15 +349,16 @@ USE_FEATURE_IP_RULE(ARG_table,)
 	};
 	struct rtnl_handle rth;
 	struct {
-		struct nlmsghdr		n;
-		struct rtmsg		r;
-		char			buf[1024];
+		struct nlmsghdr n;
+		struct rtmsg    r;
+		char            buf[1024];
 	} req;
 	char mxbuf[256];
 	struct rtattr * mxrta = (void*)mxbuf;
 	unsigned mxlock = 0;
 	char *d = NULL;
 	smalluint ok = 0;
+	smalluint scope_ok = 0;
 	int arg;
 
 	memset(&req, 0, sizeof(req));
@@ -328,15 +367,17 @@ USE_FEATURE_IP_RULE(ARG_table,)
 	req.n.nlmsg_flags = NLM_F_REQUEST | flags;
 	req.n.nlmsg_type = cmd;
 	req.r.rtm_family = preferred_family;
-	if (RT_TABLE_MAIN) /* if it is zero, memset already did it */
+	if (RT_TABLE_MAIN != 0) /* if it is zero, memset already did it */
 		req.r.rtm_table = RT_TABLE_MAIN;
-	if (RT_SCOPE_NOWHERE)
+	if (RT_SCOPE_NOWHERE != 0)
 		req.r.rtm_scope = RT_SCOPE_NOWHERE;
 
 	if (cmd != RTM_DELROUTE) {
-		req.r.rtm_protocol = RTPROT_BOOT;
 		req.r.rtm_scope = RT_SCOPE_UNIVERSE;
-		req.r.rtm_type = RTN_UNICAST;
+		if (RTPROT_BOOT != 0)
+			req.r.rtm_protocol = RTPROT_BOOT;
+		if (RTN_UNICAST != 0)
+			req.r.rtm_type = RTN_UNICAST;
 	}
 
 	mxrta->rta_type = RTA_METRICS;
@@ -367,14 +408,20 @@ USE_FEATURE_IP_RULE(ARG_table,)
 				mxlock |= (1 << RTAX_MTU);
 				NEXT_ARG();
 			}
-			if (get_unsigned(&mtu, *argv, 0))
-				invarg(*argv, "mtu");
+			mtu = get_unsigned(*argv, "mtu");
 			rta_addattr32(mxrta, sizeof(mxbuf), RTAX_MTU, mtu);
+		} else if (arg == ARG_scope) {
+			uint32_t scope;
+			NEXT_ARG();
+			if (rtnl_rtscope_a2n(&scope, *argv))
+				invarg_1_to_2(*argv, "scope");
+			req.r.rtm_scope = scope;
+			scope_ok = 1;
 		} else if (arg == ARG_protocol) {
 			uint32_t prot;
 			NEXT_ARG();
 			if (rtnl_rtprot_a2n(&prot, *argv))
-				invarg(*argv, "protocol");
+				invarg_1_to_2(*argv, "protocol");
 			req.r.rtm_protocol = prot;
 			ok |= proto_ok;
 #if ENABLE_FEATURE_IP_RULE
@@ -382,8 +429,13 @@ USE_FEATURE_IP_RULE(ARG_table,)
 			uint32_t tid;
 			NEXT_ARG();
 			if (rtnl_rttable_a2n(&tid, *argv))
-				invarg(*argv, "table");
-			req.r.rtm_table = tid;
+				invarg_1_to_2(*argv, "table");
+			if (tid < 256)
+				req.r.rtm_table = tid;
+			else {
+				req.r.rtm_table = RT_TABLE_UNSPEC;
+				addattr32(&req.n, sizeof(req), RTA_TABLE, tid);
+			}
 #endif
 		} else if (arg == ARG_dev || arg == ARG_oif) {
 			NEXT_ARG();
@@ -391,9 +443,10 @@ USE_FEATURE_IP_RULE(ARG_table,)
 		} else if (arg == ARG_metric) {
 			uint32_t metric;
 			NEXT_ARG();
-			if (get_u32(&metric, *argv, 0))
-				invarg(*argv, "metric");
+			metric = get_u32(*argv, "metric");
 			addattr32(&req.n, sizeof(req), RTA_PRIORITY, metric);
+		} else if (arg == ARG_onlink) {
+			req.r.rtm_flags |= RTNH_F_ONLINK;
 		} else {
 			int type;
 			inet_prefix dst;
@@ -402,7 +455,8 @@ USE_FEATURE_IP_RULE(ARG_table,)
 				NEXT_ARG();
 			}
 			if ((**argv < '0' || **argv > '9')
-			 && rtnl_rtntype_a2n(&type, *argv) == 0) {
+			 && rtnl_rtntype_a2n(&type, *argv) == 0
+			) {
 				NEXT_ARG();
 				req.r.rtm_type = type;
 				ok |= type_ok;
@@ -444,17 +498,22 @@ USE_FEATURE_IP_RULE(ARG_table,)
 		addattr_l(&req.n, sizeof(req), RTA_METRICS, RTA_DATA(mxrta), RTA_PAYLOAD(mxrta));
 	}
 
-	if (req.r.rtm_type == RTN_LOCAL || req.r.rtm_type == RTN_NAT)
-		req.r.rtm_scope = RT_SCOPE_HOST;
-	else if (req.r.rtm_type == RTN_BROADCAST ||
-			req.r.rtm_type == RTN_MULTICAST ||
-			req.r.rtm_type == RTN_ANYCAST)
-		req.r.rtm_scope = RT_SCOPE_LINK;
-	else if (req.r.rtm_type == RTN_UNICAST || req.r.rtm_type == RTN_UNSPEC) {
-		if (cmd == RTM_DELROUTE)
-			req.r.rtm_scope = RT_SCOPE_NOWHERE;
-		else if (!(ok & gw_ok))
+	if (!scope_ok) {
+		if (req.r.rtm_type == RTN_LOCAL || req.r.rtm_type == RTN_NAT)
+			req.r.rtm_scope = RT_SCOPE_HOST;
+		else
+		if (req.r.rtm_type == RTN_BROADCAST
+		 || req.r.rtm_type == RTN_MULTICAST
+		 || req.r.rtm_type == RTN_ANYCAST
+		) {
 			req.r.rtm_scope = RT_SCOPE_LINK;
+		}
+		else if (req.r.rtm_type == RTN_UNICAST || req.r.rtm_type == RTN_UNSPEC) {
+			if (cmd == RTM_DELROUTE)
+				req.r.rtm_scope = RT_SCOPE_NOWHERE;
+			else if (!(ok & gw_ok))
+				req.r.rtm_scope = RT_SCOPE_LINK;
+		}
 	}
 
 	if (req.r.rtm_family == AF_UNSPEC) {
@@ -504,7 +563,7 @@ static void iproute_flush_cache(void)
 	}
 
 	if (write(flush_fd, "-1", 2) < 2) {
-		bb_perror_msg("cannot flush routing cache");
+		bb_perror_msg("can't flush routing cache");
 		return;
 	}
 	close(flush_fd);
@@ -512,9 +571,9 @@ static void iproute_flush_cache(void)
 
 static void iproute_reset_filter(void)
 {
-	memset(&filter, 0, sizeof(filter));
-	filter.mdst.bitlen = -1;
-	filter.msrc.bitlen = -1;
+	memset(&G_filter, 0, sizeof(G_filter));
+	G_filter.mdst.bitlen = -1;
+	G_filter.msrc.bitlen = -1;
 }
 
 /* Return value becomes exitcode. It's okay to not return at all */
@@ -550,7 +609,7 @@ static int iproute_list_or_flush(char **argv, int flush)
 	int arg, parm;
 
 	iproute_reset_filter();
-	filter.tb = RT_TABLE_MAIN;
+	G_filter.tb = RT_TABLE_MAIN;
 
 	if (flush && !*argv)
 		bb_error_msg_and_die(bb_msg_requires_arg, "\"ip route flush\"");
@@ -560,14 +619,14 @@ static int iproute_list_or_flush(char **argv, int flush)
 		if (arg == KW_proto) {
 			uint32_t prot = 0;
 			NEXT_ARG();
-			filter.protocolmask = -1;
+			//G_filter.protocolmask = -1;
 			if (rtnl_rtprot_a2n(&prot, *argv)) {
 				if (index_in_strings(keywords, *argv) != KW_all)
-					invarg(*argv, "protocol");
+					invarg_1_to_2(*argv, "protocol");
 				prot = 0;
-				filter.protocolmask = 0;
+				//G_filter.protocolmask = 0;
 			}
-			filter.protocol = prot;
+			//G_filter.protocol = prot;
 		} else if (arg == KW_dev || arg == KW_oif) {
 			NEXT_ARG();
 			od = *argv;
@@ -576,42 +635,42 @@ static int iproute_list_or_flush(char **argv, int flush)
 			id = *argv;
 		} else if (arg == KW_via) {
 			NEXT_ARG();
-			get_prefix(&filter.rvia, *argv, do_ipv6);
+			get_prefix(&G_filter.rvia, *argv, do_ipv6);
 		} else if (arg == KW_table) { /* table all/cache/main */
 			NEXT_ARG();
 			parm = index_in_substrings(keywords, *argv);
 			if (parm == KW_cache)
-				filter.tb = -1;
+				G_filter.tb = -1;
 			else if (parm == KW_all)
-				filter.tb = 0;
+				G_filter.tb = 0;
 			else if (parm != KW_main) {
 #if ENABLE_FEATURE_IP_RULE
 				uint32_t tid;
 				if (rtnl_rttable_a2n(&tid, *argv))
-					invarg(*argv, "table");
-				filter.tb = tid;
+					invarg_1_to_2(*argv, "table");
+				G_filter.tb = tid;
 #else
-				invarg(*argv, "table");
+				invarg_1_to_2(*argv, "table");
 #endif
 			}
 		} else if (arg == KW_cache) {
 			/* The command 'ip route flush cache' is used by OpenSWAN.
 			 * Assuming it's a synonym for 'ip route flush table cache' */
-			filter.tb = -1;
+			G_filter.tb = -1;
 		} else if (arg == KW_from) {
 			NEXT_ARG();
 			parm = index_in_substrings(keywords, *argv);
 			if (parm == KW_root) {
 				NEXT_ARG();
-				get_prefix(&filter.rsrc, *argv, do_ipv6);
+				get_prefix(&G_filter.rsrc, *argv, do_ipv6);
 			} else if (parm == KW_match) {
 				NEXT_ARG();
-				get_prefix(&filter.msrc, *argv, do_ipv6);
+				get_prefix(&G_filter.msrc, *argv, do_ipv6);
 			} else {
 				if (parm == KW_exact)
 					NEXT_ARG();
-				get_prefix(&filter.msrc, *argv, do_ipv6);
-				filter.rsrc = filter.msrc;
+				get_prefix(&G_filter.msrc, *argv, do_ipv6);
+				G_filter.rsrc = G_filter.msrc;
 			}
 		} else { /* "to" is the default parameter */
 			if (arg == KW_to) {
@@ -621,21 +680,21 @@ static int iproute_list_or_flush(char **argv, int flush)
 			/* parm = arg; - would be more plausible, but we reuse 'arg' here */
 			if (arg == KW_root) {
 				NEXT_ARG();
-				get_prefix(&filter.rdst, *argv, do_ipv6);
+				get_prefix(&G_filter.rdst, *argv, do_ipv6);
 			} else if (arg == KW_match) {
 				NEXT_ARG();
-				get_prefix(&filter.mdst, *argv, do_ipv6);
+				get_prefix(&G_filter.mdst, *argv, do_ipv6);
 			} else { /* "to exact" is the default */
 				if (arg == KW_exact)
 					NEXT_ARG();
-				get_prefix(&filter.mdst, *argv, do_ipv6);
-				filter.rdst = filter.mdst;
+				get_prefix(&G_filter.mdst, *argv, do_ipv6);
+				G_filter.rdst = G_filter.mdst;
 			}
 		}
 		argv++;
 	}
 
-	if (do_ipv6 == AF_UNSPEC && filter.tb) {
+	if (do_ipv6 == AF_UNSPEC && G_filter.tb) {
 		do_ipv6 = AF_INET;
 	}
 
@@ -647,46 +706,44 @@ static int iproute_list_or_flush(char **argv, int flush)
 
 		if (id) {
 			idx = xll_name_to_index(id);
-			filter.iif = idx;
-			filter.iifmask = -1;
+			G_filter.iif = idx;
 		}
 		if (od) {
 			idx = xll_name_to_index(od);
-			filter.oif = idx;
-			filter.oifmask = -1;
+			G_filter.oif = idx;
 		}
 	}
 
 	if (flush) {
 		char flushb[4096-512];
 
-		if (filter.tb == -1) { /* "flush table cache" */
+		if (G_filter.tb == -1) { /* "flush table cache" */
 			if (do_ipv6 != AF_INET6)
 				iproute_flush_cache();
 			if (do_ipv6 == AF_INET)
 				return 0;
 		}
 
-		filter.flushb = flushb;
-		filter.flushp = 0;
-		filter.flushe = sizeof(flushb);
-		filter.rth = &rth;
+		G_filter.flushb = flushb;
+		G_filter.flushp = 0;
+		G_filter.flushe = sizeof(flushb);
+		G_filter.rth = &rth;
 
 		for (;;) {
 			xrtnl_wilddump_request(&rth, do_ipv6, RTM_GETROUTE);
-			filter.flushed = 0;
+			G_filter.flushed = 0;
 			xrtnl_dump_filter(&rth, print_route, NULL);
-			if (filter.flushed == 0)
+			if (G_filter.flushed == 0)
 				return 0;
 			if (flush_update())
 				return 1;
 		}
 	}
 
-	if (filter.tb != -1) {
+	if (G_filter.tb != -1) {
 		xrtnl_wilddump_request(&rth, do_ipv6, RTM_GETROUTE);
 	} else if (rtnl_rtcache_request(&rth, do_ipv6) < 0) {
-		bb_perror_msg_and_die("cannot send dump request");
+		bb_perror_msg_and_die("can't send dump request");
 	}
 	xrtnl_dump_filter(&rth, print_route, NULL);
 
@@ -774,8 +831,8 @@ static int iproute_get(char **argv)
 				}
 				req.r.rtm_dst_len = addr.bitlen;
 			}
-			argv++;
 		}
+		argv++;
 	}
 
 	if (req.r.rtm_dst_len == 0) {
@@ -829,7 +886,7 @@ static int iproute_get(char **argv)
 			tb[RTA_PREFSRC]->rta_type = RTA_SRC;
 			r->rtm_src_len = 8*RTA_PAYLOAD(tb[RTA_PREFSRC]);
 		} else if (!tb[RTA_SRC]) {
-			bb_error_msg_and_die("failed to connect the route");
+			bb_error_msg_and_die("can't connect the route");
 		}
 		if (!odev && tb[RTA_OIF]) {
 			tb[RTA_OIF]->rta_type = 0;
@@ -852,7 +909,7 @@ static int iproute_get(char **argv)
 }
 
 /* Return value becomes exitcode. It's okay to not return at all */
-int do_iproute(char **argv)
+int FAST_FUNC do_iproute(char **argv)
 {
 	static const char ip_route_commands[] ALIGN1 =
 	/*0-3*/	"add\0""append\0""change\0""chg\0"
@@ -861,6 +918,8 @@ int do_iproute(char **argv)
 	int command_num;
 	unsigned flags = 0;
 	int cmd = RTM_NEWROUTE;
+
+	INIT_G();
 
 	if (!*argv)
 		return iproute_list_or_flush(argv, 0);
@@ -900,7 +959,7 @@ int do_iproute(char **argv)
 		case 11: /* flush */
 			return iproute_list_or_flush(argv+1, 1);
 		default:
-			bb_error_msg_and_die("unknown command %s", *argv);
+			invarg_1_to_2(*argv, applet_name);
 	}
 
 	return iproute_modify(cmd, flags, argv+1);

@@ -5,15 +5,133 @@
  * Copyright (C) [2003] by [Matteo Croce] <3297627799@wind.it>
  * Hacked by Tito <farmatito@tiscali.it> for size optimization.
  *
- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  *
  * This program is based on the source code of hdparm: see below...
  * hdparm.c - Command line interface to get/set hard disk parameters
  *          - by Mark Lord (C) 1994-2002 -- freely distributable
  */
+//config:config HDPARM
+//config:	bool "hdparm"
+//config:	default y
+//config:	select PLATFORM_LINUX
+//config:	help
+//config:	  Get/Set hard drive parameters. Primarily intended for ATA
+//config:	  drives. Adds about 13k (or around 30k if you enable the
+//config:	  FEATURE_HDPARM_GET_IDENTITY option)....
+//config:
+//config:config FEATURE_HDPARM_GET_IDENTITY
+//config:	bool "Support obtaining detailed information directly from drives"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the -I and -i options to obtain detailed information
+//config:	  directly from drives about their capabilities and supported ATA
+//config:	  feature set. If no device name is specified, hdparm will read
+//config:	  identify data from stdin. Enabling this option will add about 16k...
+//config:
+//config:config FEATURE_HDPARM_HDIO_SCAN_HWIF
+//config:	bool "Register an IDE interface (DANGEROUS)"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the 'hdparm -R' option to register an IDE interface.
+//config:	  This is dangerous stuff, so you should probably say N.
+//config:
+//config:config FEATURE_HDPARM_HDIO_UNREGISTER_HWIF
+//config:	bool "Un-register an IDE interface (DANGEROUS)"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the 'hdparm -U' option to un-register an IDE interface.
+//config:	  This is dangerous stuff, so you should probably say N.
+//config:
+//config:config FEATURE_HDPARM_HDIO_DRIVE_RESET
+//config:	bool "Perform device reset (DANGEROUS)"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the 'hdparm -w' option to perform a device reset.
+//config:	  This is dangerous stuff, so you should probably say N.
+//config:
+//config:config FEATURE_HDPARM_HDIO_TRISTATE_HWIF
+//config:	bool "Tristate device for hotswap (DANGEROUS)"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the 'hdparm -x' option to tristate device for hotswap,
+//config:	  and the '-b' option to get/set bus state. This is dangerous
+//config:	  stuff, so you should probably say N.
+//config:
+//config:config FEATURE_HDPARM_HDIO_GETSET_DMA
+//config:	bool "Get/set using_dma flag"
+//config:	default y
+//config:	depends on HDPARM
+//config:	help
+//config:	  Enables the 'hdparm -d' option to get/set using_dma flag.
+
+//applet:IF_HDPARM(APPLET(hdparm, BB_DIR_SBIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_HDPARM) += hdparm.o
+
+//usage:#define hdparm_trivial_usage
+//usage:       "[OPTIONS] [DEVICE]"
+//usage:#define hdparm_full_usage "\n\n"
+//usage:       "	-a	Get/set fs readahead"
+//usage:     "\n	-A	Set drive read-lookahead flag (0/1)"
+//usage:     "\n	-b	Get/set bus state (0 == off, 1 == on, 2 == tristate)"
+//usage:     "\n	-B	Set Advanced Power Management setting (1-255)"
+//usage:     "\n	-c	Get/set IDE 32-bit IO setting"
+//usage:     "\n	-C	Check IDE power mode status"
+//usage:	IF_FEATURE_HDPARM_HDIO_GETSET_DMA(
+//usage:     "\n	-d	Get/set using_dma flag")
+//usage:     "\n	-D	Enable/disable drive defect-mgmt"
+//usage:     "\n	-f	Flush buffer cache for device on exit"
+//usage:     "\n	-g	Display drive geometry"
+//usage:     "\n	-h	Display terse usage information"
+//usage:	IF_FEATURE_HDPARM_GET_IDENTITY(
+//usage:     "\n	-i	Display drive identification")
+//usage:	IF_FEATURE_HDPARM_GET_IDENTITY(
+//usage:     "\n	-I	Detailed/current information directly from drive")
+//usage:     "\n	-k	Get/set keep_settings_over_reset flag (0/1)"
+//usage:     "\n	-K	Set drive keep_features_over_reset flag (0/1)"
+//usage:     "\n	-L	Set drive doorlock (0/1) (removable harddisks only)"
+//usage:     "\n	-m	Get/set multiple sector count"
+//usage:     "\n	-n	Get/set ignore-write-errors flag (0/1)"
+//usage:     "\n	-p	Set PIO mode on IDE interface chipset (0,1,2,3,4,...)"
+//usage:     "\n	-P	Set drive prefetch count"
+/* //usage:  "\n	-q	Change next setting quietly" - not supported ib bbox */
+//usage:     "\n	-Q	Get/set DMA tagged-queuing depth (if supported)"
+//usage:     "\n	-r	Get/set readonly flag (DANGEROUS to set)"
+//usage:	IF_FEATURE_HDPARM_HDIO_SCAN_HWIF(
+//usage:     "\n	-R	Register an IDE interface (DANGEROUS)")
+//usage:     "\n	-S	Set standby (spindown) timeout"
+//usage:     "\n	-t	Perform device read timings"
+//usage:     "\n	-T	Perform cache read timings"
+//usage:     "\n	-u	Get/set unmaskirq flag (0/1)"
+//usage:	IF_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(
+//usage:     "\n	-U	Unregister an IDE interface (DANGEROUS)")
+//usage:     "\n	-v	Defaults; same as -mcudkrag for IDE drives"
+//usage:     "\n	-V	Display program version and exit immediately"
+//usage:	IF_FEATURE_HDPARM_HDIO_DRIVE_RESET(
+//usage:     "\n	-w	Perform device reset (DANGEROUS)")
+//usage:     "\n	-W	Set drive write-caching flag (0/1) (DANGEROUS)"
+//usage:	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(
+//usage:     "\n	-x	Tristate device for hotswap (0/1) (DANGEROUS)")
+//usage:     "\n	-X	Set IDE xfer mode (DANGEROUS)"
+//usage:     "\n	-y	Put IDE drive in standby mode"
+//usage:     "\n	-Y	Put IDE drive to sleep"
+//usage:     "\n	-Z	Disable Seagate auto-powersaving mode"
+//usage:     "\n	-z	Reread partition table"
 
 #include "libbb.h"
+#include "common_bufsiz.h"
+/* must be _after_ libbb.h: */
 #include <linux/hdreg.h>
+#include <sys/mount.h>
+#if !defined(BLKGETSIZE64)
+# define BLKGETSIZE64 _IOR(0x12,114,size_t)
+#endif
 
 /* device types */
 /* ------------ */
@@ -59,7 +177,7 @@
 #define ADV_PIO_MODES		64  /* advanced PIO modes supported */
 				    /* multiword DMA xfer cycle time: */
 #define DMA_TIME_MIN		65  /*   - minimum */
-#define DMA_TIME_NORM		66  /*   - manufacturer's recommended	*/
+#define DMA_TIME_NORM		66  /*   - manufacturer's recommended */
 				    /* minimum PIO xfer cycle time: */
 #define PIO_NO_FLOW		67  /*   - without flow control */
 #define PIO_FLOW		68  /*   - with IORDY flow control */
@@ -82,7 +200,7 @@
 #define ENH_ERASE_TIME		90  /*   - enhanced */
 #define ADV_PWR			91  /* current advanced power management level
 				       in low byte, 0x40 in high byte. */
-#define PSWD_CODE		92  /* master password revision code	*/
+#define PSWD_CODE		92  /* master password revision code */
 #define HWRST_RSLT		93  /* hardware reset result */
 #define ACOUSTIC		94  /* acoustic mgmt values ( >= ATA-6) */
 #define LBA_LSB			100 /* LBA: maximum.  Currently only 48 */
@@ -232,6 +350,10 @@
 #undef DO_FLUSHCACHE            /* under construction: force cache flush on -W0 */
 
 
+#define IS_GET 1
+#define IS_SET 2
+
+
 enum { fd = 3 };
 
 
@@ -241,19 +363,16 @@ struct globals {
 	smallint do_ctimings, do_timings;
 	smallint reread_partn;
 	smallint set_piomode, noisy_piomode;
-	smallint set_readahead, get_readahead;
-	smallint set_readonly, get_readonly;
-	smallint set_unmask, get_unmask;
-	smallint set_mult, get_mult;
+	smallint getset_readahead;
+	smallint getset_readonly;
+	smallint getset_unmask;
+	smallint getset_mult;
 #ifdef HDIO_GET_QDMA
-	smallint get_dma_q;
-#ifdef HDIO_SET_QDMA
-	smallint set_dma_q;
+	smallint getset_dma_q;
 #endif
-#endif
-	smallint set_nowerr, get_nowerr;
-	smallint set_keep, get_keep;
-	smallint set_io32bit, get_io32bit;
+	smallint getset_nowerr;
+	smallint getset_keep;
+	smallint getset_io32bit;
 	int piomode;
 	unsigned long Xreadahead;
 	unsigned long readonly;
@@ -267,22 +386,22 @@ struct globals {
 	unsigned long io32bit;
 #if ENABLE_FEATURE_HDPARM_HDIO_GETSET_DMA
 	unsigned long dma;
-	smallint set_dma, get_dma;
+	smallint getset_dma;
 #endif
 #ifdef HDIO_DRIVE_CMD
 	smallint set_xfermode, get_xfermode;
-	smallint set_dkeep, get_dkeep;
-	smallint set_standby, get_standby;
-	smallint set_lookahead, get_lookahead;
-	smallint set_prefetch, get_prefetch;
-	smallint set_defects, get_defects;
-	smallint set_wcache, get_wcache;
-	smallint set_doorlock, get_doorlock;
-	smallint set_seagate, get_seagate;
-	smallint set_standbynow, get_standbynow;
-	smallint set_sleepnow, get_sleepnow;
+	smallint getset_dkeep;
+	smallint getset_standby;
+	smallint getset_lookahead;
+	smallint getset_prefetch;
+	smallint getset_defects;
+	smallint getset_wcache;
+	smallint getset_doorlock;
+	smallint set_seagate;
+	smallint set_standbynow;
+	smallint set_sleepnow;
 	smallint get_powermode;
-	smallint set_apmmode, get_apmmode;
+	smallint getset_apmmode;
 	int xfermode_requested;
 	unsigned long dkeep;
 	unsigned long standby_requested; /* 0..255 */
@@ -293,15 +412,15 @@ struct globals {
 	unsigned long doorlock;
 	unsigned long apmmode;
 #endif
-	USE_FEATURE_HDPARM_GET_IDENTITY(        smallint get_IDentity;)
-	USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  smallint set_busstate, get_busstate;)
-	USE_FEATURE_HDPARM_HDIO_DRIVE_RESET(    smallint perform_reset;)
-	USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  smallint perform_tristate;)
-	USE_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(smallint unregister_hwif;)
-	USE_FEATURE_HDPARM_HDIO_SCAN_HWIF(      smallint scan_hwif;)
-	USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  unsigned long busstate;)
-	USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  unsigned long tristate;)
-	USE_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(unsigned long hwif;)
+	IF_FEATURE_HDPARM_GET_IDENTITY(        smallint get_IDentity;)
+	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  smallint getset_busstate;)
+	IF_FEATURE_HDPARM_HDIO_DRIVE_RESET(    smallint perform_reset;)
+	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  smallint perform_tristate;)
+	IF_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(smallint unregister_hwif;)
+	IF_FEATURE_HDPARM_HDIO_SCAN_HWIF(      smallint scan_hwif;)
+	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  unsigned long busstate;)
+	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(  unsigned long tristate;)
+	IF_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(unsigned long hwif;)
 #if ENABLE_FEATURE_HDPARM_HDIO_SCAN_HWIF
 	unsigned long hwif_data;
 	unsigned long hwif_ctrl;
@@ -310,11 +429,8 @@ struct globals {
 #ifdef DO_FLUSHCACHE
 	unsigned char flushcache[4] = { WIN_FLUSHCACHE, 0, 0, 0 };
 #endif
-};
-#define G (*(struct globals*)&bb_common_bufsiz1)
-struct BUG_G_too_big {
-	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
-};
+} FIX_ALIASING;
+#define G (*(struct globals*)bb_common_bufsiz1)
 #define get_identity       (G.get_identity           )
 #define get_geom           (G.get_geom               )
 #define do_flush           (G.do_flush               )
@@ -323,22 +439,14 @@ struct BUG_G_too_big {
 #define reread_partn       (G.reread_partn           )
 #define set_piomode        (G.set_piomode            )
 #define noisy_piomode      (G.noisy_piomode          )
-#define set_readahead      (G.set_readahead          )
-#define get_readahead      (G.get_readahead          )
-#define set_readonly       (G.set_readonly           )
-#define get_readonly       (G.get_readonly           )
-#define set_unmask         (G.set_unmask             )
-#define get_unmask         (G.get_unmask             )
-#define set_mult           (G.set_mult               )
-#define get_mult           (G.get_mult               )
-#define set_dma_q          (G.set_dma_q              )
-#define get_dma_q          (G.get_dma_q              )
-#define set_nowerr         (G.set_nowerr             )
-#define get_nowerr         (G.get_nowerr             )
-#define set_keep           (G.set_keep               )
-#define get_keep           (G.get_keep               )
-#define set_io32bit        (G.set_io32bit            )
-#define get_io32bit        (G.get_io32bit            )
+#define getset_readahead   (G.getset_readahead       )
+#define getset_readonly    (G.getset_readonly        )
+#define getset_unmask      (G.getset_unmask          )
+#define getset_mult        (G.getset_mult            )
+#define getset_dma_q       (G.getset_dma_q           )
+#define getset_nowerr      (G.getset_nowerr          )
+#define getset_keep        (G.getset_keep            )
+#define getset_io32bit     (G.getset_io32bit         )
 #define piomode            (G.piomode                )
 #define Xreadahead         (G.Xreadahead             )
 #define readonly           (G.readonly               )
@@ -349,33 +457,21 @@ struct BUG_G_too_big {
 #define keep               (G.keep                   )
 #define io32bit            (G.io32bit                )
 #define dma                (G.dma                    )
-#define set_dma            (G.set_dma                )
-#define get_dma            (G.get_dma                )
+#define getset_dma         (G.getset_dma             )
 #define set_xfermode       (G.set_xfermode           )
 #define get_xfermode       (G.get_xfermode           )
-#define set_dkeep          (G.set_dkeep              )
-#define get_dkeep          (G.get_dkeep              )
-#define set_standby        (G.set_standby            )
-#define get_standby        (G.get_standby            )
-#define set_lookahead      (G.set_lookahead          )
-#define get_lookahead      (G.get_lookahead          )
-#define set_prefetch       (G.set_prefetch           )
-#define get_prefetch       (G.get_prefetch           )
-#define set_defects        (G.set_defects            )
-#define get_defects        (G.get_defects            )
-#define set_wcache         (G.set_wcache             )
-#define get_wcache         (G.get_wcache             )
-#define set_doorlock       (G.set_doorlock           )
-#define get_doorlock       (G.get_doorlock           )
+#define getset_dkeep       (G.getset_dkeep           )
+#define getset_standby     (G.getset_standby         )
+#define getset_lookahead   (G.getset_lookahead       )
+#define getset_prefetch    (G.getset_prefetch        )
+#define getset_defects     (G.getset_defects         )
+#define getset_wcache      (G.getset_wcache          )
+#define getset_doorlock    (G.getset_doorlock        )
 #define set_seagate        (G.set_seagate            )
-#define get_seagate        (G.get_seagate            )
 #define set_standbynow     (G.set_standbynow         )
-#define get_standbynow     (G.get_standbynow         )
 #define set_sleepnow       (G.set_sleepnow           )
-#define get_sleepnow       (G.get_sleepnow           )
 #define get_powermode      (G.get_powermode          )
-#define set_apmmode        (G.set_apmmode            )
-#define get_apmmode        (G.get_apmmode            )
+#define getset_apmmode     (G.getset_apmmode         )
 #define xfermode_requested (G.xfermode_requested     )
 #define dkeep              (G.dkeep                  )
 #define standby_requested  (G.standby_requested      )
@@ -386,8 +482,7 @@ struct BUG_G_too_big {
 #define doorlock           (G.doorlock               )
 #define apmmode            (G.apmmode                )
 #define get_IDentity       (G.get_IDentity           )
-#define set_busstate       (G.set_busstate           )
-#define get_busstate       (G.get_busstate           )
+#define getset_busstate    (G.getset_busstate        )
 #define perform_reset      (G.perform_reset          )
 #define perform_tristate   (G.perform_tristate       )
 #define unregister_hwif    (G.unregister_hwif        )
@@ -398,6 +493,10 @@ struct BUG_G_too_big {
 #define hwif_data          (G.hwif_data              )
 #define hwif_ctrl          (G.hwif_ctrl              )
 #define hwif_irq           (G.hwif_irq               )
+#define INIT_G() do { \
+	setup_common_bufsiz(); \
+	BUILD_BUG_ON(sizeof(G) > COMMON_BUFSIZE); \
+} while (0)
 
 
 /* Busybox messages and functions */
@@ -429,14 +528,14 @@ static void on_off(int value)
 static void print_flag_on_off(int get_arg, const char *s, unsigned long arg)
 {
 	if (get_arg) {
-		printf(" setting %s to %ld", s, arg);
+		printf(" setting %s to %lu", s, arg);
 		on_off(arg);
 	}
 }
 
 static void print_value_on_off(const char *str, unsigned long argp)
 {
-	printf(" %s\t= %2ld", str, argp);
+	printf(" %s\t= %2lu", str, argp);
 	on_off(argp != 0);
 }
 
@@ -696,7 +795,7 @@ static void identify(uint16_t *val)
 	swab(val, buf, sizeof(buf));
 	val = buf;
 #endif
-	/* check if we recognise the device type */
+	/* check if we recognize the device type */
 	bb_putchar('\n');
 	if (!(val[GEN_CONFIG] & NOT_ATA)) {
 		dev = ATA_DEV;
@@ -727,9 +826,9 @@ static void identify(uint16_t *val)
 	) {
 		like_std = 5;
 		if ((val[CONFIG]==STBY_NID_VAL) || (val[CONFIG]==STBY_ID_VAL))
-			printf("powers-up in standby; SET FEATURES subcmd spins-up.\n");
+			puts("powers-up in standby; SET FEATURES subcmd spins-up.");
 		if (((val[CONFIG]==STBY_NID_VAL) || (val[CONFIG]==PWRD_NID_VAL)) && (val[GEN_CONFIG] & INCOMPLETE))
-			printf("\n\tWARNING: ID response incomplete.\n\tFollowing data may be incorrect.\n\n");
+			puts("\n\tWARNING: ID response incomplete.\n\tFollowing data may be incorrect.\n");
 	}
 
 	/* output the model and serial numbers and the fw revision */
@@ -746,8 +845,8 @@ static void identify(uint16_t *val)
 		if (val[MINOR] && (val[MINOR] <= MINOR_MAX)) {
 			if (like_std < 3) like_std = 3;
 			std = actual_ver[val[MINOR]];
-			if (std) printf("\n\tUsed: %s ", nth_string(minor_str, val[MINOR]));
-
+			if (std)
+				printf("\n\tUsed: %s ", nth_string(minor_str, val[MINOR]));
 		}
 		/* looks like when they up-issue the std, they obsolete one;
 		 * thus, only the newest 4 issues need be supported. (That's
@@ -839,7 +938,7 @@ static void identify(uint16_t *val)
 	if (min_std == 0xffff)
 		min_std = like_std > 4 ? like_std - 3 : 1;
 
-	printf("Configuration:\n");
+	puts("Configuration:");
 	/* more info from the general configuration word */
 	if ((eqpt != CDROM) && (like_std == 1)) {
 		jj = val[GEN_CONFIG] >> 1;
@@ -870,16 +969,27 @@ static void identify(uint16_t *val)
 	} else {
 		/* addressing...CHS? See section 6.2 of ATA specs 4 or 5 */
 		ll = (uint32_t)val[LBA_SECTS_MSB] << 16 | val[LBA_SECTS_LSB];
-		mm = 0; bbbig = 0;
+		mm = 0;
+		bbbig = 0;
 		if ((ll > 0x00FBFC10) && (!val[LCYLS]))
-			printf("\tCHS addressing not supported\n");
+			puts("\tCHS addressing not supported");
 		else {
 			jj = val[WHATS_VALID] & OK_W54_58;
-			printf("\tLogical\t\tmax\tcurrent\n\tcylinders\t%u\t%u\n\theads\t\t%u\t%u\n\tsectors/track\t%u\t%u\n\t--\n",
-					val[LCYLS],jj?val[LCYLS_CUR]:0, val[LHEADS],jj?val[LHEADS_CUR]:0, val[LSECTS],jj?val[LSECTS_CUR]:0);
+			printf("\tLogical\t\tmax\tcurrent\n"
+				"\tcylinders\t%u\t%u\n"
+				"\theads\t\t%u\t%u\n"
+				"\tsectors/track\t%u\t%u\n"
+				"\t--\n",
+				val[LCYLS],
+				jj ? val[LCYLS_CUR] : 0,
+				val[LHEADS],
+				jj ? val[LHEADS_CUR] : 0,
+				val[LSECTS],
+				jj ? val[LSECTS_CUR] : 0);
 
 			if ((min_std == 1) && (val[TRACK_BYTES] || val[SECT_BYTES]))
-				printf("\tbytes/track: %u\tbytes/sector: %u\n", val[TRACK_BYTES], val[SECT_BYTES]);
+				printf("\tbytes/track: %u\tbytes/sector: %u\n",
+					val[TRACK_BYTES], val[SECT_BYTES]);
 
 			if (jj) {
 				mm = (uint32_t)val[CAPACITY_MSB] << 16 | val[CAPACITY_LSB];
@@ -921,22 +1031,24 @@ static void identify(uint16_t *val)
 	printf("Capabilities:\n\t");
 
 	if (dev == ATAPI_DEV) {
-		if (eqpt != CDROM && (val[CAPAB_0] & CMD_Q_SUP)) printf("Cmd queuing, ");
-		if (val[CAPAB_0] & OVLP_SUP) printf("Cmd overlap, ");
+		if (eqpt != CDROM && (val[CAPAB_0] & CMD_Q_SUP))
+			printf("Cmd queuing, ");
+		if (val[CAPAB_0] & OVLP_SUP)
+			printf("Cmd overlap, ");
 	}
 	if (val[CAPAB_0] & LBA_SUP) printf("LBA, ");
 
 	if (like_std != 1) {
 		printf("IORDY%s(can%s be disabled)\n",
-				!(val[CAPAB_0] & IORDY_SUP) ? "(may be)" : "",
-				(val[CAPAB_0] & IORDY_OFF) ? "" :"not");
+			!(val[CAPAB_0] & IORDY_SUP) ? "(may be)" : "",
+			(val[CAPAB_0] & IORDY_OFF) ? "" :"not");
 	} else
-		printf("no IORDY\n");
+		puts("no IORDY");
 
 	if ((like_std == 1) && val[BUF_TYPE]) {
 		printf("\tBuffer type: %04x: %s%s\n", val[BUF_TYPE],
-				(val[BUF_TYPE] < 2) ? "single port, single-sector" : "dual port, multi-sector",
-				(val[BUF_TYPE] > 2) ? " with read caching ability" : "");
+			(val[BUF_TYPE] < 2) ? "single port, single-sector" : "dual port, multi-sector",
+			(val[BUF_TYPE] > 2) ? " with read caching ability" : "");
 	}
 
 	if ((min_std == 1) && (val[BUFFER__SIZE] && (val[BUFFER__SIZE] != NOVAL_1))) {
@@ -953,26 +1065,28 @@ static void identify(uint16_t *val)
 		if (like_std == 1)
 			printf("\tCan%s perform double-word IO\n", (!val[DWORD_IO]) ? "not" : "");
 		else {
-			printf("\tStandby timer values: spec'd by %s", (val[CAPAB_0] & STD_STBY) ? "Standard" : "Vendor");
+			printf("\tStandby timer values: spec'd by %s",
+				(val[CAPAB_0] & STD_STBY) ? "standard" : "vendor");
 			if ((like_std > 3) && ((val[CAPAB_1] & VALID) == VALID_VAL))
-				printf(", %s device specific minimum\n", (val[CAPAB_1] & MIN_STANDBY_TIMER) ? "with" : "no");
+				printf(", %s device specific minimum\n",
+					(val[CAPAB_1] & MIN_STANDBY_TIMER) ? "with" : "no");
 			else
 				bb_putchar('\n');
 		}
 		printf("\tR/W multiple sector transfer: ");
 		if ((like_std < 3) && !(val[SECTOR_XFER_MAX] & SECTOR_XFER))
-			printf("not supported\n");
+			puts("not supported");
 		else {
 			printf("Max = %u\tCurrent = ", val[SECTOR_XFER_MAX] & SECTOR_XFER);
 			if (val[SECTOR_XFER_CUR] & MULTIPLE_SETTING_VALID)
 				printf("%u\n", val[SECTOR_XFER_CUR] & SECTOR_XFER);
 			else
-				printf("?\n");
+				puts("?");
 		}
 		if ((like_std > 3) && (val[CMDS_SUPP_1] & 0x0008)) {
 			/* We print out elsewhere whether the APM feature is enabled or
-			   not.  If it's not enabled, let's not repeat the info; just print
-			   nothing here. */
+			 * not.  If it's not enabled, let's not repeat the info; just print
+			 * nothing here. */
 			printf("\tAdvancedPM level: ");
 			if ((val[ADV_PWR] & 0xFF00) == 0x4000) {
 				uint8_t apm_level = val[ADV_PWR] & 0x00FF;
@@ -983,17 +1097,21 @@ static void identify(uint16_t *val)
 		}
 		if (like_std > 5 && val[ACOUSTIC]) {
 			printf("\tRecommended acoustic management value: %u, current value: %u\n",
-					(val[ACOUSTIC] >> 8) & 0x00ff, val[ACOUSTIC] & 0x00ff);
+				(val[ACOUSTIC] >> 8) & 0x00ff,
+				val[ACOUSTIC] & 0x00ff);
 		}
 	} else {
-		 /* ATAPI */
+		/* ATAPI */
 		if (eqpt != CDROM && (val[CAPAB_0] & SWRST_REQ))
-			printf("\tATA sw reset required\n");
+			puts("\tATA sw reset required");
 
 		if (val[PKT_REL] || val[SVC_NBSY]) {
 			printf("\tOverlap support:");
-			if (val[PKT_REL]) printf(" %uus to release bus.", val[PKT_REL]);
-			if (val[SVC_NBSY]) printf(" %uus to clear BSY after SERVICE cmd.", val[SVC_NBSY]);
+			if (val[PKT_REL])
+				printf(" %uus to release bus.", val[PKT_REL]);
+			if (val[SVC_NBSY])
+				printf(" %uus to clear BSY after SERVICE cmd.",
+					val[SVC_NBSY]);
 			bb_putchar('\n');
 		}
 	}
@@ -1001,7 +1119,7 @@ static void identify(uint16_t *val)
 	/* DMA stuff. Check that only one DMA mode is selected. */
 	printf("\tDMA: ");
 	if (!(val[CAPAB_0] & DMA_SUP))
-		printf("not supported\n");
+		puts("not supported");
 	else {
 		if (val[DMA_MODE] && !val[SINGLE_DMA] && !val[MULTI_DMA])
 			printf(" sdma%u\n", (val[DMA_MODE] & MODE) >> 8);
@@ -1024,7 +1142,7 @@ static void identify(uint16_t *val)
 		bb_putchar('\n');
 
 		if ((dev == ATAPI_DEV) && (eqpt != CDROM) && (val[CAPAB_0] & DMA_IL_SUP))
-			printf("\t\tInterleaved DMA support\n");
+			puts("\t\tInterleaved DMA support");
 
 		if ((val[WHATS_VALID] & OK_W64_70)
 		 && (val[DMA_TIME_MIN] || val[DMA_TIME_NORM])
@@ -1057,14 +1175,17 @@ static void identify(uint16_t *val)
 	if (val[WHATS_VALID] & OK_W64_70) {
 		if (val[PIO_NO_FLOW] || val[PIO_FLOW]) {
 			printf("\t\tCycle time:");
-			if (val[PIO_NO_FLOW]) printf(" no flow control=%uns", val[PIO_NO_FLOW]);
-			if (val[PIO_FLOW]) printf("  IORDY flow control=%uns", val[PIO_FLOW]);
+			if (val[PIO_NO_FLOW])
+				printf(" no flow control=%uns", val[PIO_NO_FLOW]);
+			if (val[PIO_FLOW])
+				printf("  IORDY flow control=%uns", val[PIO_FLOW]);
 			bb_putchar('\n');
 		}
 	}
 
 	if ((val[CMDS_SUPP_1] & VALID) == VALID_VAL) {
-		printf("Commands/features:\n\tEnabled\tSupported:\n");
+		puts("Commands/features:\n"
+			"\tEnabled\tSupported:");
 		jj = val[CMDS_SUPP_0];
 		kk = val[CMDS_EN_0];
 		for (ii = 0; ii < NUM_CMD_FEAT_STR; ii++) {
@@ -1092,17 +1213,20 @@ static void identify(uint16_t *val)
 	if ((eqpt != CDROM) && (like_std > 3)
 	 && (val[SECU_STATUS] || val[ERASE_TIME] || val[ENH_ERASE_TIME])
 	) {
-		printf("Security:\n");
+		puts("Security:");
 		if (val[PSWD_CODE] && (val[PSWD_CODE] != NOVAL_1))
 			printf("\tMaster password revision code = %u\n", val[PSWD_CODE]);
 		jj = val[SECU_STATUS];
 		if (jj) {
 			for (ii = 0; ii < NUM_SECU_STR; ii++) {
-				printf("\t%s\t%s\n", (!(jj & 0x0001)) ? "not" : "", nth_string(secu_str, ii));
+				printf("\t%s\t%s\n",
+					(!(jj & 0x0001)) ? "not" : "",
+					nth_string(secu_str, ii));
 				jj >>=1;
 			}
 			if (val[SECU_STATUS] & SECU_ENABLED) {
-				printf("\tSecurity level %s\n", (val[SECU_STATUS] & SECU_LEVEL) ? "maximum" : "high");
+				printf("\tSecurity level %s\n",
+					(val[SECU_STATUS] & SECU_LEVEL) ? "maximum" : "high");
 			}
 		}
 		jj =  val[ERASE_TIME]     & ERASE_BITS;
@@ -1127,16 +1251,20 @@ static void identify(uint16_t *val)
 			strng = " determined by CSEL";
 		else
 			strng = "";
-		printf("HW reset results:\n\tCBLID- %s Vih\n\tDevice num = %i%s\n",
-				(val[HWRST_RSLT] & CBLID) ? "above" : "below", !(oo), strng);
+		printf("HW reset results:\n"
+			"\tCBLID- %s Vih\n"
+			"\tDevice num = %i%s\n",
+			(val[HWRST_RSLT] & CBLID) ? "above" : "below",
+			!(oo), strng);
 	}
 
 	/* more stuff from std 5 */
 	if ((like_std > 4) && (eqpt != CDROM)) {
 		if (val[CFA_PWR_MODE] & VALID_W160) {
-			printf("CFA power mode 1:\n\t%s%s\n", (val[CFA_PWR_MODE] & PWR_MODE_OFF) ? "disabled" : "enabled",
-					(val[CFA_PWR_MODE] & PWR_MODE_REQ) ? " and required by some commands" : "");
-
+			printf("CFA power mode 1:\n"
+				"\t%s%s\n",
+				(val[CFA_PWR_MODE] & PWR_MODE_OFF) ? "disabled" : "enabled",
+				(val[CFA_PWR_MODE] & PWR_MODE_REQ) ? " and required by some commands" : "");
 			if (val[CFA_PWR_MODE] & MAX_AMPS)
 				printf("\tMaximum current = %uma\n", val[CFA_PWR_MODE] & MAX_AMPS);
 		}
@@ -1172,7 +1300,7 @@ static const char BuffType[] ALIGN1 =
 	"unknown""\0"     "1Sect""\0"      "DualPort""\0"  "DualPortCache"
 ;
 
-static void dump_identity(const struct hd_driveid *id)
+static NOINLINE void dump_identity(const struct hd_driveid *id)
 {
 	int i;
 	const unsigned short *id_regs = (const void*) id;
@@ -1184,11 +1312,12 @@ static void dump_identity(const struct hd_driveid *id)
 			printf(" %s", nth_string(cfg_str, i));
 	}
 	printf(" }\n RawCHS=%u/%u/%u, TrkSize=%u, SectSize=%u, ECCbytes=%u\n"
-			" BuffType=(%u) %s, BuffSize=%ukB, MaxMultSect=%u",
-				id->cyls, id->heads, id->sectors, id->track_bytes,
-				id->sector_bytes, id->ecc_bytes,
-				id->buf_type, nth_string(BuffType, (id->buf_type > 3) ? 0 : id->buf_type),
-				id->buf_size/2, id->max_multsect);
+		" BuffType=(%u) %s, BuffSize=%ukB, MaxMultSect=%u",
+		id->cyls, id->heads, id->sectors, id->track_bytes,
+		id->sector_bytes, id->ecc_bytes,
+		id->buf_type,
+		nth_string(BuffType, (id->buf_type > 3) ? 0 : id->buf_type),
+		id->buf_size/2, id->max_multsect);
 	if (id->max_multsect) {
 		printf(", MultSect=");
 		if (!(id->multsect_valid & 1))
@@ -1213,7 +1342,10 @@ static void dump_identity(const struct hd_driveid *id)
 	if (id->capability & 2)
 		printf(", LBAsects=%u", id->lba_capacity);
 
-	printf("\n IORDY=%s", (id->capability & 8) ? (id->capability & 4) ?  "on/off" : "yes" : "no");
+	printf("\n IORDY=%s",
+		(id->capability & 8)
+			? ((id->capability & 4) ? "on/off" : "yes")
+			: "no");
 
 	if (((id->capability & 8) || (id->field_valid & 2)) && (id->field_valid & 2))
 		printf(", tPIO={min:%u,w/IORDY:%u}", id->eide_pio, id->eide_pio_iordy);
@@ -1242,7 +1374,7 @@ static void dump_identity(const struct hd_driveid *id)
 				"*\0""sdma0 \0""*\0""sdma1 \0""*\0""sdma2 \0""*\0""sdma? \0",
 				id->dma_1word, NULL);
 			print_flags_separated(dma_wmode_masks,
-				"*\0""mdma0\0""*\0""mdma1\0""*\0""mdma2\0""*\0""mdma?\0",
+				"*\0""mdma0 \0""*\0""mdma1 \0""*\0""mdma2 \0""*\0""mdma? \0",
 				id->dma_mword, NULL);
 		}
 	}
@@ -1285,17 +1417,19 @@ static void dump_identity(const struct hd_driveid *id)
 	if ((id->minor_rev_num && id->minor_rev_num <= 31)
 	 || (id->major_rev_num && id->minor_rev_num <= 31)
 	) {
-		printf("\n Drive conforms to: %s: ", (id->minor_rev_num <= 31) ? nth_string(minor_str, id->minor_rev_num) : "unknown");
-		if (id->major_rev_num != 0x0000 &&  /* NOVAL_0 */
-		    id->major_rev_num != 0xFFFF) {  /* NOVAL_1 */
+		printf("\n Drive conforms to: %s: ",
+			(id->minor_rev_num <= 31) ? nth_string(minor_str, id->minor_rev_num) : "unknown");
+		if (id->major_rev_num != 0x0000 /* NOVAL_0 */
+		 && id->major_rev_num != 0xFFFF /* NOVAL_1 */
+		) {
 			for (i = 0; i <= 15; i++) {
 				if (id->major_rev_num & (1<<i))
-						printf(" ATA/ATAPI-%u", i);
+					printf(" ATA/ATAPI-%u", i);
 			}
 		}
 	}
 #endif /* __NEW_HD_DRIVE_ID */
-	printf("\n\n * current active mode\n\n");
+	puts("\n\n * current active mode\n");
 }
 #endif
 
@@ -1387,7 +1521,7 @@ static void do_time(int cache /*,int fd*/)
 	} else { /* Time device */
 		printf("Timing buffered disk reads:");
 	}
-	fflush(stdout);
+	fflush_all();
 
 	/* Now do the timing */
 	iterations = 0;
@@ -1436,9 +1570,9 @@ static void bus_state_value(unsigned value)
 	else if (value == BUSSTATE_OFF)
 		on_off(0);
 	else if (value == BUSSTATE_TRISTATE)
-		printf(" (tristate)\n");
+		puts(" (tristate)");
 	else
-		printf(" (unknown: %d)\n", value);
+		printf(" (unknown: %u)\n", value);
 }
 #endif
 
@@ -1450,16 +1584,17 @@ static void interpret_standby(uint8_t standby)
 		printf("off");
 	} else if (standby <= 240 || standby == 252 || standby == 255) {
 		/* standby is in 5 sec units */
-		printf("%u minutes %u seconds", standby / 12, (standby*5) % 60);
+		unsigned t = standby * 5;
+		printf("%u minutes %u seconds", t / 60, t % 60);
 	} else if (standby <= 251) {
 		unsigned t = (standby - 240); /* t is in 30 min units */;
-		printf("%u.%c hours", t / 2, (t & 1) ? '0' : '5');
+		printf("%u.%c hours", t / 2, (t & 1) ? '5' : '0');
 	}
 	if (standby == 253)
 		printf("vendor-specific");
 	if (standby == 254)
 		printf("reserved");
-	printf(")\n");
+	puts(")");
 }
 
 static const uint8_t xfermode_val[] ALIGN1 = {
@@ -1510,14 +1645,14 @@ static void interpret_xfermode(unsigned xfermode)
 		printf("UltraDMA mode%u", xfermode - 64);
 	else
 		printf("unknown");
-	printf(")\n");
+	puts(")");
 }
 #endif /* HDIO_DRIVE_CMD */
 
 static void print_flag(int flag, const char *s, unsigned long value)
 {
 	if (flag)
-		printf(" setting %s to %ld\n", s, value);
+		printf(" setting %s to %lu\n", s, value);
 }
 
 static void process_dev(char *devname)
@@ -1532,12 +1667,12 @@ static void process_dev(char *devname)
 	unsigned char args[4] = { WIN_SETFEATURES, 0, 0, 0 };
 	const char *fmt = " %s\t= %2ld";
 
-	/*fd = xopen(devname, O_RDONLY | O_NONBLOCK);*/
-	xmove_fd(xopen(devname, O_RDONLY | O_NONBLOCK), fd);
+	/*fd = xopen_nonblocking(devname);*/
+	xmove_fd(xopen_nonblocking(devname), fd);
 	printf("\n%s:\n", devname);
 
-	if (set_readahead) {
-		print_flag(get_readahead, "fs readahead", Xreadahead);
+	if (getset_readahead == IS_SET) {
+		print_flag(getset_readahead, "fs readahead", Xreadahead);
 		ioctl_or_warn(fd, BLKRASET, (int *)Xreadahead);
 	}
 #if ENABLE_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF
@@ -1547,7 +1682,7 @@ static void process_dev(char *devname)
 	}
 #endif
 #if ENABLE_FEATURE_HDPARM_HDIO_SCAN_HWIF
-	if (scan_hwif) {
+	if (scan_hwif == IS_SET) {
 		printf(" attempting to scan hwif (0x%lx, 0x%lx, %lu)\n", hwif_data, hwif_ctrl, hwif_irq);
 		args[0] = hwif_data;
 		args[1] = hwif_ctrl;
@@ -1561,7 +1696,7 @@ static void process_dev(char *devname)
 		if (noisy_piomode) {
 			printf(" attempting to ");
 			if (piomode == 255)
-				printf("auto-tune PIO mode\n");
+				puts("auto-tune PIO mode");
 			else if (piomode < 100)
 				printf("set PIO mode to %d\n", piomode);
 			else if (piomode < 200)
@@ -1571,103 +1706,103 @@ static void process_dev(char *devname)
 		}
 		ioctl_or_warn(fd, HDIO_SET_PIO_MODE, (int *)(unsigned long)piomode);
 	}
-	if (set_io32bit) {
-		print_flag(get_io32bit, "32-bit IO_support flag", io32bit);
+	if (getset_io32bit == IS_SET) {
+		print_flag(getset_io32bit, "32-bit IO_support flag", io32bit);
 		ioctl_or_warn(fd, HDIO_SET_32BIT, (int *)io32bit);
 	}
-	if (set_mult) {
-		print_flag(get_mult, "multcount", mult);
+	if (getset_mult == IS_SET) {
+		print_flag(getset_mult, "multcount", mult);
 #ifdef HDIO_DRIVE_CMD
 		ioctl_or_warn(fd, HDIO_SET_MULTCOUNT, (void *)mult);
 #else
 		force_operation |= (!ioctl_or_warn(fd, HDIO_SET_MULTCOUNT, (void *)mult));
 #endif
 	}
-	if (set_readonly) {
-		print_flag_on_off(get_readonly, "readonly", readonly);
+	if (getset_readonly == IS_SET) {
+		print_flag_on_off(getset_readonly, "readonly", readonly);
 		ioctl_or_warn(fd, BLKROSET, &readonly);
 	}
-	if (set_unmask) {
-		print_flag_on_off(get_unmask, "unmaskirq", unmask);
+	if (getset_unmask == IS_SET) {
+		print_flag_on_off(getset_unmask, "unmaskirq", unmask);
 		ioctl_or_warn(fd, HDIO_SET_UNMASKINTR, (int *)unmask);
 	}
 #if ENABLE_FEATURE_HDPARM_HDIO_GETSET_DMA
-	if (set_dma) {
-		print_flag_on_off(get_dma, "using_dma", dma);
+	if (getset_dma == IS_SET) {
+		print_flag_on_off(getset_dma, "using_dma", dma);
 		ioctl_or_warn(fd, HDIO_SET_DMA, (int *)dma);
 	}
 #endif /* FEATURE_HDPARM_HDIO_GETSET_DMA */
 #ifdef HDIO_SET_QDMA
-	if (set_dma_q) {
-		print_flag_on_off(get_dma_q, "DMA queue_depth", dma_q);
+	if (getset_dma_q == IS_SET) {
+		print_flag_on_off(getset_dma_q, "DMA queue_depth", dma_q);
 		ioctl_or_warn(fd, HDIO_SET_QDMA, (int *)dma_q);
 	}
 #endif
-	if (set_nowerr) {
-		print_flag_on_off(get_nowerr, "nowerr", nowerr);
+	if (getset_nowerr == IS_SET) {
+		print_flag_on_off(getset_nowerr, "nowerr", nowerr);
 		ioctl_or_warn(fd, HDIO_SET_NOWERR, (int *)nowerr);
 	}
-	if (set_keep) {
-		print_flag_on_off(get_keep, "keep_settings", keep);
+	if (getset_keep == IS_SET) {
+		print_flag_on_off(getset_keep, "keep_settings", keep);
 		ioctl_or_warn(fd, HDIO_SET_KEEPSETTINGS, (int *)keep);
 	}
 #ifdef HDIO_DRIVE_CMD
-	if (set_doorlock) {
+	if (getset_doorlock == IS_SET) {
 		args[0] = doorlock ? WIN_DOORLOCK : WIN_DOORUNLOCK;
 		args[2] = 0;
-		print_flag_on_off(get_doorlock, "drive doorlock", doorlock);
+		print_flag_on_off(getset_doorlock, "drive doorlock", doorlock);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 		args[0] = WIN_SETFEATURES;
 	}
-	if (set_dkeep) {
+	if (getset_dkeep == IS_SET) {
 		/* lock/unlock the drive's "feature" settings */
-		print_flag_on_off(get_dkeep, "drive keep features", dkeep);
+		print_flag_on_off(getset_dkeep, "drive keep features", dkeep);
 		args[2] = dkeep ? 0x66 : 0xcc;
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 	}
-	if (set_defects) {
+	if (getset_defects == IS_SET) {
 		args[2] = defects ? 0x04 : 0x84;
-		print_flag(get_defects, "drive defect-mgmt", defects);
+		print_flag(getset_defects, "drive defect-mgmt", defects);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 	}
-	if (set_prefetch) {
+	if (getset_prefetch == IS_SET) {
 		args[1] = prefetch;
 		args[2] = 0xab;
-		print_flag(get_prefetch, "drive prefetch", prefetch);
+		print_flag(getset_prefetch, "drive prefetch", prefetch);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 		args[1] = 0;
 	}
 	if (set_xfermode) {
 		args[1] = xfermode_requested;
 		args[2] = 3;
-		if (get_xfermode) {
-			print_flag(1, "xfermode", xfermode_requested);
-			interpret_xfermode(xfermode_requested);
-		}
+		print_flag(1, "xfermode", xfermode_requested);
+		interpret_xfermode(xfermode_requested);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 		args[1] = 0;
 	}
-	if (set_lookahead) {
+	if (getset_lookahead == IS_SET) {
 		args[2] = lookahead ? 0xaa : 0x55;
-		print_flag_on_off(get_lookahead, "drive read-lookahead", lookahead);
+		print_flag_on_off(getset_lookahead, "drive read-lookahead", lookahead);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 	}
-	if (set_apmmode) {
-		args[2] = (apmmode == 255) ? 0x85 /* disable */ : 0x05 /* set */; /* feature register */
+	if (getset_apmmode == IS_SET) {
+		/* feature register */
+		args[2] = (apmmode == 255) ? 0x85 /* disable */ : 0x05 /* set */;
 		args[1] = apmmode; /* sector count register 1-255 */
-		if (get_apmmode)
-			printf(" setting APM level to %s 0x%02lX (%ld)\n", (apmmode == 255) ? "disabled" : "", apmmode, apmmode);
+		printf(" setting APM level to %s 0x%02lX (%ld)\n",
+			(apmmode == 255) ? "disabled" : "",
+			apmmode, apmmode);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 		args[1] = 0;
 	}
-	if (set_wcache)	{
+	if (getset_wcache == IS_SET) {
 #ifdef DO_FLUSHCACHE
 #ifndef WIN_FLUSHCACHE
 #define WIN_FLUSHCACHE 0xe7
 #endif
 #endif /* DO_FLUSHCACHE */
 		args[2] = wcache ? 0x02 : 0x82;
-		print_flag_on_off(get_wcache, "drive write-caching", wcache);
+		print_flag_on_off(getset_wcache, "drive write-caching", wcache);
 #ifdef DO_FLUSHCACHE
 		if (!wcache)
 			ioctl_or_warn(fd, HDIO_DRIVE_CMD, &flushcache);
@@ -1690,7 +1825,7 @@ static void process_dev(char *devname)
 #ifndef WIN_STANDBYNOW2
 #define WIN_STANDBYNOW2 0x94
 #endif
-		if (get_standbynow) printf(" issuing standby command\n");
+		puts(" issuing standby command");
 		args[0] = WIN_STANDBYNOW1;
 		ioctl_alt_or_warn(HDIO_DRIVE_CMD, args, WIN_STANDBYNOW2);
 	}
@@ -1701,22 +1836,20 @@ static void process_dev(char *devname)
 #ifndef WIN_SLEEPNOW2
 #define WIN_SLEEPNOW2 0x99
 #endif
-		if (get_sleepnow) printf(" issuing sleep command\n");
+		puts(" issuing sleep command");
 		args[0] = WIN_SLEEPNOW1;
 		ioctl_alt_or_warn(HDIO_DRIVE_CMD, args, WIN_SLEEPNOW2);
 	}
 	if (set_seagate) {
 		args[0] = 0xfb;
-		if (get_seagate) printf(" disabling Seagate auto powersaving mode\n");
+		puts(" disabling Seagate auto powersaving mode");
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 	}
-	if (set_standby) {
+	if (getset_standby == IS_SET) {
 		args[0] = WIN_SETIDLE1;
 		args[1] = standby_requested;
-		if (get_standby) {
-			print_flag(1, "standby", standby_requested);
-			interpret_standby(standby_requested);
-		}
+		print_flag(1, "standby", standby_requested);
+		interpret_standby(standby_requested);
 		ioctl_or_warn(fd, HDIO_DRIVE_CMD, &args);
 		args[1] = 0;
 	}
@@ -1725,76 +1858,73 @@ static void process_dev(char *devname)
 		char buf[512];
 		flush_buffer_cache();
 		if (-1 == read(fd, buf, sizeof(buf)))
-			bb_perror_msg("read(%d bytes) failed (rc=-1)", sizeof(buf));
+			bb_perror_msg("read of 512 bytes failed");
 	}
-#endif	/* HDIO_DRIVE_CMD */
-
-	if (get_mult || get_identity) {
+#endif  /* HDIO_DRIVE_CMD */
+	if (getset_mult || get_identity) {
 		multcount = -1;
 		if (ioctl(fd, HDIO_GET_MULTCOUNT, &multcount)) {
-			if (get_mult && ENABLE_IOCTL_HEX2STR_ERROR) /* To be coherent with ioctl_or_warn. */
+			/* To be coherent with ioctl_or_warn. */
+			if (getset_mult && ENABLE_IOCTL_HEX2STR_ERROR)
 				bb_perror_msg("HDIO_GET_MULTCOUNT");
 			else
 				bb_perror_msg("ioctl %#x failed", HDIO_GET_MULTCOUNT);
-		} else if (get_mult) {
+		} else if (getset_mult) {
 			printf(fmt, "multcount", multcount);
 			on_off(multcount != 0);
 		}
 	}
-	if (get_io32bit) {
+	if (getset_io32bit) {
 		if (!ioctl_or_warn(fd, HDIO_GET_32BIT, &parm)) {
 			printf(" IO_support\t=%3ld (", parm);
 			if (parm == 0)
-				printf("default 16-bit)\n");
+				puts("default 16-bit)");
 			else if (parm == 2)
-				printf("16-bit)\n");
+				puts("16-bit)");
 			else if (parm == 1)
-				printf("32-bit)\n");
+				puts("32-bit)");
 			else if (parm == 3)
-				printf("32-bit w/sync)\n");
+				puts("32-bit w/sync)");
 			else if (parm == 8)
-				printf("Request-Queue-Bypass)\n");
+				puts("Request-Queue-Bypass)");
 			else
-				printf("\?\?\?)\n");
+				puts("\?\?\?)");
 		}
 	}
-	if (get_unmask) {
+	if (getset_unmask) {
 		if (!ioctl_or_warn(fd, HDIO_GET_UNMASKINTR, &parm))
 			print_value_on_off("unmaskirq", parm);
 	}
-
-
 #if ENABLE_FEATURE_HDPARM_HDIO_GETSET_DMA
-	if (get_dma) {
+	if (getset_dma) {
 		if (!ioctl_or_warn(fd, HDIO_GET_DMA, &parm)) {
 			printf(fmt, "using_dma", parm);
 			if (parm == 8)
-				printf(" (DMA-Assisted-PIO)\n");
+				puts(" (DMA-Assisted-PIO)");
 			else
 				on_off(parm != 0);
 		}
 	}
 #endif
 #ifdef HDIO_GET_QDMA
-	if (get_dma_q) {
+	if (getset_dma_q) {
 		if (!ioctl_or_warn(fd, HDIO_GET_QDMA, &parm))
 			print_value_on_off("queue_depth", parm);
 	}
 #endif
-	if (get_keep) {
+	if (getset_keep) {
 		if (!ioctl_or_warn(fd, HDIO_GET_KEEPSETTINGS, &parm))
 			print_value_on_off("keepsettings", parm);
 	}
-
-	if (get_nowerr) {
+	if (getset_nowerr) {
 		if (!ioctl_or_warn(fd, HDIO_GET_NOWERR, &parm))
 			print_value_on_off("nowerr", parm);
 	}
-	if (get_readonly) {
+	if (getset_readonly) {
 		if (!ioctl_or_warn(fd, BLKROGET, &parm))
 			print_value_on_off("readonly", parm);
 	}
-	if (get_readahead) {
+	if (getset_readahead) {
 		if (!ioctl_or_warn(fd, BLKRAGET, &parm))
 			print_value_on_off("readahead", parm);
 	}
@@ -1804,7 +1934,7 @@ static void process_dev(char *devname)
 
 			if (!ioctl_or_warn(fd, HDIO_GETGEO, &g))
 				printf(" geometry\t= %u/%u/%u, sectors = %ld, start = %ld\n",
-						g.cylinders, g.heads, g.sectors, parm, g.start);
+					g.cylinders, g.heads, g.sectors, parm, g.start);
 		}
 	}
 #ifdef HDIO_DRIVE_CMD
@@ -1854,7 +1984,7 @@ static void process_dev(char *devname)
 				id.multsect_valid &= ~1;
 			dump_identity(&id);
 		} else if (errno == -ENOMSG)
-			printf(" no identification info available\n");
+			puts(" no identification info available");
 		else if (ENABLE_IOCTL_HEX2STR_ERROR)  /* To be coherent with ioctl_or_warn */
 			bb_perror_msg("HDIO_GET_IDENTITY");
 		else
@@ -1872,14 +2002,12 @@ static void process_dev(char *devname)
 	}
 #endif
 #if ENABLE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF
-	if (set_busstate) {
-		if (get_busstate) {
-			print_flag(1, "bus state", busstate);
-			bus_state_value(busstate);
-		}
+	if (getset_busstate == IS_SET) {
+		print_flag(1, "bus state", busstate);
+		bus_state_value(busstate);
 		ioctl_or_warn(fd, HDIO_SET_BUSSTATE, (int *)(unsigned long)busstate);
 	}
-	if (get_busstate) {
+	if (getset_busstate) {
 		if (!ioctl_or_warn(fd, HDIO_GET_BUSSTATE, &parm)) {
 			printf(fmt, "bus state", parm);
 			bus_state_value(parm);
@@ -1935,21 +2063,31 @@ void identify_from_stdin(void);
 #endif
 
 /* busybox specific stuff */
-static void parse_opts(smallint *get, smallint *set, unsigned long *value, int min, int max)
+static int parse_opts(unsigned long *value, int min, int max)
 {
-	if (get) {
-		*get = 1;
-	}
 	if (optarg) {
-		*set = 1;
 		*value = xatol_range(optarg, min, max);
+		return IS_SET;
 	}
+	return IS_GET;
+}
+static int parse_opts_0_max(unsigned long *value, int max)
+{
+	return parse_opts(value, 0, max);
+}
+static int parse_opts_0_1(unsigned long *value)
+{
+	return parse_opts(value, 0, 1);
+}
+static int parse_opts_0_INTMAX(unsigned long *value)
+{
+	return parse_opts(value, 0, INT_MAX);
 }
 
 static void parse_xfermode(int flag, smallint *get, smallint *set, int *value)
 {
 	if (flag) {
-		*get = 1;
+		*get = IS_GET;
 		if (optarg) {
 			*value = translate_xfermode(optarg);
 			*set = (*value > -1);
@@ -1960,12 +2098,12 @@ static void parse_xfermode(int flag, smallint *get, smallint *set, int *value)
 /*------- getopt short options --------*/
 static const char hdparm_options[] ALIGN1 =
 	"gfu::n::p:r::m::c::k::a::B:tT"
-	USE_FEATURE_HDPARM_GET_IDENTITY("iI")
-	USE_FEATURE_HDPARM_HDIO_GETSET_DMA("d::")
+	IF_FEATURE_HDPARM_GET_IDENTITY("iI")
+	IF_FEATURE_HDPARM_HDIO_GETSET_DMA("d::")
 #ifdef HDIO_DRIVE_CMD
 	"S:D:P:X:K:A:L:W:CyYzZ"
 #endif
-	USE_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF("U:")
+	IF_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF("U:")
 #ifdef HDIO_GET_QDMA
 #ifdef HDIO_SET_QDMA
 	"Q:"
@@ -1973,9 +2111,9 @@ static const char hdparm_options[] ALIGN1 =
 	"Q"
 #endif
 #endif
-	USE_FEATURE_HDPARM_HDIO_DRIVE_RESET("w")
-	USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF("x::b:")
-	USE_FEATURE_HDPARM_HDIO_SCAN_HWIF("R:");
+	IF_FEATURE_HDPARM_HDIO_DRIVE_RESET("w")
+	IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF("x::b:")
+	IF_FEATURE_HDPARM_HDIO_SCAN_HWIF("R:");
 /*-------------------------------------*/
 
 /* our main() routine: */
@@ -1985,57 +2123,57 @@ int hdparm_main(int argc, char **argv)
 	int c;
 	int flagcount = 0;
 
+	INIT_G();
+
 	while ((c = getopt(argc, argv, hdparm_options)) >= 0) {
 		flagcount++;
-		USE_FEATURE_HDPARM_GET_IDENTITY(get_IDentity |= (c == 'I'));
-		USE_FEATURE_HDPARM_GET_IDENTITY(get_identity |= (c == 'i'));
+		IF_FEATURE_HDPARM_GET_IDENTITY(get_IDentity |= (c == 'I'));
+		IF_FEATURE_HDPARM_GET_IDENTITY(get_identity |= (c == 'i'));
 		get_geom |= (c == 'g');
 		do_flush |= (c == 'f');
-		if (c == 'u') parse_opts(&get_unmask, &set_unmask, &unmask, 0, 1);
-		USE_FEATURE_HDPARM_HDIO_GETSET_DMA(if (c == 'd') parse_opts(&get_dma, &set_dma, &dma, 0, 9));
-		if (c == 'n') parse_opts(&get_nowerr, &set_nowerr, &nowerr, 0, 1);
+		if (c == 'u') getset_unmask    = parse_opts_0_1(&unmask);
+	IF_FEATURE_HDPARM_HDIO_GETSET_DMA(
+		if (c == 'd') getset_dma       = parse_opts_0_max(&dma, 9);
+	)
+		if (c == 'n') getset_nowerr    = parse_opts_0_1(&nowerr);
 		parse_xfermode((c == 'p'), &noisy_piomode, &set_piomode, &piomode);
-		if (c == 'r') parse_opts(&get_readonly, &set_readonly, &readonly, 0, 1);
-		if (c == 'm') parse_opts(&get_mult, &set_mult, &mult, 0, INT_MAX /*32*/);
-		if (c == 'c') parse_opts(&get_io32bit, &set_io32bit, &io32bit, 0, INT_MAX /*8*/);
-		if (c == 'k') parse_opts(&get_keep, &set_keep, &keep, 0, 1);
-		if (c == 'a') parse_opts(&get_readahead, &set_readahead, &Xreadahead, 0, INT_MAX);
-		if (c == 'B') parse_opts(&get_apmmode, &set_apmmode, &apmmode, 1, 255);
+		if (c == 'r') getset_readonly  = parse_opts_0_1(&readonly);
+		if (c == 'm') getset_mult      = parse_opts_0_INTMAX(&mult /*32*/);
+		if (c == 'c') getset_io32bit   = parse_opts_0_INTMAX(&io32bit /*8*/);
+		if (c == 'k') getset_keep      = parse_opts_0_1(&keep);
+		if (c == 'a') getset_readahead = parse_opts_0_INTMAX(&Xreadahead);
+		if (c == 'B') getset_apmmode   = parse_opts(&apmmode, 1, 255);
 		do_flush |= do_timings |= (c == 't');
 		do_flush |= do_ctimings |= (c == 'T');
 #ifdef HDIO_DRIVE_CMD
-		if (c == 'S') parse_opts(&get_standby, &set_standby, &standby_requested, 0, 255);
-		if (c == 'D') parse_opts(&get_defects, &set_defects, &defects, 0, INT_MAX);
-		if (c == 'P') parse_opts(&get_prefetch, &set_prefetch, &prefetch, 0, INT_MAX);
+		if (c == 'S') getset_standby  = parse_opts_0_max(&standby_requested, 255);
+		if (c == 'D') getset_defects  = parse_opts_0_INTMAX(&defects);
+		if (c == 'P') getset_prefetch = parse_opts_0_INTMAX(&prefetch);
 		parse_xfermode((c == 'X'), &get_xfermode, &set_xfermode, &xfermode_requested);
-		if (c == 'K') parse_opts(&get_dkeep, &set_dkeep, &prefetch, 0, 1);
-		if (c == 'A') parse_opts(&get_lookahead, &set_lookahead, &lookahead, 0, 1);
-		if (c == 'L') parse_opts(&get_doorlock, &set_doorlock, &doorlock, 0, 1);
-		if (c == 'W') parse_opts(&get_wcache, &set_wcache, &wcache, 0, 1);
+		if (c == 'K') getset_dkeep     = parse_opts_0_1(&prefetch);
+		if (c == 'A') getset_lookahead = parse_opts_0_1(&lookahead);
+		if (c == 'L') getset_doorlock  = parse_opts_0_1(&doorlock);
+		if (c == 'W') getset_wcache    = parse_opts_0_1(&wcache);
 		get_powermode |= (c == 'C');
-		get_standbynow = set_standbynow |= (c == 'y');
-		get_sleepnow = set_sleepnow |= (c == 'Y');
+		set_standbynow |= (c == 'y');
+		set_sleepnow |= (c == 'Y');
 		reread_partn |= (c == 'z');
-		get_seagate = set_seagate |= (c == 'Z');
+		set_seagate |= (c == 'Z');
 #endif
-		USE_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(if (c == 'U') parse_opts(NULL, &unregister_hwif, &hwif, 0, INT_MAX));
+		IF_FEATURE_HDPARM_HDIO_UNREGISTER_HWIF(if (c == 'U') unregister_hwif = parse_opts_0_INTMAX(&hwif));
 #ifdef HDIO_GET_QDMA
 		if (c == 'Q') {
-#ifdef HDIO_SET_QDMA
-			parse_opts(&get_dma_q, &set_dma_q, &dma_q, 0, INT_MAX);
-#else
-			parse_opts(&get_dma_q, NULL, NULL, 0, 0);
-#endif
+			getset_dma_q = parse_opts_0_INTMAX(&dma_q);
 		}
 #endif
-		USE_FEATURE_HDPARM_HDIO_DRIVE_RESET(perform_reset = (c == 'r'));
-		USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(if (c == 'x') parse_opts(NULL, &perform_tristate, &tristate, 0, 1));
-		USE_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(if (c == 'b') parse_opts(&get_busstate, &set_busstate, &busstate, 0, 2));
+		IF_FEATURE_HDPARM_HDIO_DRIVE_RESET(perform_reset = (c == 'r'));
+		IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(if (c == 'x') perform_tristate = parse_opts_0_1(&tristate));
+		IF_FEATURE_HDPARM_HDIO_TRISTATE_HWIF(if (c == 'b') getset_busstate = parse_opts_0_max(&busstate, 2));
 #if ENABLE_FEATURE_HDPARM_HDIO_SCAN_HWIF
 		if (c == 'R') {
-			parse_opts(NULL, &scan_hwif, &hwif_data, 0, INT_MAX);
-			hwif_ctrl = xatoi_u((argv[optind]) ? argv[optind] : "");
-			hwif_irq  = xatoi_u((argv[optind+1]) ? argv[optind+1] : "");
+			scan_hwif = parse_opts_0_INTMAX(&hwif_data);
+			hwif_ctrl = xatoi_positive((argv[optind]) ? argv[optind] : "");
+			hwif_irq  = xatoi_positive((argv[optind+1]) ? argv[optind+1] : "");
 			/* Move past the 2 additional arguments */
 			argv += 2;
 			argc -= 2;
@@ -2044,8 +2182,8 @@ int hdparm_main(int argc, char **argv)
 	}
 	/* When no flags are given (flagcount = 0), -acdgkmnru is assumed. */
 	if (!flagcount) {
-		get_mult = get_io32bit = get_unmask = get_keep = get_readonly = get_readahead = get_geom = 1;
-		USE_FEATURE_HDPARM_HDIO_GETSET_DMA(get_dma = 1);
+		getset_mult = getset_io32bit = getset_unmask = getset_keep = getset_readonly = getset_readahead = get_geom = IS_GET;
+		IF_FEATURE_HDPARM_HDIO_GETSET_DMA(getset_dma = IS_GET);
 	}
 	argv += optind;
 
