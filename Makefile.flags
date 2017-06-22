@@ -165,15 +165,11 @@ ifeq ($(CONFIG_DMALLOC),y)
 LDLIBS += dmalloc
 endif
 
-<<<<<<< HEAD
 LDLIBS += event
 
 LDFLAGS += -Llibevent-2.0.20-stable/.libs -Wl,-rpath,/usr/local/atlas/lib -Wl,-rpath,/home/atlas/busybox-1.13.3/libevent-2.0.20-stable/.libs
 
-# If a flat binary should be built, CFLAGS_busybox="-Wl,-elf2flt"
-=======
 # If a flat binary should be built, CFLAGS_busybox="-elf2flt"
->>>>>>> busybox-base-1-26-2
 # env var should be set for make invocation.
 # Here we check whether CFLAGS_busybox indeed contains that flag.
 # (For historical reasons, we also check LDFLAGS, which doesn't

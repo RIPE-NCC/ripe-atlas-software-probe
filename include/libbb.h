@@ -442,15 +442,15 @@ char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
 /* What's the best place for this? AA may be atlas_probe.h */
-#define ATLAS_HOME	"/home/atlas"
-#define ATLAS_CRONS		ATLAS_HOME "/crons"
-#define ATLAS_STATUS		ATLAS_HOME "/status"
-#define ATLAS_DATA_OUT		ATLAS_HOME "/data/out"
-#define ATLAS_DATA_OOQ_OUT	ATLAS_HOME "/data/ooq.out"
-#define ATLAS_DATA_NEW		ATLAS_HOME "/data/new"
-#define ATLAS_DATA_STORAGE	ATLAS_HOME "/data/storage"
-#define ATLAS_TIMESYNC_FILE	ATLAS_DATA_NEW "/timesync.vol"
-#define ATLAS_FUZZING		ATLAS_HOME "/data"
+#define ATLAS_HOME     "/home/atlas"
+#define ATLAS_CRONS            ATLAS_HOME "/crons"
+#define ATLAS_STATUS           ATLAS_HOME "/status"
+#define ATLAS_DATA_OUT         ATLAS_HOME "/data/out"
+#define ATLAS_DATA_OOQ_OUT     ATLAS_HOME "/data/ooq.out"
+#define ATLAS_DATA_NEW         ATLAS_HOME "/data/new"
+#define ATLAS_DATA_STORAGE     ATLAS_HOME "/data/storage"
+#define ATLAS_TIMESYNC_FILE    ATLAS_DATA_NEW "/timesync.vol"
+#define ATLAS_FUZZING          ATLAS_HOME "/data"
 
 extern int validate_filename(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
@@ -601,15 +601,12 @@ struct BUG_too_small {
 			) <= 127 ? 1 : -1];
 };
 
-<<<<<<< HEAD
-=======
 
 void parse_datestr(const char *date_str, struct tm *ptm) FAST_FUNC;
 time_t validate_tm_time(const char *date_str, struct tm *ptm) FAST_FUNC;
 char *strftime_HHMMSS(char *buf, unsigned len, time_t *tp) FAST_FUNC;
 char *strftime_YYYYMMDDHHMMSS(char *buf, unsigned len, time_t *tp) FAST_FUNC;
 
->>>>>>> busybox-base-1-26-2
 int xsocket(int domain, int type, int protocol) FAST_FUNC;
 void xbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen) FAST_FUNC;
 void xrbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen,
@@ -617,21 +614,18 @@ void xrbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen,
 void xlisten(int s, int backlog) FAST_FUNC;
 void xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen) FAST_FUNC;
 void xrconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen,
-				void (*reportf)(int err)) FAST_FUNC;
+	void (*reportf)(int err)) FAST_FUNC;
 ssize_t xsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
 				socklen_t tolen) FAST_FUNC;
-<<<<<<< HEAD
 ssize_t xrsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
-			socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
+		socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
 ssize_t rsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
-			socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
-=======
+		socklen_t tolen, void (*reportf)(int err)) FAST_FUNC;
 
 int setsockopt_int(int fd, int level, int optname, int optval) FAST_FUNC;
 int setsockopt_1(int fd, int level, int optname) FAST_FUNC;
 int setsockopt_SOL_SOCKET_int(int fd, int optname, int optval) FAST_FUNC;
 int setsockopt_SOL_SOCKET_1(int fd, int optname) FAST_FUNC;
->>>>>>> busybox-base-1-26-2
 /* SO_REUSEADDR allows a server to rebind to an address that is already
  * "in use" by old connections to e.g. previous server instance which is
  * killed or crashed. Without it bind will fail until all such connections
@@ -731,7 +725,6 @@ struct hostent *xgethostbyname(const char *name) FAST_FUNC;
 // + inet_common.c has additional IPv4-only stuff
 
 len_and_sockaddr* get_sock_lsa(int fd) FAST_FUNC;
-
 
 void socket_want_pktinfo(int fd) FAST_FUNC;
 ssize_t send_to_from(int fd, void *buf, size_t len, int flags,

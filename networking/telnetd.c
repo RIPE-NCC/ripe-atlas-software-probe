@@ -126,7 +126,6 @@
 #endif
 #include <arpa/telnet.h>
 
-<<<<<<< HEAD
 #define ATLAS 1
 
 #ifdef ATLAS
@@ -176,10 +175,6 @@ enum state
 };
 #endif
 
-/* Structure that describes a session */
-=======
-
->>>>>>> busybox-base-1-26-2
 struct tsession {
 	struct tsession *next;
 	pid_t shell_pid;
@@ -220,44 +215,6 @@ int validate_filename(const char *path, const char *prefix);
 #endif
 
 /* Globals */
-<<<<<<< HEAD
-static int maxfd;
-static struct tsession *sessions;
-static const char *loginpath = "/bin/login";
-static const char *issuefile = "/etc/issue.net";
-
-#ifdef ATLAS
-/* Place to store the file handle and directory name for a new crontab */
-static FILE *atlas_crontab;
-static char atlas_dirname[256];
-static struct tsession *atlas_ts;	/* Allow only one 'atlas' connection
-					 * at a time. The old one
-					 * self-destructs when a new one is
-					 * started.
-					 */
-#endif
-
-/*
-   Remove all IAC's from buf1 (received IACs are ignored and must be removed
-   so as to not be interpreted by the terminal).  Make an uninterrupted
-   string of characters fit for the terminal.  Do this by packing
-   all characters meant for the terminal sequentially towards the end of buf.
-
-   Return a pointer to the beginning of the characters meant for the terminal.
-   and make *num_totty the number of characters that should be sent to
-   the terminal.
-
-   Note - If an IAC (3 byte quantity) starts before (bf + len) but extends
-   past (bf + len) then that IAC will be left unprocessed and *processed
-   will be less than len.
-
-   FIXME - if we mean to send 0xFF to the terminal then it will be escaped,
-   what is the escape character?  We aren't handling that situation here.
-
-   CR-LF ->'s CR mapping is also done here, for convenience.
-
-   NB: may fail to remove iacs which wrap around buffer!
-=======
 struct globals {
 	struct tsession *sessions;
 	const char *loginpath;
@@ -271,11 +228,20 @@ struct globals {
 	G.issuefile = "/etc/issue.net"; \
 } while (0)
 
+#ifdef ATLAS
+/* Place to store the file handle and directory name for a new crontab */
+static FILE *atlas_crontab;
+static char atlas_dirname[256];
+static struct tsession *atlas_ts;	/* Allow only one 'atlas' connection
+					 * at a time. The old one
+					 * self-destructs when a new one is
+					 * started.
+					 */
+#endif
 
 /* Write some buf1 data to pty, processing IACs.
  * Update wridx1 and size1. Return < 0 on error.
  * Buggy if IAC is present but incomplete: skips them.
->>>>>>> busybox-base-1-26-2
  */
 static ssize_t
 safe_write_to_pty_decode_iac(struct tsession *ts)
@@ -506,12 +472,16 @@ static size_t safe_write_double_iac(int fd, const char *buf, size_t count)
 
 /* Must match getopt32 string */
 enum {
+		/*	 (1 << 0)	-f */
+		/*	 (1 << 1)	-l */
 	OPT_WATCHCHILD = (1 << 2), /* -K */
 	OPT_INETD      = (1 << 3) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -i */
-	OPT_PORT       = (1 << 4) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p PORT */
-	OPT_FOREGROUND = (1 << 6) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
-	OPT_SYSLOG     = (1 << 7) * ENABLE_FEATURE_TELNETD_INETD_WAIT, /* -S */
-	OPT_WAIT       = (1 << 8) * ENABLE_FEATURE_TELNETD_INETD_WAIT, /* -w SEC */
+		/*	 (1 << 4)	-P */
+	OPT_PORT       = (1 << 5) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p PORT */
+		/*	 (1 << 6)	-b */
+	OPT_FOREGROUND = (1 << 7) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
+	OPT_SYSLOG     = (1 << 8) * ENABLE_FEATURE_TELNETD_INETD_WAIT, /* -S */
+	OPT_WAIT       = (1 << 9) * ENABLE_FEATURE_TELNETD_INETD_WAIT, /* -w SEC */
 };
 
 static struct tsession *
@@ -519,13 +489,10 @@ make_new_session(
 		IF_FEATURE_TELNETD_STANDALONE(int sock)
 		IF_NOT_FEATURE_TELNETD_STANDALONE(void)
 ) {
-<<<<<<< HEAD
-#ifndef ATLAS
-=======
 #if !ENABLE_FEATURE_TELNETD_STANDALONE
 	enum { sock = 0 };
 #endif
->>>>>>> busybox-base-1-26-2
+#ifndef ATLAS
 	const char *login_argv[2];
 	struct termios termbuf;
 	int fd, pid;
@@ -540,28 +507,20 @@ make_new_session(
 	/*ts->buf1 = (char *)(ts + 1);*/
 	/*ts->buf2 = ts->buf1 + BUFSIZE;*/
 
-<<<<<<< HEAD
 #ifdef ATLAS
 	ts->ptyfd= 0;
 #else
-	/* Got a new connection, set up a tty. */
-=======
 	/* Got a new connection, set up a tty */
->>>>>>> busybox-base-1-26-2
 	fd = xgetpty(tty_name);
 	if (fd > G.maxfd)
 		G.maxfd = fd;
 	ts->ptyfd = fd;
 	ndelay_on(fd);
-<<<<<<< HEAD
-#endif /* ATLAS */
-
-=======
 	close_on_exec_on(fd);
+#endif /* ATLAS */
 
 	/* SO_KEEPALIVE by popular demand */
 	setsockopt_keepalive(sock);
->>>>>>> busybox-base-1-26-2
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 	ts->sockfd_read = sock;
 	ndelay_on(sock);
@@ -607,7 +566,6 @@ make_new_session(
 		/*ts->size2 = 0;*/
 	}
 
-<<<<<<< HEAD
 #ifdef ATLAS	/* Split original function into two */
 	return ts;
 }
@@ -621,16 +579,13 @@ static int start_login(struct tsession *ts, char *user)
 
 	/* Got a new connection, set up a tty. */
 	fd = xgetpty(tty_name);
-	if (fd > maxfd)
-		maxfd = fd;
+	if (fd > G.maxfd)
+		G.maxfd = fd;
 	ts->ptyfd = fd;
 	ndelay_on(fd);
 #endif /* ATLAS */
 
-	fflush(NULL); /* flush all streams */
-=======
 	fflush_all();
->>>>>>> busybox-base-1-26-2
 	pid = vfork(); /* NOMMU-friendly */
 	if (pid < 0) {
 		free(ts);
@@ -661,7 +616,8 @@ static int start_login(struct tsession *ts, char *user)
 
 	pid = getpid();
 
-	if (ENABLE_FEATURE_UTMP) {
+#if ENABLE_FEATURE_UTMP
+	{
 		len_and_sockaddr *lsa = get_peer_lsa(sock);
 		char *hostname = NULL;
 		if (lsa) {
@@ -671,6 +627,7 @@ static int start_login(struct tsession *ts, char *user)
 		write_new_utmp(pid, LOGIN_PROCESS, tty_name, /*username:*/ "LOGIN", hostname);
 		free(hostname);
 	}
+#endif /* ENABLE_FEATURE_UTMP */
 
 	/* Make new session and process group */
 	setsid();
@@ -703,15 +660,11 @@ static int start_login(struct tsession *ts, char *user)
 	print_login_issue(G.issuefile, tty_name);
 
 	/* Exec shell / login / whatever */
-<<<<<<< HEAD
-	login_argv[0] = loginpath;
+	login_argv[0] = G.loginpath;
 #ifdef ATLAS
 	login_argv[1] = user;
 	login_argv[2] = NULL;
 #else
-=======
-	login_argv[0] = G.loginpath;
->>>>>>> busybox-base-1-26-2
 	login_argv[1] = NULL;
 #endif
 	/* exec busybox applet (if PREFER_APPLETS=y), if that fails,
@@ -725,21 +678,6 @@ static int start_login(struct tsession *ts, char *user)
 	_exit(EXIT_FAILURE); /*bb_perror_msg_and_die("execv %s", G.loginpath);*/
 }
 
-<<<<<<< HEAD
-/* Must match getopt32 string */
-enum {
-		/*	 (1 << 0)	-f */
-		/*	 (1 << 1)	-l */
-	OPT_WATCHCHILD = (1 << 2), /* -K */
-	OPT_INETD      = (1 << 3) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -i */
-		/*	 (1 << 4)	-P */
-	OPT_PORT       = (1 << 5) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -p */
-		/*	 (1 << 6)	-b */
-	OPT_FOREGROUND = (1 << 7) * ENABLE_FEATURE_TELNETD_STANDALONE, /* -F */
-};
-
-=======
->>>>>>> busybox-base-1-26-2
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 
 static void
@@ -844,7 +782,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	fd_set rdfdset, wrfdset;
 	unsigned opt;
 	int count, probe_id;
-	int num_totty;
 	struct tsession *ts;
 	char *line;
 #if ENABLE_FEATURE_TELNETD_STANDALONE
@@ -861,29 +798,21 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		master_fd = -1,
 	};
 #endif
-<<<<<<< HEAD
 	struct timeval tv;
 
-	/* Even if !STANDALONE, we accept (and ignore) -i, thus people
-	 * don't need to guess whether it's ok to pass -i to us */
-	opt = getopt32(argv, "f:l:KiP:" USE_FEATURE_TELNETD_STANDALONE("p:b:F"),
-			&issuefile, &loginpath, &PidFileName
-			USE_FEATURE_TELNETD_STANDALONE(, &opt_portnbr, &opt_bindaddr));
-=======
 	INIT_G();
 
 	/* -w NUM, and implies -F. -w and -i don't mix */
 	IF_FEATURE_TELNETD_INETD_WAIT(opt_complementary = "wF:i--w:w--i";)
 	/* Even if !STANDALONE, we accept (and ignore) -i, thus people
 	 * don't need to guess whether it's ok to pass -i to us */
-	opt = getopt32(argv, "f:l:Ki"
+	opt = getopt32(argv, "f:l:KiP:"
 			IF_FEATURE_TELNETD_STANDALONE("p:b:F")
 			IF_FEATURE_TELNETD_INETD_WAIT("Sw:+"),
-			&G.issuefile, &G.loginpath
+			&G.issuefile, &G.loginpath, &PidFileName
 			IF_FEATURE_TELNETD_STANDALONE(, &opt_portnbr, &opt_bindaddr)
 			IF_FEATURE_TELNETD_INETD_WAIT(, &sec_linger)
 	);
->>>>>>> busybox-base-1-26-2
 	if (!IS_INETD /*&& !re_execed*/) {
 		/* inform that we start in standalone mode?
 		 * May be useful when people forget to give -i */
@@ -899,22 +828,12 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		openlog(applet_name, LOG_PID, LOG_DAEMON);
 		logmode = LOGMODE_SYSLOG;
 	}
-<<<<<<< HEAD
-	USE_FEATURE_TELNETD_STANDALONE(
-		if (opt & OPT_PORT)
-			portnbr = xatou16(opt_portnbr);
-	);
 
 	if(PidFileName)
 	{
 		write_pidfile(PidFileName);
 	}
 
-	/* Used to check access(loginpath, X_OK) here. Pointless.
-	 * exec will do this for us for free later. */
-
-=======
->>>>>>> busybox-base-1-26-2
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 	if (IS_INETD) {
 		G.sessions = make_new_session(0);
@@ -1011,11 +930,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			G.maxfd = master_fd;
 	}
 
-<<<<<<< HEAD
-	tv.tv_sec= 10;
-	tv.tv_usec= 0;
-	count = select(maxfd + 1, &rdfdset, &wrfdset, NULL, &tv);
-=======
 	{
 		struct timeval *tv_ptr = NULL;
 #if ENABLE_FEATURE_TELNETD_INETD_WAIT
@@ -1026,11 +940,15 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			tv_ptr = &tv;
 		}
 #endif
+		tv.tv_sec= 10;
+		tv.tv_usec= 0;
+		tv_ptr = &tv;
 		count = select(G.maxfd + 1, &rdfdset, &wrfdset, NULL, tv_ptr);
 	}
+#if 0
 	if (count == 0) /* "telnetd -w SEC" timed out */
 		return 0;
->>>>>>> busybox-base-1-26-2
+#endif
 	if (count < 0)
 		goto again; /* EINTR or ENOMEM */
 
@@ -1048,7 +966,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		/* Create a new session and link it into active list */
 		new_ts = make_new_session(fd);
 		if (new_ts) {
-<<<<<<< HEAD
 #ifdef ATLAS
 			char *hostname;
 
@@ -1061,12 +978,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			add_2sock(new_ts, LOGIN_PROMPT);
 			free(hostname);
 #endif /* ATLAS */
-			new_ts->next = sessions;
-			sessions = new_ts;
-=======
 			new_ts->next = G.sessions;
 			G.sessions = new_ts;
->>>>>>> busybox-base-1-26-2
 		} else {
 			close(fd);
 		}
@@ -1079,15 +992,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		struct tsession *next = ts->next; /* in case we free ts */
 
 		if (/*ts->size1 &&*/ FD_ISSET(ts->ptyfd, &wrfdset)) {
-<<<<<<< HEAD
-			unsigned char *ptr;
-			/* Write to pty from buffer 1. */
-			ptr = remove_iacs(ts, &num_totty);
-			count = safe_write(ts->ptyfd, ptr, num_totty);
-=======
 			/* Write to pty from buffer 1 */
 			count = safe_write_to_pty_decode_iac(ts);
->>>>>>> busybox-base-1-26-2
 			if (count < 0) {
 				if (errno == EAGAIN)
 					goto skip1;
@@ -1115,9 +1021,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		}
  skip2:
 
-<<<<<<< HEAD
-		if (/*ts->size1 < BUFSIZE &&*/
-			FD_ISSET(ts->sockfd_read, &rdfdset)) {
+		if (/*ts->size1 < BUFSIZE &&*/ FD_ISSET(ts->sockfd_read, &rdfdset)) {
 #ifdef ATLAS
 			if (ts->size1 < BUFSIZE &&
 				(ts->rdidx1 >= BUFSIZE ||
@@ -1127,17 +1031,9 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			}
 #endif
 
-			/* Read from socket to buffer 1. */
-			count = MIN(BUFSIZE - ts->rdidx1, BUFSIZE - ts->size1);
-
-			count = safe_read(ts->sockfd_read,
-				TS_BUF1 + ts->rdidx1, count);
-=======
-		if (/*ts->size1 < BUFSIZE &&*/ FD_ISSET(ts->sockfd_read, &rdfdset)) {
 			/* Read from socket to buffer 1 */
 			count = MIN(BUFSIZE - ts->rdidx1, BUFSIZE - ts->size1);
 			count = safe_read(ts->sockfd_read, TS_BUF1(ts) + ts->rdidx1, count);
->>>>>>> busybox-base-1-26-2
 			if (count <= 0) {
 				if (count < 0 && errno == EAGAIN)
 					goto skip3;
@@ -1160,10 +1056,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 			break;	/* Nothing to do */
 		case GET_LOGINNAME:
 			{
-			unsigned char *ptr;
-
-			ptr = remove_iacs(ts, &num_totty);
-
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
@@ -1192,8 +1084,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 			}
 		case GET_PASSWORD:
-			remove_iacs(ts, &num_totty);
-
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
@@ -1235,8 +1125,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
-
-			remove_iacs(ts, &num_totty);
 
 			line= getline_2pty(ts);
 			if (!line)
@@ -1304,8 +1192,6 @@ do_cmd:
 			if (ts != atlas_ts)
 				goto kill_session;	/* Old session */
 
-			remove_iacs(ts, &num_totty);
-
 			line= getline_2pty(ts);
 			if (!line)
 				goto skip3a;
@@ -1339,7 +1225,6 @@ do_cmd:
 				goto kill_session;	/* Old session */
 
 			/* Just eat all input and return bad command */
-			remove_iacs(ts, &num_totty);
 
 			line= getline_2pty(ts);
 			if (!line)
@@ -1373,7 +1258,6 @@ skip3a:
 		ts = next;
 		continue;
  kill_session:
-<<<<<<< HEAD
 #ifdef ATLAS
 		if (ts == atlas_ts)
 		{
@@ -1385,10 +1269,8 @@ skip3a:
 			atlas_ts= NULL;
 		}
 #endif /* ATLAS */
-=======
 		if (ts->shell_pid > 0)
 			update_utmp_DEAD_PROCESS(ts->shell_pid);
->>>>>>> busybox-base-1-26-2
 		free_session(ts);
 		ts = next;
 	}
@@ -1461,7 +1343,7 @@ static void add_2sock(struct tsession *ts, const char *str)
 	if (ts->rdidx2 + len > BUFSIZE)
 		pack_4sock();
 
-	memcpy(TS_BUF2+ts->rdidx2, str, len);
+	memcpy(TS_BUF2(ts)+ts->rdidx2, str, len);
 	ts->rdidx2 += len;
 	ts->size2 += len;
 }
@@ -1479,13 +1361,12 @@ static char *getline_2pty(struct tsession *ts)
 
 	size1= ts->size1;
 
-
 	if (ts->wridx1 + size1 > BUFSIZE)
 		pack_2pty(ts);
 
 	/* remove_iacs converts a CR-LF to a CR */
-	cp= memchr(TS_BUF1+ts->wridx1, '\r', size1);
-	cp2= memchr(TS_BUF1+ts->wridx1, '\n', size1);
+	cp= memchr(TS_BUF1(ts)+ts->wridx1, '\r', size1);
+	cp2= memchr(TS_BUF1(ts)+ts->wridx1, '\n', size1);
 	if (cp2 != NULL && (cp == NULL || cp2 < cp))
 	{
 		/* Use the LF. Patch '\n' to '\r' */
@@ -1495,9 +1376,9 @@ static char *getline_2pty(struct tsession *ts)
 	if (cp == NULL)
 		return NULL;
 
-	len= cp-((char *)TS_BUF1+ts->wridx1)+1;
+	len= cp-((char *)TS_BUF1(ts)+ts->wridx1)+1;
 	line= xmalloc(len+1);
-	memcpy(line, (char *)TS_BUF1+ts->wridx1, len);
+	memcpy(line, (char *)TS_BUF1(ts)+ts->wridx1, len);
 	line[len]= '\0';
 
 	ts->wridx1 += len;
@@ -1532,10 +1413,10 @@ static void pack_2pty(struct tsession *ts)
 	size_lo= size1-size_hi;
 
 	/* Move the low part up a bit */
-	memmove(TS_BUF1+size_hi, TS_BUF1, size_lo);
+	memmove(TS_BUF1(ts)+size_hi, TS_BUF1(ts), size_lo);
 
 	/* Now move the high part down */
-	memmove(TS_BUF1, TS_BUF1+wridx1, size_hi);
+	memmove(TS_BUF1(ts), TS_BUF1(ts)+wridx1, size_hi);
 
 	/* Update wridx1 and rdidx1 */
 	ts->wridx1= 0;

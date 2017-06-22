@@ -4,7 +4,21 @@
  * Usage2: ./init_resp_parse init_messagefile
  * $Id: $
  */
+//config:config ATLASINIT
+//config:       bool "atlasinit"
+//config:       default n
+//config:       help
+//config:       RIPE NCC Atlas initialization and parsing applicaton.
+//config:       antony@rip.net. Aug 2010.
 
+//applet:IF_ATLASINIT(APPLET(atlasinit, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_ATLASINIT) += atlasinit.o
+
+//usage:#define atlasinit_trivial_usage
+//usage:       "[OPTION]...[MANPAGE]..."
+//usage:#define atlasinit_full_usage
+//usage:       "atlasinit filename"
 
 #include <stdio.h>
 #include <string.h>

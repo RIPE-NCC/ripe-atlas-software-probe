@@ -3,6 +3,27 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * Standalone version of the event-based ping. 
  */
+//config:config EVPING
+//config:       bool "evping"
+//config:       default n
+//config:       help
+//config:               standalone version of event-driven ping
+
+//applet:IF_EVPING(APPLET(evping, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EVPING) += evping.o
+
+//usage:#define evping_trivial_usage
+//usage:       "todo"
+//usage:#define evping_full_usage "\n\n"
+//usage:       "\nOptions:"
+//usage:       "\n     -c <count>      Number of packets"
+//usage:       "\n     -s <size>       Size"
+//usage:       "\n     -A <id>         Atlas measurement ID"
+//usage:       "\n     -O <out file>   Output file name"
+//usage:       "\n     -4              IPv4"
+//usage:       "\n     -6              IPv6"
+//usage:     "todo"
 
 #include "libbb.h"
 #include <syslog.h>

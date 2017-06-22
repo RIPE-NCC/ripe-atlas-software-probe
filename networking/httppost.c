@@ -3,6 +3,20 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * httppost.c -- Simple program that uses the HTTP POST command
 */
+//config:config HTTPPOST
+//config:       bool "httppost"
+//config:       default n
+//config:       help
+//config:         httppost post files using http
+
+//applet:IF_HTTPPOST(APPLET(httppost, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_HTTPPOST) += httppost.o
+
+//usage:#define httppost_trivial_usage
+//usage:       ""
+//usage:#define httppost_full_usage "\n\n"
+//usage:       ""
 
 #include <errno.h>
 #include <fcntl.h>

@@ -6,8 +6,26 @@
  * if env variable LOWMEM_REBOOT is set KBytes same as buddyinfo reboot
  *
  */
+//config:config BUDDYINFO
+//config:       bool "buddyinfo"
+//config:       default n
+//config:       help
+//config:         buddyinfo reports on the amount of free memory
+
+//applet:IF_CONDMV(APPLET(buddyinfo, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_BUDDYINFO) += buddyinfo.o
+
+//usage:#define buddyinfo_trivial_usage
+//usage:       ""
+//usage:#define buddyinfo_full_usage "\n\n"
+//usage:       ""
 
 #include "libbb.h"
+
+#include <sys/sysinfo.h>
+
+#define DBQ(str) "\"" #str "\""
 
 /* This is a NOFORK applet. Be very careful! */
 
@@ -16,57 +34,68 @@ int buddyinfo_main(int argc UNUSED_PARAM, char **argv)
 {
 	char *lowmemChar;
 	unsigned lowmem = 0;
-	lowmemChar = getenv("LOW_MEM_T");
+	FILE *fp = xfopen_for_read("/proc/buddyinfo");
+	char aa[10];
+	char *my_mac ;
+	int i = 0;
+	int j = 0;
+	int memBlock = 4;
+	int need_reboot = 0; // don't reboot 
+	int freeMem = 0;
+	int jMax = 64; // enough
+	struct sysinfo info; 
+
+	lowmemChar =  argv[1];
+
 	if(lowmemChar) 
 		lowmem = xatou(lowmemChar);
-	
-        FILE *fp = xfopen_for_read("/proc/buddyinfo");
-        char aa[10];
-        fscanf(fp, "%s", aa);
+        fscanf(fp, "%s", aa); 
         fscanf(fp, "%s", aa);
         fscanf(fp, "%s", aa);
         fscanf(fp, "%s", aa);
 
-	char *my_mac ;
         my_mac = getenv("ETHER_SCANNED");
 
-        int i = 0;
-        int j = 0;
-	int memBlock = 4;
-	int fReboot = 1; // don't reboot 
 	if (lowmem >= 4 ) 
 	{
-		fReboot = 0; // env variable is set sow we check for low thershhold
+		/* We need to reboot unless we find a big enough chunk
+		 * of memory.
+		 */
+		need_reboot = 1;
 	}
-        printf ("RESULT 9001.0 ongoing %d ", (int)time(0));
+        printf ("RESULT { " DBQ(id) ": " DBQ(9001) ", " DBQ(time) ": %lld",
+		(long long)time(0));
 	if (my_mac !=  NULL)
-		printf("%s ", my_mac);
-        for (j=0; j< 11; j++)
+		printf(", " DBQ(macaddr) ": " DBQ(%s), my_mac);
+
+	/* get uptime and print it */
+	sysinfo(&info);
+ 	printf (", " DBQ(uptime) ": %ld", info.uptime );
+	
+	printf(", " DBQ(buddyinfo) ": [ ");
+        for (j=0; j < jMax; j++)  
         {
-                fscanf(fp, "%d", &i);
-                printf("%-3d ", i);
-		if ( lowmem >= 4) 
+                if (fscanf(fp, "%d", &i) != 1)
+			break;
+		printf("%s%d", j == 0 ? "" : ", ", i);
+		freeMem += ( memBlock * i);
+		if (i > 0 && lowmem >= 4 && memBlock >= lowmem)
 		{
-			if(  memBlock >=  lowmem)
-			{
-		 		if(fReboot == 0)
-				{ 
-			  		if (i > 0 )
-						{
-							fReboot = 1;
-							
-						}
-				} 
-			}
+			/* Found a big enough chunk */
+			need_reboot = 0;
 		}
 		memBlock  *= 2; 
         }
-        printf ("\n"); 
-        fclose(fp);
-	if(fReboot == 0 )
+
+	/* now print it */
+	printf (" ], " DBQ(freemem) ": %d }\n" ,  freeMem);
+
+	fclose (fp);
+
+	if(need_reboot)
 	{
 		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
 		return (EXIT_FAILURE);
 	}
-        return EXIT_SUCCESS;
+	return 0;
 }

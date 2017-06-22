@@ -3,6 +3,47 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * httpget.c -- Simple program that uses the HTTP GET command
  */
+//config:config HTTPGET
+//config:       bool "httpget"
+//config:       default y
+//config:       help
+//config:         simple http GET. RIPE NCC 2011
+
+//applet:IF_HTTPGET(APPLET(httpget, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_HTTPGET) += httpget.o
+
+//usage:#define httpget_trivial_usage
+//usage:       "[--append] [--delete-file] [--get|--head|--post] "
+//usage:       "[--post-file FILE] [--post-dir DIR] "
+//usage:       "[--post-header FILE] "
+//usage:       "[--post-footer FILE] [--set-time bound] "
+//usage:       "[--store-headers SIZE] [--store-body SIZE] [--summary] "
+//usage:       "[--user-agent STRING] [-0|-1] [-4|-6] [-A STRING] [-O FILE] URL"
+//usage:#define httpget_full_usage "\n\n"
+//usage: "Interact with a HTTP server using GET/HEAD/POST commands\n"
+//usage: "\nOptions:"
+//usage: "\n    --append                Append data to output file"
+//usage: "\n    --defile-file           Delete files after they have been posted"
+//usage: "\n    --get                   HTTP GET command (default)"
+//usage: "\n    --head                  HTTP HEAD command"
+//usage: "\n    --post                  HTTP POST command"
+//usage: "\n    --post-file FILE        Post this file"
+//usage: "\n    --post-dir DIR          Post all files in this directory"
+//usage: "\n    --post-header FILE      First post this file and do not delete it"
+//usage: "\n    --post-footer FILE      Post this file last and do not delete it"
+//usage: "\n    --set-time bound        Parse the time in the HTTP reply and set the"
+//usage: "\n                            system time if it exceeds bound (in seconds)"
+//usage: "\n    --store-headers SIZE    Write this amount of headers to the output"
+//usage: "\n    --store-body SIZE       Write this amount of body to the output"
+//usage: "\n    --summary               Write the summary output"
+//usage: "\n    --user-agent STRING     Set the user-agent header to STRING"
+//usage: "\n    -0                      Send the request using http/1.0"
+//usage: "\n    -1                      Send the request using http/1.1 (default)"
+//usage: "\n    -4                      Connect only over IPv4"
+//usage: "\n    -6                      Connect only over IPv6"
+//usage: "\n    -A STRING               Format the output for Atlas using STRING"
+//usage: "\n    -O FILE                 Write the body of the HTTP reply to FILE"
 
 #include <errno.h>
 #include <fcntl.h>

@@ -1,4 +1,18 @@
 /* Standalone version of the event-based sslgetcert. */
+//config:config EVSSLGETCERT
+//config:       bool "evsslgetcert"
+//config:       default n
+//config:       help
+//config:               standalone version of event-driven sslgetcert
+
+//applet:IF_EVSSLGETCERT(APPLET(evsslgetcert, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EVSSLGETCERT) += evsslgetcert.o
+
+//usage:#define evsslgetcert_trivial_usage
+//usage:       "todo"
+//usage:#define evsslgetcert_full_usage "\n\n"
+//usage:     "todo"
 
 #include "libbb.h"
 #include <syslog.h>

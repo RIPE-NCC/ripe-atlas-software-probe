@@ -3,6 +3,18 @@
  * Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
+//config:config RPTADDRS
+//config:       bool "rptaddrs"
+//config:       default n
+//config:       help
+//config:         Report addresses, routes, dns both static and dynamic
+
+//applet:IF_RPTADDRS(APPLET(rptaddrs, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_RPTADDRS) += rptaddrs.o
+
+//usage:#define rptaddrs_trivial_usage
+//usage:#define rptaddrs_full_usage "\n\n"
 
 #include <errno.h>
 #include <resolv.h>
@@ -11,7 +23,7 @@
 #include <string.h>
 #include <net/route.h>
 #include <net/if.h>
-#include <inet_common.h>
+//#include <inet_common.h>
 #include "../eperd/eperd.h"
 #include "../eperd/readresolv.h"
 
@@ -360,6 +372,7 @@ static int setup_ipv6_rpt(FILE *of)
 				dst6p[0], dst6p[1], dst6p[2], dst6p[3],
 				dst6p[4], dst6p[5], dst6p[6], dst6p[7]);
 
+		memset(&sdst6, '\0', sizeof(sdst6));
 		inet_pton(AF_INET6, dst6in, (struct sockaddr *) &sdst6.sin6_addr);
 		sdst6.sin6_family = AF_INET6;
 		dst6out = INET6_rresolve((struct sockaddr_in6 *) &sdst6, 0x0fff);
@@ -475,10 +488,12 @@ static int setup_ipv6_rpt(FILE *of)
 
 		
 		set_flags(flags, (iflags & IPV6_MASK));
+		memset(&sdst6, '\0', sizeof(sdst6));
 		inet_pton(AF_INET6, dst6in, (struct sockaddr *) &sdst6.sin6_addr);
 		sdst6.sin6_family = AF_INET6;
 		dst6out = INET6_rresolve((struct sockaddr_in6 *) &sdst6, 0x0fff);
 
+		memset(&snh6, '\0', sizeof(snh6));
 		inet_pton(AF_INET6, nh6in, (struct sockaddr *) &snh6.sin6_addr);
 		snh6.sin6_family = AF_INET6;
 		nh6out = INET6_rresolve((struct sockaddr_in6 *) &snh6, 0x0fff);

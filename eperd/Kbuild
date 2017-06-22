@@ -1,8 +1,0 @@
-# Makefile for busybox
-#
-# Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
-#
-# Licensed under the GPL v2, see the file LICENSE in this tarball.
-
-lib-y:=
-lib-$(CONFIG_EPERD)      += eooqd.o eperd.o condmv.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o

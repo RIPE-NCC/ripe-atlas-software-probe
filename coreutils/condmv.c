@@ -3,6 +3,23 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * condmv.c -- move a file only if the destination doesn't exist
  */
+//config:config CONDMV
+//config:       bool "condmv"
+//config:       default n
+//config:       help
+//config:         condmv is used to rename a file if the destination does not exists
+
+//applet:IF_CONDMV(APPLET(condmv, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_CONDMV) += condmv.o
+
+//usage:#define condmv_trivial_usage
+//usage:       "[-A <string to append>][-f] FILE1 FILE2"
+//usage:#define condmv_full_usage "\n\n"
+//usage:       "Rename FILE1 to FILE2 if FILE2 does not exist\n"
+//usage:     "\nOptions:"
+//usage:     "\n       -A <string>     Append <string> before renaming FILE1"
+//usage:     "\n       -f              Force. Move even if FILE2 does exist"
 
 #include "libbb.h"
 
@@ -24,6 +41,7 @@ static int cross_filesystems, append_timestamp;
 static int do_dir(char *from_dir, char *to_dir);
 static int do_cprm(char *from_file, char *to_file);
 
+int condmv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int condmv_main(int argc, char *argv[])
 {
 	char *opt_add, *opt_age, *from, *to, *check;

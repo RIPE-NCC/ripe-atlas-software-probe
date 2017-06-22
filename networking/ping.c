@@ -158,9 +158,8 @@ enum {
 	pingsock = 0,
 };
 
-<<<<<<< HEAD
 #ifdef ATLAS
-#define create_icmp_socket() local_create_icmp_socket()
+#define create_icmp_socket(lsa) local_create_icmp_socket()
 #define create_icmp6_socket() local_create_icmp6_socket()
 #define xbind(fd, addr, len) xrbind(fd, addr, len, ping_report_err)
 #define xsendto(fd, buf, len, addr, addrlen) \
@@ -174,10 +173,7 @@ static void ping_report_reserr(const char *hn);
 #define ping_report_err	0
 #endif /* ATLAS */
 
-/* common routines */
-
-static int in_cksum(unsigned short *buf, int sz)
-=======
+#if 0
 static void
 #if ENABLE_PING6
 create_icmp_socket(len_and_sockaddr *lsa)
@@ -185,7 +181,6 @@ create_icmp_socket(len_and_sockaddr *lsa)
 create_icmp_socket(void)
 #define create_icmp_socket(lsa) create_icmp_socket()
 #endif
->>>>>>> busybox-base-1-26-2
 {
 	int sock;
 #if ENABLE_PING6
@@ -202,6 +197,7 @@ create_icmp_socket(void)
 
 	xmove_fd(sock, pingsock);
 }
+#endif
 
 #if !ENABLE_FEATURE_FANCY_PING
 
@@ -232,30 +228,20 @@ static void ping4(len_and_sockaddr *lsa)
 	pkt->icmp_id = G.myid;
 	pkt->icmp_cksum = inet_cksum((uint16_t *) pkt, sizeof(G.packet));
 
-<<<<<<< HEAD
-	c = rsendto(pingsock, packet, DEFDATALEN + ICMP_MINLEN,
-	   (struct sockaddr *) &pingaddr, sizeof(pingaddr), ping_report_err);
+	c = rsendto(pingsock, G.packet, DEFDATALEN + ICMP_MINLEN, &lsa->u.sa, lsa->len, ping_report_err);
 	if (c == -1)
 		return;
-=======
-	xsendto(pingsock, G.packet, DEFDATALEN + ICMP_MINLEN, &lsa->u.sa, lsa->len);
->>>>>>> busybox-base-1-26-2
 
 	/* listen for replies */
 	while (1) {
+		if (need_to_exit)
+			break;
+
 #if 0
 		struct sockaddr_in from;
 		socklen_t fromlen = sizeof(from);
 
-<<<<<<< HEAD
-		if (need_to_exit)
-			break;
-
-printf("%s, %d: recvfrom, need_to_exit %d\n", __FILE__, __LINE__, need_to_exit);
-		c = recvfrom(pingsock, packet, sizeof(packet), 0,
-=======
 		c = recvfrom(pingsock, G.packet, sizeof(G.packet), 0,
->>>>>>> busybox-base-1-26-2
 				(struct sockaddr *) &from, &fromlen);
 #else
 		c = recv(pingsock, G.packet, sizeof(G.packet), 0);
@@ -285,15 +271,6 @@ static void ping6(len_and_sockaddr *lsa)
 	struct icmp6_hdr *pkt;
 	int c;
 	int sockopt;
-<<<<<<< HEAD
-	char packet[DEFDATALEN + MAXIPLEN + MAXICMPLEN];
-
-	pingsock = create_icmp6_socket();
-	if (pingsock == -1)
-		return;
-	pingaddr = lsa->u.sin6;
-=======
->>>>>>> busybox-base-1-26-2
 
 	pkt = (struct icmp6_hdr *) G.packet;
 	/*memset(pkt, 0, sizeof(G.packet)); already is */
@@ -307,18 +284,14 @@ static void ping6(len_and_sockaddr *lsa)
 
 	/* listen for replies */
 	while (1) {
+		if (need_to_exit)
+			break;
+
 #if 0
 		struct sockaddr_in6 from;
 		socklen_t fromlen = sizeof(from);
 
-<<<<<<< HEAD
-		if (need_to_exit)
-			break;
-
-		c = recvfrom(pingsock, packet, sizeof(packet), 0,
-=======
 		c = recvfrom(pingsock, G.packet, sizeof(G.packet), 0,
->>>>>>> busybox-base-1-26-2
 				(struct sockaddr *) &from, &fromlen);
 #else
 		c = recv(pingsock, G.packet, sizeof(G.packet), 0);
@@ -396,25 +369,12 @@ static int common_ping_main(sa_family_t af, char **argv)
 
 /* Full(er) version */
 
-<<<<<<< HEAD
-#define OPT_STRING ("!qvc:s:w:W:I:A:4D" USE_PING6("6"))
-=======
-#define OPT_STRING ("qvc:+s:t:+w:+W:+I:np:4" IF_PING6("6"))
->>>>>>> busybox-base-1-26-2
+#define OPT_STRING ("!qvc:+s:t:+w:+W:+I:np:4AD" IF_PING6("6"))
 enum {
 	OPT_QUIET = 1 << 0,
 	OPT_VERBOSE = 1 << 1,
 	OPT_c = 1 << 2,
 	OPT_s = 1 << 3,
-<<<<<<< HEAD
-	OPT_w = 1 << 4,
-	OPT_W = 1 << 5,
-	OPT_I = 1 << 6,
-	OPT_A = 1 << 7,
-	OPT_IPV4 = 1 << 8,
-	OPT_D_WATCHDOG = 1 << 9,
-	OPT_IPV6 = (1 << 10) * ENABLE_PING6,
-=======
 	OPT_t = 1 << 4,
 	OPT_w = 1 << 5,
 	OPT_W = 1 << 6,
@@ -422,8 +382,9 @@ enum {
 	/*OPT_n = 1 << 8, - ignored */
 	OPT_p = 1 << 9,
 	OPT_IPV4 = 1 << 10,
-	OPT_IPV6 = (1 << 11) * ENABLE_PING6,
->>>>>>> busybox-base-1-26-2
+	OPT_A = 1 << 11,
+	OPT_D_WATCHDOG = 1 << 12,
+	OPT_IPV6 = (1 << 13) * ENABLE_PING6,
 };
 
 
@@ -490,67 +451,44 @@ struct globals {
 	tmax = 0; \
 	need_to_exit = 0; \
 	send_error = 0; \
-	ntransmitted = 0; \
-	nreceived = 0; \
-	nrepeats = 0; \
+	G.ntransmitted = 0; \
+	G.nreceived = 0; \
+	G.nrepeats = 0; \
 } while (0)
 
 
-<<<<<<< HEAD
-#define	A(bit)		rcvd_tbl[(bit)>>3]	/* identify byte in array */
-#define	B(bit)		(1 << ((bit) & 0x07))	/* identify bit in byte */
-#define	SET(bit)	(A(bit) |= B(bit))
-#define	CLR(bit)	(A(bit) &= (~B(bit)))
-#define	TST(bit)	(A(bit) & B(bit))
-
-/**************************************************************************/
-#ifdef ATLAS
-static void req_exit(int sig UNUSED_PARAM)
-{
-	need_to_exit= 1;
-=======
 #define BYTE(bit)	rcvd_tbl[(bit)>>3]
 #define MASK(bit)	(1 << ((bit) & 7))
 #define SET(bit)	(BYTE(bit) |= MASK(bit))
 #define CLR(bit)	(BYTE(bit) &= (~MASK(bit)))
 #define TST(bit)	(BYTE(bit) & MASK(bit))
->>>>>>> busybox-base-1-26-2
 
+#ifdef ATLAS
+static void req_exit(int sig UNUSED_PARAM)
+{
+	need_to_exit= 1;
+ 
 	/* Reset the alarm in case of a race condition */
 	alarm(1);
 }
 #endif
 
-static void print_stats(void)
+
+static void print_stats(int junk UNUSED_PARAM)
 {
 	unsigned long ul;
 	unsigned long nrecv;
 
 	signal(SIGINT, SIG_IGN);
 
-<<<<<<< HEAD
 	if (send_error)
 		return;
 
 #ifdef ATLAS
-        printf("%lu %lu %lu", ntransmitted, nreceived, nrepeats);
+        printf("%lu %lu %lu", G.ntransmitted, G.nreceived, G.nrepeats);
 #else
-	printf("\n--- %s ping statistics ---\n", hostname);
-	printf("%lu packets transmitted, ", ntransmitted);
-	printf("%lu packets received, ", nreceived);
-	if (nrepeats)
-		printf("%lu duplicates, ", nrepeats);
-	if (ntransmitted)
-		ntransmitted = (ntransmitted - nreceived) * 100 / ntransmitted;
-	printf("%lu%% packet loss\n", ntransmitted);
-#endif
-	if (tmin != UINT_MAX) {
-		unsigned tavg = tsum / (nreceived + nrepeats);
-#ifdef ATLAS
-		printf(" %u.%03u %u.%03u %u.%03u",
-#else
-=======
 	nrecv = G.nreceived;
+
 	printf("\n--- %s ping statistics ---\n"
 		"%lu packets transmitted, "
 		"%lu packets received, ",
@@ -562,11 +500,14 @@ static void print_stats(void)
 	if (ul != 0)
 		ul = (ul - nrecv) * 100 / ul;
 	printf("%lu%% packet loss\n", ul);
+#endif
 	if (tmin != UINT_MAX) {
 		unsigned tavg = tsum / (nrecv + G.nrepeats);
->>>>>>> busybox-base-1-26-2
+#ifdef ATLAS
+		printf(" %u.%03u %u.%03u %u.%03u",
+#else
 		printf("round-trip min/avg/max = %u.%03u/%u.%03u/%u.%03u ms\n",
-#endif 
+#endif
 			tmin / 1000, tmin % 1000,
 			tavg / 1000, tavg % 1000,
 			tmax / 1000, tmax % 1000);
@@ -577,10 +518,10 @@ static void print_stats(void)
 static void print_stats_and_exit(int junk) NORETURN;
 static void print_stats_and_exit(int junk UNUSED_PARAM)
 {
-	print_stats();
+	print_stats(0 /* dummy */);
 
 	/* if condition is true, exit with 1 -- 'failure' */
-	exit(nrecv == 0 || (deadline && nrecv < pingcount));
+	exit(G.nreceived == 0 || (deadline && G.nreceived < pingcount));
 }
 
 static void sendping_tail(void (*sp)(int), int size_pkt)
@@ -597,21 +538,17 @@ static void sendping_tail(void (*sp)(int), int size_pkt)
 
 	/* sizeof(pingaddr) can be larger than real sa size, but I think
 	 * it doesn't matter */
-<<<<<<< HEAD
-	sz = rsendto(pingsock, pkt, size_pkt, &pingaddr.sa, sizeof(pingaddr),
-		ping_report_err);
+	sz = rsendto(pingsock, G.snd_packet, size_pkt, &pingaddr.sa,
+		sizeof(pingaddr), ping_report_err);
 	if (sz == -1)
 	{
 		need_to_exit= 1;
 		send_error= 1;
 		return;
 	}
-=======
-	sz = xsendto(pingsock, G.snd_packet, size_pkt, &pingaddr.sa, sizeof(pingaddr));
->>>>>>> busybox-base-1-26-2
 	if (sz != size_pkt)
 	{
-		bb_error_msg_and_die(bb_msg_write_error);
+ 		bb_error_msg_and_die(bb_msg_write_error);
 		printf ("ERRROR AA\n");
 	}
 
@@ -835,17 +772,8 @@ static void unpack6(char *packet, int sz, struct sockaddr_in6 *from, int hoplimi
 		if (sz >= sizeof(struct icmp6_hdr) + sizeof(uint32_t))
 			tp = (uint32_t *) &icmppkt->icmp6_data8[4];
 		unpack_tail(sz, tp,
-<<<<<<< HEAD
-#if 1	/* NSS, fixed for IPv6 ready logo */
 			inet_ntop(AF_INET6, &from->sin6_addr,
 					buf, sizeof(buf)),
-#else
-			inet_ntop(AF_INET6, &pingaddr.sin6.sin6_addr,
-=======
-			inet_ntop(AF_INET6, &from->sin6_addr,
->>>>>>> busybox-base-1-26-2
-					buf, sizeof(buf)),
-#endif
 			recv_seq, hoplimit);
 	} else if (icmppkt->icmp6_type != ICMP6_ECHO_REQUEST) {
 		bb_error_msg("warning: got ICMP %d (%s)",
@@ -892,14 +820,10 @@ static void ping4(len_and_sockaddr *lsa)
 		socklen_t fromlen = (socklen_t) sizeof(from);
 		int c;
 
-<<<<<<< HEAD
 		if (need_to_exit)
 			break;
 
-		c = recvfrom(pingsock, packet, sizeof(packet), 0,
-=======
 		c = recvfrom(pingsock, G.rcv_packet, G.sizeof_rcv_packet, 0,
->>>>>>> busybox-base-1-26-2
 				(struct sockaddr *) &from, &fromlen);
 		if (c < 0) {
 			if (errno != EINTR)
@@ -921,12 +845,6 @@ static void ping6(len_and_sockaddr *lsa)
 	struct iovec iov;
 	char control_buf[CMSG_SPACE(36)];
 
-<<<<<<< HEAD
-	pingsock = create_icmp6_socket();
-	if (pingsock == -1)
-		return;
-=======
->>>>>>> busybox-base-1-26-2
 	pingaddr.sin6 = lsa->u.sin6;
 	if (source_lsa)
 		xbind(pingsock, &source_lsa->u.sa, source_lsa->len);
@@ -1002,13 +920,8 @@ static void ping6(len_and_sockaddr *lsa)
 				move_from_unaligned_int(hoplimit, CMSG_DATA(mp));
 			}
 		}
-<<<<<<< HEAD
-		unpack6(packet, c, &from, hoplimit);
-		if (pingcount && nreceived >= pingcount)
-=======
 		unpack6(G.rcv_packet, c, &from, hoplimit);
 		if (pingcount && G.nreceived >= pingcount)
->>>>>>> busybox-base-1-26-2
 			break;
 	}
 	close(pingsock);
@@ -1027,7 +940,7 @@ static void ping(len_and_sockaddr *lsa)
         printf(" %s %s %d ",  hostname, dotted, datalen);
 #else
 	printf("PING %s (%s)", hostname, dotted);
-#endif /*i ifdef ATLAS */
+#endif /* ifdef ATLAS */
 	if (source_lsa) {
 		printf(" from %s",
 			xmalloc_sockaddr2dotted_noport(&source_lsa->u.sa));
@@ -1057,31 +970,20 @@ static void ping(len_and_sockaddr *lsa)
 	}
 }
 
-static int common_ping_main(int opt, char **argv)
+static int common_ping_main(uint32_t opt, char **argv)
 {
 	len_and_sockaddr *lsa;
-<<<<<<< HEAD
-	char *str_s;
-	uint32_t opt;
-
-	INIT_G();
-
-	/* exactly one argument needed; -v and -q don't mix; -c NUM, -w NUM, -W NUM */
-	opt_complementary = "=1:q--v:v--q:c+:w+:W+";
-	opt = getopt32(argv, OPT_STRING, &pingcount, &str_s, &deadline, &timeout, &str_I, &str_Atlas);
-	if (opt == (uint32_t)-1)
-	{
-		return EXIT_FAILURE;
-	}
-=======
 	char *str_s, *str_p;
 
 	INIT_G();
 
 	/* exactly one argument needed; -v and -q don't mix; -c NUM, -t NUM, -w NUM, -W NUM */
 	opt_complementary = "=1:q--v:v--q";
-	opt |= getopt32(argv, OPT_STRING, &pingcount, &str_s, &opt_ttl, &deadline, &timeout, &str_I, &str_p);
->>>>>>> busybox-base-1-26-2
+	opt |= getopt32(argv, OPT_STRING, &pingcount, &str_s, &opt_ttl, &deadline, &timeout, &str_I, &str_p, &str_Atlas);
+	if (opt == (uint32_t)-1)
+	{
+		return EXIT_FAILURE;
+	}
 	if (opt & OPT_s)
 		datalen = xatou16(str_s); // -s
 	if(opt & OPT_D_WATCHDOG )
@@ -1145,7 +1047,7 @@ static int common_ping_main(int opt, char **argv)
 	ping(lsa);
 
 #ifdef ATLAS
-	print_stats();
+	print_stats(0 /* dummy */);
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);
 	signal(SIGINT, SIG_DFL);

@@ -97,7 +97,7 @@
 	unary-operator ::= "-r"|"-w"|"-x"|"-f"|"-d"|"-c"|"-b"|"-p"|
 		"-u"|"-g"|"-k"|"-s"|"-t"|"-z"|"-n"|"-o"|"-O"|"-G"|"-L"|"-S";
 
-	binary-operator ::= "="|"=="|"!="|"-eq"|"-ne"|"-ge"|"-gt"|"-ad"|"-le"|"-lt"|
+	binary-operator ::= "="|"=="|"!="|"-eq"|"-ne"|"-ge"|"-gt"|"-le"|"-lt"|
 			"-nt"|"-ot"|"-ef";
 	operand ::= <any legal UNIX file name>
 */
@@ -190,7 +190,6 @@ enum token {
 	INTNE,
 	INTGE,
 	INTGT,
-	INTAD,
 	INTLE,
 	INTLT,
 
@@ -264,7 +263,6 @@ static const char *const TOKSTR[] = {
 	"INTNE",
 	"INTGE",
 	"INTGT",
-	"INTAD'
 	"INTLE",
 	"INTLT",
 	"UNOT",
@@ -293,51 +291,6 @@ struct operator_t {
 	unsigned char op_num, op_type;
 };
 
-<<<<<<< HEAD
-static const struct operator_t ops[] = {
-	{ "-r", FILRD   , UNOP   },
-	{ "-w", FILWR   , UNOP   },
-	{ "-x", FILEX   , UNOP   },
-	{ "-e", FILEXIST, UNOP   },
-	{ "-f", FILREG  , UNOP   },
-	{ "-d", FILDIR  , UNOP   },
-	{ "-c", FILCDEV , UNOP   },
-	{ "-b", FILBDEV , UNOP   },
-	{ "-p", FILFIFO , UNOP   },
-	{ "-u", FILSUID , UNOP   },
-	{ "-g", FILSGID , UNOP   },
-	{ "-k", FILSTCK , UNOP   },
-	{ "-s", FILGZ   , UNOP   },
-	{ "-t", FILTT   , UNOP   },
-	{ "-z", STREZ   , UNOP   },
-	{ "-n", STRNZ   , UNOP   },
-	{ "-h", FILSYM  , UNOP   },    /* for backwards compat */
-
-	{ "-O" , FILUID , UNOP   },
-	{ "-G" , FILGID , UNOP   },
-	{ "-L" , FILSYM , UNOP   },
-	{ "-S" , FILSOCK, UNOP   },
-	{ "="  , STREQ  , BINOP  },
-	{ "==" , STREQ  , BINOP  },
-	{ "!=" , STRNE  , BINOP  },
-	{ "<"  , STRLT  , BINOP  },
-	{ ">"  , STRGT  , BINOP  },
-	{ "-eq", INTEQ  , BINOP  },
-	{ "-ne", INTNE  , BINOP  },
-	{ "-ge", INTGE  , BINOP  },
-	{ "-gt", INTGT  , BINOP  },
-	{ "-le", INTLE  , BINOP  },
-	{ "-ad", INTAD  , BINOP  },
-	{ "-lt", INTLT  , BINOP  },
-	{ "-nt", FILNT  , BINOP  },
-	{ "-ot", FILOT  , BINOP  },
-	{ "-ef", FILEQ  , BINOP  },
-	{ "!"  , UNOT   , BUNOP  },
-	{ "-a" , BAND   , BBINOP },
-	{ "-o" , BOR    , BBINOP },
-	{ "("  , LPAREN , PAREN  },
-	{ ")"  , RPAREN , PAREN  },
-=======
 static const struct operator_t ops_table[] = {
 	{ /* "-r" */ FILRD   , UNOP   },
 	{ /* "-w" */ FILWR   , UNOP   },
@@ -380,7 +333,6 @@ static const struct operator_t ops_table[] = {
 	{ /* "-o" */ BOR     , BBINOP },
 	{ /* "("  */ LPAREN  , PAREN  },
 	{ /* ")"  */ RPAREN  , PAREN  },
->>>>>>> busybox-base-1-26-2
 };
 /* Please keep these two tables in sync */
 static const char ops_texts[] ALIGN1 =
@@ -577,8 +529,6 @@ static int binop(void)
 			return val1 >= val2;
 		if (op->op_num == INTGT)
 			return val1 >  val2;
-		if (op->op_num == INTAD)
-			return 7;
 		if (op->op_num == INTLE)
 			return val1 <= val2;
 		/*if (op->op_num == INTLT)*/

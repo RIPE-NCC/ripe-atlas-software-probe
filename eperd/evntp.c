@@ -3,6 +3,20 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * Standalone version of the event-based ntp. 
  */
+//config:config EVNTP
+//config:       bool "evntp"
+//config:       default n
+//config:       help
+//config:               standalone version of event-driven ntp
+
+//applet:IF_EVNTP(APPLET(evntp, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EVNTP) += evntp.o
+
+//usage:#define evntp_trivial_usage
+//usage:       "todo"
+//usage:#define evntp_full_usage
+//usage:       "todo"
 
 #include "libbb.h"
 #include <syslog.h>

@@ -136,16 +136,6 @@
 //usage:       "$ date\n"
 //usage:       "Wed Apr 12 18:52:41 MDT 2000\n"
 
-<<<<<<< HEAD
-#define DATE_OPT_RFC2822	0x01
-#define DATE_OPT_SET		0x02
-#define DATE_OPT_UTC		0x04
-#define DATE_OPT_DATE		0x08
-#define DATE_OPT_REFERENCE	0x10
-#define DATE_OPT_UNIXSECS	0x20
-#define DATE_OPT_TIMESPEC	0x40
-#define DATE_OPT_HINT		0x80
-=======
 #include "libbb.h"
 #include "common_bufsiz.h"
 #if ENABLE_FEATURE_DATE_NANO
@@ -158,10 +148,10 @@ enum {
 	OPT_UTC       = (1 << 2), /* u */
 	OPT_DATE      = (1 << 3), /* d */
 	OPT_REFERENCE = (1 << 4), /* r */
-	OPT_TIMESPEC  = (1 << 5) * ENABLE_FEATURE_DATE_ISOFMT, /* I */
-	OPT_HINT      = (1 << 6) * ENABLE_FEATURE_DATE_ISOFMT, /* D */
+	OPT_UNIXSECS  = (1 << 5), /* S */
+	OPT_TIMESPEC  = (1 << 6) * ENABLE_FEATURE_DATE_ISOFMT, /* I */
+	OPT_HINT      = (1 << 7) * ENABLE_FEATURE_DATE_ISOFMT, /* D */
 };
->>>>>>> busybox-base-1-26-2
 
 static void maybe_set_utc(int opt)
 {
@@ -189,6 +179,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 	char buf_fmt_dt2str[64];
 	unsigned opt;
 	int ifmt = -1;
+	time_t tm;
 	char *date_str;
 	char *fmt_dt2str;
 	char *fmt_str2dt;
@@ -197,16 +188,10 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 	char *check;
 
 	opt_complementary = "d--s:s--d"
-<<<<<<< HEAD
-		USE_FEATURE_DATE_ISOFMT(":R--I:I--R");
-	opt = getopt32(argv, "Rs:ud:r:S"
-			USE_FEATURE_DATE_ISOFMT("I::D:"),
-=======
 		IF_FEATURE_DATE_ISOFMT(":R--I:I--R");
 	IF_LONG_OPTS(applet_long_options = date_longopts;)
-	opt = getopt32(argv, "Rs:ud:r:"
+	opt = getopt32(argv, "Rs:ud:r:S"
 			IF_FEATURE_DATE_ISOFMT("I::D:"),
->>>>>>> busybox-base-1-26-2
 			&date_str, &date_str, &filename
 			IF_FEATURE_DATE_ISOFMT(, &isofmt_arg, &fmt_str2dt));
 	argv += optind;
@@ -295,8 +280,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 		tm_time.tm_hour = 0;
 
 		/* Process any date input to UNIX time since 1 Jan 1970 */
-<<<<<<< HEAD
-		if (opt & DATE_OPT_UNIXSECS)
+		if (opt & OPT_UNIXSECS)
 		{
 			tm= strtoul(date_str, &check, 10);
 			if (check[0] != '\0')
@@ -308,39 +292,23 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 			/* Fill in tm_time */
 			tm_time= *localtime(&tm);
 		}
-		else if (ENABLE_FEATURE_DATE_ISOFMT && (opt & DATE_OPT_HINT)) {
-=======
-		if (ENABLE_FEATURE_DATE_ISOFMT && (opt & OPT_HINT)) {
->>>>>>> busybox-base-1-26-2
+		else if (ENABLE_FEATURE_DATE_ISOFMT && (opt & OPT_HINT)) {
 			if (strptime(date_str, fmt_str2dt, &tm_time) == NULL)
 				bb_error_msg_and_die(bb_msg_invalid_date, date_str);
 		} else {
 			parse_datestr(date_str, &tm_time);
 		}
-<<<<<<< HEAD
-		if (!(opt & DATE_OPT_UNIXSECS))
+
+		if (!(opt & OPT_UNIXSECS))
 		{
-			/* Correct any day of week and day of year etc.
-			 * fields
-			 */
-			tm_time.tm_isdst = -1;	/* Be sure to recheck dst. */
-			tm = mktime(&tm_time);
-			if (tm < 0) {
-				bb_error_msg_and_die(bb_msg_invalid_date,
-					date_str);
-			}
+			/* Correct any day of week and day of year etc. fields */
+			/* Be sure to recheck dst (but not if date is time_t format) */
+			if (date_str[0] != '@')
+				tm_time.tm_isdst = -1;
+			ts.tv_sec = validate_tm_time(date_str, &tm_time);
+
 			maybe_set_utc(opt);
 		}
-=======
-
-		/* Correct any day of week and day of year etc. fields */
-		/* Be sure to recheck dst (but not if date is time_t format) */
-		if (date_str[0] != '@')
-			tm_time.tm_isdst = -1;
-		ts.tv_sec = validate_tm_time(date_str, &tm_time);
-
-		maybe_set_utc(opt);
->>>>>>> busybox-base-1-26-2
 
 		/* if setting time, set it */
 		if ((opt & OPT_SET) && stime(&ts.tv_sec) < 0) {

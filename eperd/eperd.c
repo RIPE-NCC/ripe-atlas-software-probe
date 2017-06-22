@@ -12,9 +12,36 @@
  *
  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
  */
+//config:config EPERD
+//config:       bool "Eperd"
+//config:       default n
+//config:       select FEATURE_SUID
+//config:       select FEATURE_SYSLOG
+//config:       help
+//config:           Eperd periodically runs Atlas measurements. It is based on crond.
+
+//applet:IF_EPERD(APPLET(eperd, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
+
+//usage:#define eperd_trivial_usage
+//usage:       "-fbSAD -P pidfile -l N -d N -L LOGFILE -c DIR"
+//usage:#define eperd_full_usage "\n\n"
+//usage:       "       -f      Foreground"
+//usage:     "\n       -b      Background (default)"
+//usage:     "\n       -S      Log to syslog (default)"
+//usage:     "\n       -l      Set log level. 0 is the most verbose, default 8"
+//usage:     "\n       -d      Set log level, log to stderr"
+//usage:     "\n       -L      Log to file"
+//usage:     "\n       -c      Working dir"
+//usage:     "\n       -A      Atlas specific processing"
+//usage:     "\n       -D      Periodically kick watchdog"
+//usage:     "\n       -P      pidfile to use"
 
 #include "libbb.h"
 #include <syslog.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
 #include <event2/dns.h>
@@ -274,13 +301,12 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	INIT_G();
 
 	/* "-b after -f is ignored", and so on for every pair a-b */
-	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_PERD_D(":d-l")
+	opt_complementary = "d-l"
 			":i+:l+:d+"; /* -i, -l and -d have numeric param */
-	opt = getopt32(argv, "I:i:l:L:fc:A:DP:" USE_FEATURE_PERD_D("d:") "O:",
+	opt = getopt32(argv, "I:i:l:L:fc:A:DP:d:O:",
 			&interface_name, &instance_id, &LogLevel,
 			&LogFile, &CDir,
-			&atlas_id, &PidFileName
-			USE_FEATURE_PERD_D(,&LogLevel), &out_filename);
+			&atlas_id, &PidFileName,&LogLevel, &out_filename);
 	/* both -d N and -l N set the same variable: LogLevel */
 
 	if (out_filename && !validate_filename(out_filename, SAFE_PREFIX))
@@ -1076,7 +1102,7 @@ error:
 			c= *p;
 			if (c == '"' || c == '\\')
 				fprintf(fn, "\\%c", c);
-			else if (isprint((unsigned char)c))
+			else if (isprint_asciionly((unsigned char)c))
 				fputc(c, fn);
 			else
 				fprintf(fn, "\\u%04x", (unsigned char)c);
@@ -1291,7 +1317,7 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 				c= *p;
 				if (c == '"' || c == '\\')
 					fprintf(fn, "\\%c", c);
-				else if (isprint((unsigned char)c))
+				else if (isprint_asciionly((unsigned char)c))
 					fputc(c, fn);
 				else
 					fprintf(fn, "\\u%04x", (unsigned char)c);

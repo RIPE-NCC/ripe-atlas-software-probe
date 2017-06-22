@@ -3,6 +3,35 @@
  * Copyright (c) 2009 Rocco Carbone <ro...@tecsiel.it>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
+//config:config EVTDIG
+//config:       bool "evtdig"
+//config:       default n
+//config:       depends on EPERD
+//config:       help
+//config:          tiny dig event driven version. support only limited queries id.sever
+//config:          txt chaos.  RIPE NCC 2011
+
+//config:config FEATURE_EVTDIG_DEBUG
+//config:       bool "Enable debug support in evtdig"
+//config:       default n
+//config:       depends on EVTDIG
+//config:       help
+//config:        extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
+
+//applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EVTDIG) += evtdig.o
+
+//usage:#define evtdig_trivial_usage
+//usage:             "[-h|-i|-b|-s] ... <server IP address>"
+//usage:#define evtdig_full_usage "\n\n"
+//usage:    "evtdig:  a tiny implemention dns queries which supports 4 queries\n"
+//usage:     "\n     not implemented:  recursion"
+//usage:     "\n     -h | --hostname-bind hostname.bind txt chaos "
+//usage:     "\n     -i | id-server id.server txt chaos "
+//usage:     "\n     -b | version-bind version-bind txt chaos "
+//usage:     "\n     -s | soa <zone> to be implmented "
+//usage:     "\n      RIPE NCC 2011 "
 
 #include "libbb.h"
 #include "atlas_bb64.h"

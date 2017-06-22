@@ -3,9 +3,27 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * eooqd.c  Libevent-based One-off queue daemon
  */
+//config:config EOOQD
+//config:       bool "Eooqd"
+//config:       default n
+//config:       select FEATURE_SUID
+//config:       select FEATURE_SYSLOG
+//config:       help
+//config:           Eooqd runs Atlas measurements just once.
+
+//applet:IF_EOOQD(APPLET(eooqd, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EOOQD) += eooqd.o
+
+//usage:#define eooqd_trivial_usage 
+//usage:       "<queue-file>"
+//usage:#define eooqd_full_usage 
 
 #include <stdio.h>
 #include <string.h>
+
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include <libbb.h>
 #include <event2/event.h>
@@ -542,7 +560,7 @@ error:
 			c= *p;
 			if (c == '"' || c == '\\')
 				fprintf(fn, "\\%c", c);
-			else if (isprint((unsigned char)c))
+			else if (isprint_asciionly((unsigned char)c))
 				fputc(c, fn);
 			else
 				fprintf(fn, "\\u%04x", (unsigned char)c);

@@ -1039,7 +1039,7 @@ static void add_str_quoted(struct hgstate *state, char *str)
 		c= *p;
 		if (c == '"' || c == '\\')
 			snprintf(buf, sizeof(buf), "\\%c", c);
-		else if (isprint((unsigned char)c))
+		else if (isprint_asciionly((unsigned char)c))
 		{
 			buf[0]= c;
 			buf[1]= '\0';

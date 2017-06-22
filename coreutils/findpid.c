@@ -4,6 +4,21 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  * simple find_pid_name. return 0 if a name is found
  */
+//config:config FINDPID
+//config:       bool "findpid"
+//config:       default n
+//config:       help
+//config:         find a pid given the name of a process
+
+//applet:IF_FINDPID(APPLET(findpid, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_FINDPID) += findpid.o
+
+//usage:#define findpid_trivial_usage
+//usage:       ""
+//usage:#define findpid_full_usage "\n\n"
+//usage:       ""
+
 
 #include "libbb.h"
 

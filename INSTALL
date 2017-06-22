@@ -6,8 +6,8 @@ The BusyBox build process is similar to the Linux kernel build:
   make menuconfig     # This creates a file called ".config"
   make                # This creates the "busybox" executable
   cd libevent-2.0.20-stable  # first build libevent
-  ./configure --prefix=/usr/local/atlas 
-  make install 
+  ./configure --prefix=/usr/local/atlas
+  make install
   cd ../
   make CONFIG_PREFIX=/usr/local//atlas/bb-13.3 install #RIPE NCC atlas install
 

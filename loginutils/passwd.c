@@ -41,19 +41,6 @@
 #include <syslog.h>
 #include <sys/resource.h> /* setrlimit */
 
-<<<<<<< HEAD
-
-static char* new_password( int algo, char *pass)
-{
-	char salt[sizeof("$N$XXXXXXXX")]; /* "$N$XXXXXXXX" or "XX" */
-	char *ret = NULL; /* failure so far */
-
-	crypt_make_salt(salt, 1, 0); /* des */
-	if (algo) { /* MD5 */
-		strcpy(salt, "$1$");
-		crypt_make_salt(salt + 3, 4, 0);
-	}
-=======
 static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo)
 {
 	char salt[MAX_PW_SALT_LEN];
@@ -100,13 +87,10 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
 
 	crypt_make_pw_salt(salt, algo);
 
->>>>>>> busybox-base-1-26-2
 	/* pw_encrypt returns malloced str */
-	ret = pw_encrypt(pass, salt, 1);
+	ret = pw_encrypt(newp, salt, 1);
 	/* whee, success! */
 
-<<<<<<< HEAD
-=======
  err_ret:
 	nuke_str(orig);
 	if (ENABLE_FEATURE_CLEAN_UP) free(orig);
@@ -115,7 +99,6 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
 	if (ENABLE_FEATURE_CLEAN_UP) free(newp);
 
 	nuke_str(cp);
->>>>>>> busybox-base-1-26-2
 	return ret;
 }
 
@@ -136,10 +119,10 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 	char *myname;
 	char *name;
 	char *newp;
-	char *pass;
 	struct passwd *pw;
 	uid_t myuid;
 	struct rlimit rlimit_fsize;
+	char c;
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	/* Using _r function to avoid pulling in static buffers */
 	struct spwd spw;
@@ -158,31 +141,14 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 		bb_show_usage();
 
 	/* Will complain and die if username not found */
-<<<<<<< HEAD
-	myname = xstrdup(bb_getpwuid(NULL, -1, myuid));
-
-	if( argc<3 ) {
-		bb_error_msg_and_die("You should supply a name ans a password");
-	}
-
-	name = argv[0];
-	pass = argv[1];
-	pw = getpwnam(name);
-	if (!pw)
-		bb_error_msg_and_die("unknown user %s", name);
-	if (myuid && pw->pw_uid != myuid) {
-=======
 	myname = xstrdup(xuid2uname(myuid));
 	name = argv[0] ? argv[0] : myname;
 
 	pw = xgetpwnam(name);
 	if (myuid != 0 && pw->pw_uid != myuid) {
->>>>>>> busybox-base-1-26-2
 		/* LOGMODE_BOTH */
 		bb_error_msg_and_die("%s can't change password for %s", myname, name);
 	}
-
-	newp = new_password( opt & STATE_ALGO_md5, pass);
 
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	{
@@ -209,8 +175,6 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 	}
 #endif
 
-<<<<<<< HEAD
-=======
 	/* Decide what the new password will be */
 	newp = NULL;
 	c = pw->pw_passwd[0] - '!';
@@ -240,7 +204,6 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 		newp = (char*)"";
 	}
 
->>>>>>> busybox-base-1-26-2
 	rlimit_fsize.rlim_cur = rlimit_fsize.rlim_max = 512L * 30000;
 	setrlimit(RLIMIT_FSIZE, &rlimit_fsize);
 	bb_signals(0
@@ -253,17 +216,12 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_FEATURE_SHADOWPASSWDS
 	filename = bb_path_shadow_file;
-<<<<<<< HEAD
-	rc = update_passwd(bb_path_shadow_file, name, newp );
-	if (rc == 0) /* no lines updated, no errors detected */
-=======
 	rc = update_passwd(bb_path_shadow_file, name, newp, NULL);
 	if (rc > 0)
 		/* password in /etc/shadow was updated */
 		newp = (char*) "x";
 	if (rc >= 0)
 		/* 0 = /etc/shadow missing (not an error), >0 = passwd changed in /etc/shadow */
->>>>>>> busybox-base-1-26-2
 #endif
 	{
 		filename = bb_path_passwd_file;
@@ -274,13 +232,8 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
 		bb_error_msg_and_die("can't update password file %s", filename);
 	bb_error_msg("password for %s changed by %s", name, myname);
 
-<<<<<<< HEAD
-	//if (ENABLE_FEATURE_CLEAN_UP) free(newp);
-
-=======
 	/*if (ENABLE_FEATURE_CLEAN_UP) free(newp); - can't, it may be non-malloced */
  skip:
->>>>>>> busybox-base-1-26-2
 	if (!newp) {
 		bb_error_msg_and_die("password for %s is already %slocked",
 			name, (opt & OPT_unlock) ? "un" : "");

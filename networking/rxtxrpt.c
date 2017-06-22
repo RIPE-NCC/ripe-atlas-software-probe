@@ -4,6 +4,22 @@ rxtxrpt.c
 Report RX and TX statistics. Also report IPv6 address and the IPv6 routing
 table if it has changed.
 */
+//config:config RXTXRPT
+//config:       bool "rxtxrpt"
+//config:       default n
+//config:       help
+//config:         rxtxrpt report RX and TX statistics as well as IPv6 addresses and
+//config:         routes
+
+//applet:IF_RXTXRPT(APPLET(rxtxrpt, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_RXTXRPT) += rxtxrpt.o
+
+//usage:#define rxtxrpt_trivial_usage
+//usage:       "[-A STRING] [ipv6-info-cache]"
+//usage:#define rxtxrpt_full_usage "\n\n"
+//usage:       "Display RX and TX statistics as well as IPv6 info\n"
+//usage:       "\n     -A STRING       Use Atlas format with STRING"
 
 #include <errno.h>
 #include <stdarg.h>

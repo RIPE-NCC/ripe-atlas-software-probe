@@ -2,6 +2,20 @@
  * ooqd.c One-off queue daemon
  * Copyright (c) 2011-2014 RIPE NCC <atlas@ripe.net>
  */
+//config:config OOQD
+//config:       bool "ooqd"
+//config:       default n
+//config:       help
+//config:         Ooqd runs one-off Atlas measurements.
+
+//applet:IF_OOQD(APPLET(ooqd, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_OOQD) += ooqd.o
+
+//usage:#define ooqd_trivial_usage
+//usage:       "<queue-file>"
+//usage:#define ooqd_full_usage
+//usage:       "<queue-file>"
 
 #include <stdio.h>
 #include <string.h>

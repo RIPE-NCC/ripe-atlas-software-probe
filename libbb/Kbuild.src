@@ -13,10 +13,10 @@ INSERT
 lib-y += appletlib.o
 lib-y += ask_confirmation.o
 lib-y += atlas_bb64.o
-lib-y += atlas_probe.o
-lib-y += atlas_timesync.o
 lib-y += atlas_check_addr.o
 lib-y += atlas_name_macro.o
+lib-y += atlas_probe.o
+lib-y += atlas_timesync.o
 lib-y += bb_askpass.o
 lib-y += bb_bswap_64.o
 lib-y += bb_do_delay.o
@@ -96,6 +96,8 @@ lib-y += single_argv.o
 lib-y += skip_whitespace.o
 lib-y += speed_table.o
 lib-y += str_tolower.o
+lib-y += strlcat.o
+lib-y += strlcpy.o
 lib-y += strrstr.o
 lib-y += sysconf.o
 lib-y += time.o
@@ -120,8 +122,6 @@ lib-y += xgetcwd.o
 lib-y += xgethostbyname.o
 lib-y += xreadlink.o
 lib-y += xrealloc_vector.o
-lib-y += strlcat.o
-lib-y += strlcpy.o
 
 lib-$(CONFIG_PLATFORM_LINUX) += match_fstype.o
 

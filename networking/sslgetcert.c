@@ -1,6 +1,24 @@
 /* Simple SSL client to get server certificates 
  * Copyright (c) 2014 RIPE NCC <atlas@ripe.net>
  */
+//config:config SSLGETCERT
+//config:       bool "sslgetcert"
+//config:       default n
+//config:       help
+//config:         simple simple program to get certificates from an ssl server
+
+//applet:IF_SSLGETCERT(APPLET(sslgetcert, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_SSLGETCERT) += sslgetcert.o
+
+//usage:#define sslgetcert_trivial_usage
+//usage:       "-[46] [-A <id>] [-p <port>] <hostname>"
+//usage:#define sslgetcert_full_usage "\n\n"
+//usage:       "\nOptions:"
+//usage:       "\n     -A <id>         Atlas measurement ID"
+//usage:       "\n     -p <port>       Port (default https)"
+//usage:       "\n     -4              IPv4"
+//usage:       "\n     -6              IPv6"
 
 #include "libbb.h"
 

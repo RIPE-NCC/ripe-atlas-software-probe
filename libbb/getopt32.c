@@ -3,7 +3,6 @@
  * universal getopt32 implementation for busybox
  *
  * Copyright (C) 2003-2005  Vladimir Oleynik  <dzo@simtreas.ru>
- * Copyright (c) 2013 RIPE NCC <atlas@ripe.net>
  *
  * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
@@ -389,11 +388,8 @@ getopt32(char **argv, const char *applet_opts, ...)
 	on_off = complementary;
 	memset(on_off, 0, sizeof(complementary));
 
-<<<<<<< HEAD
-=======
 	applet_opts = strcpy(alloca(strlen(applet_opts) + 1), applet_opts);
 
->>>>>>> busybox-base-1-26-2
 	/* skip bbox extension */
 	first_char = applet_opts[0];
 	if (first_char == '!')
@@ -632,18 +628,12 @@ getopt32(char **argv, const char *applet_opts, ...)
 
 	/* check depending requires for given options */
 	for (on_off = complementary; on_off->opt_char; on_off++) {
-<<<<<<< HEAD
-		if (on_off->requires && (flags & on_off->switch_on) &&
-					(flags & on_off->requires) == 0)
-			goto error;
-=======
 		if (on_off->requires
 		 && (flags & on_off->switch_on)
 		 && (flags & on_off->requires) == 0
 		) {
 			goto error;
 		}
->>>>>>> busybox-base-1-26-2
 	}
 	if (requires && (flags & requires) == 0)
 		goto error;

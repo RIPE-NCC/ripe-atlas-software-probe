@@ -2,6 +2,19 @@
  * Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
+//config:config RPTRA6
+//config:       bool "rptra6"
+//config:       default n
+//config:       help
+//config:         Report received IPv6 router advertisements
+
+//applet:IF_RPTRA6(APPLET(rptra6, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_RPTRA6) += rptra6.o
+
+//usage:#define rptra6_trivial_usage
+//usage:#define rptra6_full_usage "\n\n"
+
 #include "libbb.h"
 
 #include <netinet/in.h>

@@ -4,6 +4,21 @@
  * dfrm.c
  * Remove the contents of directories if the amount of free space gets too low
  */
+//config:config DFRM
+//config:       bool "dfrm"
+//config:       default n
+//config:       help
+//config:         dfrm deletes files from directories when the amount of free space is
+//config:         too low
+
+//applet:IF_DFRM(APPLET(dfrm, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_DFRM) += dfrm.o
+
+//usage:#define dfrm_trivial_usage
+//usage:       "<fs> <min-size> <dir>..."
+//usage:#define dfrm_full_usage
+//usage:       "<fs> <min-size> <dir>..."
 
 #include <dirent.h>
 #include <errno.h>
@@ -16,6 +31,7 @@
 
 #define DBQ(str) "\"" #str "\""
 
+int dfrm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int dfrm_main(int argc, char *argv[])
 {
 	int i;
