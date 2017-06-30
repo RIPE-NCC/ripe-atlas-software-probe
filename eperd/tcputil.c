@@ -234,7 +234,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 static int create_bev(struct tu_env *env)
 {
-	int af, fd;
+	int af, fd, fl;
 	struct bufferevent *bev;
 
 	af= env->dns_curr->ai_addr->sa_family;
@@ -262,6 +262,20 @@ static int create_bev(struct tu_env *env)
 			close(fd);
 			return -1;
 		}
+
+		/* Set socket to nonblocking */
+                fl= fcntl(fd, F_GETFL);
+                if (fl < 0) {
+                        env->reporterr(env, TU_SOCKET_ERR, "fcntl F_GETFL");
+			close(fd);
+                        return -1;
+                }
+                if (fcntl(fd, F_SETFL, fl | O_NONBLOCK) == -1) {
+                        env->reporterr(env, TU_SOCKET_ERR, "fcntl F_SETFL");
+			close(fd);
+                        return -1;
+                }
+
 		bufferevent_setfd(bev, fd);
 	}
 	bufferevent_setcb(bev, env->readcb, env->writecb, eventcb, env);
