@@ -93,17 +93,6 @@ struct state
 	struct bufferevent *bev;
 	enum readstate readstate;
 	enum writestate writestate;
-	int http_result;
-	char res_major;
-	char res_minor;
-	int headers_size;
-	int tot_headers;
-	int chunked;
-	int tot_chunked;
-	int content_length;
-	int content_offset;
-	int subid;
-	int submax;
 	time_t gstart;
 	struct timespec start;
 	struct timespec t_connect;
@@ -112,6 +101,7 @@ struct state
 	char *post_buf;
 	char recv_major;
 	char recv_minor;
+	unsigned server_cipher;
 
 	struct buf inbuf;
 	struct msgbuf msginbuf;
@@ -1147,6 +1137,8 @@ static FILE *report_head(struct state *state)
 		(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 	fprintf(fh, ", " DBQ(rt) ": %f", resptime);
 
+	fprintf(fh, ", " DBQ(server_cipher) ": 0x%04x", state->server_cipher);
+
 	return fh;
 }
 
@@ -1211,7 +1203,7 @@ static int eat_alert(struct state *state)
 static int eat_server_hello(struct state *state)
 {
 	int r, type;
-	size_t len;
+	size_t o, len, seslen, totlen;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
 
@@ -1279,7 +1271,69 @@ static int eat_server_hello(struct state *state)
 			}
 			continue;
 		}
-		msgbuf->buffer.offset += 4+len;
+
+		totlen= 4+len;
+		o= 4;
+
+		/* ProtocolVersion */
+		if (o+2 > totlen)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello too short (ProtocolVersion)));
+			report(state);
+			return -1;
+		}
+		o += 2;
+
+		/* Random */
+		if (o+32 > totlen)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello too short (Random)));
+			report(state);
+			return -1;
+		}
+		o += 32;
+
+		/* opaque SessionID<0..32> */
+		if (o+1 > totlen)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello too short (SessionID len)));
+			report(state);
+			return -1;
+		}
+		seslen= p[o];
+		o++;
+		if (seslen > 32)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello bad SessionID len));
+			report(state);
+			return -1;
+		}
+		if (o+seslen > totlen)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello too short (SessionID)));
+			report(state);
+			return -1;
+		}
+		o += seslen;
+
+
+		/* CipherSuite */
+		if (o+2 > totlen)
+		{
+			add_str(state, DBQ(err) ":"
+				DBQ(Server Hello too short (CipherSuite)));
+			report(state);
+			return -1;
+		}
+		state->server_cipher= (p[o] << 8) | p[o+1];
+		o += 2;
+
+		msgbuf->buffer.offset += totlen;
 		break;
 	}
 	return 0;
@@ -1518,8 +1572,6 @@ static void dnscount(struct tu_env *env, int count)
 	struct state *state;
 
 	state= ENV2STATE(env);
-	state->subid= 0;
-	state->submax= count;
 }
 
 static void beforeconnect(struct tu_env *env,
@@ -1538,8 +1590,6 @@ static void beforeconnect(struct tu_env *env,
 
 	state->linelen= 0;
 	state->lineoffset= 0;
-	state->headers_size= 0;
-	state->tot_headers= 0;
 
 	/* Clear result */
 	//if (!state->do_all || !state->do_combine)
