@@ -145,6 +145,7 @@ struct trtstate
 					 * we sent. For dup detection.
 					 */
 	unsigned dnsip:1;		/* Busy with dns name resolution */
+	unsigned no_src:1;		/* Did not bind yet */
 	struct evutil_addrinfo *dns_res;
 	struct evutil_addrinfo *dns_curr;
 
@@ -421,7 +422,9 @@ static void report(struct trtstate *state)
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
 		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
-
+	}
+	if (!state->dnsip && !state->no_src)
+	{
 		namebuf[0]= '\0';
 		getnameinfo((struct sockaddr *)&state->loc_sin6,
 			state->loc_socklen,
@@ -4421,6 +4424,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	}
 
 	env->dnsip= 0;
+	env->no_src= 0;
 
 	env->dns_res= res;
 	env->dns_curr= res;
@@ -4452,7 +4456,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			snprintf(line, sizeof(line),
 			"{ " DBQ(error) ":" DBQ(address not allowed) " }");
 			add_str(env, line);
-			env->dnsip= 1;
+			env->no_src= 1;
 			report(env);
 			return;
 		}

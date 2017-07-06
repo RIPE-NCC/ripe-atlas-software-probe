@@ -114,6 +114,7 @@ struct pingstate
 	char got_reply;
 	char first;
 	char no_dst;
+	char no_src;
 	unsigned char ttl;
 	unsigned size;
 	unsigned psize;
@@ -242,7 +243,10 @@ static void report(struct pingstate *state)
 			namebuf, sizeof(namebuf), NULL, 0, NI_NUMERICHOST);
 
 		fprintf(fh, ", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
+	}
 
+	if (!state->no_dst && !state->no_src)
+	{
 		namebuf[0]= '\0';
 		getnameinfo((struct sockaddr *)&state->loc_sin6,
 			state->loc_socklen, namebuf, sizeof(namebuf),
@@ -426,6 +430,10 @@ static void ping_cb(int result, int bytes, int psize,
 			"%s{ " DBQ(error) ":" DBQ(address not allowed) " }",
 			pingstate->first ? "" : ", ");
 		add_str(pingstate, line);
+
+		pingstate->no_dst= 0;
+		pingstate->no_src= 1;
+
 		report(pingstate);
 	}
 	if (result == PING_ERR_DONE)
@@ -1407,6 +1415,7 @@ static void ping_start2(void *state)
 	pingstate->send_error= 0;
 	pingstate->got_reply= 0;
 	pingstate->no_dst= 0;
+	pingstate->no_src= 0;
 
 	if (pingstate->af == AF_INET)
 	{

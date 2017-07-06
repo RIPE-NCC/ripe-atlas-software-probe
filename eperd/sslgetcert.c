@@ -937,12 +937,6 @@ static void report(struct state *state)
 		fprintf(fh, DBQ(af) ": %d, ",
 			state->sin6.sin6_family == AF_INET6 ? 6 : 4);
 
-#if 0
-		getnameinfo((struct sockaddr *)&state->loc_sin6,
-			state->loc_socklen, hostbuf, sizeof(hostbuf), NULL, 0,
-			NI_NUMERICHOST);
-		fprintf(fh, ", " DBQ(src_addr) ":" DBQ(%s), hostbuf);
-#endif
 	}
 
 	fprintf(fh, "%s }\n", state->result);
@@ -1646,8 +1640,9 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		break;
 
 	case TU_BAD_ADDR:
+		state->socklen= env->dns_curr->ai_addrlen;
+		memcpy(&state->sin6, env->dns_curr->ai_addr, state->socklen);
 		add_str(state, DBQ(error) ": " DBQ(address not allowed));
-		state->dnserr= 1;
 		report(state);
 		break;
 

@@ -1910,6 +1910,7 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		const char *str)
 {
 	struct hgstate *state;
+	char namebuf[NI_MAXHOST];
 	char line[80];
 
 	state= ENV2STATE(env);
@@ -1954,7 +1955,16 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 
 	case TU_BAD_ADDR:
 		add_str(state, "{ " DBQ(error) ": "
-			DBQ(address not allowed) " }");
+			DBQ(address not allowed));
+
+		getnameinfo(env->dns_curr->ai_addr,
+			env->dns_curr->ai_addrlen, namebuf, sizeof(namebuf),
+			NULL, 0, NI_NUMERICHOST);
+
+		snprintf(line, sizeof(line),
+			", " DBQ(dst_addr) ":" DBQ(%s) " }", namebuf);
+		add_str(state, line);
+
 		state->dnserr= 1;
 		report(state);
 		break;

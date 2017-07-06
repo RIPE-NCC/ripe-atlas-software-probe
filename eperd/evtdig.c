@@ -955,6 +955,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				"%s \"reason\" : \"address not allowed\"",
 					qry->err.size ? ", " : "");
 				buf_add(&qry->err, line, strlen(line));
+
+				/* Trigger printing of dst_addr */
+				qry->ressent = qry->res;	
+
 				printReply (qry, 0, NULL);
 				return;
 			}
@@ -1110,6 +1114,11 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
         case TU_BAD_ADDR:
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TU_BAD_ADDR\" : true", qry->err.size ? ", " : "");
 		buf_add(&qry->err, line, strlen(line));
+
+		qry->dst_ai_family = env->dns_curr->ai_addr->sa_family;
+		getnameinfo(env->dns_curr->ai_addr, env->dns_curr->ai_addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
+
+		qry->ressent = qry->res;	/* Trigger printing of dst_addr */
                 break;
 
         default:
