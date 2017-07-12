@@ -112,6 +112,12 @@ struct ntpstate
 	time_t starttime;
 	struct timeval xmit_time;
 
+	struct timespec start_time;	/* At the moment only for
+					 * DNS resolution
+					 */
+	double ttr;			/* Time to resolve a name, in ms */
+
+
 	uint8_t ntp_flags;
 	uint8_t ntp_stratum;
 	int8_t ntp_poll;
@@ -329,10 +335,13 @@ static void format_ts(char *line, size_t size, const char *label,
 
 static void report(struct ntpstate *state)
 {
+	int r;
 	FILE *fh;
 	const char *proto;
+	struct addrinfo *ai;
 	char namebuf[NI_MAXHOST];
 	char line[80];
+	struct addrinfo hints;
 
 	event_del(&state->timer);
 
@@ -362,6 +371,21 @@ static void report(struct ntpstate *state)
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
 		state->hostname);
+
+	/* Check if hostname is numeric or had to be resolved */
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_flags= AI_NUMERICHOST;
+	r= getaddrinfo(state->hostname, NULL, &hints, &ai);
+	if (r == 0)
+	{
+		/* Getaddrinfo succeded so hostname is an address literal */
+		freeaddrinfo(ai);
+	}
+	else
+	{
+		/* Assume that name resolution was required */
+		fprintf(fh, ", " DBQ(ttr) ":%f", state->ttr);
+	}
 
 	if (!state->dnsip || state->report_dst)
 	{
@@ -1977,6 +2001,8 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	int r, count;
 	struct ntpstate *env;
 	struct evutil_addrinfo *cur;
+	double nsecs;
+	struct timespec now, elapsed;
 	char line[160];
 
 	env= ctx;
@@ -1989,6 +2015,17 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			evutil_freeaddrinfo(res);
 		return;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
+	if (now.tv_nsec < env->start_time.tv_sec)
+	{
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	}
+	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
+	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
+	env->ttr= nsecs/1e6;
 
 	if (result != 0)
 	{
@@ -2094,6 +2131,7 @@ static void ntp_start(void *state)
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
 	ntpstate->dnsip= 1;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &ntpstate->start_time);
 	(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
 		ntpstate->destportstr, &hints, dns_cb, ntpstate);
 }

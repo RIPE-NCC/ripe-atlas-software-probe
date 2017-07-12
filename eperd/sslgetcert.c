@@ -928,6 +928,9 @@ static void report(struct state *state)
 		DBQ(dst_port) ":" DBQ(%s) ", ",
 		state->hostname, state->portname);
 
+	if (!state->tu_env.host_is_literal)
+		fprintf(fh, DBQ(ttr) ":%f, ", state->tu_env.ttr);
+
 	if (!state->dnserr)
 	{
 		getnameinfo((struct sockaddr *)&state->sin6, state->socklen,
@@ -1077,6 +1080,12 @@ static FILE *report_head(struct state *state)
 	fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
 		DBQ(dst_port) ":" DBQ(%s),
 		state->hostname, state->portname);
+
+	if (!state->tu_env.host_is_literal)
+	{
+		/* Assume that name resolution was required */
+		fprintf(fh, ", " DBQ(ttr) ":%f", state->tu_env.ttr);
+	}
 
 	if (state->recv_major == 3 && state->recv_minor == 3)
 	{

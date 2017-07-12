@@ -775,6 +775,12 @@ static void report(struct hgstate *state)
 				fprintf(fh, DBQ(bundle) ":%s, ",
 					state->bundle);
 			}
+			if (!state->tu_env.host_is_literal)
+			{
+				fprintf(fh, DBQ(ttr) ":%f, ",
+					state->tu_env.ttr);
+			}
+
 		}
 		fprintf(fh, DBQ(result) ":[ ");
 	}

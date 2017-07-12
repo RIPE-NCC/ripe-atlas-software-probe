@@ -144,6 +144,10 @@ struct pingstate
 	u_int8_t rcvd_ttl;		/* TTL in (last) reply packet */
 	char dnsip;
 	char send_error;
+	struct timespec start_time;	/* At the moment only for
+					 * DNS resolution
+					 */
+	double ttr;			/* Time to resolve a name, in ms */
 
 	struct event ping_timer;       /* Timer to ping host at given
 					* intervals
@@ -204,8 +208,11 @@ static void add_str(struct pingstate *state, const char *str)
 
 static void report(struct pingstate *state)
 {
+	int r;
 	FILE *fh;
+	struct addrinfo *ai;
 	char namebuf[NI_MAXHOST];
+	struct addrinfo hints;
 
 	if (state->out_filename)
 	{
@@ -232,6 +239,21 @@ static void report(struct pingstate *state)
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
 		state->hostname);
+
+	/* Check if hostname is numeric or had to be resolved */
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_flags= AI_NUMERICHOST;
+	r= getaddrinfo(state->hostname, NULL, &hints, &ai);
+	if (r == 0)
+	{
+		/* Getaddrinfo succeded so hostname is an address literal */
+		freeaddrinfo(ai);
+	}
+	else
+	{
+		/* Assume that name resolution was required */
+		fprintf(fh, ", " DBQ(ttr) ":%f", state->ttr);
+	}
 
 	fprintf(fh, ", " DBQ(af) ":%d",
 		state->af == AF_INET ? 4 : 6);
@@ -1540,6 +1562,8 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	int r, count;
 	struct pingstate *env;
 	struct evutil_addrinfo *cur;
+	struct timespec now, elapsed;
+	double nsecs;
 
 	env= ctx;
 
@@ -1551,6 +1575,17 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			evutil_freeaddrinfo(res);
 		return;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
+	if (now.tv_nsec < env->start_time.tv_sec)
+	{
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	}
+	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
+	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
+	env->ttr= nsecs/1e6;
 
 	env->dnsip= 0;
 
@@ -1667,6 +1702,7 @@ static void ping_start(void *state)
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= pingstate->af;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &pingstate->start_time);
 	(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
 		&hints, dns_cb, pingstate);
 }

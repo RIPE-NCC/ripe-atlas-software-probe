@@ -152,6 +152,11 @@ struct trtstate
 	time_t starttime;
 	struct timespec xmit_time;
 
+	struct timespec start_time;	/* At the moment only for
+					 * DNS resolution
+					 */
+	double ttr;			/* Time to resolve a name, in ms */
+
 	struct event timer;
 
 	unsigned long min;
@@ -381,9 +386,12 @@ static void add_str(struct trtstate *state, const char *str)
 
 static void report(struct trtstate *state)
 {
+	int r;
 	FILE *fh;
 	const char *proto;
+	struct addrinfo *ai;
 	char namebuf[NI_MAXHOST];
+	struct addrinfo hints;
 
 	event_del(&state->timer);
 
@@ -415,6 +423,21 @@ static void report(struct trtstate *state)
 
 	fprintf(fh, DBQ(dst_name) ":" DBQ(%s),
 		state->hostname);
+
+	/* Check if hostname is numeric or had to be resolved */
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_flags= AI_NUMERICHOST;
+	r= getaddrinfo(state->hostname, NULL, &hints, &ai);
+	if (r == 0)
+	{
+		/* Getaddrinfo succeded so hostname is an address literal */
+		freeaddrinfo(ai);
+	}
+	else
+	{
+		/* Assume that name resolution was required */
+		fprintf(fh, ", " DBQ(ttr) ":%f", state->ttr);
+	}
 
 	if (!state->dnsip)
 	{
@@ -4393,6 +4416,8 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	int r, count;
 	struct trtstate *env;
 	struct evutil_addrinfo *cur;
+	double nsecs;
+	struct timespec now, elapsed;
 	char line[160];
 
 	env= ctx;
@@ -4405,6 +4430,17 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			evutil_freeaddrinfo(res);
 		return;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
+	if (now.tv_nsec < env->start_time.tv_sec)
+	{
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	}
+	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
+	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
+	env->ttr= nsecs/1e6;
 
 	if (result != 0)
 	{
@@ -4515,6 +4551,7 @@ static void traceroute_start(void *state)
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
 	trtstate->dnsip= 1;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &trtstate->start_time);
 	(void) evdns_getaddrinfo(DnsBase, trtstate->hostname,
 		trtstate->destportstr, &hints, dns_cb, trtstate);
 }

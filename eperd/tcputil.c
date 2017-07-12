@@ -30,6 +30,10 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	void (*readcb)(struct bufferevent *bev, void *ptr),
 	void (*writecb)(struct bufferevent *bev, void *ptr))
 {
+	int r;
+	struct addrinfo *ai;
+	struct addrinfo loc_hints;
+
 	env->interval= *interval;
 	env->infname= infname;
 	env->reporterr= reporterr;
@@ -44,8 +48,21 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	evtimer_assign(&env->timer, EventBase,
 		timeout_callback, env);
 
+	/* Check if hostname is numeric or had to be resolved */
+	env->host_is_literal= 0;
+	memset(&loc_hints, '\0', sizeof(loc_hints));
+	loc_hints.ai_flags= AI_NUMERICHOST;
+	r= getaddrinfo(host, NULL, &loc_hints, &ai);
+	if (r == 0)
+	{
+		/* Getaddrinfo succeded so hostname is an address literal */
+		freeaddrinfo(ai);
+		env->host_is_literal= 1;
+	}
+
 	env->dnsip= 1;
 	env->connecting= 0;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &env->start_time);
 	(void) evdns_getaddrinfo(DnsBase, host, port, hints, dns_cb, env);
 }
 
@@ -141,6 +158,8 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	struct tu_env *env;
 	struct bufferevent *bev;
 	struct evutil_addrinfo *cur;
+	double nsecs;
+	struct timespec now, elapsed;
 
 	env= ctx;
 
@@ -152,6 +171,17 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			evutil_freeaddrinfo(res);
 		return;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
+	if (now.tv_nsec < env->start_time.tv_sec)
+	{
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	}
+	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
+	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
+	env->ttr= nsecs/1e6;
 
 	env->dnsip= 0;
 

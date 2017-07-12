@@ -12,12 +12,15 @@ struct tu_env
 {
 	char dnsip;
 	char connecting;
+	char host_is_literal;
 	struct evutil_addrinfo *dns_res;
 	struct evutil_addrinfo *dns_curr;
 	struct bufferevent *bev;
 	struct timeval interval;
 	char *infname;
 	struct event timer;
+	struct timespec start_time;	/* name resolution */
+	double ttr;
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *str);
 	void (*reportcount)(struct tu_env *env, int count);
