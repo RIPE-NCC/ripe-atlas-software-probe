@@ -1140,7 +1140,7 @@ static FILE *report_head(struct state *state)
 		(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 	fprintf(fh, ", " DBQ(rt) ": %f", resptime);
 
-	fprintf(fh, ", " DBQ(server_cipher) ": 0x%04x", state->server_cipher);
+	fprintf(fh, ", " DBQ(server_cipher) ": " DBQ(0x%04x), state->server_cipher);
 
 	return fh;
 }
