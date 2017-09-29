@@ -409,6 +409,8 @@ int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
 
 	execv(WIFIMSM_PATH, argv);
 	report_err("wifimsm_main: execv '%s' failed", WIFIMSM_PATH);
-	return 1;
+
+	/* Child, so we need to exit */
+	_exit(1);
 #endif
 }
