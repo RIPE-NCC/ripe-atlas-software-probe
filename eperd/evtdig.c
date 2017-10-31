@@ -312,6 +312,7 @@ struct query_state {
 	int opt_edns0;
 	int opt_dnssec;
 	int opt_nsid;
+	int opt_client_subnet;
 	int opt_qbuf;
 	int opt_abuf;
 	int opt_resolv_conf;
@@ -440,6 +441,17 @@ struct EDNS_NSID
 	u_int16_t olength; 	// length of option data
 };
 
+// Client Subnet option (RFC 7871)
+struct EDNS_CLIENT_SUBNET
+{
+	u_int16_t otype;
+	u_int16_t olength;
+	u_int16_t cs_family;
+	u_int8_t cs_src_prefix_len;
+	u_int8_t cs_scope_prefix_len;
+	// u_int8_t[] cs_address;
+};
+
 
 //Constant sized fields of query structure
 struct QUESTION
@@ -518,6 +530,7 @@ static struct option longopts[]=
 	// flags
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
+	{ "client-subnet", no_argument, NULL, 'c' },
 	{ "do", no_argument, NULL, 'd' },
 	{ "cd", no_argument, NULL, O_CD},
 
@@ -730,6 +743,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	struct QUESTION *qinfo = NULL;
 	struct EDNS0_HEADER *e;
 	struct EDNS_NSID *n;
+	struct EDNS_CLIENT_SUBNET *cs;
+	uint16_t rdlen;
 	int r, qnamelen;
 	struct buf pbuf;
 	char *lookup_prepend;
@@ -777,7 +792,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		sizeof(struct DNS_HEADER) +
 		qnamelen + sizeof(struct QUESTION) +
 		1 /* dummy dns name */ + sizeof(struct EDNS0_HEADER) +
-		sizeof(struct EDNS_NSID))
+		sizeof(struct EDNS_NSID) +
+		sizeof(struct EDNS_CLIENT_SUBNET))
 	{
 		crondlog(DIE9 "mk_dns_buff: packet size too small, got %d",
 			packetlen);
@@ -814,7 +830,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 
 	qry->pktsize  = (sizeof(struct DNS_HEADER) + qnamelen +
 		sizeof(struct QUESTION)) ;
-	if(qry->opt_nsid || qry->opt_dnssec || (qry->opt_edns0 > 512)) { 
+	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_dnssec ||
+		(qry->opt_edns0 > 512)) { 
 		p= &packet[qry->pktsize];
 		*p= 0;	/* encoding of '.' */
 		qry->pktsize++;
@@ -846,10 +863,26 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 
 		if(qry->opt_nsid ) {
 			n=(struct EDNS_NSID*)&packet[ qry->pktsize ];
-			e->_edns_rdlen =  htons(sizeof(struct EDNS_NSID));
+			rdlen= ntohs(e->_edns_rdlen);
+			e->_edns_rdlen =
+				htons(rdlen + sizeof(struct EDNS_NSID));
 			n->otype = htons(3); 
 			n->olength =  htons(0);
 			qry->pktsize  += sizeof(struct EDNS_NSID);
+		}
+		if (qry->opt_client_subnet)
+		{
+			cs=(struct EDNS_CLIENT_SUBNET*)&packet[ qry->pktsize ];
+			rdlen= ntohs(e->_edns_rdlen);
+			e->_edns_rdlen =
+				htons(rdlen + sizeof(struct EDNS_NSID));
+			cs->otype = htons(8); 
+			cs->olength = htons(sizeof(struct EDNS_CLIENT_SUBNET) -
+				offsetof(struct EDNS_CLIENT_SUBNET, cs_family));
+			cs->cs_family= htons(qry->opt_AF == AF_INET ? 1 : 2);
+			cs->cs_src_prefix_len= htons(0);
+			cs->cs_scope_prefix_len= htons(0);
+			qry->pktsize  += sizeof(struct EDNS_CLIENT_SUBNET);
 		}
 
 		/* Transmit the request over the network */
@@ -897,6 +930,12 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	//AA delete qry->outbuff = outbuff;
 	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
+
+	/* Assume that we are limited to one AF. mk_dns_buff needs to know
+	 * for the client subnet option.
+	 */
+	qry->opt_AF = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
+
 	r= mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
 	if (r == -1)
 	{
@@ -1573,6 +1612,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_edns0 = 512; 
 	qry->opt_dnssec = 0;
 	qry->opt_nsid = 0; 
+	qry->opt_client_subnet = 0; 
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
@@ -1657,6 +1697,10 @@ static void *tdig_init(int argc, char *argv[],
 					strdup ("version.bind.");
 				break;
 		
+			case 'c':
+				qry->opt_client_subnet = 1;
+				break;
+
 			case 'd':
 				qry->opt_dnssec = 1;
 				break;
