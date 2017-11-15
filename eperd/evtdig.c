@@ -11,6 +11,13 @@
 //config:          tiny dig event driven version. support only limited queries id.sever
 //config:          txt chaos.  RIPE NCC 2011
 
+//config:config FEATURE_EVTDIG_TLS
+//config:       bool "Enable DNS over TLS."
+//config:       default n
+//config:       depends on EVTDIG
+//config:       help
+//config:        Enable DNS over TLS. 2016 IETF Dprive draft
+
 //config:config FEATURE_EVTDIG_DEBUG
 //config:       bool "Enable debug support in evtdig"
 //config:       default n

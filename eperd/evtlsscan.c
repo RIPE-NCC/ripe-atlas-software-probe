@@ -3,6 +3,27 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
 
+//config:config EVTLSGETCERT
+//config:       bool "evtlsgetcert"
+//config:       default n
+//config:       help
+//config:               standalone version of event-driven TLS getcert
+
+//config:config EVTLSSCAN
+//config:       bool "evtlsscan"
+//config:       default n
+//config:       help
+//config:               Scan TLS server with various TLS paramenters and summarize them.
+
+//applet:IF_EVTLSSCAN(APPLET(evtlsscan, BB_DIR_BIN, BB_SUID_DROP))
+
+//kbuild:lib-$(CONFIG_EVTLSSCAN) += evtlsscan.o
+
+//usage:#define evtlsscan_trivial_usage
+//usage:       "todo"
+//usage:#define evtlsscan_full_usage "\n\n"
+//usage:     "todo"
+
 #include "json-macros.h"
 #include "libbb.h"
 #include "atlas_bb64.h"
