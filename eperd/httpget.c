@@ -102,6 +102,7 @@ struct hgstate
 	struct tu_env tu_env;
 	char dnserr;
 	char connecting;
+	char in_writecb;
 	char *host;
 	char *port;
 	char *hostport;
@@ -1736,6 +1737,10 @@ static void writecb(struct bufferevent *bev, void *ptr)
 
 	state= ENV2STATE(ptr);
 
+	if (state->in_writecb)
+		return;	/* Recursive call */
+	state->in_writecb= 1;
+
 	for(;;)
 	{
 		switch(state->writestate)
@@ -1797,7 +1802,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 				state->writestate = WRITE_POST_HEADER;
 			else
 				state->writestate = WRITE_DONE;
-			return;
+			goto out;
 		case WRITE_POST_HEADER:
 			if (!state->post_header)
 			{
@@ -1806,7 +1811,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			}
 			r= post_file(state, state->post_header);
 			if (r != 1)
-				return;
+				goto out;
 
 			/* Done */
 			state->writestate= WRITE_POST_FILE;
@@ -1820,7 +1825,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			}
 			r= post_file(state, state->post_file);
 			if (r != 1)
-				return;
+				goto out;
 
 			/* Done */
 			state->writestate= WRITE_POST_FOOTER;
@@ -1833,20 +1838,22 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			}
 			r= post_file(state, state->post_footer);
 			if (r != 1)
-				return;
+				goto out;
 
 			/* Done */
 			state->writestate= WRITE_DONE;
 			continue;
 		case WRITE_DONE:
-			return;
+			goto out;
 		default:
 			printf("writecb: unknown write state: %d\n",
 				state->writestate);
-			return;
+			goto out;
 		}
 	}
 
+out:
+	state->in_writecb= 0;
 }
 
 static void err_reading(struct hgstate *state)
@@ -1911,6 +1918,7 @@ static void beforeconnect(struct tu_env *env,
 	memcpy(&state->sin6, addr, state->socklen);
 
 	state->connecting= 1;
+	state->in_writecb= 0;
 	state->readstate= READ_FIRST;
 	state->writestate= WRITE_FIRST;
 
