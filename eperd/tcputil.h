@@ -14,8 +14,6 @@ enum tu_err { TU_DNS_ERR, TU_READ_ERR, TU_SOCKET_ERR, TU_CONNECT_ERR,
 	TU_OUT_OF_ADDRS, TU_BAD_ADDR, TU_SSL_CTX_INIT_ERR, TU_SSL_OBJ_INIT_ERR,
 	TU_SSL_INIT_ERR };
 
-enum tu_ops {TU_DONOT_TLS, TU_DO_TLS};
-
 struct tu_env
 {
 	char dnsip;

@@ -195,7 +195,7 @@ static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	*portp= NULL;
 	*hostportp= NULL;
 	*pathp= NULL;
-	*do_tls = TU_DONOT_TLS;
+	*do_tls = 0;
 
 	/* the url must start with 'http://' */
 	prefix= "http://";
@@ -206,13 +206,13 @@ static int parse_url(char *url, char **hostp, char **portp, char **hostportp,
 	len= strlen(prefix);
 	if (strncasecmp(prefix, url, len) == 0) 
 	{
-		*do_tls = TU_DONOT_TLS;
+		*do_tls = 0;
 	}
 #if ENABLE_FEATURE_EVHTTPGET_HTTPS	
 	else if (strncasecmp(prefixs, url, lens) == 0)
 	{
 		len = lens;
-		*do_tls = TU_DO_TLS;
+		*do_tls = 1;
 	}
 #endif
 	else
@@ -424,7 +424,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	do_get= 1;
 	do_head= 0;
 	do_post= 0;
-	do_tls = TU_DONOT_TLS;
+	do_tls = 0;
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;

@@ -1593,7 +1593,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->result.buf = NULL;
 	qry->opt_query_arg = 0;
 	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
-	qry->opt_do_tls = TU_DONOT_TLS;
+	qry->opt_do_tls = 0;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -1718,7 +1718,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 
 #if ENABLE_FEATURE_EVTDIG_TLS
 			case O_TLS:
-				qry->opt_do_tls = TU_DO_TLS;
+				qry->opt_do_tls = 1;
 				break;
 #endif
 
