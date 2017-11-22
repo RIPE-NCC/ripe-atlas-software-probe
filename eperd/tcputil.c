@@ -12,13 +12,8 @@
 
 #include "tcputil.h"
 
-/* struct common for all quries */
-struct ssl_base {
-	        struct event_base *event_base;
-};
-static struct ssl_base *ssl_base = NULL;
+static int ssl_initialized= 0;
 
-static void ssl_base_new(struct event_base *event_base);
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
 static int create_bev(struct tu_env *env);
 static void eventcb(struct bufferevent *bev, short events, void *ptr);
@@ -279,8 +274,8 @@ static int create_bev(struct tu_env *env)
 #if ENABLE_FEATURE_EVHTTPGET_HTTPS
 	if(env->do_tls)
 	{
-		if (ssl_base == NULL) {
-			ssl_base_new(EventBase);
+		if (!ssl_initialized) {
+			ssl_initialized= 1;
 			RAND_poll();
 			SSL_library_init(); /* call only once this is not reentrant. */
 			ERR_load_crypto_strings();
@@ -394,8 +389,3 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 		printf("events = 0x%x\n", events);
 }
 
-/* called only once. Initialize ssl_base variables here */
-static void ssl_base_new(struct event_base *event_base)
-{
-	        ssl_base = xzalloc(sizeof( struct ssl_base));
-}
