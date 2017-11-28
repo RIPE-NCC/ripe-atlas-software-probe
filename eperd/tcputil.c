@@ -6,6 +6,7 @@
 
 #include "libbb.h"
 #include "eperd.h"
+#include <assert.h>
 #include <event2/bufferevent.h>
 #include <event2/dns.h>
 #include <event2/event.h>
@@ -145,6 +146,11 @@ void tu_cleanup(struct tu_env *env)
 		env->dns_res= NULL;
 		env->dns_curr= NULL;
 	}
+	if (env->tls_ctx)
+	{
+		SSL_CTX_free(env->tls_ctx);
+		env->tls_ctx= NULL;
+	}
 	if (env->bev)
 	{
 		bufferevent_free(env->bev);
@@ -268,9 +274,12 @@ static int create_bev(struct tu_env *env)
 {
 	int af, fd, fl;
 	struct bufferevent *bev;
+	SSL *tls;
 
 	af= env->dns_curr->ai_addr->sa_family;
 
+	/* Consistency check. These fields need to be clear */
+	assert(!env->tls_ctx);
 #if ENABLE_FEATURE_EVHTTPGET_HTTPS
 	if(env->do_tls)
 	{
@@ -289,12 +298,12 @@ static int create_bev(struct tu_env *env)
 				"SSL_CTX_new call failed");
 				return -1;
 		}
-		if ((env->tls = SSL_new(env->tls_ctx)) == NULL) {
+		if ((tls = SSL_new(env->tls_ctx)) == NULL) {
 			env->reporterr(env, TU_SSL_OBJ_INIT_ERR,
 				"SSL_new call failed");
 				return -1;
 		}
-		bev = bufferevent_openssl_socket_new(EventBase, -1, env->tls,
+		bev = bufferevent_openssl_socket_new(EventBase, -1, tls,
 				BUFFEREVENT_SSL_CONNECTING,
 				BEV_OPT_CLOSE_ON_FREE);
 		if (bev == NULL) 

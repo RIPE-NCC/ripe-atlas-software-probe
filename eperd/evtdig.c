@@ -2530,6 +2530,11 @@ static int tdig_delete(void *state)
 		free(qry->infname);
 		qry->infname = NULL;
 	}
+	if (qry->port_as_char)
+	{
+		free(qry->port_as_char);
+		qry->port_as_char = NULL;
+	}
 
 	/* Delete timers */
 	evtimer_del(&qry->noreply_timer);

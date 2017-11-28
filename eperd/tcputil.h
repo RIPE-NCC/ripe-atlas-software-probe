@@ -26,7 +26,6 @@ struct tu_env
 	char *infname;
 	char do_tls;
 	SSL_CTX *tls_ctx;
-	SSL *tls;
 	struct event timer;
 	struct timespec start_time;	/* name resolution */
 	double ttr;
