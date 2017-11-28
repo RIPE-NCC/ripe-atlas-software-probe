@@ -23,11 +23,12 @@
 #include <string.h>
 #include <net/route.h>
 #include <net/if.h>
-//#include <inet_common.h>
 #include "../eperd/eperd.h"
 #include "../eperd/readresolv.h"
 
 #include "libbb.h"
+
+#include <inet_common.h>
 
 #define IPV4_ROUTE_FILE	"/proc/net/route"
 #define IF_INET6_FILE	"/proc/net/if_inet6"
