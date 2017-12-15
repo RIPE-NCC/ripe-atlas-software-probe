@@ -52,6 +52,7 @@ extern struct testops ntp_ops;
 extern struct testops ping_ops;
 extern struct testops sslgetcert_ops;
 extern struct testops tdig_ops;
+extern struct testops tlsscan_ops;
 extern struct testops traceroute_ops;
 
 void crondlog(const char *ctl, ...);

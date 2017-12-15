@@ -465,7 +465,7 @@ static int setup_ipv6_rpt(FILE *of)
 		if (!(iflags & RTF_UP)) { /* Skip interfaces that are down. */
 			continue;
 		}
-		if ((iflags & RTF_ADDRCONF) && (iflags & RTF_CACHE)) { /* Skip interfaces that are down. */
+		if ((iflags & RTF_ADDRCONF) && (iflags & RTF_CACHE)) { /* Skip cache entry */
 			continue;
 		}
 

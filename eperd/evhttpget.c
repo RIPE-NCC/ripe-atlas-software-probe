@@ -9,6 +9,13 @@
 //config:       help
 //config:               standalone version of event-driven httpget
 
+//config:config FEATURE_EVHTTPGET_HTTPS
+//config:       bool "Enable https support"
+//config:       default n
+//config:       depends on EVHTTPGET
+//config:       help
+//config:        Enable https:// support for httpget
+
 //applet:IF_EVHTTPGET(APPLET(evhttpget, BB_DIR_BIN, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVHTTPGET) += evhttpget.o

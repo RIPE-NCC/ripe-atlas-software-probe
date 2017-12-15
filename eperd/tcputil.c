@@ -6,17 +6,20 @@
 
 #include "libbb.h"
 #include "eperd.h"
+#include <assert.h>
 #include <event2/bufferevent.h>
 #include <event2/dns.h>
 #include <event2/event.h>
 
 #include "tcputil.h"
 
+static int ssl_initialized= 0;
+
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
 static int create_bev(struct tu_env *env);
 static void eventcb(struct bufferevent *bev, short events, void *ptr);
 
-void tu_connect_to_name(struct tu_env *env, char *host, char *port,
+void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	struct timeval *interval,
 	struct evutil_addrinfo *hints,
 	char *infname,
@@ -44,6 +47,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, char *port,
 	env->writecb= writecb;
 	env->dns_res= NULL;
 	env->bev= NULL;
+	env->do_tls = do_tls;
 
 	evtimer_assign(&env->timer, EventBase,
 		timeout_callback, env);
@@ -105,7 +109,6 @@ void tu_restart_connect(struct tu_env *env)
 			return;
 		}
 		bev= env->bev;
-
 		if (bufferevent_socket_connect(bev,
 			env->dns_curr->ai_addr,
 			env->dns_curr->ai_addrlen) == 0)
@@ -142,6 +145,11 @@ void tu_cleanup(struct tu_env *env)
 		evutil_freeaddrinfo(env->dns_res);
 		env->dns_res= NULL;
 		env->dns_curr= NULL;
+	}
+	if (env->tls_ctx)
+	{
+		SSL_CTX_free(env->tls_ctx);
+		env->tls_ctx= NULL;
 	}
 	if (env->bev)
 	{
@@ -266,12 +274,51 @@ static int create_bev(struct tu_env *env)
 {
 	int af, fd, fl;
 	struct bufferevent *bev;
+	SSL *tls;
 
 	af= env->dns_curr->ai_addr->sa_family;
 
-	bev= bufferevent_socket_new(EventBase, -1,
-		BEV_OPT_CLOSE_ON_FREE);
-	if (!bev)
+	/* Consistency check. These fields need to be clear */
+	assert(!env->tls_ctx);
+#if ENABLE_FEATURE_EVHTTPGET_HTTPS
+	if(env->do_tls)
+	{
+		if (!ssl_initialized) {
+			ssl_initialized= 1;
+			RAND_poll();
+			SSL_library_init(); /* call only once this is not reentrant. */
+			ERR_load_crypto_strings();
+			SSL_load_error_strings();
+			OpenSSL_add_all_algorithms();
+		}
+		/* fancy ssl options yet. just what is default in lib */
+		if ((env->tls_ctx = SSL_CTX_new(SSLv23_client_method())) == NULL)
+		{
+			env->reporterr(env, TU_SSL_CTX_INIT_ERR,
+				"SSL_CTX_new call failed");
+				return -1;
+		}
+		if ((tls = SSL_new(env->tls_ctx)) == NULL) {
+			env->reporterr(env, TU_SSL_OBJ_INIT_ERR,
+				"SSL_new call failed");
+				return -1;
+		}
+		bev = bufferevent_openssl_socket_new(EventBase, -1, tls,
+				BUFFEREVENT_SSL_CONNECTING,
+				BEV_OPT_CLOSE_ON_FREE);
+		if (bev == NULL) 
+		{
+			env->reporterr(env, TU_SSL_INIT_ERR,
+				"bufferevent_openssl_socket_new call failed");
+				return -1;
+		}
+	} 
+	else if 
+#else 
+	if
+#endif
+		((bev= bufferevent_socket_new(EventBase, -1,
+			BEV_OPT_CLOSE_ON_FREE)) == NULL)
 	{
 		crondlog(DIE9 "bufferevent_socket_new failed");
 	}

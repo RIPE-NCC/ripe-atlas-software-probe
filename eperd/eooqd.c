@@ -84,6 +84,9 @@ static struct builtin
 #if ENABLE_EVSSLGETCERT
 	{ "evsslgetcert", &sslgetcert_ops },
 #endif
+#if ENABLE_EVTLSSCAN
+	{ "evtlsscan", &tlsscan_ops },
+#endif
 	{ "evtraceroute", &traceroute_ops },
 	{ NULL, NULL }
 };

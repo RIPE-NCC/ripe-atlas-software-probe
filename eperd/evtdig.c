@@ -11,6 +11,13 @@
 //config:          tiny dig event driven version. support only limited queries id.sever
 //config:          txt chaos.  RIPE NCC 2011
 
+//config:config FEATURE_EVTDIG_TLS
+//config:       bool "Enable DNS over TLS."
+//config:       default n
+//config:       depends on EVTDIG
+//config:       help
+//config:        Enable DNS over TLS. 2016 IETF Dprive draft
+
 //config:config FEATURE_EVTDIG_DEBUG
 //config:       bool "Enable debug support in evtdig"
 //config:       default n
@@ -86,6 +93,10 @@
 #define O_QUERY 1009
 #define O_OUTPUT_COBINED 1101
 #define O_CD 1010
+
+#if ENABLE_FEATURE_EVTDIG_TLS
+#define O_TLS 1012
+#endif
 
 #define DNS_FLAG_RD 0x0100
 
@@ -314,6 +325,7 @@ struct query_state {
 	unsigned opt_timeout;
 	int retry;
 	int resolv_i;
+	bool opt_do_tls;
 
 	char * str_Atlas; 
 	char * str_bundle; 
@@ -322,8 +334,9 @@ struct query_state {
 
 	char *macro_lookupname;
 	char *lookupname;
-	char * server_name;
-	char *out_filename ;
+	char *server_name;
+	char *out_filename;
+	char *port_as_char;
 
 	/* Contents of resolv.conf during a measurement */
 	int resolv_max;
@@ -507,6 +520,11 @@ static struct option longopts[]=
 	{ "nsid", no_argument, NULL, 'n' },
 	{ "do", no_argument, NULL, 'd' },
 	{ "cd", no_argument, NULL, O_CD},
+
+#if ENABLE_FEATURE_EVTDIG_TLS
+	{ "tls", no_argument, NULL, O_TLS},
+#endif
+	{ "port", required_argument, NULL, 'p'},
  	
 	{ "retry",  required_argument, NULL, O_RETRY },
 	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
@@ -561,19 +579,19 @@ int evtdig_main(int argc, char **argv)
 	EventBase=event_base_new();
 	if (!EventBase)
 	{
-		crondlog(LVL9 "event_base_new failed"); /* exits */
+		crondlog(LVL9 "ERROR: critical event_base_new failed"); /* exits */
 	}
 
 	qry = tdig_init(argc, argv, local_exit);
 	if(!qry) {
-		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+		crondlog(DIE9 "ERROR: critical tdig_init failed"); /* exits */
 		event_base_free	(EventBase);
 		return 1;
 	}
 
 	DnsBase = evdns_base_new(EventBase, 1);
 	if (!DnsBase) {
-		crondlog(DIE9 "evdns_base_new failed"); /* exits */
+		crondlog(DIE9 "ERROR: critical evdns_base_new failed"); /* exits */
 		event_base_free	(EventBase);
 		return 1;
 	}
@@ -1083,7 +1101,6 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
         switch(cause)
         {
         case TU_DNS_ERR:
-
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TUDNS\" : \"%s\"", qry->err.size ? ", " : "", str );
 		buf_add(&qry->err, line, strlen(line));
                 break;
@@ -1484,12 +1501,31 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 		}
 	}
 
-
-
 	if(qry->opt_v6_only  == 0)
 	{
 		qry->opt_v4_only = 1;
 		qry->opt_AF = AF_INET;
+	}
+
+#if ENABLE_FEATURE_EVTDIG_TLS
+	if (qry->opt_do_tls)
+	{
+		qry->opt_proto = 6; /* switch to TCP for TLS */
+	}
+#endif
+
+	if (qry->port_as_char == NULL) 
+	{
+#if ENABLE_FEATURE_EVTDIG_TLS
+	      if (qry->opt_do_tls)
+	      {
+		qry->port_as_char = strdup("853");
+	      } 
+	      else 
+#endif
+	      {
+		qry->port_as_char = strdup("53");
+	      }
 	}
 	return FALSE;
 }
@@ -1549,6 +1585,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->opt_resolv_conf = 0;
 	qry->macro_lookupname = NULL;
 	qry->lookupname = NULL;
+	qry->port_as_char = NULL;
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
@@ -1556,6 +1593,7 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 	qry->result.buf = NULL;
 	qry->opt_query_arg = 0;
 	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
+	qry->opt_do_tls = 0;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -1638,6 +1676,10 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 				qry->opt_nsid = 1;
 				break;
 
+			case 'p':
+				qry->port_as_char = strdup(optarg);
+				break;
+
 			case 'O':
 				qry->out_filename = strdup(optarg);
 				break;
@@ -1672,6 +1714,13 @@ static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
 			case 1002:
 				qry->opt_abuf = 0;
 				break;
+
+
+#if ENABLE_FEATURE_EVTDIG_TLS
+			case O_TLS:
+				qry->opt_do_tls = 1;
+				break;
+#endif
 
 			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
@@ -2053,7 +2102,6 @@ void tdig_start (void *arg)
 	struct query_state *qry;
 	struct addrinfo hints, *res;
 	char port[] = "domain";
-	char port_as_char[] = "53";  
 
 	qry= arg;
 
@@ -2140,7 +2188,7 @@ void tdig_start (void *arg)
 	if(qry->opt_proto == 17) {  //UDP 
 		if(qry->opt_evdns ) {
 			// use EVDNS asynchronous call 
-			evdns_getaddrinfo(DnsBase, qry->server_name, port_as_char , &hints, udp_dns_cb, qry);
+			evdns_getaddrinfo(DnsBase, qry->server_name, qry->port_as_char, &hints, udp_dns_cb, qry);
 		}
 		else {
 			// using getaddrinfo; blocking call
@@ -2193,7 +2241,7 @@ void tdig_start (void *arg)
 		else
 		{
 			tu_connect_to_name (&qry->tu_env,   qry->server_name,
-					port_as_char,
+					qry->opt_do_tls, qry->port_as_char,
 					&interval, &hints, qry->infname,
 					tcp_timeout_callback, tcp_reporterr,
 					tcp_dnscount, tcp_beforeconnect,
@@ -2482,6 +2530,11 @@ static int tdig_delete(void *state)
 		free(qry->infname);
 		qry->infname = NULL;
 	}
+	if (qry->port_as_char)
+	{
+		free(qry->port_as_char);
+		qry->port_as_char = NULL;
+	}
 
 	/* Delete timers */
 	evtimer_del(&qry->noreply_timer);
@@ -2492,7 +2545,7 @@ static int tdig_delete(void *state)
 		crondlog(LVL7 "deleted last query qry %s", qry->str_Atlas);
 	}
 	else {
-#if  ENABLE_FEATURE_EVTDIG_DEBUG
+#if ENABLE_FEATURE_EVTDIG_DEBUG
 		crondlog(LVL7 "deleted qry %s qry->prev %s qry->next %s qry_head %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas, qry->base->qry_head->str_Atlas);
 		crondlog(LVL7 "old qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,  qry->prev->next->str_Atlas);
 #endif
@@ -2503,7 +2556,7 @@ static int tdig_delete(void *state)
 		if(qry->base && qry->base->qry_head == qry) 
 			qry->base->qry_head = qry->next;
 
-#if  ENABLE_FEATURE_EVTDIG_DEBUG
+#if ENABLE_FEATURE_EVTDIG_DEBUG
 		crondlog(LVL7 "new qry->next->prev %s qry->prev->next  %s", qry->next->prev->str_Atlas,    qry->prev->next->str_Atlas);
 #endif
 	}
@@ -2659,6 +2712,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			JS(name,  qry->server_name);
 		}
 		JS(dst_addr, addrstr);
+		JS(dst_port, qry->port_as_char);
 		JD(af, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
 	}
 	else if(qry->dst_ai_family && qry->server_name)
@@ -2667,6 +2721,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			JS(dst_name,  qry->server_name);
 		}
 		JS(dst_addr , qry->dst_addr_str);
+		JS(dst_port, qry->port_as_char);
 		JD(af, qry->dst_ai_family == PF_INET6 ? 6 : 4);
 	}
 	else if(qry->server_name) {

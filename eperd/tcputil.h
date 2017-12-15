@@ -5,9 +5,15 @@
  */
 
 #include <event2/event_struct.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <event2/bufferevent_ssl.h>
 
 enum tu_err { TU_DNS_ERR, TU_READ_ERR, TU_SOCKET_ERR, TU_CONNECT_ERR,
-	TU_OUT_OF_ADDRS, TU_BAD_ADDR };
+	TU_OUT_OF_ADDRS, TU_BAD_ADDR, TU_SSL_CTX_INIT_ERR, TU_SSL_OBJ_INIT_ERR,
+	TU_SSL_INIT_ERR };
+
 struct tu_env
 {
 	char dnsip;
@@ -18,6 +24,8 @@ struct tu_env
 	struct bufferevent *bev;
 	struct timeval interval;
 	char *infname;
+	char do_tls;
+	SSL_CTX *tls_ctx;
 	struct event timer;
 	struct timespec start_time;	/* name resolution */
 	double ttr;
@@ -31,7 +39,7 @@ struct tu_env
 	void (*writecb)(struct bufferevent *bev, void *env);
 };
 
-void tu_connect_to_name(struct tu_env *env, char *host, char *port,
+void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	struct timeval *timeout,
 	struct evutil_addrinfo *hints,
 	char *infname,
