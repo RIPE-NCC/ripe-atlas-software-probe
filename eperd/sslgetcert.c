@@ -490,6 +490,19 @@ static void hsbuf_add_u16(struct hsbuf *hsbuf, unsigned u16)
 	buf_add(&hsbuf->buffer, &c, 1);
 }
 
+static size_t hsbuf_len(struct hsbuf *hsbuf)
+{
+	return hsbuf->buffer.size - hsbuf->buffer.offset;
+}
+
+static void hsbuf_copy(struct hsbuf *dst, struct hsbuf *src)
+{
+	size_t len;
+
+	len= src->buffer.size - src->buffer.offset;
+	hsbuf_add(dst, src->buffer.buf + src->buffer.offset, len);
+}
+
 static void hsbuf_cleanup(struct hsbuf *hsbuf)
 {
 	buf_cleanup(&hsbuf->buffer);
@@ -591,33 +604,38 @@ static void add_compression(struct hsbuf *hsbuf)
 	hsbuf_add(hsbuf, compression, len);
 }
 
-static void add_sni(struct hsbuf *hsbuf, const char *server_name)
+static void ext_sigs(struct hsbuf *hsbuf)
 {
-	/* Assume there is only a single extension with one hostname.
-	 * Add the following:
-	 *
-	 * size of extensions vector, 16-bit
-	 * extension_type (server_name, 0), 16-bit
-	 * size of extension_data vector, 16-bit
-	 * size of server_name_list, 16-bit
-	 * name_type (host_name, 0), 8-bit
-	 * size of HostName, 16-bit
-	 * actual hostname.
-	 */
+	uint16_t sigextlen, siglen;
+	uint8_t sigs[] =
+	{
+		/* From wget 1.13.4 */
+		0x04, 0x02,	/* SHA256, DSA */
+		0x04, 0x01,	/* SHA256, RSA */
+		0x02, 0x01,	/* SHA1, RSA */
+		0x02, 0x02,	/* SHA1, DSA */
+	};
 
+	siglen= sizeof(sigs);
+	sigextlen= siglen + 2;
+
+	hsbuf_add_u16(hsbuf, 13 /*signature_algorithms*/);
+	hsbuf_add_u16(hsbuf, sigextlen);
+	hsbuf_add_u16(hsbuf, siglen);
+	hsbuf_add(hsbuf, sigs, siglen);
+}
+
+static void sni(struct hsbuf *hsbuf, const char *server_name)
+{
 	uint8_t c;
-	size_t size_hostname, size_server_name_list, size_extension_data,
-		size_extensions;
+	size_t size_hostname, size_server_name_list, size_extension_data;
 
 	size_hostname= strlen(server_name);
 	size_server_name_list= 1 /*name_type*/ + 2 /*size_hostname*/ +
 		size_hostname;
 	size_extension_data= 2 /*size_server_name_list*/ +
 		size_server_name_list;
-	size_extensions= 2 /*extension_type*/ + 2 /*size_extension_data*/ +
-		size_extension_data;
 
-	hsbuf_add_u16(hsbuf, size_extensions);
 	hsbuf_add_u16(hsbuf, 0 /* server_name */);
 	hsbuf_add_u16(hsbuf, size_extension_data);
 	hsbuf_add_u16(hsbuf, size_server_name_list);
@@ -625,6 +643,30 @@ static void add_sni(struct hsbuf *hsbuf, const char *server_name)
 	hsbuf_add(hsbuf, &c, 1);
 	hsbuf_add_u16(hsbuf, size_hostname);
 	hsbuf_add(hsbuf, server_name, size_hostname);
+}
+
+static void add_extensions(struct state *state, struct hsbuf *hsbuf)
+{
+	size_t size_extensions;
+	struct hsbuf ext_sigs_buf;
+	struct hsbuf sni_buf;
+
+	/* SNI */
+	hsbuf_init(&sni_buf);
+	if (state->sni)
+		sni(&sni_buf, state->sni);
+
+	/* Signatures */
+	hsbuf_init(&ext_sigs_buf);
+	ext_sigs(&ext_sigs_buf);
+
+	size_extensions= hsbuf_len(&sni_buf) + hsbuf_len(&ext_sigs_buf);
+
+	hsbuf_add_u16(hsbuf, size_extensions);
+	hsbuf_copy(hsbuf, &sni_buf);
+	hsbuf_cleanup(&sni_buf);
+	hsbuf_copy(hsbuf, &ext_sigs_buf);
+	hsbuf_cleanup(&ext_sigs_buf);
 }
 
 static struct hgbase *sslgetcert_base_new(struct event_base *event_base)
@@ -1538,8 +1580,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 			add_ciphers(&hsbuf);
 			add_compression(&hsbuf);
 
-			if (state->sni)
-				add_sni(&hsbuf, state->sni);
+			add_extensions(state, &hsbuf);
 
 			hsbuf_final(&hsbuf, HS_CLIENT_HELLO, &msgoutbuf);
 			msgbuf_final(&msgoutbuf, MSG_HANDSHAKE);
