@@ -609,11 +609,17 @@ static void ext_sigs(struct hsbuf *hsbuf)
 	uint16_t sigextlen, siglen;
 	uint8_t sigs[] =
 	{
-		/* From wget 1.13.4 */
-		0x04, 0x02,	/* SHA256, DSA */
+		/* From wget 1.19.1 */
 		0x04, 0x01,	/* SHA256, RSA */
+		0x04, 0x03,	/* SHA256, ECDSA */
+		0x05, 0x01,	/* SHA384, RSA */
+		0x05, 0x03,	/* SHA384, ECDSA */
+		0x06, 0x01,	/* SHA512, RSA */
+		0x06, 0x03,	/* SHA512, ECDSA */
+		0x03, 0x01,	/* SHA224, RSA */
+		0x03, 0x03,	/* SHA224, ECDSA */
 		0x02, 0x01,	/* SHA1, RSA */
-		0x02, 0x02,	/* SHA1, DSA */
+		0x02, 0x01,	/* SHA1, ECDSA */
 	};
 
 	siglen= sizeof(sigs);
