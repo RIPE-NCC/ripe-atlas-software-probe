@@ -625,6 +625,28 @@ static void ext_sigs(struct hsbuf *hsbuf)
 	hsbuf_add(hsbuf, sigs, siglen);
 }
 
+static void elliptic_curves(struct hsbuf *hsbuf)
+{
+	uint16_t curvesextlen, curveslen;
+	uint8_t curves[] =
+	{
+		/* From wget 1.19.1 */
+		0x00, 0x17,	/* secp256r1 */
+		0x00, 0x18,	/* secp384r1 */
+		0x00, 0x19,	/* secp521r1 */
+		0x00, 0x15,	/* secp224r1 */
+		0x00, 0x13,	/* secp192r1 */
+	};
+
+	curveslen= sizeof(curves);
+	curvesextlen= curveslen + 2;
+
+	hsbuf_add_u16(hsbuf, 10 /*elliptic_curves*/);
+	hsbuf_add_u16(hsbuf, curvesextlen);
+	hsbuf_add_u16(hsbuf, curveslen);
+	hsbuf_add(hsbuf, curves, curveslen);
+}
+
 static void sni(struct hsbuf *hsbuf, const char *server_name)
 {
 	uint8_t c;
@@ -650,6 +672,7 @@ static void add_extensions(struct state *state, struct hsbuf *hsbuf)
 	size_t size_extensions;
 	struct hsbuf ext_sigs_buf;
 	struct hsbuf sni_buf;
+	struct hsbuf elliptic_curves_buf;
 
 	/* SNI */
 	hsbuf_init(&sni_buf);
@@ -660,13 +683,20 @@ static void add_extensions(struct state *state, struct hsbuf *hsbuf)
 	hsbuf_init(&ext_sigs_buf);
 	ext_sigs(&ext_sigs_buf);
 
-	size_extensions= hsbuf_len(&sni_buf) + hsbuf_len(&ext_sigs_buf);
+	/* Elliptic curvers */
+	hsbuf_init(&elliptic_curves_buf);
+	elliptic_curves(&elliptic_curves_buf);
+
+	size_extensions= hsbuf_len(&sni_buf) + hsbuf_len(&ext_sigs_buf) +
+		hsbuf_len(&elliptic_curves_buf);
 
 	hsbuf_add_u16(hsbuf, size_extensions);
 	hsbuf_copy(hsbuf, &sni_buf);
 	hsbuf_cleanup(&sni_buf);
 	hsbuf_copy(hsbuf, &ext_sigs_buf);
 	hsbuf_cleanup(&ext_sigs_buf);
+	hsbuf_copy(hsbuf, &elliptic_curves_buf);
+	hsbuf_cleanup(&elliptic_curves_buf);
 }
 
 static struct hgbase *sslgetcert_base_new(struct event_base *event_base)
