@@ -1449,7 +1449,10 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 				state->readstate= READ_DONE;
 			}
 			else if (state->chunked)
+			{
 				state->readstate= READ_CHUNKED;
+				state->content_offset= 0;
+			}
 			else
 			{
 				state->readstate= READ_SIMPLE;
