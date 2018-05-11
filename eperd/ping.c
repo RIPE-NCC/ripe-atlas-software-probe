@@ -26,14 +26,15 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define PING_OPT_STRING ("!46prc:s:A:B:O:i:I:R:W:")
+#define PING_OPT_STRING ("!46eprc:s:A:B:O:i:I:R:W:")
 
 enum 
 {
 	opt_4 = (1 << 0),
 	opt_6 = (1 << 1),
-	opt_p = (1 << 2),
-	opt_r = (1 << 3),
+	opt_e = (1 << 3),
+	opt_p = (1 << 4),
+	opt_r = (1 << 5),
 };
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified)
@@ -1328,10 +1329,15 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 	else
 		af= AF_INET6;
 	include_probe_id= !!(opt & opt_p);
+
+	/* Keep -r in case there is still code using that option */
 	delay_name_res= !!(opt & opt_r);
 	delay_name_res= 1;	/* Always enabled, leave the old code in
 				 * place for now.
 				 */
+	/* Introduce a new option to use the libc stub resolver */
+	if (opt & opt_e)
+		delay_name_res= 0;
 
 	if (!delay_name_res)
 	{
