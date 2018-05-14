@@ -286,7 +286,7 @@ struct tdig_base {
 
 	u_char packet [MAX_DNS_BUF_SIZE] ;
 	/* used only for the stand alone version */
-	void (*done)(void *state);
+	void (*done)(void *state, int error);
 };
 
 static struct tdig_base *tdig_base;
@@ -551,8 +551,9 @@ struct tdig_base *tdig_base_new(struct event_base *event_base);
 void tdig_start (void *qry);
 void printReply(struct query_state *qry, int wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
-static void local_exit(void *state);
-static void *tdig_init(int argc, char *argv[], void (*done)(void *state));
+static void local_exit(void *state, int error);
+static void *tdig_init(int argc, char *argv[],
+	void (*done)(void *state, int error));
 static void process_reply(void * arg, int nrecv, struct timespec now);
 static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	size_t packetlen) ;
@@ -643,7 +644,7 @@ void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry)
         AS("\" ] ");
 }
 
-static void local_exit(void *state UNUSED_PARAM)
+static void local_exit(void *state UNUSED_PARAM, int error)
 {
 	/*
 	   qry->base->done(qry);
@@ -664,7 +665,7 @@ static void local_exit(void *state UNUSED_PARAM)
 	   terminator(qry);
 	*/
 	fprintf(stderr, "And we are done\n");
-	exit(0);
+	exit(error);
 }
 
 
@@ -1047,7 +1048,7 @@ static void done_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM
 	struct query_state *qry = h;
 	qry->qst = STATUS_FREE;
 	BLURT(LVL5 "query %s is done call done",  qry->server_name);
-	qry->base->done(qry);
+	qry->base->done(qry, 0);
 }
 
 static void next_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
@@ -1531,7 +1532,8 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 }
 
 /* this called for each query/line in eperd */
-static void *tdig_init(int argc, char *argv[], void (*done)(void *state))
+static void *tdig_init(int argc, char *argv[],
+	void (*done)(void *state, int error))
 {
 	char *check;
 	struct query_state *qry;

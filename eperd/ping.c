@@ -87,7 +87,7 @@ struct pingbase
 	struct pingstate **table;
 	int tabsiz;
 
-	void (*done)(void *state);	/* Called when a ping is done */
+	void (*done)(void *state, int error);	/* Called when a ping is done */
 
 	u_char packet[MAX_DATA_SIZE];
 };
@@ -116,6 +116,7 @@ struct pingstate
 	char first;
 	char no_dst;
 	char no_src;
+	char error;
 	unsigned char ttl;
 	unsigned size;
 	unsigned psize;
@@ -461,6 +462,7 @@ static void ping_cb(int result, int bytes, int psize,
 	}
 	if (result == PING_ERR_DONE)
 	{
+		pingstate->error= (pingstate->got_reply == 0);
 		report(pingstate);
 	}
 }
@@ -670,7 +672,7 @@ static void ping_xmit(struct pingstate *host)
 			host->dns_res= NULL;
 		}
 		if (host->base->done)
-			host->base->done(host);
+			host->base->done(host, host->error);
 
 		return;
 	}
@@ -1190,7 +1192,7 @@ done:
 
 
 static void *ping_init(int __attribute((unused)) argc, char *argv[],
-	void (*done)(void *state))
+	void (*done)(void *state, int error))
 {
 	static struct pingbase *ping_base;
 
@@ -1444,6 +1446,7 @@ static void ping_start2(void *state)
 	pingstate->got_reply= 0;
 	pingstate->no_dst= 0;
 	pingstate->no_src= 0;
+	pingstate->error= 0;
 
 	if (pingstate->af == AF_INET)
 	{
@@ -1468,7 +1471,7 @@ static void ping_start2(void *state)
 			add_str(pingstate, line);
 			report(pingstate);
 			if (pingstate->base->done)
-				pingstate->base->done(pingstate);
+				pingstate->base->done(pingstate, 1);
 			return;
 		}
 		pingstate->socket= fd;
@@ -1500,7 +1503,7 @@ static void ping_start2(void *state)
 			add_str(pingstate, line);
 			report(pingstate);
 			if (pingstate->base->done)
-				pingstate->base->done(pingstate);
+				pingstate->base->done(pingstate, 1);
 			return;
 		}
 
@@ -1535,7 +1538,7 @@ static void ping_start2(void *state)
 			add_str(pingstate, line);
 			report(pingstate);
 			if (pingstate->base->done)
-				pingstate->base->done(pingstate);
+				pingstate->base->done(pingstate, 1);
 			return;
 		}
 	}
@@ -1550,7 +1553,7 @@ static void ping_start2(void *state)
 		add_str(pingstate, line);
 		report(pingstate);
 		if (pingstate->base->done)
-			pingstate->base->done(pingstate);
+			pingstate->base->done(pingstate, 1);
 		return;
 	}
 
@@ -1608,7 +1611,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			0, 0, NULL,
 			env);
 		if (env->base->done)
-			env->base->done(env);
+			env->base->done(env, 1);
 		return;
 	}
 
@@ -1642,7 +1645,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 				0, 0, NULL,
 				env);
 			if (env->base->done)
-				env->base->done(env);
+				env->base->done(env, 1);
 			return;
 		}
 
@@ -1661,7 +1664,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		0, 0, NULL,
 		env);
 	if (env->base->done)
-		env->base->done(env);
+		env->base->done(env, 1);
 }
 
 static void ping_start(void *state)

@@ -102,7 +102,7 @@ static void report_err(const char *fmt, ...);
 
 static void checkQueue(evutil_socket_t fd, short what, void *arg);
 static int add_line(void);
-static void cmddone(void *cmdstate);
+static void cmddone(void *cmdstate, int error);
 static void re_post(evutil_socket_t fd, short what, void *arg);
 static void post_results(int force_post);
 static void skip_space(char *cp, char **ncpp);
@@ -589,7 +589,7 @@ error:
 	return 0;
 }
 
-static void cmddone(void *cmdstate)
+static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 {
 	int i, r;
 	char from_filename[80];

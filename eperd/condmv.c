@@ -25,7 +25,7 @@ struct condmvstate
 };
 
 static void *condmv_init(int argc, char *argv[],
-	void (*done)(void *state) UNUSED_PARAM)
+	void (*done)(void *state, int error) UNUSED_PARAM)
 {
 	char *opt_add, *opt_interval, *from, *to, *check;
 	int interval;

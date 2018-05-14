@@ -66,7 +66,7 @@ struct hgbase
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
-	void (*done)(void *state);
+	void (*done)(void *state, int error);
 };
 
 struct hgstate
@@ -400,7 +400,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 }
 
 static void *httpget_init(int __attribute((unused)) argc, char *argv[],
-	void (*done)(void *state))
+	void (*done)(void *state, int error))
 {
 	int c, i, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
@@ -951,7 +951,7 @@ static void report(struct hgstate *state)
 
 	state->busy= 0;
 	if (state->base->done)
-		state->base->done(state);
+		state->base->done(state, 0);
 }
 
 static int get_input(struct hgstate *state)

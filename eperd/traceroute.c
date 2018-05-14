@@ -72,7 +72,7 @@ struct trtbase
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
-	void (*done)(void *state);
+	void (*done)(void *state, int error);
 
 	/* Leave some space for headers. The various traceroute variations
 	 * have to check that it fits.
@@ -497,7 +497,7 @@ static void report(struct trtstate *state)
 	state->busy= 0;
 
 	if (state->base->done)
-		state->base->done(state);
+		state->base->done(state, 0);
 }
 
 static void send_pkt(struct trtstate *state)
@@ -3870,7 +3870,7 @@ static void noreply_callback(int __attribute((unused)) unused,
 }
 
 static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
-	void (*done)(void *state))
+	void (*done)(void *state, int error))
 {
 	uint16_t destport;
 	uint32_t opt;

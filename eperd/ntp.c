@@ -62,7 +62,7 @@ struct ntpbase
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
-	void (*done)(void *state);
+	void (*done)(void *state, int error);
 
 	u_char packet[MAX_DATA_SIZE];
 };
@@ -469,7 +469,7 @@ static void report(struct ntpstate *state)
 	state->busy= 0;
 
 	if (state->base->done)
-		state->base->done(state);
+		state->base->done(state, 0);
 }
 
 static void send_pkt(struct ntpstate *state)
@@ -1702,7 +1702,7 @@ static void noreply_callback(int __attribute((unused)) unused,
 }
 
 static void *ntp_init(int __attribute((unused)) argc, char *argv[],
-	void (*done)(void *state))
+	void (*done)(void *state, int error))
 {
 	uint32_t opt;
 	int i, do_v6;

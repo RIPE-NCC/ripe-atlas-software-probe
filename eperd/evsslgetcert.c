@@ -22,10 +22,10 @@
 
 #include "eperd.h"
 
-static void done(void *state UNUSED_PARAM)
+static void done(void *state UNUSED_PARAM, int error)
 {
 	fprintf(stderr, "And we are done\n");
-	exit(0);
+	exit(error);
 }
 
 int evsslgetcert_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;

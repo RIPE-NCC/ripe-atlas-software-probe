@@ -48,7 +48,7 @@ struct hgbase
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
-	void (*done)(void *state);
+	void (*done)(void *state, int error);
 };
 
 struct buf
@@ -767,7 +767,7 @@ static void timeout_callback(int __attribute((unused)) unused,
 }
 
 static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
-	void (*done)(void *state))
+	void (*done)(void *state, int error))
 {
 	int c, i, only_v4, only_v6, major, minor;
 	size_t newsiz;
@@ -1058,7 +1058,7 @@ static void report(struct state *state)
 
 	state->busy= 0;
 	if (state->base->done)
-		state->base->done(state);
+		state->base->done(state, 0);
 }
 
 
@@ -1113,7 +1113,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			tu_cleanup(&state->tu_env);
 			state->busy= 0;
 			if (state->base->done)
-				state->base->done(state);
+				state->base->done(state, 0);
 			return;
 
 		default:
