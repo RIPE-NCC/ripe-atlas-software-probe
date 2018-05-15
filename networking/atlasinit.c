@@ -1400,8 +1400,6 @@ static int reg_init_main( int argc, char *argv[] )
 					ipv4_gw,
 					str_device,
 					atlas_network_v4_static_info_json);
-				// ping the gateway 
-				fprintf (f, "ping -c 2 -q %s \n", ipv4_gw);
 				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
 
 				fclose(f);
