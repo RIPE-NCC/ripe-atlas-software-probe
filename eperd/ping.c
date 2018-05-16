@@ -32,9 +32,9 @@ enum
 {
 	opt_4 = (1 << 0),
 	opt_6 = (1 << 1),
-	opt_e = (1 << 3),
-	opt_p = (1 << 4),
-	opt_r = (1 << 5),
+	opt_e = (1 << 2),
+	opt_p = (1 << 3),
+	opt_r = (1 << 4),
 };
 
 /* Intervals and timeouts (all are in milliseconds unless otherwise specified)
