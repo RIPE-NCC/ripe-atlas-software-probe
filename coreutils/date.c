@@ -179,7 +179,6 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 	char buf_fmt_dt2str[64];
 	unsigned opt;
 	int ifmt = -1;
-	time_t tm;
 	char *date_str;
 	char *fmt_dt2str;
 	char *fmt_str2dt;
@@ -282,7 +281,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 		/* Process any date input to UNIX time since 1 Jan 1970 */
 		if (opt & OPT_UNIXSECS)
 		{
-			tm= strtoul(date_str, &check, 10);
+			ts.tv_sec= strtoul(date_str, &check, 10);
 			if (check[0] != '\0')
 			{
 				bb_error_msg_and_die(bb_msg_invalid_date,
@@ -290,7 +289,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 			}
 
 			/* Fill in tm_time */
-			tm_time= *localtime(&tm);
+			tm_time= *localtime(&ts.tv_sec);
 		}
 		else if (ENABLE_FEATURE_DATE_ISOFMT && (opt & OPT_HINT)) {
 			if (strptime(date_str, fmt_str2dt, &tm_time) == NULL)
