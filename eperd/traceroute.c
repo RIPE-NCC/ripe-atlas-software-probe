@@ -28,7 +28,7 @@
 #define uh_sum check
 #endif
 
-#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:w:z:A:B:O:S:H:D:R:W:")
+#define TRACEROUTE_OPT_STRING ("!46IUFrTa:b:c:f:g:i:m:p:t:w:z:A:B:O:S:H:D:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -58,6 +58,8 @@
 #define MPLS_EXT_MASK 0x7
 #define MPLS_S_BIT 0x100
 #define MPLS_TTL_MASK 0xff
+
+#define IP6_TOS(ip6_hdr) ((ntohl((ip6_hdr)->ip6_flow) >> 20) & 0xff)
 
 struct trtbase
 {
@@ -106,6 +108,7 @@ struct trtstate
 	unsigned char parisbase;
 	unsigned duptimeout;
 	unsigned timeout;
+	int tos;
 
 	char *response_in;	/* Fuzzing */
 	char *response_out;
@@ -500,6 +503,45 @@ static void report(struct trtstate *state)
 		state->base->done(state, 0);
 }
 
+static int set_tos(struct trtstate *state, int sock, int af, int inner)
+{
+	int r;
+	char line[80];
+
+	if (!state->tos)
+		return 0;	/* Nothing to do */
+
+	if (af == AF_INET6)
+	{
+		r= setsockopt(sock, IPPROTO_IPV6, IPV6_TCLASS, &state->tos,
+			sizeof(state->tos));
+	}
+	else
+	{
+		r= setsockopt(sock, IPPROTO_IP, IP_TOS, &state->tos,
+			sizeof(state->tos));
+	}
+
+	if (r == -1)
+	{
+		crondlog(LVL7 "setting %s failed with '%s'",
+			af == AF_INET6 ? "traffic class" : "ToS",
+			strerror(errno));
+
+		snprintf(line, sizeof(line),
+			"%s" DBQ(error) ":"
+		DBQ(setting %s failed)
+			"%s", inner ? (state->sent ? " }, { " : "{ ") : ", ",
+			af == AF_INET6 ? "traffic class" : "ToS",
+			inner ? " } ] }" : " }");
+		add_str(state, line);
+		report(state);
+		return -1;
+	}
+
+	return 0;
+}
+
 static void send_pkt(struct trtstate *state)
 {
 	int r, hop, len, on, sock, serrno;
@@ -598,6 +640,12 @@ static void send_pkt(struct trtstate *state)
 					 state->destoptsize);
 			}
 #endif
+
+			if (set_tos(state, sock, AF_INET6, 1 /*inner*/) == -1)
+			{
+				close(sock);
+				return;
+			}
 
 			/* Bind to source addr/port */
 			if (state->response_in)
@@ -856,6 +904,12 @@ static void send_pkt(struct trtstate *state)
 					 state->destoptsize);
 			}
 
+			if (set_tos(state, sock, AF_INET6, 1 /*inner*/) == -1)
+			{
+				close(sock);
+				return;
+			}
+
 			/* Bind to source addr/port */
 			if (state->response_in)
 				r= 0;	/* No need to bind */
@@ -985,6 +1039,12 @@ static void send_pkt(struct trtstate *state)
 			on= 1;
 			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
 				sizeof(on));
+
+			if (set_tos(state, sock, AF_INET, 1 /*inner*/) == -1)
+			{
+				close(sock);
+				return;
+			}
 
 			/* Bind to source addr/port */
 			if (state->response_in)
@@ -1238,6 +1298,12 @@ static void send_pkt(struct trtstate *state)
 			on= 1;
 			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on,
 				sizeof(on));
+
+			if (set_tos(state, sock, AF_INET, 1 /*inner*/) == -1)
+			{
+				close(sock);
+				return;
+			}
 
 			/* Bind to source addr/port */
 			r= bind(sock,
@@ -1750,6 +1816,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 					eip->ip_ttl);
 				add_str(state, line);
 			}
+			if (eip->ip_tos != 0 || state->tos != 0)
+			{
+				snprintf(line, sizeof(line), ", \"itos\":%d",
+					eip->ip_tos);
+				add_str(state, line);
+			}
 
 			if (memcmp(&eip->ip_src,
 				&((struct sockaddr_in *)&state->loc_sin6)->
@@ -1962,6 +2034,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
+				add_str(state, line);
+			}
+			if (eip->ip_tos != 0 || state->tos != 0)
+			{
+				snprintf(line, sizeof(line), ", \"itos\":%d",
+					eip->ip_tos);
 				add_str(state, line);
 			}
 
@@ -2189,6 +2267,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 				snprintf(line, sizeof(line), ", \"ittl\":%d",
 					eip->ip_ttl);
+				add_str(state, line);
+			}
+			if (eip->ip_tos != 0 || state->tos != 0)
+			{
+				snprintf(line, sizeof(line), ", \"itos\":%d",
+					eip->ip_tos);
 				add_str(state, line);
 			}
 
@@ -2449,6 +2533,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 		snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
 			ip->ip_ttl, (int)nrecv - IPHDR - ICMP_MINLEN);
 		add_str(state, line);
+		if (ip->ip_tos != 0 || state->tos != 0)
+		{
+			snprintf(line, sizeof(line), ", \"tos\":%d",
+				ip->ip_tos);
+			add_str(state, line);
+		}
 		if (!late)
 		{
 			snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
@@ -2716,6 +2806,11 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
 		ip->ip_ttl, (int)(nrecv - IPHDR - sizeof(*tcphdr)));
 	add_str(state, line);
+	if (ip->ip_tos != 0 || state->tos != 0)
+	{
+		snprintf(line, sizeof(line), ", \"tos\":%d", ip->ip_tos);
+		add_str(state, line);
+	}
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
 		(tcphdr->syn ? "S" : ""),
@@ -2771,7 +2866,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	uint16_t myport;
-	int late, isDup, rcvdttl, tcp_hlen;
+	int late, isDup, rcvdttl, rcvdtclass, tcp_hlen;
 	unsigned ind, seq;
 	ssize_t nrecv;
 	struct trtbase *base;
@@ -2809,7 +2904,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	{
 		uint32_t len;
 
-		/* Proto is eaten by ready_callback4 */
+		/* Proto is eaten by ready_callback6 */
 		if (read(state->socket_icmp, &len, sizeof(len)) != sizeof(len))
 		{
 			//printf("ready_tcp4: error reading from '%s'\n",
@@ -2865,6 +2960,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	}
 
 	rcvdttl= -42;	/* To spot problems */
+	rcvdtclass= -42;	/* To spot problems */
 	memset(&dstaddr, '\0', sizeof(dstaddr));
 	for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
 		cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
@@ -2881,6 +2977,11 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		{
 			dstaddr= ((struct in6_pktinfo *)
 				CMSG_DATA(cmsgptr))->ipi6_addr;
+		}
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			cmsgptr->cmsg_type == IPV6_TCLASS)
+		{
+			rcvdtclass= *(int *)CMSG_DATA(cmsgptr);
 		}
 	}
 
@@ -2938,7 +3039,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		{
 #if 0
 			printf(
-"ready_callback4: mismatch for seq, got 0x%x, expected 0x%x, for %s\n",
+"ready_callback6: mismatch for seq, got 0x%x, expected 0x%x, for %s\n",
 				seq, state->seq, state->hostname);
 #endif
 			return;
@@ -2965,6 +3066,12 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
 		rcvdttl, (int)(nrecv - sizeof(*tcphdr)));
 	add_str(state, line);
+	if (rcvdtclass != 0 || state->tos != 0)
+	{
+		snprintf(line, sizeof(line), ", \"tos\":%d",
+			rcvdtclass);
+		add_str(state, line);
+	}
 	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
 		(tcphdr->fin ? "F" : ""),
 		(tcphdr->syn ? "S" : ""),
@@ -2988,7 +3095,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	}
 
 #if 0
-	printf("ready_callback4: from %s, ttl %d",
+	printf("ready_callback6: from %s, ttl %d",
 		inet_ntoa(remote.sin_addr), ip->ip_ttl);
 	printf(" for %s hop %d\n",
 		inet_ntoa(((struct sockaddr_in *)
@@ -3020,7 +3127,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	ssize_t nrecv;
-	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset;
+	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset, rcvdtclass;
 	unsigned nextmtu, seq, optlen, hbhoptsize, dstoptsize;
 	size_t v6info_siz, siz;
 	struct trtbase *base;
@@ -3148,7 +3255,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
 	}
 
-	rcvdttl= -42;	/* To spot problems */
+	rcvdttl= -42;		/* To spot problems */
+	rcvdtclass= -42;	/* To spot problems */
 	memset(&dstaddr, '\0', sizeof(dstaddr));
 	for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
 		cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
@@ -3165,6 +3273,11 @@ static void ready_callback6(int __attribute((unused)) unused,
 		{
 			dstaddr= ((struct in6_pktinfo *)
 				CMSG_DATA(cmsgptr))->ipi6_addr;
+		}
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+			cmsgptr->cmsg_type == IPV6_TCLASS)
+		{
+			rcvdtclass= *(int *)CMSG_DATA(cmsgptr);
 		}
 	}
 
@@ -3509,6 +3622,13 @@ static void ready_callback6(int __attribute((unused)) unused,
 					eip->ip6_hops);
 				add_str(state, line);
 			}
+			if (IP6_TOS(eip) != 0 || state->tos != 0)
+			{
+				snprintf(line, sizeof(line), ", \"itos\":%d",
+					IP6_TOS(eip));
+				add_str(state, line);
+			}
+
 			if (hbhoptsize)
 			{
 				snprintf(line, sizeof(line),
@@ -3780,6 +3900,12 @@ static void ready_callback6(int __attribute((unused)) unused,
 			", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
 			rcvdttl, ms, (int)(nrecv - ICMP6_HDR));
 		add_str(state, line);
+		if (rcvdtclass != 0 || state->tos != 0)
+		{
+			snprintf(line, sizeof(line), ", \"itos\":%d",
+				rcvdtclass);
+			add_str(state, line);
+		}
 
 #if 0
 		printf("ready_callback6: from %s, ttl %d",
@@ -3875,6 +4001,7 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	uint16_t destport;
 	uint32_t opt;
 	int i, do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
+	int tos;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
 		hbhoptsize, destoptsize, parismod, parisbase, timeout;
 		/* must be int-sized */
@@ -3913,12 +4040,13 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	parisbase= 0;
 	hbhoptsize= 0;
 	destoptsize= 0;
+	tos= 0;
 	str_Atlas= NULL;
 	str_bundle= NULL;
 	out_filename= NULL;
 	response_in= NULL;
 	response_out= NULL;
-	opt_complementary = "=1:4--6:i--u:a+:b+:c+:f+:g+:m+:w+:z+:S+:H+:D+";
+	opt_complementary = "=1:4--6:i--u:a+:b+:c+:f+:g+:m+:t+:w+:z+:S+:H+:D+";
 
 for (i= 0; argv[i] != NULL; i++)
 	printf("argv[%d] = '%s'\n", i, argv[i]);
@@ -3926,8 +4054,8 @@ for (i= 0; argv[i] != NULL; i++)
 	opt = getopt32(argv, TRACEROUTE_OPT_STRING, &parismod, &parisbase,
 		&count,
 		&firsthop, &gaplimit, &interface, &maxhops, &destportstr,
-		&timeout,
-		&duptimeout, &str_Atlas, &str_bundle, &out_filename, &maxpacksize,
+		&tos, &timeout, &duptimeout,
+		&str_Atlas, &str_bundle, &out_filename, &maxpacksize,
 		&hbhoptsize, &destoptsize, &response_in, &response_out);
 	hostname = argv[optind];
 
@@ -4045,6 +4173,7 @@ for (i= 0; argv[i] != NULL; i++)
 	state->destportstr= strdup(destportstr);
 	state->duptimeout= duptimeout*1000;
 	state->timeout= timeout*1000;
+	state->tos= tos;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
 	state->bundle_id= str_bundle ? strdup(str_bundle) : NULL;
 	state->hostname= strdup(hostname);
@@ -4317,6 +4446,10 @@ static int create_socket(struct trtstate *state, int do_tcp)
 		on = 1;
 		setsockopt(state->socket_icmp, IPPROTO_IPV6,
 			IPV6_RECVHOPLIMIT, &on, sizeof(on));
+
+		on = 1;
+		setsockopt(state->socket_icmp, IPPROTO_IPV6,
+			IPV6_RECVTCLASS, &on, sizeof(on));
 	}
 
 	if (state->interface)
@@ -4331,6 +4464,9 @@ static int create_socket(struct trtstate *state, int do_tcp)
 			return -1;
 		}
 	}
+
+	if (set_tos(state, state->socket_icmp, af, 0 /*!inner*/) == -1)
+		return -1;
 
 	event_assign(&state->event_icmp, state->base->event_base,
 		state->socket_icmp,
@@ -4362,6 +4498,9 @@ static int create_socket(struct trtstate *state, int do_tcp)
 			on = 1;
 			setsockopt(state->socket_tcp, IPPROTO_IPV6,
 				IPV6_RECVHOPLIMIT, &on, sizeof(on));
+			on = 1;
+			setsockopt(state->socket_tcp, IPPROTO_IPV6,
+				IPV6_RECVTCLASS, &on, sizeof(on));
 		}
 
 		if (state->interface)
