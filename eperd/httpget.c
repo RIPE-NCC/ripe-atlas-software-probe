@@ -35,6 +35,7 @@ static struct option longopts[]=
 	{ "combine",	no_argument, NULL, 'c' },
 	{ "get",	no_argument, NULL, 'g' },
 	{ "head",	no_argument, NULL, 'E' },
+	{ "host",	required_argument, NULL, 'n' },
 	{ "post",	no_argument, NULL, 'P' },
 	{ "post-file",	required_argument, NULL, 'p' },
 	{ "post-header", required_argument, NULL, 'h' },
@@ -409,7 +410,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	size_t newsiz, read_limit;
 	unsigned timeout;
 	char *url, *check;
-	char *post_file, *output_file, *post_footer, *post_header,
+	char *host_arg, *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *b_arg, *store_headers, *store_body, *read_limit_str,
 		*timeout_str, *infname, *response_in, *response_out;
 	const char *user_agent;
@@ -425,6 +426,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	do_head= 0;
 	do_post= 0;
 	do_tls = 0;
+	host_arg= NULL;
 	post_file= NULL; 
 	post_footer=NULL;
 	post_header=NULL;
@@ -515,6 +517,9 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 'I':
 			infname= optarg;
+			break;
+		case 'n':
+			host_arg= optarg;		/* --host */
 			break;
 		case 'O':
 			output_file= optarg;
@@ -679,6 +684,13 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	{
 		/* Do we need to report an error? */
 		return NULL;
+	}
+
+	if (host_arg)
+	{
+		/* Replace hostport from the URL with host_arg */
+		free(hostport);
+		hostport= strdup(host_arg);
 	}
 
 	//printf("host: %s\n", host);
