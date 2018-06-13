@@ -365,7 +365,9 @@ static int create_bev(struct tu_env *env)
 
 static void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
+	long err;
 	struct tu_env *env;
+	char errbuf[80];
 
 	env= ptr;
 
@@ -379,8 +381,17 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	{
 		if (env->connecting)
 		{
-			env->reporterr(env, TU_CONNECT_ERR,
-				strerror(errno));
+			err= bufferevent_get_openssl_error(bev);
+			if (err)
+			{
+				ERR_error_string_n(err, errbuf, sizeof(errbuf));
+				env->reporterr(env, TU_CONNECT_ERR, errbuf);
+			}
+			else
+			{
+				env->reporterr(env, TU_CONNECT_ERR,
+					strerror(errno));
+			}
 			return;
 		}
 		events &= ~BEV_EVENT_ERROR;
