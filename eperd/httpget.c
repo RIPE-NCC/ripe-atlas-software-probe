@@ -1966,7 +1966,7 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 {
 	struct hgstate *state;
 	char namebuf[NI_MAXHOST];
-	char line[80];
+	char line[160];
 
 	state= ENV2STATE(env);
 
