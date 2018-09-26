@@ -4272,7 +4272,8 @@ static void traceroute_start2(void *state)
 		trtstate->paris= (trtstate->paris-trtstate->parisbase+1) %
 			trtstate->parismod + trtstate->parisbase;
 	}
-	trtstate->last_response_hop= 0;	/* Should be starting hop */
+	trtstate->last_response_hop=
+		(trtstate->firsthop > 1 ? trtstate->firsthop-1 : 0);
 	trtstate->done= 0;
 	trtstate->not_done= 0;
 	trtstate->lastditch= 0;
