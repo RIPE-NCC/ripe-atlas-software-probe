@@ -329,6 +329,7 @@ struct query_state {
 	int opt_AF;
 	int opt_proto;
 	int opt_edns0;
+	int opt_edns_version;
 	int opt_dnssec;
 	int opt_nsid;
 	int opt_client_subnet;
@@ -446,8 +447,8 @@ struct EDNS0_HEADER
 	/** EDNS0 available buffer size, see RFC2671 */
 	u_int16_t otype;
 	uint16_t _edns_udp_size;
-	u_int8_t _edns_x; // combined rcode and edns version both zeros.
-	u_int8_t _edns_y; // combined rcode and edns version both zeros.
+	u_int8_t _edns_ercode; // rcode extension 
+	u_int8_t _edns_version; // EDNS version
 	u_int16_t Z ;     // first bit is the D0 bit.
 	uint16_t _edns_rdlen; // length of rdata
 }; 
@@ -575,6 +576,7 @@ static struct option longopts[]=
 	{ "timeout", required_argument, NULL, 'T' },
 
 	{ "evdns", no_argument, NULL, O_EVDNS },
+	{ "edns-version", required_argument, NULL, '1' },
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
@@ -869,7 +871,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	qry->pktsize  = (sizeof(struct DNS_HEADER) + qnamelen +
 		sizeof(struct QUESTION)) ;
 	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_cookies ||
-		qry->opt_dnssec || (qry->opt_edns0 > 512)) { 
+		qry->opt_dnssec || (qry->opt_edns0 > 512) ||
+		qry->opt_edns_version != 0) { 
 		p= &packet[qry->pktsize];
 		*p= 0;	/* encoding of '.' */
 		qry->pktsize++;
@@ -877,6 +880,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		e=(struct EDNS0_HEADER*)&packet[ qry->pktsize ];
 		e->otype = htons(ns_t_opt);
 		e->_edns_udp_size = htons(qry->opt_edns0);
+		e->_edns_version = qry->opt_edns_version;
 		if(qry->opt_dnssec) {
 			e->Z = htons(0x8000);
 		}
@@ -1882,6 +1886,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_rd = 0;
 	qry->opt_cd = 0;
 	qry->opt_evdns = 0;
+	qry->opt_edns_version = 0;
 	qry->opt_rset = 0;
 	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
@@ -1916,6 +1921,11 @@ static void *tdig_init(int argc, char *argv[],
 	optind = 0;
 	while (c= getopt_long(argc, argv, "46adD:e:tbhinqO:Rrs:A:B:I:?", longopts, NULL), c != -1) {
 		switch(c) {
+			case '1':
+				qry->opt_edns_version=
+					strtoul(optarg, &check, 10);
+				break;
+
 			case '4':
 				qry->opt_v4_only = 1;
 				qry->opt_AF = AF_INET;
