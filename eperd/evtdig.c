@@ -260,8 +260,26 @@
 #define T_SSHFP ns_t_sshfp
 #endif
 
+#define EDNS_OPT_CLIENT_SUBNET		 8
+
+#define EDNS_OPT_COOKIE			10
+#define DNS_CLIENT_COOKIE_LEN		 8
+#define DNS_SERVER_COOKIE_MIN_LEN	 8
+#define DNS_SERVER_COOKIE_MAX_LEN	32
+
 /* Definition for various types of counters */
 typedef uint32_t counter_t;
+
+struct dns_cookie_state
+{
+	uint8_t client_secret[32];	/* 256 bits, we are using sha256 */
+	uint8_t client_cookie[DNS_CLIENT_COOKIE_LEN];
+	struct dns_server_cookie
+	{
+		uint8_t len;
+		uint8_t cookie[DNS_SERVER_COOKIE_MAX_LEN];
+	} server_cookies[MAXNS];
+};
 
 /* How to keep track of a DNS query session */
 struct tdig_base {
@@ -301,6 +319,7 @@ struct query_state {
 	struct event event;         /* Used to detect read events on udp socket   */
 	int udp_fd;		    /* udp_fd */
 	int wire_size;
+	struct dns_cookie_state *cookie_state;
 
 	struct bufferevent *bev_tcp;
 	struct tu_env tu_env;
@@ -313,6 +332,7 @@ struct query_state {
 	int opt_dnssec;
 	int opt_nsid;
 	int opt_client_subnet;
+	int opt_cookies;
 	int opt_qbuf;
 	int opt_abuf;
 	int opt_resolv_conf;
@@ -327,6 +347,7 @@ struct query_state {
 	int retry;
 	int resolv_i;
 	bool opt_do_tls;
+	bool client_cookie_mismatch;
 
 	char * str_Atlas; 
 	char * str_bundle; 
@@ -349,9 +370,6 @@ struct query_state {
 
 	uint32_t pktsize;              /* Packet size in bytes */
 	struct addrinfo *res, *ressave, *ressent;
-
-	struct sockaddr_in remote;     /* store the reply packet src address      */
-
 
 	struct event noreply_timer;    /* Timer to handle timeout */
 	struct event nsm_timer;       /* Timer to send UDP */
@@ -452,6 +470,16 @@ struct EDNS_CLIENT_SUBNET
 	// u_int8_t[] cs_address;
 };
 
+// DNS Cookies option (RFC 7873)
+struct EDNS_COOKIES
+{
+	u_int16_t otype;
+	u_int16_t olength;
+	u_int8_t client_cookie[DNS_CLIENT_COOKIE_LEN];
+
+	/* The server cookie could be smaller or even empty */
+	u_int8_t server_cookie[DNS_SERVER_COOKIE_MAX_LEN];
+};
 
 //Constant sized fields of query structure
 struct QUESTION
@@ -531,6 +559,7 @@ static struct option longopts[]=
 	{ "edns0", required_argument, NULL, 'e' },
 	{ "nsid", no_argument, NULL, 'n' },
 	{ "client-subnet", no_argument, NULL, 'c' },
+	{ "cookies", no_argument, NULL, 'C' },
 	{ "do", no_argument, NULL, 'd' },
 	{ "cd", no_argument, NULL, O_CD},
 
@@ -568,6 +597,12 @@ static void local_exit(void *state, int error);
 static void *tdig_init(int argc, char *argv[],
 	void (*done)(void *state, int error));
 static void process_reply(void * arg, int nrecv, struct timespec now);
+static void update_server_cookie(struct query_state *qry, uint8_t *packet,
+	int packlen);
+static int get_edns_opt(int *optoffp, int target_code,
+	uint8_t *packet, int packlen);
+static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
+	int question);
 static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	size_t packetlen) ;
 int ip_addr_cmp (u_int16_t af_a, void *a, u_int16_t af_b, void *b);
@@ -744,11 +779,14 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	struct EDNS0_HEADER *e;
 	struct EDNS_NSID *n;
 	struct EDNS_CLIENT_SUBNET *cs;
+	struct EDNS_COOKIES *cookies;
 	uint16_t rdlen;
-	int r, qnamelen;
+	int r, cookie_opt_len, ind, qnamelen, server_len;
 	struct buf pbuf;
 	char *lookup_prepend;
 	int probe_id;
+	sha256_ctx_t sha256_ctx;
+	uint8_t sha256_buf[32];
 
 	dns = (struct DNS_HEADER *)packet;
 	r =  random();
@@ -830,8 +868,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 
 	qry->pktsize  = (sizeof(struct DNS_HEADER) + qnamelen +
 		sizeof(struct QUESTION)) ;
-	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_dnssec ||
-		(qry->opt_edns0 > 512)) { 
+	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_cookies ||
+		qry->opt_dnssec || (qry->opt_edns0 > 512)) { 
 		p= &packet[qry->pktsize];
 		*p= 0;	/* encoding of '.' */
 		qry->pktsize++;
@@ -875,14 +913,94 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 			cs=(struct EDNS_CLIENT_SUBNET*)&packet[ qry->pktsize ];
 			rdlen= ntohs(e->_edns_rdlen);
 			e->_edns_rdlen =
-				htons(rdlen + sizeof(struct EDNS_NSID));
-			cs->otype = htons(8); 
+				htons(rdlen + sizeof(struct EDNS_CLIENT_SUBNET));
+			cs->otype = htons(EDNS_OPT_CLIENT_SUBNET); 
 			cs->olength = htons(sizeof(struct EDNS_CLIENT_SUBNET) -
 				offsetof(struct EDNS_CLIENT_SUBNET, cs_family));
 			cs->cs_family= htons(qry->opt_AF == AF_INET ? 1 : 2);
 			cs->cs_src_prefix_len= htons(0);
 			cs->cs_scope_prefix_len= htons(0);
 			qry->pktsize  += sizeof(struct EDNS_CLIENT_SUBNET);
+		}
+		if (qry->opt_cookies)
+		{
+			char addrstr[INET6_ADDRSTRLEN];
+			getnameinfo((struct sockaddr *)&qry->loc_sin6,
+				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
+				NULL, 0, NI_NUMERICHOST);
+			printf("cookies: local '%s'\n", addrstr);
+			getnameinfo(qry->res->ai_addr, qry->res->ai_addrlen, addrstr, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
+
+			printf("cookies: remote '%s'\n", addrstr);
+
+			/* Create client cookie. We should use hmac, but it
+			 * doesn't seem to be available. However, just using
+			 * sha256 should be good enough.
+			 */
+			sha256_begin(&sha256_ctx);
+			if (qry->opt_AF == AF_INET)
+			{
+				sha256_hash(&sha256_ctx,
+					&((struct sockaddr_in *)&qry->
+					loc_sin6)->sin_addr,
+					sizeof((struct sockaddr_in *)&qry->
+                                        loc_sin6)->sin_addr);
+				sha256_hash(&sha256_ctx,
+					&((struct sockaddr_in *)&qry->
+					res->ai_addr)->sin_addr,
+					sizeof((struct sockaddr_in *)&qry->
+                                        res->ai_addr)->sin_addr);
+			}
+			else
+			{
+				sha256_hash(&sha256_ctx,
+					&qry->loc_sin6.sin6_addr,
+					sizeof(qry->loc_sin6.sin6_addr));
+				sha256_hash(&sha256_ctx,
+					&((struct sockaddr_in6 *)&qry->res->
+					ai_addr)->sin6_addr,
+					sizeof(((struct sockaddr_in6 *)&qry->
+					res->ai_addr)->sin6_addr));
+			}
+			sha256_hash(&sha256_ctx,
+				&qry->cookie_state->client_secret,
+				sizeof(qry->cookie_state->client_secret));
+			sha256_end(&sha256_ctx, sha256_buf);
+			
+			cookies=(struct EDNS_COOKIES *)&packet[ qry->pktsize ];
+
+			/* Fill-in client cookie */
+			memcpy(cookies->client_cookie,
+				sha256_buf+sizeof(sha256_buf) -
+				DNS_CLIENT_COOKIE_LEN, DNS_CLIENT_COOKIE_LEN);
+
+			/* Save cookie to check reply */
+			memcpy(qry->cookie_state->client_cookie,
+				cookies->client_cookie,
+				DNS_CLIENT_COOKIE_LEN);
+
+			/* Select server cookie */
+			if (qry->opt_resolv_conf)
+				ind= qry->resolv_i;
+			else
+				ind= 0;
+			server_len= qry->cookie_state->server_cookies[ind].len;
+			assert(server_len >= 0 &&
+				server_len <= DNS_SERVER_COOKIE_MAX_LEN);
+			memcpy(cookies->server_cookie,
+				qry->cookie_state->server_cookies[ind].cookie,
+				server_len);
+
+			cookie_opt_len= offsetof(struct EDNS_COOKIES,
+				server_cookie[server_len]);
+
+			rdlen= ntohs(e->_edns_rdlen);
+			e->_edns_rdlen =
+				htons(rdlen + cookie_opt_len);
+			cookies->otype = htons(EDNS_OPT_COOKIE); 
+			cookies->olength = htons(cookie_opt_len -
+				offsetof(struct EDNS_COOKIES, client_cookie));
+			qry->pktsize  += cookie_opt_len;
 		}
 
 		/* Transmit the request over the network */
@@ -931,24 +1049,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	qry->xmit_time= time(NULL);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 
-	/* Assume that we are limited to one AF. mk_dns_buff needs to know
-	 * for the client subnet option.
-	 */
-	qry->opt_AF = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
-
-	r= mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
-	if (r == -1)
-	{
-		/* Can't construct a DNS query */
-		free (outbuff);
-		outbuff = NULL;
-		snprintf(line, DEFAULT_LINE_LENGTH,
-			"%s \"err\" : \"unable to format DNS query\"",
-			qry->err.size ? ", " : "");
-		buf_add(&qry->err, line, strlen(line));
-		printReply (qry, 0, NULL);
-		return;
-	}
 	do {
 		if (qry->udp_fd != -1)
 		{
@@ -1037,6 +1137,37 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				return;
 		}
 
+		if (!qry->response_in &&
+			getsockname(qry->udp_fd,
+			(struct sockaddr *)&qry->loc_sin6,
+			&qry->loc_socklen)  == -1) {
+			snprintf(line, DEFAULT_LINE_LENGTH,
+				"%s \"getsockname\" : \"%s\"",
+				qry->err.size ? ", " : "", strerror(errno));
+			buf_add(&qry->err, line, strlen(line));
+		}
+
+		/* Assume that we are limited to one AF. mk_dns_buff needs
+		 * to know for the client subnet option. We also need to
+		 * know the local address for the cookie option.
+		 */
+		qry->opt_AF =
+			((struct sockaddr *)(qry->res->ai_addr))->sa_family;
+
+		r= mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
+		if (r == -1)
+		{
+			/* Can't construct a DNS query */
+			free (outbuff);
+			outbuff = NULL;
+			snprintf(line, DEFAULT_LINE_LENGTH,
+				"%s \"err\" : \"unable to format DNS query\"",
+				qry->err.size ? ", " : "");
+			buf_add(&qry->err, line, strlen(line));
+			printReply (qry, 0, NULL);
+			return;
+		}
+
 		if (qry->response_in)
 			nsent= qry->pktsize;
 		else
@@ -1047,10 +1178,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		qry->ressent = qry->res;
 
 		if (nsent == qry->pktsize) {
-			if (!qry->response_in && getsockname(qry->udp_fd, (struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen)  == -1) {
-				snprintf(line, DEFAULT_LINE_LENGTH, "%s \"getsockname\" : \"%s\"", qry->err.size ? ", " : "", strerror(errno));
-				buf_add(&qry->err, line, strlen(line));
-			}
 
 			/* One more DNS Query is sent */
 			base->sentok++;
@@ -1402,8 +1529,182 @@ static void process_reply(void * arg, int nrecv, struct timespec now)
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
+
+	if (qry->opt_cookies)
+		update_server_cookie(qry, base->packet, nrecv);
+
 	printReply (qry, nrecv, base->packet);
 	return;
+}
+
+static void update_server_cookie(struct query_state *qry, uint8_t *packet,
+	int packlen)
+{
+	int ind, optlen, optoff;
+
+	/* Should wipe server cookie first. */
+	printf("update_server_cookie: should wipe server cookie\n");
+
+	/* Select server cookie */
+	if (qry->opt_resolv_conf)
+		ind= qry->resolv_i;
+	else
+		ind= 0;
+	qry->cookie_state->server_cookies[ind].len= 0;
+
+	optlen= get_edns_opt(&optoff, EDNS_OPT_COOKIE, packet, packlen);
+	if (optlen == -1)
+	{
+		printf("update_server_cookie: cookie opt not found\n");
+		return;
+	}
+
+	/* We expect a server cookie */
+	if (optlen < DNS_CLIENT_COOKIE_LEN + DNS_SERVER_COOKIE_MIN_LEN ||
+		optlen > DNS_CLIENT_COOKIE_LEN + DNS_SERVER_COOKIE_MAX_LEN)
+	{
+		/* Wrong size */
+		printf("update_server_cookie: wrong size\n");
+		return;
+	}
+
+	/* Check if client cookie matches */
+	if (memcmp(qry->cookie_state->client_cookie, packet+optoff,
+		DNS_CLIENT_COOKIE_LEN) != 0)
+	{
+		qry->client_cookie_mismatch= 1;
+		/* Should report cookie mismatch */
+		printf("update_server_cookie: client cookie mismatch\n");
+		return;
+	}
+
+	/* Should update server cookie */
+
+	qry->cookie_state->server_cookies[ind].len=
+		optlen-DNS_CLIENT_COOKIE_LEN;;
+	memcpy(qry->cookie_state->server_cookies[ind].cookie,
+		packet+optoff+DNS_CLIENT_COOKIE_LEN,
+		qry->cookie_state->server_cookies[ind].len);
+}
+
+static int get_edns_opt(int *optoffp, int target_code,
+	uint8_t *packet, int packlen)
+{
+	int i, l, o, is_question, qcount, recs_to_skip;
+	int namelen, opt_code, opt_len, opt_o, rdata_o, rdlen, rr_o, type;
+	struct DNS_HEADER *dnsR = NULL;
+
+	dnsR = (struct DNS_HEADER*) packet;
+
+	qcount= ntohs(dnsR->q_count);
+	recs_to_skip= qcount +
+		ntohs(dnsR->ans_count ) +
+		ntohs(dnsR->ns_count) +
+		ntohs(dnsR->add_count);
+	o= sizeof(struct DNS_HEADER);
+	for (i= 0; i<recs_to_skip; i++)
+	{
+		is_question= (i<qcount);
+		l= get_rr_len(&namelen, packet, o, packlen,
+			is_question);
+		if (l == -1)
+		{
+			printf("get_edns_opt: bad rr\n");
+			return -1;
+		}
+		rr_o= o+namelen;
+		rdata_o = rr_o + /*type*/ 2 + /*class*/ 2 + /*ttl*/ 4 +
+			/* rdlength*/ 2;
+		rdlen= o + l - rdata_o;
+		o += l;
+		if (!is_question)
+		{
+			/* Is this the ENDS0 op RR? */
+			if (namelen != 1)
+				continue;
+			type= (packet[rr_o] << 8) | packet[rr_o+1];
+			printf("get_edns_opt: type %d\n", type);
+			printf("ns_t_opt = %d\n", ns_t_opt);
+			if (type != ns_t_opt)
+				continue;
+			break;
+		}
+	}
+	if (i >= recs_to_skip)
+	{
+		printf("get_edns_opt: no OPT RR\n");
+		return -1;	/* No OPT RR */
+	}
+	opt_o= 0;
+	for (opt_o= 0; opt_o+4 <= rdlen;)
+	{
+		opt_code= (packet[rdata_o + opt_o] << 8) |
+			packet[rdata_o + opt_o + 1];
+		opt_len= (packet[rdata_o + opt_o +2] << 8) |
+                        packet[rdata_o + opt_o + 3];
+		if (opt_o + 4 + opt_len > rdlen)
+		{
+			printf("get_edns_opt: no option header\n");
+			return -1;
+		}
+		printf("get_edns_opt: code %d\n", opt_code);
+		if (opt_code == target_code)
+		{
+			*optoffp= rdata_o + opt_o + 4;
+			return opt_len;
+		}
+		opt_o += 4 + opt_len;
+	}
+
+	/* Not found */
+	return -1;
+}
+
+static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
+	int question)
+{
+	int label_len, name_len, rdlength, rr_len;
+
+	printf("get_rr_len:\n");
+	
+	/* Handle name */
+	name_len= 0;
+	for(;;)
+	{
+		if (offset+name_len >= len)
+			return -1;
+		label_len= packet[offset+name_len];
+		printf("get_rr_len: label_len %d\n", label_len);
+		if (label_len > 63)
+		{
+			if (label_len < 192)
+				return -1;	/* bogus */
+			name_len += 2;
+			break;
+		}
+		else if (label_len == 0)
+		{
+			name_len++;
+			break;
+		}
+		name_len += label_len+1;
+	}
+
+	*namelenp= name_len;
+
+	if (question)
+		return name_len + /*qtype*/ 2 + /*qclass*/ 2;
+
+	rr_len= name_len + /*type*/ 2 + /*class*/ 2 + /*ttl*/ 4;
+	printf("offset %d, rr_len %d, len %d\n", offset, rr_len, len);
+	if (offset+rr_len+2 > len)
+		return -1;
+	rdlength= (packet[offset+rr_len] << 8) | packet[offset+rr_len+1];
+
+	rr_len += 2 + rdlength;
+
+	printf("returning %d\n", rr_len);
+	return rr_len;
 }
 
 static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
@@ -1449,45 +1750,6 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	process_reply(arg, nrecv, rectime);
 	return;
 } 
-
-#if 0
-static void ready_callback6 (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
-{
-	struct query_state * qry;
-	int nrecv; 
-	struct timespec rectime;
-	struct msghdr msg;
-	struct iovec iov[1];
-	//char buf[INET6_ADDRSTRLEN];
-	char cmsgbuf[256];
-
-	qry= arg;
-
-	/* Time the packet has been received */
-	gettimeofday(&rectime, NULL);
-
-	iov[0].iov_base= qry->base->packet;
-	iov[0].iov_len= sizeof(qry->base->packet);
-
-	msg.msg_name= &remote6;
-	msg.msg_namelen= sizeof( struct sockaddr_in6);
-	msg.msg_iov= iov;
-	msg.msg_iovlen= 1;
-	msg.msg_control= cmsgbuf;
-	msg.msg_controllen= sizeof(cmsgbuf);
-	msg.msg_flags= 0;                       /* Not really needed */
-
-	nrecv= recvmsg(qry->udp_fd, &msg, MSG_DONTWAIT);
-	if (nrecv == -1) {
-		/* Strange, read error */
-		printf("ready_callback6: read error '%s'\n", strerror(errno));
-		return;
-	}
-	process_reply(arg, nrecv, rectime);
-
-	return;
-}
-#endif
 
 static bool argProcess (int argc, char *argv[], struct query_state *qry )
 {
@@ -1576,7 +1838,7 @@ static void *tdig_init(int argc, char *argv[],
 {
 	char *check;
 	struct query_state *qry;
-	int c;
+	int c, r, fd;
 
 	if (!tdig_base)
 		tdig_base = tdig_base_new(EventBase);
@@ -1599,6 +1861,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->str_bundle = NULL;
 	qry->out_filename = NULL;
 	qry->opt_proto = 17; 
+	qry->cookie_state = NULL;
 	qry->udp_fd = -1;
 	qry->server_name = NULL;
 	qry->infname = NULL;
@@ -1613,6 +1876,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_dnssec = 0;
 	qry->opt_nsid = 0; 
 	qry->opt_client_subnet = 0; 
+	qry->opt_cookies = 0; 
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
@@ -1688,10 +1952,6 @@ static void *tdig_init(int argc, char *argv[],
 				qry->str_bundle= strdup(optarg);
 				break;
 
-			case 'I':
-				free(qry->infname);
-				qry->infname= strdup(optarg);
-				break;
 			case 'b':
 				qry->macro_lookupname =
 					strdup ("version.bind.");
@@ -1699,6 +1959,9 @@ static void *tdig_init(int argc, char *argv[],
 		
 			case 'c':
 				qry->opt_client_subnet = 1;
+				break;
+			case 'C':
+				qry->opt_cookies = 1;
 				break;
 
 			case 'd':
@@ -1716,6 +1979,10 @@ static void *tdig_init(int argc, char *argv[],
 
 			case 'i':
 				qry->macro_lookupname = strdup("id.server.");
+				break;
+			case 'I':
+				free(qry->infname);
+				qry->infname= strdup(optarg);
 				break;
 
 			case 'n':
@@ -2049,6 +2316,28 @@ static void *tdig_init(int argc, char *argv[],
 				 * place for now.
 				 */
 
+	if (qry->opt_cookies)
+	{
+		qry->cookie_state= malloc(sizeof(*qry->cookie_state));
+		memset(qry->cookie_state, '\0', sizeof(*qry->cookie_state));
+
+		/* Get secret */
+		fd= open("/dev/urandom", O_RDONLY);
+		if (fd == -1)
+		{
+			crondlog(LVL8 "unable to open /dev/urandom");
+			return NULL;
+		}
+		r= read(fd, qry->cookie_state->client_secret,
+			sizeof(qry->cookie_state->client_secret));
+		close(fd);
+		if (r != sizeof(qry->cookie_state->client_secret))
+		{
+			crondlog(LVL8 "unable to read from /dev/urandom");
+			return NULL;
+		}
+	}
+
 	qry->base = tdig_base;
 
 	/* insert this qry into the list of queries */
@@ -2150,6 +2439,8 @@ void tdig_start (void *arg)
 	char port[] = "domain";
 
 	qry= arg;
+
+	qry->client_cookie_mismatch= false;
 
 	switch(qry->qst)
 	{
@@ -2556,6 +2847,11 @@ static int tdig_delete(void *state)
 	if (qry->qst )
 		return 0;
 
+	if (qry->cookie_state)
+	{
+		free(qry->cookie_state);
+		qry->cookie_state= NULL;
+	}
 	if(qry->out_filename)
 	{ 
 		free(qry->out_filename);
@@ -2806,6 +3102,12 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			buf_add(&qry->result,line, strlen(line));
 			buf_add_b64(&qry->result, result, wire_size, 0);
 			AS("\"");
+		}
+
+		if (qry->client_cookie_mismatch)
+		{
+			snprintf(line, DEFAULT_LINE_LENGTH, ", \"client-cookie-mismatch\" : true");
+			buf_add(&qry->result,line, strlen(line));
 		}
 
 		if (wire_size < sizeof(struct DNS_HEADER))
