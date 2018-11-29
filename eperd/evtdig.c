@@ -331,6 +331,7 @@ struct query_state {
 	int opt_edns0;
 	int opt_edns_version;
 	int opt_edns_flags;
+	int opt_edns_option;
 	int opt_dnssec;
 	int opt_nsid;
 	int opt_client_subnet;
@@ -579,6 +580,7 @@ static struct option longopts[]=
 	{ "evdns", no_argument, NULL, O_EVDNS },
 	{ "edns-version", required_argument, NULL, '1' },
 	{ "edns-flags", required_argument, NULL, '2' },
+	{ "edns-option", required_argument, NULL, '3' },
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
@@ -875,7 +877,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_cookies ||
 		qry->opt_dnssec || (qry->opt_edns0 > 512) ||
 		qry->opt_edns_version != 0 ||
-		qry->opt_edns_flags != 0) { 
+		qry->opt_edns_flags != 0 ||
+		qry->opt_edns_option != 0) { 
 		p= &packet[qry->pktsize];
 		*p= 0;	/* encoding of '.' */
 		qry->pktsize++;
@@ -1006,6 +1009,19 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 			cookies->olength = htons(cookie_opt_len -
 				offsetof(struct EDNS_COOKIES, client_cookie));
 			qry->pktsize  += cookie_opt_len;
+		}
+		if(qry->opt_edns_option ) {
+			/* Insert an empty option with this option code.
+			 * Use struct EDNS_NSID because it is exacly the
+			 * empty header we need.
+			 */
+			n=(struct EDNS_NSID*)&packet[ qry->pktsize ];
+			rdlen= ntohs(e->_edns_rdlen);
+			e->_edns_rdlen =
+				htons(rdlen + sizeof(struct EDNS_NSID));
+			n->otype = htons(qry->opt_edns_option); 
+			n->olength =  htons(0);
+			qry->pktsize  += sizeof(struct EDNS_NSID);
 		}
 
 		/* Transmit the request over the network */
@@ -1878,6 +1894,9 @@ static void *tdig_init(int argc, char *argv[],
 	qry->wire_size = 0;
 	qry->triptime = 0;
 	qry->opt_edns0 = 512; 
+	qry->opt_edns_version = 0;
+	qry->opt_edns_flags = 0;
+	qry->opt_edns_option = 0;
 	qry->opt_dnssec = 0;
 	qry->opt_nsid = 0; 
 	qry->opt_client_subnet = 0; 
@@ -1887,8 +1906,6 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_rd = 0;
 	qry->opt_cd = 0;
 	qry->opt_evdns = 0;
-	qry->opt_edns_version = 0;
-	qry->opt_edns_flags = 0;
 	qry->opt_rset = 0;
 	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
@@ -1929,6 +1946,10 @@ static void *tdig_init(int argc, char *argv[],
 				break;
 			case '2':
 				qry->opt_edns_flags=
+					strtoul(optarg, &check, 0);
+				break;
+			case '3':
+				qry->opt_edns_option=
 					strtoul(optarg, &check, 0);
 				break;
 
