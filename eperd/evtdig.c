@@ -330,6 +330,7 @@ struct query_state {
 	int opt_proto;
 	int opt_edns0;
 	int opt_edns_version;
+	int opt_edns_flags;
 	int opt_dnssec;
 	int opt_nsid;
 	int opt_client_subnet;
@@ -577,6 +578,7 @@ static struct option longopts[]=
 
 	{ "evdns", no_argument, NULL, O_EVDNS },
 	{ "edns-version", required_argument, NULL, '1' },
+	{ "edns-flags", required_argument, NULL, '2' },
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
@@ -872,7 +874,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		sizeof(struct QUESTION)) ;
 	if(qry->opt_nsid || qry->opt_client_subnet || qry->opt_cookies ||
 		qry->opt_dnssec || (qry->opt_edns0 > 512) ||
-		qry->opt_edns_version != 0) { 
+		qry->opt_edns_version != 0 ||
+		qry->opt_edns_flags != 0) { 
 		p= &packet[qry->pktsize];
 		*p= 0;	/* encoding of '.' */
 		qry->pktsize++;
@@ -881,11 +884,9 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		e->otype = htons(ns_t_opt);
 		e->_edns_udp_size = htons(qry->opt_edns0);
 		e->_edns_version = qry->opt_edns_version;
+		e->Z = htons(qry->opt_edns_flags);
 		if(qry->opt_dnssec) {
-			e->Z = htons(0x8000);
-		}
-		else  {
-			e->Z = 0x0;
+			e->Z |= htons(0x8000);
 		}
 		e->_edns_rdlen =  htons(0);
 		crondlog(LVL5 "opt header in hex | %02X  %02X %02X %02X %02X %02X %02X %02X %02X | %02X",
@@ -1887,6 +1888,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_cd = 0;
 	qry->opt_evdns = 0;
 	qry->opt_edns_version = 0;
+	qry->opt_edns_flags = 0;
 	qry->opt_rset = 0;
 	qry->opt_prepend_probe_id = 0;
 	qry->ressave = NULL;
@@ -1924,6 +1926,10 @@ static void *tdig_init(int argc, char *argv[],
 			case '1':
 				qry->opt_edns_version=
 					strtoul(optarg, &check, 10);
+				break;
+			case '2':
+				qry->opt_edns_flags=
+					strtoul(optarg, &check, 0);
 				break;
 
 			case '4':
