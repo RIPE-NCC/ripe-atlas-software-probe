@@ -460,6 +460,7 @@ extern int get_atlas_fw_version(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
 extern char *atlas_name_macro(char *str);
+extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;

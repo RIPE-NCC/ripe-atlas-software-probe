@@ -214,64 +214,6 @@ static void ready_tcp4(int __attribute((unused)) unused,
 static void ready_callback6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s);
 
-#define OPT_PAD1 0
-#define OPT_PADN 1
-static void do_hbh_dest_opt(struct trtbase *base, int sock, int hbh_dest,
-	unsigned size)
-{
-	int i;
-	size_t totsize, ehlen, padlen;
-
-	if (size == 0)
-	{
-		setsockopt(sock, IPPROTO_IPV6,
-			hbh_dest ? IPV6_DSTOPTS : IPV6_HOPOPTS, NULL, 0);
-		return;
-	}
-
-	/* Compute the totsize we need */
-	totsize = 2 + size;
-	if (totsize % 8)
-		totsize += 8 - (totsize % 8);
-
-	/* Consistency check */
-	if (totsize > sizeof(base->packet))
-		return;
-
-	ehlen= totsize/8 - 1;
-	if (ehlen > 255)
-		return;
-
-	memset(base->packet, '\0', totsize);
-	base->packet[1]= ehlen;
-	for (i= 2; i<totsize;)
-	{
-		padlen= totsize-i;
-		if (padlen == 1)
-		{
-			base->packet[i]= OPT_PAD1;
-			i++;
-			continue;
-		}
-		padlen -= 2;
-		if (padlen > 255)
-			padlen= 255;
-		base->packet[i]= OPT_PADN;
-		base->packet[i+1]= padlen;
-		i += 2+padlen;
-	}
-	if (hbh_dest)
-	{
-		setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, base->packet,
-			totsize);
-	}
-	else
-	{
-		setsockopt(sock, IPPROTO_IPV6, IPV6_HOPOPTS, base->packet,
-			totsize);
-	}
-}
-
 static int in_cksum(unsigned short *buf, int sz)
 {
 	int nleft = sz;
@@ -631,12 +573,12 @@ static void send_pkt(struct trtstate *state)
 #if 1
 			if (state->hbhoptsize != 0)
 			{
-				do_hbh_dest_opt(base, sock, 0 /* hbh */,
+				do_ipv6_option(sock, 0 /* hbh */,
 					 state->hbhoptsize);
 			}
 			if (state->destoptsize != 0)
 			{
-				do_hbh_dest_opt(base, sock, 1 /* dest */,
+				do_ipv6_option(sock, 1 /* dest */,
 					 state->destoptsize);
 			}
 #endif
@@ -769,9 +711,9 @@ static void send_pkt(struct trtstate *state)
 			setsockopt(state->socket_icmp, IPPROTO_IPV6,
 					IPV6_MTU_DISCOVER, &on, sizeof(on));
 
-			do_hbh_dest_opt(base, state->socket_icmp, 0 /* hbh */,
+			do_ipv6_option(state->socket_icmp, 0 /* hbh */,
 					 state->hbhoptsize);
-			do_hbh_dest_opt(base, state->socket_icmp, 1 /* dest */,
+			do_ipv6_option(state->socket_icmp, 1 /* dest */,
 					 state->destoptsize);
 
 			icmp6_hdr= (struct icmp6_hdr *)base->packet;
@@ -895,12 +837,12 @@ static void send_pkt(struct trtstate *state)
 
 			if (state->hbhoptsize != 0)
 			{
-				do_hbh_dest_opt(base, sock, 0 /* hbh */,
+				do_ipv6_option(sock, 0 /* hbh */,
 					 state->hbhoptsize);
 			}
 			if (state->destoptsize != 0)
 			{
-				do_hbh_dest_opt(base, sock, 1 /* dest */,
+				do_ipv6_option(sock, 1 /* dest */,
 					 state->destoptsize);
 			}
 

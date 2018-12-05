@@ -332,6 +332,7 @@ struct query_state {
 	int opt_edns_version;
 	int opt_edns_flags;
 	int opt_edns_option;
+	int opt_ipv6_dest_option;
 	int opt_dnssec;
 	int opt_nsid;
 	int opt_client_subnet;
@@ -581,6 +582,7 @@ static struct option longopts[]=
 	{ "edns-version", required_argument, NULL, '1' },
 	{ "edns-flags", required_argument, NULL, '2' },
 	{ "edns-option", required_argument, NULL, '3' },
+	{ "ipv6-dest-option", required_argument, NULL, '5' },
 	{ "out-file", required_argument, NULL, 'O' },
 	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
@@ -1098,6 +1100,12 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			outbuff = NULL;
 			return;
 		} 
+
+		if (af == AF_INET6 && qry->opt_ipv6_dest_option != 0)
+		{
+			do_ipv6_option(fd, 1 /* dest */,
+				qry->opt_ipv6_dest_option);
+		}
 
 		qry->udp_fd= fd;
 
@@ -1897,6 +1905,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_edns_version = 0;
 	qry->opt_edns_flags = 0;
 	qry->opt_edns_option = 0;
+	qry->opt_ipv6_dest_option = 0;
 	qry->opt_dnssec = 0;
 	qry->opt_nsid = 0; 
 	qry->opt_client_subnet = 0; 
@@ -1957,6 +1966,12 @@ static void *tdig_init(int argc, char *argv[],
 				qry->opt_v4_only = 1;
 				qry->opt_AF = AF_INET;
 				break;
+
+			case '5':
+				qry->opt_ipv6_dest_option=
+					strtoul(optarg, &check, 10);
+				break;
+
 			case '6':
 				qry->opt_v6_only = 1;
 				qry->opt_AF = AF_INET6;
