@@ -654,7 +654,7 @@ int evtdig_main(int argc, char **argv)
 	}
 
 	tdig_start(qry);  
-	printf ("starting query\n");
+	// printf ("starting query\n");
 
 	event_base_dispatch (EventBase);
 	event_base_loopbreak (EventBase);
@@ -800,8 +800,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	r =  random();
 	r %= 65535;
 	qry->qryid = (uint16_t) r; // host is storing int host byte order
-	crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
-	BLURT(LVL5 "dns qyery id %d", qry->qryid);
+	// crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
+	// BLURT(LVL5 "dns qyery id %d", qry->qryid);
 	dns->id = (uint16_t) htons(r); 
  
 	dns->qr = 0; //This is a query
@@ -894,6 +894,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 			e->Z |= htons(0x8000);
 		}
 		e->_edns_rdlen =  htons(0);
+#if 0
 		crondlog(LVL5 "opt header in hex | %02X  %02X %02X %02X %02X %02X %02X %02X %02X | %02X",
 				packet[qry->pktsize],
 				packet[qry->pktsize + 1],
@@ -905,6 +906,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 				packet[qry->pktsize + 7],
 				packet[qry->pktsize + 8],
 				packet[qry->pktsize + 9]);
+#endif
 
 		qry->pktsize  += sizeof(struct EDNS0_HEADER) ;
 		dns->add_count = htons(1);
@@ -1028,9 +1030,10 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 
 		/* Transmit the request over the network */
 	}
-	buf_init(&pbuf, -1);
 
+#if 0
 	if(qry->pktsize) {
+		buf_init(&pbuf, -1);
 		snprintf(line, DEFAULT_LINE_LENGTH, "%0d bytes ", qry->pktsize);
 		buf_add(&pbuf, line, strlen(line));
 
@@ -1046,6 +1049,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		crondlog(LVL5 "payload : %s", pbuf.buf);
 		buf_cleanup(&pbuf);
 	}
+#endif
 
 	return 0;
 } 
@@ -1070,7 +1074,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
 	qry->xmit_time= time(NULL);
-	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 
 	do {
 		if (qry->udp_fd != -1)
@@ -1197,6 +1200,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			return;
 		}
 
+		clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
+
 		if (qry->response_in)
 			nsent= qry->pktsize;
 		else
@@ -1242,13 +1247,13 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 static void done_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
 	struct query_state *qry = h;
 	qry->qst = STATUS_FREE;
-	BLURT(LVL5 "query %s is done call done",  qry->server_name);
+	// BLURT(LVL5 "query %s is done call done",  qry->server_name);
 	qry->base->done(qry, 0);
 }
 
 static void next_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
 	struct query_state *qry = h;
-	BLURT(LVL5 "next query for %s",  qry->server_name);
+	// BLURT(LVL5 "next query for %s",  qry->server_name);
 	tdig_start(qry);  
 }
 
@@ -1354,7 +1359,7 @@ static void tcp_dnscount(struct tu_env *env, int count)
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
 	qry->qst = STATUS_SEND;
-	BLURT(LVL5 "dns count for %s : %d", qry->server_name , count);
+	// BLURT(LVL5 "dns count for %s : %d", qry->server_name , count);
 }
 
 static void tcp_beforeconnect(struct tu_env *env,
@@ -1363,10 +1368,11 @@ static void tcp_beforeconnect(struct tu_env *env,
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
 	qry->xmit_time= time(NULL);
-	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->dst_ai_family = addr->sa_family;
-	BLURT(LVL5 "time : %d",  qry->xmit_time);
+	// BLURT(LVL5 "time : %d",  qry->xmit_time);
 	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 }
 
 static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
@@ -1396,7 +1402,7 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	}
 	qry->base->sentok++;
 	qry->base->sentbytes+= (qry->pktsize +2);
-	BLURT(LVL5 "send %u bytes", payload_len );
+	// BLURT(LVL5 "send %u bytes", payload_len );
 
 	if(qry->opt_qbuf) {
 		buf_init(&qry->qbuf, -1);
@@ -1416,8 +1422,10 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
+	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
+
         qry = ENV2QRY(ptr);
-	BLURT(LVL5 "TCP readcb %s", qry->server_name );
+	// BLURT(LVL5 "TCP readcb %s", qry->server_name );
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
@@ -1429,7 +1437,6 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		return;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
         bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
 	if (!qry->response_in)
@@ -1439,7 +1446,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			n= fread(b2, 1, 2, qry->resp_file);
 		else
 			n = evbuffer_remove(input, b2, 2 );
-		printf("got %d bytes for response size\n", n);
+		// printf("got %d bytes for response size\n", n);
 		if(n == 2){
 			if (qry->response_out)
 				fwrite(b2, 2, 1, qry->resp_file);
@@ -1469,7 +1476,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			n= fread(line, 1, 1, qry->resp_file);
 		else
 			n = evbuffer_remove(input,line , DEFAULT_LINE_LENGTH );
-		printf("got %d bytes for data size\n", n);
+		// printf("got %d bytes for data size\n", n);
 		if (n <= 0)
 		{
 			if (qry->response_in)
@@ -1479,11 +1486,11 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		if (qry->response_out)
 			fwrite(line, n, 1, qry->resp_file);
 		buf_add(&qry->packet, line, n);
-		crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
+		// crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
 		if(qry->wire_size == qry->packet.size) {
-			crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
-			crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
-			crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
+			// crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
+			// crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
+			// crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
 			dnsR = (struct DNS_HEADER*) qry->packet.buf;
 			if ( ntohs(dnsR->id)  == qry->qryid ) {
 				qry->triptime = (rectime.tv_sec -
@@ -1509,7 +1516,7 @@ static void tcp_writecb(struct bufferevent *bev UNUSED_PARAM, void *ptr UNUSED_P
 	struct query_state * qry; 
 	qry = ENV2QRY(ptr); 
 	*/
-	BLURT(LVL5 "TCP writecb");
+	// BLURT(LVL5 "TCP writecb");
 }
 
 
@@ -1543,7 +1550,7 @@ static void process_reply(void * arg, int nrecv, struct timespec now)
 	base->recvok++; 
 
 
-	crondlog(LVL7 "DBG: base address process reply %p, nrec %d", base, nrecv);
+	// crondlog(LVL7 "DBG: base address process reply %p, nrec %d", base, nrecv);
 	if (ntohs(dnsR->id) != qry->qryid)
 	{
 		base->martian++;
@@ -1552,7 +1559,6 @@ static void process_reply(void * arg, int nrecv, struct timespec now)
 	}
 
 	qry->base->recvbytes += nrecv;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now); // lave this till fix now from ready_callback6 corruption; ghoost
 	qry->triptime = (now.tv_sec-qry->xmit_time_ts.tv_sec)*1000 +
 		(now.tv_nsec-qry->xmit_time_ts.tv_nsec)/1e6;
 
@@ -1751,6 +1757,7 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	/* Time the packet has been received */
 
 	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
+
 	/* Receive data from the network */
 	if (qry->response_in)
 	{
@@ -2397,7 +2404,7 @@ static void *tdig_init(int argc, char *argv[],
 		qry->next = qry->prev = qry;
 		tdig_base->qry_head = qry;
 		tdig_stats( 0, 0, tdig_base); // call this first time to initial values.
-		crondlog(LVL7 "new head qry %s qry->prev %s qry->next %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
+		// crondlog(LVL7 "new head qry %s qry->prev %s qry->next %s", qry->str_Atlas,  qry->prev->str_Atlas,  qry->next->str_Atlas);
 	} 
 	else {	
 		crondlog(LVL7 "old head hea %s hea->prev %s hea->next %s", tdig_base->qry_head->str_Atlas,  tdig_base->qry_head->prev->str_Atlas,  tdig_base->qry_head->next->str_Atlas);
@@ -2517,12 +2524,12 @@ void tdig_start (void *arg)
 			/* Get time in case we don't send any packet */
 			qry->xmit_time= time(NULL);
 			qry->resolv_i = 0;
-			crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  qry->resolv_max);
+			// crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  qry->resolv_max);
 			if( qry->opt_resolv_conf) {
 				get_local_resolvers (qry->nslist,
 					&qry->resolv_max,
 					qry->infname);
-				crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
+				// crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
 				if(qry->resolv_max ) {
 					free(qry->server_name);
 					qry->server_name = NULL;
@@ -2557,7 +2564,6 @@ void tdig_start (void *arg)
 	hints.ai_flags = 0;
 
 	qry->xmit_time= time(NULL);
-	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
 	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
@@ -2609,7 +2615,7 @@ void tdig_start (void *arg)
 		}
 
 		qry->wire_size =  0;
-		crondlog(LVL5 "TCP QUERY %s", qry->server_name);
+		// crondlog(LVL5 "TCP QUERY %s", qry->server_name);
 		interval.tv_sec = CONN_TO;
 		interval.tv_usec= 0;
 
@@ -2799,7 +2805,7 @@ static void free_qry_inst(struct query_state *qry)
 {
 	int i;
 	struct timeval asap = { 1, 0 };
-	BLURT(LVL5 "freeing instance of %s ", qry->server_name);
+	// BLURT(LVL5 "freeing instance of %s ", qry->server_name);
 
 	if (qry->response_in)
 	{

@@ -71,18 +71,20 @@ void get_local_resolvers(char *nslist[MAXNS], int *resolv_max, char *ifname)
 		strlcpy(filename, RESOLV_CONF, sizeof(filename));
 	}
 
-	crondlog(LVL8 "get_local_resolvers: using %s", filename);
+	// crondlog(LVL8 "get_local_resolvers: using %s", filename);
 
 	R = fopen (filename, "r");
 	if (R != NULL) {
 		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
 			buf_start = buf;
 			if(resolv_conf_parse_line(&nslist[i], buf) ) {
-				crondlog(LVL5 "parsed file %s , line %s i=%d", filename, buf_start, i);
+				// crondlog(LVL5 "parsed file %s , line %s i=%d", filename, buf_start, i);
 				i++;
 			}
 			else 
-				crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", filename, i, buf_start);
+			{
+				// crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", filename, i, buf_start);
+			}
 		}
 		fclose (R);
 	}
