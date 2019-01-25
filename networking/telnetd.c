@@ -119,6 +119,7 @@
 #include "libbb.h"
 #include "common_bufsiz.h"
 #include <syslog.h>
+#include <sys/mount.h>
 
 #if DEBUG
 # define TELCMDS
@@ -140,11 +141,13 @@
 #define ATLAS_LOGIN	"C_TO_P_TEST_V1"
 #define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
 #define SESSION_ID_PREFIX	"SESSION_ID "
+#define FW_APP_VERS_FILE	"/home/atlas/state/FIRMWARE_APPS_VERSION"
 
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
 #define CMD_ONEOFF	"ONEOFF "
 #define CMD_REBOOT	"REBOOT"
+#define CMD_RELOAD	"RELOAD"
 
 #define CRLF		"\r\n"
 #define RESULT_OK	"OK" CRLF CRLF
@@ -155,6 +158,8 @@
 #define CREATE_FAILED	"UNABLE_TO_CREATE_NEW_CRONTAB" CRLF CRLF
 #define IO_ERROR	"IO_ERROR" CRLF CRLF
 #define BAD_PATH	"BAD_PATH" CRLF CRLF
+#define BAD_FW_FILE	"BAD_FW_FILE" CRLF CRLF
+#define BAD_REMOUNT	"BAD_REMOUNT" CRLF CRLF
 
 #define CRONUSER	"root"
 #define CRONTAB_NEW_SUF	"/" CRONUSER ".new"
@@ -163,6 +168,7 @@
 #define UPDATELINE	CRONUSER "\n"
 #define ONEOFF_SUFFIX	".new"
 #define SAFE_PREFIX	ATLAS_CRONS
+#define RELOAD_VERSION	"0000"
 
 enum state
 {
@@ -784,6 +790,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	int count, probe_id;
 	struct tsession *ts;
 	char *line;
+	FILE *file;
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 #define IS_INETD (opt & OPT_INETD)
 	int master_fd = master_fd; /* for compiler */
@@ -1165,6 +1172,29 @@ do_cmd:
 				reboot(LINUX_REBOOT_CMD_RESTART);
 				free(line); line= NULL;
 
+				goto skip3;
+			}
+			if (strcmp(line, CMD_RELOAD) == 0)
+			{
+				free(line); line= NULL;
+
+				r= mount(NULL, "/", NULL, MS_REMOUNT, NULL);
+				if (r == -1)
+				{
+					add_2sock(ts, BAD_REMOUNT);
+					goto skip3a;
+				}
+				file= fopen(FW_APP_VERS_FILE, "w");
+				if (!file)
+				{
+					add_2sock(ts, BAD_FW_FILE);
+					goto skip3a;
+				}
+				fputs(RELOAD_VERSION "\n", file);
+				fclose(file); file= NULL;
+
+				sync();
+				reboot(LINUX_REBOOT_CMD_RESTART);
 				goto skip3;
 			}
 			if (strlen(line) == 0)
