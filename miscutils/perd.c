@@ -343,10 +343,20 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 				last_minutely= t1;
 				CheckUpdates();
 			}
+			if (t1 < last_minutely)
+			{
+				/* Time is going backward */
+				last_minutely= t1;
+			}
 			if (t1 >= last_hourly + 3600)
 			{
 				last_hourly= t1;
 				SynchronizeDir();
+			}
+			if (t1 < last_hourly)
+			{
+				/* Time is going backward */
+				last_hourly= t1;
 			}
 #else
 			t2 = time(NULL);
