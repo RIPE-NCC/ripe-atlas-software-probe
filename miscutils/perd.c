@@ -49,7 +49,6 @@
 #include <syslog.h>
 
 #define ATLAS 1
-#define ATLAS_NEW_FORMAT 1
 
 #define DBQ(str) "\"" #str "\""
 
@@ -83,10 +82,7 @@
 #define SAFE_PREFIX ATLAS_DATA_NEW
 #endif
 
-#if ATLAS_NEW_FORMAT
 #define URANDOM_DEV	"/dev/urandom"
-#endif
-
 
 typedef struct CronFile {
 	struct CronFile *cf_Next;
@@ -104,7 +100,6 @@ typedef struct CronLine {
 	struct CronLine *cl_Next;
 	char *cl_Shell;         /* shell command                        */
 	pid_t cl_Pid;           /* running pid, 0, or armed (-1)        */
-#if ATLAS_NEW_FORMAT
 	unsigned interval;
 	time_t nextcycle;
 	time_t start_time;
@@ -115,14 +110,6 @@ typedef struct CronLine {
 
 	/* For debugging */
 	time_t lasttime;
-#else
-	/* ordered by size, not in natural order. makes code smaller: */
-	char cl_Dow[7];         /* 0-6, beginning sunday                */
-	char cl_Mons[12];       /* 0-11                                 */
-	char cl_Hrs[24];        /* 0-23                                 */
-	char cl_Days[32];       /* 1-31                                 */
-	char cl_Mins[60];       /* 0-59                                 */
-#endif /* ATLAS_NEW_FORMAT */
 } CronLine;
 
 
@@ -187,11 +174,7 @@ static int atlas_run(char *cmdline);
 
 static void CheckUpdates(void);
 static void SynchronizeDir(void);
-#if ATLAS_NEW_FORMAT
 static int TestJobs(time_t *nextp);
-#else
-static int TestJobs(time_t t1, time_t t2);
-#endif
 static void RunJobs(void);
 static int CheckJobs(void);
 static void RunJob(const char *user, CronLine *line);
@@ -253,10 +236,8 @@ int perd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int perd_main(int argc UNUSED_PARAM, char **argv)
 {
 	unsigned opt;
-#if ATLAS_NEW_FORMAT
 	int fd;
 	unsigned seed;
-#endif
 
 	const char *PidFileName = NULL;
 	atexit(my_exit);
@@ -290,7 +271,6 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	xsetenv("SHELL", DEFAULT_SHELL); /* once, for all future children */
 	crondlog(LVL9 "crond (busybox "BB_VER") started, log level %d", LogLevel);
 
-#if ATLAS_NEW_FORMAT
 	fd= open(URANDOM_DEV, O_RDONLY);
 
 	/* Best effort, just ignore errors */
@@ -301,7 +281,6 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	}
 	crondlog(LVL7 "using seed '%u'", seed);
 	srandom(seed);
-#endif
 
 	SynchronizeDir();
 
@@ -309,15 +288,9 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	 * of 1 second. */
 	{
 		time_t t1 = time(NULL);
-#if ATLAS_NEW_FORMAT
 		time_t next;
 		time_t last_minutely= 0;
 		time_t last_hourly= 0;
-#else
-		time_t t2;
-		long dt;
-		int rescan = 60;
-#endif
 		int sleep_time = 10; /* AA previously 60 */
 		if(PidFileName)
 		{
@@ -329,15 +302,10 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 		}
 		for (;;) {
 			kick_watchdog();
-#if ATLAS_NEW_FORMAT
 			sleep(sleep_time);
-#else
-			sleep((sleep_time + 1) - (time(NULL) % sleep_time));
-#endif
 
 			kick_watchdog();
 
-#if ATLAS_NEW_FORMAT
 			if (t1 >= last_minutely + 60)
 			{
 				last_minutely= t1;
@@ -358,39 +326,7 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 				/* Time is going backward */
 				last_hourly= t1;
 			}
-#else
-			t2 = time(NULL);
-			dt = (long)t2 - (long)t1;
-
-			/*
-			 * The file 'cron.update' is checked to determine new cron
-			 * jobs.  The directory is rescanned once an hour to deal
-			 * with any screwups.
-			 *
-			 * check for disparity.  Disparities over an hour either way
-			 * result in resynchronization.  A reverse-indexed disparity
-			 * less then an hour causes us to effectively sleep until we
-			 * match the original time (i.e. no re-execution of jobs that
-			 * have just been run).  A forward-indexed disparity less then
-			 * an hour causes intermediate jobs to be run, but only once
-			 * in the worst case.
-			 *
-			 * when running jobs, the inequality used is greater but not
-			 * equal to t1, and less then or equal to t2.
-			 */
-			if (--rescan == 0) {
-				rescan = 60;
-				SynchronizeDir();
-			}
-			CheckUpdates();
-			if (DebugOpt)
-				crondlog(LVL5 "wakeup dt=%ld", dt);
-			if (dt < -60 * 60 || dt > 60 * 60) {
-				crondlog(WARN9 "time disparity of %d minutes detected", dt / 60);
-			} else if (dt > 0)
-#endif /* ATLAS_NEW_FORMAT */
 			{
-#if ATLAS_NEW_FORMAT
 				sleep_time= 60;
 				if (do_kick_watchdog)
 					sleep_time= 10;
@@ -413,22 +349,8 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 				crondlog(
 				LVL7 "t1 = %d, next = %d, sleep_time = %d",
 					t1, next, sleep_time);
-#else
-				TestJobs(t1, t2);
-				RunJobs();
-				sleep(4);
-				if (CheckJobs() > 0) {
-					sleep_time = 10;
-				} else {
-					sleep_time = 10; /* AA previously 60 */
-				}
-#endif
 			}
-#if ATLAS_NEW_FORMAT
 			t1= time(NULL);
-#else
-			t1 = t2;
-#endif
 		}
 	}
 	return 0; /* not reached */
@@ -490,146 +412,6 @@ static const char MonAry[] ALIGN1 =
 	/* "Jan""Feb""Mar""Apr""May""Jun""Jul""Aug""Sep""Oct""Nov""Dec" */
 ;
 
-#if !ATLAS_NEW_FORMAT
-static void ParseField(char *user, char *ary, int modvalue, int off,
-				const char *names, char *ptr)
-/* 'names' is a pointer to a set of 3-char abbreviations */
-{
-	char *base = ptr;
-	int n1 = -1;
-	int n2 = -1;
-
-	// this can't happen due to config_read()
-	/*if (base == NULL)
-		return;*/
-
-	while (1) {
-		int skip = 0;
-
-		/* Handle numeric digit or symbol or '*' */
-		if (*ptr == '*') {
-			n1 = 0;		/* everything will be filled */
-			n2 = modvalue - 1;
-			skip = 1;
-			++ptr;
-		} else if (isdigit(*ptr)) {
-			if (n1 < 0) {
-				n1 = strtol(ptr, &ptr, 10) + off;
-			} else {
-				n2 = strtol(ptr, &ptr, 10) + off;
-			}
-			skip = 1;
-		} else if (names) {
-			int i;
-
-			for (i = 0; names[i]; i += 3) {
-				/* was using strncmp before... */
-				if (strncasecmp(ptr, &names[i], 3) == 0) {
-					ptr += 3;
-					if (n1 < 0) {
-						n1 = i / 3;
-					} else {
-						n2 = i / 3;
-					}
-					skip = 1;
-					break;
-				}
-			}
-		}
-
-		/* handle optional range '-' */
-		if (skip == 0) {
-			goto err;
-		}
-		if (*ptr == '-' && n2 < 0) {
-			++ptr;
-			continue;
-		}
-
-		/*
-		 * collapse single-value ranges, handle skipmark, and fill
-		 * in the character array appropriately.
-		 */
-		if (n2 < 0) {
-			n2 = n1;
-		}
-		if (*ptr == '/') {
-			skip = strtol(ptr + 1, &ptr, 10);
-		}
-
-		/*
-		 * fill array, using a failsafe is the easiest way to prevent
-		 * an endless loop
-		 */
-		{
-			int s0 = 1;
-			int failsafe = 1024;
-
-			--n1;
-			do {
-				n1 = (n1 + 1) % modvalue;
-
-				if (--s0 == 0) {
-					ary[n1 % modvalue] = 1;
-					s0 = skip;
-				}
-				if (--failsafe == 0) {
-					goto err;
-				}
-			} while (n1 != n2);
-
-		}
-		if (*ptr != ',') {
-			break;
-		}
-		++ptr;
-		n1 = -1;
-		n2 = -1;
-	}
-
-	if (*ptr) {
- err:
-		crondlog(WARN9 "user %s: parse error at %s", user, base);
-		return;
-	}
-
-	if (DebugOpt && (LogLevel <= 5)) { /* like LVL5 */
-		/* can't use crondlog, it inserts '\n' */
-		int i;
-		for (i = 0; i < modvalue; ++i)
-			fprintf(stderr, "%d", (unsigned char)ary[i]);
-		fputc('\n', stderr);
-	}
-}
-#endif /* !ATLAS_NEW_FORMAT */
-
-#if !ATLAS_NEW_FORMAT
-static void FixDayDow(CronLine *line)
-{
-	unsigned i;
-	int weekUsed = 0;
-	int daysUsed = 0;
-
-	for (i = 0; i < ARRAY_SIZE(line->cl_Dow); ++i) {
-		if (line->cl_Dow[i] == 0) {
-			weekUsed = 1;
-			break;
-		}
-	}
-	for (i = 0; i < ARRAY_SIZE(line->cl_Days); ++i) {
-		if (line->cl_Days[i] == 0) {
-			daysUsed = 1;
-			break;
-		}
-	}
-	if (weekUsed != daysUsed) {
-		if (weekUsed)
-			memset(line->cl_Days, 0, sizeof(line->cl_Days));
-		else /* daysUsed */
-			memset(line->cl_Dow, 0, sizeof(line->cl_Dow));
-	}
-}
-#endif /* !ATLAS_NEW_FORMAT */
 
 static void do_distr(CronLine *line)
 {
@@ -658,10 +440,8 @@ static void SynchronizeFile(const char *fileName)
 	struct stat sbuf;
 	int maxLines;
 	char *tokens[6];
-#if ATLAS_NEW_FORMAT
 	char *check0, *check1, *check2;
 	time_t now;
-#endif
 
 	if (!fileName)
 		return;
@@ -681,9 +461,7 @@ static void SynchronizeFile(const char *fileName)
 
 	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
 
-#if ATLAS_NEW_FORMAT
 	now= time(NULL);
-#endif
 
 	if (fstat(fileno(parser->fp), &sbuf) == 0 /* && sbuf.st_uid == DaemonUid */ ) {
 		CronFile *file = xzalloc(sizeof(CronFile));
@@ -713,7 +491,6 @@ static void SynchronizeFile(const char *fileName)
 			if (n < 6)
 				continue;
 			*pline = line = xzalloc(sizeof(*line));
-#if ATLAS_NEW_FORMAT
 			line->interval= strtoul(tokens[0], &check0, 10);
 			line->start_time= strtoul(tokens[1], &check1, 10);
 			line->end_time= strtoul(tokens[2], &check2, 10);
@@ -756,19 +533,6 @@ static void SynchronizeFile(const char *fileName)
 			do_distr(line);
 
 			line->lasttime= 0;
-#else
-			/* parse date ranges */
-			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
-			ParseField(file->cf_User, line->cl_Hrs, 24, 0, NULL, tokens[1]);
-			ParseField(file->cf_User, line->cl_Days, 32, 0, NULL, tokens[2]);
-			ParseField(file->cf_User, line->cl_Mons, 12, -1, MonAry, tokens[3]);
-			ParseField(file->cf_User, line->cl_Dow, 7, 0, DowAry, tokens[4]);
-			/*
-			 * fix days and dow - if one is not "*" and the other
-			 * is "*", the other is set to 0, and vise-versa
-			 */
-			FixDayDow(line);
-#endif /* ATLAS_NEW_FORMAT */
 			/* copy command */
 			line->cl_Shell = xstrdup(tokens[5]);
 			if (DebugOpt) {
@@ -1001,39 +765,17 @@ static void DeleteFile(CronFile *tfile)
  * period is about a minute (one scan).  Worst case it will be one
  * hour (60 scans).
  */
-#if ATLAS_NEW_FORMAT
 static int TestJobs(time_t *nextp)
-#else
-static int TestJobs(time_t t1, time_t t2)
-#endif
 {
 	int nJobs = 0;
-#if ATLAS_NEW_FORMAT
 	time_t now;
-#else
-	time_t t;
-#endif
 
-#if ATLAS_NEW_FORMAT
 	now= time(NULL);
 	*nextp= now+3600;	/* Enough */
 
 	{
 		CronFile *file;
 		CronLine *line;
-#else
-	/* Find jobs > t1 and <= t2 */
-
-	for (t = t1 - t1 % 60; t <= t2; t += 60) {
-		struct tm *tp;
-		CronFile *file;
-		CronLine *line;
-
-		if (t <= t1)
-			continue;
-
-		tp = localtime(&t);
-#endif /* ATLAS_NEW_FORMAT */
 		for (file = FileBase; file; file = file->cf_Next) {
 			if (DebugOpt)
 				crondlog(LVL5 "file %s:", file->cf_User);
@@ -1042,7 +784,6 @@ static int TestJobs(time_t t1, time_t t2)
 			for (line = file->cf_LineBase; line; line = line->cl_Next) {
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
-#if ATLAS_NEW_FORMAT
 				if (line->lasttime != 0)
 				{
 					if (now > line->lasttime+
@@ -1069,12 +810,6 @@ LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
 					now >= line->start_time &&
 					now <= line->end_time
 				)
-#else
-				if (line->cl_Mins[tp->tm_min] && line->cl_Hrs[tp->tm_hour]
-				 && (line->cl_Days[tp->tm_mday] || line->cl_Dow[tp->tm_wday])
-				 && line->cl_Mons[tp->tm_mon]
-				)
-#endif
 				{
 					if (DebugOpt) {
 						crondlog(LVL5 " job: %d %s",
@@ -1087,7 +822,6 @@ LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
 						line->cl_Pid = -1;
 						file->cf_Ready = 1;
 						++nJobs;
-#if ATLAS_NEW_FORMAT
 						*nextp= 0;
 						line->nextcycle++;
 						if (line->start_time +
@@ -1099,10 +833,8 @@ LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
 							line->interval + 1;
 						}
 						do_distr(line);
-#endif
 					}
 				}
-#if ATLAS_NEW_FORMAT
 				else if (now >= line->start_time &&
 					now <= line->end_time)
 				{
@@ -1115,7 +847,6 @@ LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
 					if (next < *nextp)
 						*nextp= next;
 				}
-#endif /* ATLAS_NEW_FORMAT */
 			}
 		}
 	}
