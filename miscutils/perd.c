@@ -784,6 +784,16 @@ static int TestJobs(time_t *nextp)
 			for (line = file->cf_LineBase; line; line = line->cl_Next) {
 				if (DebugOpt)
 					crondlog(LVL5 " line %s", line->cl_Shell);
+				if (now >= line->start_time &&
+					now < line->start_time +
+                                        (line->nextcycle-10)*line->interval)
+				{
+						crondlog(LVL7
+				"time went backward, resetting nextcycle");
+						line->lasttime= 0;
+						line->nextcycle= 0;
+				}
+					
 				if (line->lasttime != 0)
 				{
 					if (now > line->lasttime+
@@ -791,11 +801,12 @@ static int TestJobs(time_t *nextp)
 						line->distr_param)
 					{
 						crondlog(
-LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, should %d: %s",
+LVL7 "(TestJobs) job is late. Now %d, lasttime %d, max %d, nextcycle %d, should be %d: %s",
 							now, line->lasttime,
 							line->lasttime+
 							line->interval+
 							line->distr_param,
+							line->interval,
 							line->start_time +
 							line->nextcycle*
 							line->interval+
