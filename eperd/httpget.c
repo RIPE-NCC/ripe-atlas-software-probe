@@ -1464,6 +1464,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			{
 				state->readstate= READ_CHUNKED;
 				state->content_offset= 0;
+				state->tot_chunked= 0;
 			}
 			else
 			{
@@ -1908,7 +1909,7 @@ static void err_reading(struct hgstate *state)
 		report(state);
 		break;
 	default:
-		printf("in err_reading, unhandled case\n");
+		printf("in err_reading, unhandled case %d\n", state->readstate);
 	}
 }
 
@@ -2106,8 +2107,8 @@ static void httpget_start(void *state)
 	}
 	else
 	{
-		tu_connect_to_name(&hgstate->tu_env, hgstate->host, hgstate->do_tls,
-			hgstate->port,
+		tu_connect_to_name(&hgstate->tu_env, hgstate->host,
+			hgstate->do_tls, hgstate->port,
 			&interval, &hints, hgstate->infname, timeout_callback,
 			reporterr, dnscount, beforeconnect,
 			connected, readcb, writecb);
