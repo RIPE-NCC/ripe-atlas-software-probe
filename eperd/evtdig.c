@@ -1153,6 +1153,21 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				return;
 			}
 		}
+
+		if (qry->opt_resolv_conf && strcmp(qry->macro_lookupname,
+			qry->lookupname) != 0)
+		{
+			/* We want $r to generate a new random number for 
+			 * each resolver. 
+			 */
+			if (qry->lookupname)
+			{
+				free(qry->lookupname);
+				qry->lookupname= NULL;
+			}
+			qry->lookupname=
+				atlas_name_macro(qry->macro_lookupname);
+		}
 		qry->loc_socklen = sizeof(qry->loc_sin6);
 		if (qry->response_in)
 			;	/* No need to connect */
@@ -2321,7 +2336,7 @@ static void *tdig_init(int argc, char *argv[],
 			case (100000 + T_SSHFP):
 				qry->qtype = T_SSHFP;
 				qry->qclass = C_IN;
-				qry->lookupname = strdup(optarg);
+				qry->macro_lookupname = strdup(optarg);
 				break;
 
 			case (100000 + T_TA):
