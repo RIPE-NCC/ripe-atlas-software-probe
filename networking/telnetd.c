@@ -168,7 +168,7 @@
 #define UPDATELINE	CRONUSER "\n"
 #define ONEOFF_SUFFIX	".new"
 #define SAFE_PREFIX	ATLAS_CRONS
-#define RELOAD_VERSION	"0000"
+#define RELOAD_VERSION	"2000"
 
 enum state
 {
