@@ -1650,7 +1650,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			/* Quick check if the source port is in range */
 			srcport= ntohs(etcp->source);
 			if (srcport < SRC_BASE_PORT ||
-				srcport > SRC_BASE_PORT+256)
+				srcport >= SRC_BASE_PORT+base->tabsiz)
 			{
 #if 0
 				printf(
@@ -2677,7 +2677,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 
 	/* Quick check if the port is in range */
 	myport= ntohs(tcphdr->dest);
-	if (myport < SRC_BASE_PORT || myport > SRC_BASE_PORT+256)
+	if (myport < SRC_BASE_PORT || myport >= SRC_BASE_PORT+base->tabsiz)
 	{
 		return;	/* Not for us */
 	}
@@ -2939,7 +2939,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 
 	/* Quick check if the port is in range */
 	myport= ntohs(tcphdr->dest);
-	if (myport < SRC_BASE_PORT || myport > SRC_BASE_PORT+256)
+	if (myport < SRC_BASE_PORT || myport >= SRC_BASE_PORT+base->tabsiz)
 	{
 		return;	/* Not for us */
 	}
