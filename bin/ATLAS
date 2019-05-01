@@ -1,0 +1,317 @@
+#!/bin/sh
+# The ATLAS Main Loop
+# 2010 atlas@ripe.net  
+# Written by Daniel Karrenberg, Antony Antony
+# RIPE NCC
+
+#exec >/tmp/ATLAS.out 2>tmp/ATLAS.err
+#set -x
+
+DEVICE_NAME=
+if [ -f  /etc/board.json ]
+then
+	grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json &&
+		export DEVICE_NAME=nanopi-neo-plus2
+fi
+
+if [ -f /bin/dbug-config ]	# Should only exist on Xport.
+then
+	. /home/atlas/bin/xport-ATLAS.sh
+elif [ -f /etc/redhat-release ]
+then
+	. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-ATLAS.sh
+elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
+then
+	. /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-ATLAS.sh
+	echo "DEVICE_NAME=${DEVICE_NAME}"
+else	# assume tplink
+	. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-ATLAS.sh
+fi
+
+. $BIN_DIR/common.sh
+
+# Common config
+CON_KEEP_PID=con_keep_pid.vol
+
+$MOUNT_FS_CMD
+
+mkdir -p $STATUS_DIR $STATE_DIR $RUN_DIR
+mkdir -p $DATA_DIR $DATA_NEW_DIR $DATA_OUT_DIR
+mkdir -p $DATA_DIR/out/ooq
+mkdir -p $DATA_DIR/out/ooq10	# For wifi, can't hurt to just create this
+
+$CHOWN_DATA_DIRS
+
+if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR/home/atlas/data/new $DATA_DIR/home/atlas/data/out >> $DATA_NEW_DIR/simpleping
+then
+	D=`epoch`
+	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" 
+	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping 
+fi
+
+buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+buddyinfo $LOW_MEM_T
+
+/bin/mkdir -p $BASE_DIR/crons/main $BASE_DIR/crons/2
+rm -f $DATA_NEW_DIR/v6addr.vol
+rm -f $DATA_OUT_DIR/v6addr.txt
+rm -f $SSH_ERR
+
+# Try to get the date from a previous incarnation
+$LOAD_STORAGE_CURRENT_TIME
+if [ -f $STATUS_DIR/currenttime.txt ]
+then
+	t=`cat $STATUS_DIR/currenttime.txt`
+	echo Setting time to $t
+	date -S -s "$t"
+	D=`epoch`
+	echo "RESULT 9004 done $D after setting time from currenttime.txt to $t" >> $DATA_NEW_DIR/simpleping
+else
+	echo no file $STATUS_DIR/currenttime.txt
+fi
+
+# Source system specific initializing files
+if [ -f $BIN_DIR/passwdset ] ; then
+. $BIN_DIR/passwdset 
+rm -f $BIN_DIR/passwdset 
+$AFTER_PASSWDSET
+fi
+
+if [ -f $BIN_DIR/rc.local ] ; then
+. $BIN_DIR/rc.local
+fi
+
+$TRY_UPGRADE_CMD
+
+echo "P_TO_C_REPORT" > $STATUS_DIR/p_to_c_report_header
+
+mkdir -p $SSH_DIR
+cp $KNOWN_HOSTS_REG $SSH_DIR/known_hosts
+if [ -f $STATUS_DIR/known_hosts_controllers ]
+then
+	cat $STATUS_DIR/known_hosts_controllers >> $SSH_DIR/known_hosts
+fi
+
+$SETUP_NETWORK_CMD
+$SET_HOSTNAME $ETHER_ADDR
+
+# Kill deamons that may be still running before deleting the pid files
+$KILL_TELNETD_CMD
+$KILL_PERDS_CMD
+
+# the system part is done. now set env for ATLAS.
+rm -f $STATUS_DIR/*.vol
+
+# Crontabs may be bad enough that we can't actually do anything. Delete them
+# after too many failed boots
+if [ -f $DATA_NEW_DIR/reboot-count.txt ]
+then
+	a=`cat $DATA_NEW_DIR/reboot-count.txt`
+	b=`expr $a + 1`
+	echo $b > $DATA_NEW_DIR/reboot-count.txt
+	echo Reboot count is now $b
+	if [ $b -gt 10 ]
+	then
+		echo Removing crontabs
+		rm -f $BASE_DIR/crons/main/root
+		rm -f $BASE_DIR/crons/*/root
+	fi
+else
+	echo 0 > $DATA_NEW_DIR/reboot-count.txt
+fi
+
+D=`epoch` 
+MSG="RESULT 9000 done $D $ETHER_SCANNED STARTING ATLAS system initialized (reboot count `cat $DATA_NEW_DIR/reboot-count.txt`)"
+echo "$MSG" >> $DATA_NEW_DIR/simpleping
+echo "$MSG"
+
+echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY" 
+echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY" >> $DATA_NEW_DIR/simpleping
+telnetd -b 127.0.0.1 -p $TELNETD_PORT -P $RUN_DIR/telnetd-port$TELNETD_PORT-pid.vol &
+
+buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+buddyinfo $LOW_MEM_T 
+ifconfig
+
+mkdir -p $BASE_DIR/crons/main
+mkdir -p $BASE_DIR/crons/2  $BASE_DIR/crons/3  $BASE_DIR/crons/4 
+mkdir -p $BASE_DIR/crons/5  $BASE_DIR/crons/6  $BASE_DIR/crons/7 
+mkdir -p $BASE_DIR/crons/8  $BASE_DIR/crons/9  $BASE_DIR/crons/10 
+mkdir -p $BASE_DIR/crons/11  $BASE_DIR/crons/12  $BASE_DIR/crons/13
+mkdir -p $BASE_DIR/crons/14  $BASE_DIR/crons/15  $BASE_DIR/crons/16
+mkdir -p $BASE_DIR/crons/17  $BASE_DIR/crons/18  $BASE_DIR/crons/19
+mkdir -p $BASE_DIR/crons/20
+mkdir -p $DATA_DIR/oneoff
+
+$CHOWN_FOR_MSM
+$CHMOD_FOR_MSM
+
+perd -c $BASE_DIR/crons/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
+if [ -n "$DO_WIFI" ]; then
+	perd -c $BASE_DIR/crons/2 -A 9802 -P $RUN_DIR/perd-2.pid.vol
+	ooqd $BASE_DIR/crons/oneoff3 &
+fi
+if [ -n "$DO_WIFI" ]; then
+	eperd -I br-lan -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
+	eooqd -I br-lan $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
+	eooqd -q10 -I wlan0 $BASE_DIR/crons/oneoff10 -A 9810 -P $RUN_DIR/eooqd10.pid.vol -i 10 &
+else
+	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
+	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
+fi
+
+buddyinfo 4096               
+if [ $? -eq 0 ] ; then 
+	$NTPCLIENT_CMD &
+fi  
+
+if [ -n "$RESOLVCONF_CMD" ]
+then
+	rptra6 -P $RUN_DIR/rptra6.pid.vol -r $DATA_NEW_DIR/resolv.conf.ra6 &
+	$RESOLVCONF_CMD
+fi
+
+while : 
+do
+	$CHECK_RO_USB
+
+	if [ $DHCP == "Temp" ] ; then	
+		#static config failed started DHCP tempeorly
+		evping -c 2 $IPV4_GW 
+		ARP=`arp -n $IPV4_GW`
+		set $ARP
+		MAC=$4
+		
+		# Use dynamic resolvers until we switch to static
+		# addresses
+		if [ -n "$RESOLVCONF_CMD" ]
+		then
+			$RESOLVCONF_CMD "" dynamic
+		fi
+
+		if [ -n $MAC ] ; then
+			if [ $MAC != '<incomplete>' ] ; then
+				$KILL_DHCPC_CMD
+				/sbin/route del default 
+				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP" > $DATA_NEW_DIR/simpleping
+				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP"
+				. $NETCONFIG_V4_DEST
+				/sbin/ifconfig $LANINF 0.0.0.0
+				DHCP=False
+				if [ -n "$RESOLVCONF_CMD" ]
+				then
+					# Regenerate resolv.conf
+					$RESOLVCONF_CMD
+				else
+					cp $RESOLV_CONF_STATIC $RESOLV_CONF
+				fi
+			fi
+		fi
+
+		
+	fi
+
+	# Check if ssh is still running (when we expect it to be running)
+	if [ -f  $STATUS_DIR/reginit.vol ]; then
+		$FINDPID_SSH_CMD
+		FOUNDPID=$?
+		if [ $FOUNDPID -eq 1 ] ; then
+			echo "no ssh client matching $KEEP_PID. cleanup state files. for next restart"
+			rm -f $NETCONFIG_V4_VOL
+			rm -f $NETCONFIG_V6_VOL
+			rm -f $STATUS_DIR/reginit.vol 
+			rm -f $STATUS_DIR/con_hello_sent.vol
+			rm -f $STATUS_DIR/network_info.vol
+			rm -f $STATUS_DIR/network_info_sent.vol
+			D=`epoch`
+			echo "RESULT 9010 done $D $ETHER_SCANNED no ssh client running restart registeration"  >> $DATA_NEW_DIR/simpleping
+			echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
+		else
+			$SET_LEDS_CMD keep-found
+			$SET_LEDS_CMD net-ok
+			echo "found KEEP ssh client running"
+		fi
+	fi
+
+	if [ -s $STATUS_DIR/con_keep_reply.vol ] ; then
+		echo "Controller kicked us out. KEEP result is nonzero"
+		echo "kill the session and forced reregister"
+		$KILL_SSH_CMD
+		echo "REASON=CON_KEEP_BROKEN" > $FORCE_REG
+		rm -f $STATUS_DIR/con_keep_reply.txt
+		rm -f $STATUS_DIR/reginit.vol
+		D=`epoch`
+		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP" >> $DATA_NEW_DIR/simpleping
+		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP" 
+	fi
+
+	$TRIGGER_MANUAL_UPGRADE_CMD
+
+	if [ ! -f  $STATUS_DIR/reginit.vol ] ; then 
+		D=`epoch`
+		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registeration" 
+		echo "$STATUS_DIR/reginit.vol does not exist try new reg"
+		UPTIME=`onlyuptime`
+		$SET_LEDS_CMD net-try
+		if evping -A "9017" -e -O $DATA_NEW_DIR/simpleping "U$UPTIME.M$ETHER_SCANNED.sos.atlas.ripe.net"
+		then
+			echo "Ping works"
+			$SET_LEDS_CMD net-ok
+		else
+			echo "Ping failed"
+			$SET_LEDS_CMD net-fail
+		fi
+		$KILL_SSH_CMD
+		echo "start reg"
+		$BIN_DIR/reginit.sh $STATUS_DIR/reginit.vol
+	fi
+
+	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+	buddyinfo $LOW_MEM_T
+	if [ $? -eq 1 ] ; then
+		D=`epoch`
+		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks " 
+		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks " >> $DATA_NEW_DIR/simpleping 
+		reboot_probe
+	fi
+
+	rxtxrpt -A "9002" >> $DATA_NEW_DIR/simpleping
+	rxtxrpt
+	rptaddrs -A 9104 -c $DATA_NEW_DIR/v6addr.vol -O $DATA_NEW_DIR/v6addr.txt
+	rptuptime >> $DATA_NEW_DIR/simpleping
+	condmv $DATA_NEW_DIR/v6addr.txt $DATA_OUT_DIR/v6addr.txt
+	condmv $DATA_NEW_DIR/simpleping $DATA_OUT_DIR/simpleping
+
+	epoch >$STATUS_DIR/currenttime.txt
+	$HANDLE_STORAGE_CURRENT_TIME
+
+	sleepkick 180
+
+	if [ -f $DATA_NEW_DIR/reboot-count.txt ]
+	then
+		UPTIME=`onlyuptime`
+		if [ $UPTIME -gt 600 ]
+		then
+			# Use condmv because it is build-in
+			echo Moving reboot-count.txt
+			condmv -f $DATA_NEW_DIR/reboot-count.txt $DATA_NEW_DIR/reboot-count.old
+		fi
+	else
+		if dfrm -A 9018 $DATA_DIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR >> $DATA_NEW_DIR/simpleping
+		then
+			D=`epoch`
+			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB" 
+			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping 
+			reboot_probe
+		fi
+	fi
+
+	if [ -n "$RESOLVCONF_CMD" -a -f $DATA_NEW_DIR/resolv.conf.ra6 ]
+	then
+		mv $DATA_NEW_DIR/resolv.conf.ra6 /tmp/resolv.conf.ra6
+		$RESOLVCONF_CMD
+	fi
+
+	sync
+	$DROP_CACHES
+done 
