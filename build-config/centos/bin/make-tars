@@ -1,0 +1,7 @@
+#!/bin/sh
+cd
+busybox_id=$(cd busybox && git rev-parse HEAD)
+scripts_id=$(cd atlas-probe-scripts && git rev-parse HEAD)
+rm -f rpmbuild/SOURCES/*.tar.gz
+tar cvzf rpmbuild/SOURCES/busybox-$busybox_id.tar.gz busybox
+tar cvzf rpmbuild/SOURCES/scripts-$scripts_id.tar.gz atlas-probe-scripts

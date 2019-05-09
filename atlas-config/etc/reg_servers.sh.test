@@ -1,0 +1,6 @@
+REG_1_HOST=reg01-test.atlas.ripe.net
+REG_2_HOST=193.0.19.181
+REG_3_HOST=2001:67c:2e8:11::c100:13b5
+REG_4_HOST=reg02-test.atlas.ripe.net
+REG_5_HOST=193.0.19.26
+REG_6_HOST=2001:67c:2e8:11::c100:131a
