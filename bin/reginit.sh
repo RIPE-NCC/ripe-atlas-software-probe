@@ -8,15 +8,18 @@
 
 STATE_FILE=$1 
 
-if [ -f /bin/dbug-config ]	# Should only exist on Xport.
+if [ X"${DEVICE_NAME}" = X"centos-sw-probe" ]
+then
+	. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-reginit.sh
+elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
+then
+        . /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-reginit.sh
+elif [ -f /bin/dbug-config ]	# Should only exist on Xport.
 then
 	. /home/atlas/bin/xport-reginit.sh
 elif [ -f /etc/redhat-release ]
 then
 	. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-reginit.sh
-elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
-then
-        . /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-reginit.sh
 else	# assume OpenWRT TP-Link probe
 	. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-reginit.sh
 fi
