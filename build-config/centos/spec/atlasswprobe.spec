@@ -3,11 +3,11 @@
 Name:           atlasswprobe
 Summary:        RIPE Atlas probe software
 Version:        4970
-Release:        12%{?dist}
+Release:        13%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        busybox-721e000967a2876646960f87b0a027a3b7e234f5.tar.gz
-Source2:        scripts-87fefcc6faf1247e5b199d7d02804121f056bca7.tar.gz
+Source2:        scripts-8ac9a3ae1f872438290cd82244c33fa29026949a.tar.gz
 Requires:       sudo %{?el6:daemontools} %{?el7:psmisc}
 BuildRequires:  rpm %{?el7:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
