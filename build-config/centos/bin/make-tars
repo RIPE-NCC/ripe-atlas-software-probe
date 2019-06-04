@@ -1,7 +1,6 @@
 #!/bin/sh
 cd
-busybox_id=$(cd busybox && git rev-parse HEAD)
-scripts_id=$(cd atlas-probe-scripts && git rev-parse HEAD)
+git_id=$(cd ripe-atlas-software-probe && git rev-parse HEAD)
+mkdir -p rpmbuild/SOURCES
 rm -f rpmbuild/SOURCES/*.tar.gz
-tar cvzf rpmbuild/SOURCES/busybox-$busybox_id.tar.gz busybox
-tar cvzf rpmbuild/SOURCES/scripts-$scripts_id.tar.gz atlas-probe-scripts
+tar cvzf rpmbuild/SOURCES/src-$git_id.tar.gz ripe-atlas-software-probe

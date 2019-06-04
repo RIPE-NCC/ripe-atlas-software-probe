@@ -6,8 +6,7 @@ Version:        4970
 Release:        13%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
-Source1:        busybox-721e000967a2876646960f87b0a027a3b7e234f5.tar.gz
-Source2:        scripts-8ac9a3ae1f872438290cd82244c33fa29026949a.tar.gz
+Source1:        src-6aad8b765895a75fd59c12355552ce019246e705.tar.gz
 Requires:       sudo %{?el6:daemontools} %{?el7:psmisc}
 BuildRequires:  rpm %{?el7:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
@@ -17,25 +16,22 @@ This is the RIPE Atlas probe software. It's designed to run on CentOS Linux syst
 
 %prep
 tar xf %{SOURCE1}
-tar xf %{SOURCE2}
-#rm -rf atlas-probe-scripts
-#cp -r /home/atlas-dev/atlas-probe-scripts atlas-probe-scripts
 
 %build
-cd busybox/libevent-2.0.20-stable
+cd ripe-atlas-software-probe/probe-busybox/libevent-2.0.20-stable
 ./configure
 make
 cd ..
 make
 
 %install
-cd busybox
+cd ripe-atlas-software-probe/probe-busybox
 make install
 mkdir -p %{buildroot}%{installpath}/{bin,bin/arch/centos-sw-probe,bin/arch/linux,bb-13.3,etc,lib,state}
 cp -r ./_install/* %{buildroot}%{installpath}/bb-13.3
 cp ./libevent-2.0.20-stable/.libs/libevent-*so* %{buildroot}%{installpath}/lib
 cp ./libevent-2.0.20-stable/.libs/libevent_openssl-*so* %{buildroot}%{installpath}/lib
-cd ../atlas-probe-scripts
+cd ..
 cp bin/{ATLAS,common-pre.sh,common.sh,reginit.sh} %{buildroot}%{installpath}/bin
 cp bin/arch/centos-sw-probe/* %{buildroot}%{installpath}/bin/arch/centos-sw-probe
 cp bin/arch/linux/* %{buildroot}%{installpath}/bin/arch/linux
