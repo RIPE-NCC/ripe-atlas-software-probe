@@ -79,7 +79,7 @@
 #ifdef ATLAS
 #include <cmdtable.h>
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 #endif
 
 #define URANDOM_DEV	"/dev/urandom"
@@ -969,6 +969,7 @@ static int atlas_run(char *cmdline)
 	char *cp, *ncp;
 	struct builtin *bp;
 	char *outfile;
+	char *validated_fn= NULL;
 	FILE *fn;
 	char *reason;
 	char *argv[ATLAS_NARGS];
@@ -1143,7 +1144,9 @@ static int atlas_run(char *cmdline)
 	{
 		/* Redirect I/O */
 		crondlog(LVL7 "sending output to '%s'", outfile);
-		if (!validate_filename(outfile, SAFE_PREFIX))
+		validated_fn= rebased_validated_filename(outfile,
+			SAFE_PREFIX_REL);
+		if (!validated_fn)
 		{
 			crondlog(
 			LVL8 "atlas_run: insecure output file '%s'",
@@ -1160,11 +1163,12 @@ static int atlas_run(char *cmdline)
 		{
 			crondlog(
 			LVL8 "atlas_run: unable to create output file '%s'",
-				outfile);
+				validated_fn);
 			r= -1;
 			reason="unable to create output file";
 			goto error;
 		}
+		free(validated_fn); validated_fn= NULL;
 		fflush(stdout);
 		saved_fd= dup(1);
 		if (saved_fd == -1)
@@ -1191,6 +1195,7 @@ static int atlas_run(char *cmdline)
 	}
 
 error:
+	if (validated_fn) free(validated_fn);
 	if (r != 0 && out_filename)
 	{
 		fn= fopen(out_filename, "a");

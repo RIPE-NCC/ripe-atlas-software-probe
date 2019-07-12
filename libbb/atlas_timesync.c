@@ -6,10 +6,13 @@
 #include "libbb.h"
 int get_timesync(void)
 {
+	char *fn;
 	FILE *fh;
 	int lastsync;
 
-	fh= fopen(ATLAS_TIMESYNC_FILE, "r");
+	fn= atlas_path(ATLAS_TIMESYNC_FILE_REL);
+	fh= fopen(fn, "r");
+	free(fn); fn= NULL;
 	if (!fh)
 		return -1;
 	fscanf(fh, "%d", &lastsync);

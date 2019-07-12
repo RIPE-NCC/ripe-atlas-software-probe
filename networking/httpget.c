@@ -57,8 +57,8 @@
 #include <sys/stat.h>
 #include "libbb.h"
 
-#define SAFE_PREFIX_OUT ATLAS_DATA_OUT
-#define SAFE_PREFIX_NEW ATLAS_DATA_NEW
+#define SAFE_PREFIX_OUT_REL ATLAS_DATA_OUT_REL
+#define SAFE_PREFIX_NEW_REL ATLAS_DATA_NEW_REL
 
 #define debug 0
 
@@ -118,6 +118,7 @@ int httpget_main(int argc, char *argv[])
 	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *store_headers, *store_body;
+	char *validated_fn= NULL;
 	FILE *tcp_file, *out_file;
 	struct timeval tv_start, tv_end;
 	struct stat sbF, sbH, sbS;
@@ -301,70 +302,79 @@ int httpget_main(int argc, char *argv[])
 
 	if(post_header != NULL )
 	{	
-		if (!validate_filename(post_header, SAFE_PREFIX_OUT))
+		validated_fn= rebased_validated_filename(post_header,
+			SAFE_PREFIX_OUT_REL);
+		if (validated_fn == NULL)
 		{
 			report("insecure file '%s'", post_header);
 			goto err;
 		}
-		fdH = open(post_header, O_RDONLY);
+		fdH = open(validated_fn, O_RDONLY);
 		if(fdH == -1 )
 		{
-			report_err("unable to open header '%s'", post_header);
+			report_err("unable to open header '%s'",
+				validated_fn);
 			goto err;
 		}
 		if (fstat(fdH, &sbH) == -1)
 		{
 			report_err("fstat failed on header file '%s'",
-				post_header);
+				validated_fn);
 			goto err;
 		}
 		if (!S_ISREG(sbH.st_mode))
 		{
 			report("'%s' header is not a regular file",
-				post_header);
+				validated_fn);
 			goto err;
 		}
+		free(validated_fn); validated_fn= NULL;
 	}
 
 	if(post_footer != NULL )
 	{	
-		if (!validate_filename(post_footer, SAFE_PREFIX_OUT))
+		validated_fn= rebased_validated_filename(post_footer,
+			SAFE_PREFIX_OUT_REL);
+		if (validated_fn == NULL)
 		{
 			report("insecure file '%s'", post_footer);
 			goto err;
 		}
-		fdF = open(post_footer, O_RDONLY);
+		fdF = open(validated_fn, O_RDONLY);
 		if(fdF == -1 )
 		{
-			report_err("unable to open footer '%s'", post_footer);
+			report_err("unable to open footer '%s'", validated_fn);
 			goto err;
 		}
 		if (fstat(fdF, &sbF) == -1)
 		{
 			report_err("fstat failed on footer file '%s'",
-				post_footer);
+				validated_fn);
 			goto err;
 		}
 		if (!S_ISREG(sbF.st_mode))
 		{
 			report("'%s' footer is not a regular file",
-				post_footer);
+				validated_fn);
 			goto err;
 		}
+		free(validated_fn); validated_fn= NULL;
 	}
 
 	/* Try to open the file before trying to connect */
 	if (post_file != NULL)
 	{
-		if (!validate_filename(post_file, SAFE_PREFIX_OUT))
+		validated_fn= rebased_validated_filename(post_file,
+			SAFE_PREFIX_OUT_REL);
+		if (validated_fn == NULL)
 		{
 			report("insecure file '%s'", post_file);
 			goto err;
 		}
-		fdS= open(post_file, O_RDONLY);
+		fdS= open(validated_fn, O_RDONLY);
 		if (fdS == -1)
 		{
-			report_err("unable to open '%s'", post_file);
+			report_err("unable to open '%s'", validated_fn);
 			goto err;
 		}
 		if (fstat(fdS, &sbS) == -1)
@@ -374,9 +384,10 @@ int httpget_main(int argc, char *argv[])
 		}
 		if (!S_ISREG(sbS.st_mode))
 		{
-			report("'%s' is not a regular file", post_file);
+			report("'%s' is not a regular file", validated_fn);
 			goto err;
 		}
+		free(validated_fn); validated_fn= NULL;
 	}
 
 	sa.sa_flags= 0;
@@ -389,17 +400,20 @@ int httpget_main(int argc, char *argv[])
 
 	if (output_file)
 	{
-		if (!validate_filename(output_file, SAFE_PREFIX_NEW))
+		validated_fn= rebased_validated_filename(output_file,
+			SAFE_PREFIX_NEW_REL);
+		if (!validated_fn)
 		{
 			report("insecure output file '%s'", output_file);
 			goto err;
 		}
-		out_file= fopen(output_file, do_append ? "a" : "w");
+		out_file= fopen(validated_fn, do_append ? "a" : "w");
 		if (!out_file)
 		{
 			report_err("unable to create '%s'", output_file);
 			goto err;
 		}
+		free(validated_fn); validated_fn= NULL;
 		out_file_needs_closing= 1;
 	}
 	else
@@ -492,15 +506,17 @@ int httpget_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			if (debug) fprintf(stderr, "posting file '%s'\n", p);
-			if (!validate_filename(p, SAFE_PREFIX_OUT))
+			validated_fn= rebased_validated_filename(p,
+				SAFE_PREFIX_OUT_REL);
+			if (validated_fn == NULL)
 			{
 				report("insecure file '%s'", p);
 				goto err;
 			}
-			fd= open(p, O_RDONLY);
+			fd= open(validated_fn, O_RDONLY);
 			if (fd == -1)
 			{
-				report_err("unable to open '%s'", p);
+				report_err("unable to open '%s'", validated_fn);
 				goto err;
 			}
 			r= write_to_tcp_fd(fd, tcp_file);
@@ -511,6 +527,7 @@ int httpget_main(int argc, char *argv[])
 				printf("write_to_tcp_fd failed\n");
 				goto fail;
 			}
+			free(validated_fn); validated_fn= NULL;
 		}
 	}
 
@@ -652,6 +669,7 @@ leave:
 	return result; 
 
 err:
+	if (validated_fn) free(validated_fn);
 	result= 1;
 	goto leave;
 }

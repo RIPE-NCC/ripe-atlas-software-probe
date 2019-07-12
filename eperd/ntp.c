@@ -18,7 +18,7 @@
 
 #include "eperd.h"
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
 #define DBQ(str) "\"" #str "\""
 
@@ -1716,6 +1716,9 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	const char *destportstr;
 	char *interface;
 	char *response_in, *response_out;
+	char *validated_response_in= NULL;
+	char *validated_response_out= NULL;
+	char *validated_out_filename= NULL;
 	struct ntpstate *state;
 	FILE *fh;
 
@@ -1752,34 +1755,42 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		if (!validate_filename(response_in, ATLAS_FUZZING))
+		validated_response_in= rebased_validated_filename(response_in,
+			ATLAS_FUZZING_REL);
+		if (!validated_response_in)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_in);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_in);
+			goto err;
 		}
 	}
 	if (response_out)
 	{
-		if (!validate_filename(response_out, ATLAS_FUZZING))
+		validated_response_out= rebased_validated_filename(response_out,
+			ATLAS_FUZZING_REL);
+		if (!validated_response_out)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_out);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_out);
+			goto err;
 		}
 	}
 
 	if (out_filename)
 	{
-		if (!validate_filename(out_filename, SAFE_PREFIX))
+		validated_out_filename= rebased_validated_filename(out_filename,
+			SAFE_PREFIX_REL);
+		if (!validated_out_filename)
 		{
 			crondlog(LVL8 "insecure file '%s'", out_filename);
-			return NULL;
+			goto err;
 		}
-		fh= fopen(out_filename, "a");
+		fh= fopen(validated_out_filename, "a");
 		if (!fh)
 		{
 			crondlog(LVL8 "unable to append to '%s'",
-				out_filename);
-			return NULL;
+				validated_out_filename);
+			goto err;
 		}
 		fclose(fh);
 	}
@@ -1789,7 +1800,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(str_Atlas))
 		{
 			crondlog(LVL8 "bad atlas ID '%s'", str_Atlas);
-			return NULL;
+			goto err;
 		}
 	}
 	if (str_bundle)
@@ -1797,7 +1808,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(str_bundle))
 		{
 			crondlog(LVL8 "bad bundle ID '%s'", str_bundle);
-			return NULL;
+			goto err;
 		}
 	}
 
@@ -1812,9 +1823,12 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	state->bundle= str_bundle ? strdup(str_bundle) : NULL;
 	state->hostname= strdup(hostname);
 	state->do_v6= do_v6;
-	state->out_filename= out_filename ? strdup(out_filename) : NULL;
-	state->response_in= response_in ? strdup(response_in) : NULL;
-	state->response_out= response_out ? strdup(response_out) : NULL;
+	state->out_filename= validated_out_filename;
+		validated_out_filename= NULL;
+	state->response_in= validated_response_in;
+		validated_response_in= NULL;
+	state->response_out= validated_response_out;
+		validated_response_out= NULL;
 	state->base= ntp_base;
 	state->busy= 0;
 	state->result= NULL;
@@ -1847,6 +1861,12 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		noreply_callback, state);
 
 	return state;
+
+err:
+	if (validated_response_in) free(validated_response_in);
+	if (validated_response_out) free(validated_response_out);
+	if (validated_out_filename) free(validated_out_filename);
+	return NULL;
 }
 
 static void traceroute_start2(void *state)

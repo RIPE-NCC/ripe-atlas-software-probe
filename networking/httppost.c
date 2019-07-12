@@ -30,11 +30,14 @@
 #include <sys/stat.h>
 #include "libbb.h"
 
-#define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
+//#define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
+#define SAFE_PREFIX_DATA_OUT_REL ATLAS_DATA_OUT_REL
 #define SAFE_PREFIX_DATA_OOQ_OUT ATLAS_DATA_OOQ_OUT
-#define SAFE_PREFIX_DATA_NEW ATLAS_DATA_NEW
+#define SAFE_PREFIX_DATA_OOQ_OUT_REL ATLAS_DATA_OOQ_OUT_REL
+#define SAFE_PREFIX_DATA_NEW_REL ATLAS_DATA_NEW_REL
 #define SAFE_PREFIX_DATA_STORAGE ATLAS_DATA_STORAGE
-#define SAFE_PREFIX_STATUS ATLAS_STATUS
+#define SAFE_PREFIX_DATA_STORAGE_REL ATLAS_DATA_STORAGE_REL
+#define SAFE_PREFIX_STATUS_REL ATLAS_STATUS_REL
 
 /* Maximum number of files to post in one go with post-dir */
 #define MAX_FILES	1000
@@ -86,7 +89,8 @@ int httppost_main(int argc, char *argv[])
 	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *atlas_id, *output_file,
 		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
-	char *time_tolerance;
+	char *time_tolerance, *rebased_fn= NULL;
+	char *fn_new, *fn;
 	FILE *tcp_file, *out_file, *fh;
 	time_t server_time, tolerance;
 	struct stat sbF, sbH, sbS;
@@ -224,67 +228,90 @@ int httppost_main(int argc, char *argv[])
 
 	if(post_header != NULL )
 	{	
-		if (!validate_filename(post_header, SAFE_PREFIX_DATA_OUT) &&
-			!validate_filename(post_header, SAFE_PREFIX_STATUS))
+		rebased_fn= rebased_validated_filename(post_header,
+			SAFE_PREFIX_DATA_OUT_REL);
+		if (rebased_fn == NULL)
 		{
-			report("protected file (for header) '%s'", post_header);
+			rebased_fn= rebased_validated_filename(post_header,
+				SAFE_PREFIX_STATUS_REL);
+		}
+		if (rebased_fn == NULL)
+		{
+			report("protected file (for header) '%s'",
+				post_header);
 			goto err;
 		}
-		fdH = open(post_header, O_RDONLY);
+		fdH = open(rebased_fn, O_RDONLY);
 		if(fdH == -1 )
 		{
-			report_err("unable to open header '%s'", post_header);
+			report_err("unable to open header '%s'", rebased_fn);
 			goto err;
 		}
 		if (fstat(fdH, &sbH) == -1)
 		{
 			report_err("fstat failed on header file '%s'",
-				post_header);
+				rebased_fn);
 			goto err;
 		}
 		if (!S_ISREG(sbH.st_mode))
 		{
 			report("'%s' header is not a regular file",
-				post_header);
+				rebased_fn);
 			goto err;
 		}
+		free(rebased_fn); rebased_fn= NULL;
 		cLength  +=  sbH.st_size;
 	}
 
 	if(post_footer != NULL )
 	{	
-		if (!validate_filename(post_footer, SAFE_PREFIX_DATA_OUT) &&
-			!validate_filename(post_footer, SAFE_PREFIX_STATUS))
+		rebased_fn= rebased_validated_filename(post_footer,
+			SAFE_PREFIX_DATA_OUT_REL);
+		if (rebased_fn == NULL)
 		{
-			report("pretected file (for footer) '%s'", post_footer);
+			rebased_fn= rebased_validated_filename(post_footer,
+				SAFE_PREFIX_STATUS_REL);
+		}
+		if (rebased_fn == NULL)
+		{
+			report("pretected file (for footer) '%s'",
+				post_footer);
 			goto err;
 		}
 		fdF = open(post_footer, O_RDONLY);
 		if(fdF == -1 )
 		{
-			report_err("unable to open footer '%s'", post_footer);
+			report_err("unable to open footer '%s'",
+				rebased_fn);
 			goto err;
 		}
 		if (fstat(fdF, &sbF) == -1)
 		{
 			report_err("fstat failed on footer file '%s'",
-				post_footer);
+				rebased_fn);
 			goto err;
 		}
 		if (!S_ISREG(sbF.st_mode))
 		{
 			report("'%s' footer is not a regular file",
-				post_footer);
+				rebased_fn);
 			goto err;
 		}
+		free(rebased_fn); rebased_fn= NULL;
 		cLength  +=  sbF.st_size;
 	}
 
 	/* Try to open the file before trying to connect */
 	if (post_file != NULL)
 	{
-		if (!validate_filename(post_file, SAFE_PREFIX_DATA_OUT) &&
-			!validate_filename(post_file, SAFE_PREFIX_STATUS))
+		rebased_fn= rebased_validated_filename(post_file,
+			SAFE_PREFIX_DATA_OUT_REL);
+		if (rebased_fn == NULL)
+		{
+			rebased_fn= rebased_validated_filename(post_file,
+				SAFE_PREFIX_STATUS_REL);
+		}
+		if (rebased_fn == NULL)
 		{
 			report("protected file (post) '%s'", post_file);
 			goto err;
@@ -292,7 +319,7 @@ int httppost_main(int argc, char *argv[])
 		fdS= open(post_file, O_RDONLY);
 		if (fdS == -1)
 		{
-			report_err("unable to open '%s'", post_file);
+			report_err("unable to open '%s'", rebased_fn);
 			goto err;
 		}
 		if (fstat(fdS, &sbS) == -1)
@@ -302,9 +329,10 @@ int httppost_main(int argc, char *argv[])
 		}
 		if (!S_ISREG(sbS.st_mode))
 		{
-			report("'%s' is not a regular file", post_file);
+			report("'%s' is not a regular file", rebased_fn);
 			goto err;
 		}
+		free(rebased_fn); rebased_fn= NULL;
 		cLength  += sbS.st_size;
 	}
 
@@ -386,11 +414,19 @@ int httppost_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			fprintf(stderr, "posting file '%s'\n", p);
-			if (!validate_filename(p, SAFE_PREFIX_DATA_OUT) &&
-				!validate_filename(p,
-					SAFE_PREFIX_DATA_OOQ_OUT) &&
-				!validate_filename(p,
-					SAFE_PREFIX_DATA_STORAGE))
+			rebased_fn= rebased_validated_filename(p,
+				SAFE_PREFIX_DATA_OUT_REL);
+			if (rebased_fn == NULL)
+			{
+				rebased_fn= rebased_validated_filename(p,
+					SAFE_PREFIX_DATA_OOQ_OUT_REL);
+			}
+			if (rebased_fn == NULL)
+			{
+				rebased_fn= rebased_validated_filename(p,
+					SAFE_PREFIX_DATA_STORAGE_REL);
+			}
+			if (rebased_fn == NULL)
 			{
 				report("protected file (post dir) '%s'", p);
 				goto err;
@@ -398,9 +434,11 @@ int httppost_main(int argc, char *argv[])
 			fd= open(p, O_RDONLY);
 			if (fd == -1)
 			{
-				report_err("unable to open '%s'", p);
+				report_err("unable to open '%s'",
+					rebased_fn);
 				goto err;
 			}
+			free(rebased_fn); rebased_fn= NULL;
 			r= write_to_tcp_fd(fd, tcp_file);
 			close(fd);
 			fd= -1;
@@ -453,14 +491,17 @@ int httppost_main(int argc, char *argv[])
 		else if (rtt <= 1)
 		{
 			/* Time and network are fine. Record this fact */
-			fh= fopen(ATLAS_TIMESYNC_FILE ".new", "wt");
+			fn_new= atlas_path(ATLAS_TIMESYNC_FILE_REL ".new");
+			fn= atlas_path(ATLAS_TIMESYNC_FILE_REL);
+			fh= fopen(fn_new, "wt");
 			if (fh)
 			{
 				fprintf(fh, "%ld\n", (long)now.tv_sec);
 				fclose(fh);
-				rename(ATLAS_TIMESYNC_FILE ".new",
-					ATLAS_TIMESYNC_FILE);
+				rename(fn_new, fn);
 			}
+			free(fn_new); fn_new= NULL;
+			free(fn); fn= NULL;
 		}
 		else if (atlas_id)
 		{
@@ -472,17 +513,20 @@ int httppost_main(int argc, char *argv[])
 	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
 	{
-		if (!validate_filename(output_file, SAFE_PREFIX_DATA_NEW))
+		rebased_fn= rebased_validated_filename(output_file,
+			SAFE_PREFIX_DATA_NEW_REL);
+		if (!rebased_fn)
 		{
 			report("protected file (output) '%s'", output_file);
 			goto err;
 		}
-		out_file= fopen(output_file, "w");
+		out_file= fopen(rebased_fn, "w");
 		if (!out_file)
 		{
-			report_err("unable to create '%s'", output_file);
+			report_err("unable to create '%s'", rebased_fn);
 			goto err;
 		}
+		free(rebased_fn); rebased_fn= NULL;
 	}
 	else
 		out_file= stdout;
@@ -507,18 +551,21 @@ int httppost_main(int argc, char *argv[])
 	}
 	if (!found_ok)
 		fprintf(stderr, "httppost: reply text was not equal to OK\n");
-	if ( opt_delete_file == 1  && found_ok)
+	if (opt_delete_file == 1  && found_ok)
 	{
 		fprintf(stderr, "httppost: deleting files\n");
 		if (post_file)
 		{
-			if (!validate_filename(post_file, SAFE_PREFIX_DATA_OUT))
+			rebased_fn= rebased_validated_filename(post_file,
+					SAFE_PREFIX_DATA_OUT_REL);
+			if (!rebased_fn)
 			{
 				report("trying to delete protected file '%s'",
 					post_file);
 				goto err;
 			}
-			unlink (post_file);
+			unlink (rebased_fn);
+			free(rebased_fn); rebased_fn= NULL;
 		}
 		if (post_dir)
 		{
@@ -551,6 +598,7 @@ leave:
 	if (hostport) free(hostport);
 	if (path) free(path);
 	if (filelist) free(filelist);
+	if (rebased_fn) free(rebased_fn);
 
 	alarm(0);
 	signal(SIGPIPE, SIG_DFL);

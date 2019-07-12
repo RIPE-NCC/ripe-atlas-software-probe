@@ -17,7 +17,7 @@ Created:	April 2013 by Philip Homburg for RIPE NCC
 #include "tcputil.h"
 
 #define SAFE_PREFIX_IN ATLAS_DATA_OUT
-#define SAFE_PREFIX_OUT ATLAS_DATA_NEW
+#define SAFE_PREFIX_OUT_REL ATLAS_DATA_NEW_REL
 
 #define CONN_TO		   5
 
@@ -774,6 +774,9 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	char *hostname, *str_port, *infname, *version_str;
 	char *output_file, *A_arg, *B_arg, *h_arg;
 	char *response_in, *response_out;
+	char *validated_response_in= NULL;
+	char *validated_response_out= NULL;
+	char *validated_output_file= NULL;
 	struct state *state;
 	FILE *fh;
 
@@ -855,34 +858,42 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		if (!validate_filename(response_in, ATLAS_FUZZING))
+		validated_response_in= rebased_validated_filename(response_in,
+			ATLAS_FUZZING_REL);
+		if (!validated_response_in)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_in);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_in);
+			goto err;
 		}
 	}
 	if (response_out)
 	{
-		if (!validate_filename(response_out, ATLAS_FUZZING))
+		validated_response_out= rebased_validated_filename(response_out,
+			ATLAS_FUZZING_REL);
+		if (!validated_response_out)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_out);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_out);
+			goto err;
 		}
 	}
 
 	if (output_file)
 	{
-		if (!validate_filename(output_file, SAFE_PREFIX_OUT))
+		validated_output_file= rebased_validated_filename(output_file,
+			SAFE_PREFIX_OUT_REL);
+		if (!validated_output_file)
 		{
 			crondlog(LVL8 "insecure file '%s'", output_file);
-			return NULL;
+			goto err;
 		}
-		fh= fopen(output_file, "a");
+		fh= fopen(validated_output_file, "a");
 		if (!fh)
 		{
 			crondlog(LVL8 "unable to append to '%s'",
-				output_file);
-			return NULL;
+				validated_output_file);
+			goto err;
 		}
 		fclose(fh);
 	}
@@ -892,7 +903,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(A_arg))
 		{
 			crondlog(LVL8 "bad atlas ID '%s'", A_arg);
-			return NULL;
+			goto err;
 		}
 	}
 	if (B_arg)
@@ -900,7 +911,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(B_arg))
 		{
 			crondlog(LVL8 "bad bundle ID '%s'", B_arg);
-			return NULL;
+			goto err;
 		}
 	}
 
@@ -927,16 +938,19 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	else 
 	{
 		crondlog(LVL8 "bad protocol version '%s'", version_str);
-		return NULL;
+		goto err;
 	}
 
 	state= xzalloc(sizeof(*state));
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
 	state->bundle= B_arg ? strdup(B_arg) : NULL;
-	state->output_file= output_file ? strdup(output_file) : NULL;
-	state->response_in= response_in ? strdup(response_in) : NULL;
-	state->response_out= response_out ? strdup(response_out) : NULL;
+	state->output_file= validated_output_file;
+		validated_output_file= NULL;
+	state->response_in= validated_response_in;
+		validated_response_in= NULL;
+	state->response_out= validated_response_out;
+		validated_response_out= NULL;
 	state->infname= infname ? strdup(infname) : NULL;
 	state->hostname= strdup(hostname);
 	state->sni= h_arg ? strdup(h_arg) : NULL;
@@ -977,6 +991,12 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	hg_base->done= done;
 
 	return state;
+
+err:
+	if (validated_response_in) free(validated_response_in);
+	if (validated_response_out) free(validated_response_out);
+	if (validated_output_file) free(validated_output_file);
+	return NULL;
 }
 
 static void report(struct state *state)

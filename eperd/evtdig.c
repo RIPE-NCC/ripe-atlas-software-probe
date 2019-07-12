@@ -77,7 +77,7 @@
 #define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val); ADDRESULT
 #define JC snprintf(line, DEFAULT_LINE_LENGTH, ","); ADDRESULT
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
 #define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
 #define IAMHERE crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);
@@ -790,7 +790,6 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	struct EDNS_COOKIES *cookies;
 	uint16_t rdlen;
 	int r, cookie_opt_len, ind, qnamelen, server_len;
-	struct buf pbuf;
 	char *lookup_prepend;
 	int probe_id;
 	sha256_ctx_t sha256_ctx;
@@ -1804,6 +1803,8 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 
 static bool argProcess (int argc, char *argv[], struct query_state *qry )
 {
+	char *validated_fn= NULL;
+
 	if( qry->opt_resolv_conf) {
 		qry->resolv_i = 0;
 	}
@@ -1828,30 +1829,46 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 		return TRUE;
 	}
 
-	if (qry->out_filename &&
-		!validate_filename(qry->out_filename, SAFE_PREFIX))
+	if (qry->out_filename)
 	{
-		crondlog(LVL8 "insecure file '%s'", qry->out_filename);
-		tdig_delete(qry);
-		return TRUE;
+		validated_fn= rebased_validated_filename(qry->out_filename,
+			SAFE_PREFIX_REL);
+		if (validated_fn == NULL)
+		{
+			crondlog(LVL8 "insecure file '%s'", qry->out_filename);
+			tdig_delete(qry);
+			return TRUE;
+		}
+		free(qry->out_filename);
+		qry->out_filename= validated_fn; validated_fn= NULL;
 	}
 	if (qry->response_in)
 	{
-		if (!validate_filename(qry->response_in, ATLAS_FUZZING))
+		validated_fn= rebased_validated_filename(qry->response_in,
+			ATLAS_FUZZING_REL);
+		if (!validated_fn)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", qry->response_in);
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				qry->response_in);
 			tdig_delete(qry);
 			return TRUE;
 		}
+		free(qry->response_in);
+		qry->response_in= validated_fn; validated_fn= NULL;
 	}
 	if (qry->response_out)
 	{
-		if (!validate_filename(qry->response_out, ATLAS_FUZZING))
+		validated_fn= rebased_validated_filename(qry->response_out,
+			ATLAS_FUZZING_REL);
+		if (!validated_fn)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", qry->response_out);
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				qry->response_out);
 			tdig_delete(qry);
 			return TRUE;
 		}
+		free(qry->response_out);
+		qry->response_out= validated_fn; validated_fn= NULL;
 	}
 
 	if(qry->opt_v6_only  == 0)

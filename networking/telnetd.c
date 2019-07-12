@@ -139,9 +139,9 @@
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
 #define ATLAS_LOGIN	"C_TO_P_TEST_V1"
-#define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
+#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
 #define SESSION_ID_PREFIX	"SESSION_ID "
-#define FW_APP_VERS_FILE	"/home/atlas/state/FIRMWARE_APPS_VERSION"
+#define FW_APP_VERS_FILE_REL	"state/FIRMWARE_APPS_VERSION"
 
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
@@ -167,7 +167,7 @@
 #define CRONUPDATE	"/cron.update"
 #define UPDATELINE	CRONUSER "\n"
 #define ONEOFF_SUFFIX	".new"
-#define SAFE_PREFIX	ATLAS_CRONS
+#define SAFE_PREFIX_REL	ATLAS_CRONS_REL
 #define RELOAD_VERSION	"2000"
 
 enum state
@@ -789,7 +789,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned opt;
 	int count, probe_id;
 	struct tsession *ts;
-	char *line;
+	char *fn, *line;
 	FILE *file;
 #if ENABLE_FEATURE_TELNETD_STANDALONE
 #define IS_INETD (opt & OPT_INETD)
@@ -1184,7 +1184,9 @@ do_cmd:
 					add_2sock(ts, BAD_REMOUNT);
 					goto skip3a;
 				}
-				file= fopen(FW_APP_VERS_FILE, "w");
+				fn= atlas_path(FW_APP_VERS_FILE_REL);
+				file= fopen(fn, "w");
+				free(fn); fn= NULL;
 				if (!file)
 				{
 					add_2sock(ts, BAD_FW_FILE);
@@ -1312,26 +1314,29 @@ skip3a:
 static int equal_sessionid(char *passwd)
 {
 	size_t len;
-	char *cp;
+	char *cp, *fn;
 	FILE *file;
 	char line[80];
 
-	file= fopen(ATLAS_SESSION_FILE, "r");
+	fn= atlas_path(ATLAS_SESSION_FILE_REL);
+	file= fopen(fn, "r");
 	if (file == NULL)
 	{
-		syslog(LOG_ERR, "unable to open '%s': %m", ATLAS_SESSION_FILE);
+		syslog(LOG_ERR, "unable to open '%s': %m", fn);
+		free(fn); fn= NULL;
 		return 0;
 	}
 
 	fgets(line, sizeof(line), file);	/* Skip first empty line */
 	if (fgets(line, sizeof(line), file) == NULL)
 	{
-		syslog(LOG_ERR, "unable to read from '%s': %m",
-			ATLAS_SESSION_FILE);
+		syslog(LOG_ERR, "unable to read from '%s': %m", fn);
 		fclose(file);
+		free(fn); fn= NULL;
 		return 0;
 	}
 	fclose(file);
+	free(fn); fn= NULL;
 
 	len= strlen(SESSION_ID_PREFIX);
 	if (strlen(line) < len)
@@ -1456,7 +1461,7 @@ static void pack_2pty(struct tsession *ts)
 static int start_crontab(struct tsession *ts, char *line)
 {
 	size_t len;
-	char *cp;
+	char *cp, *rebased_fn;
 	char filename[256];
 
 	if (atlas_crontab)
@@ -1483,13 +1488,15 @@ static int start_crontab(struct tsession *ts, char *line)
 	strlcpy(filename, atlas_dirname, sizeof(filename));
 	strlcat(filename, CRONTAB_NEW_SUF, sizeof(filename));
 
-	if (!validate_filename(filename, SAFE_PREFIX))
+	rebased_fn= rebased_validated_filename(filename, SAFE_PREFIX_REL);
+	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
 		return -1;
 	}
 
-	atlas_crontab= fopen(filename, "w");
+	atlas_crontab= fopen(rebased_fn, "w");
+	free(rebased_fn); rebased_fn= NULL;
 	if (!atlas_crontab)
 	{
 		add_2sock(ts, CREATE_FAILED);
@@ -1598,7 +1605,7 @@ static void end_crontab(struct tsession *ts)
 static void do_oneoff(struct tsession *ts, char *line)
 {
 	size_t len;
-	char *cp, *ncp;
+	char *cp, *ncp, *rebased_fn, *rebased_fn_new;
 	FILE *file;
 	char filename[256];
 	char filename_new[256];
@@ -1627,20 +1634,30 @@ static void do_oneoff(struct tsession *ts, char *line)
 	strlcpy(filename_new, filename, sizeof(filename_new));
 	strlcat(filename_new, ONEOFF_SUFFIX, sizeof(filename_new));
 
-	if (!validate_filename(filename, SAFE_PREFIX))
+	rebased_fn= rebased_validated_filename(filename, SAFE_PREFIX_REL);
+	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
+		return;
+	}
+	rebased_fn_new= rebased_validated_filename(filename_new,
+		SAFE_PREFIX_REL);
+	if (!rebased_fn_new)
+	{
+		add_2sock(ts, BAD_PATH);
+		free(rebased_fn); rebased_fn= NULL;
 		return;
 	}
 
 	/* Try to grab 'filename', if there is any. It doesn't matter if this
 	 * fails.
 	 */
-	rename(filename, filename_new);
-
+	rename(rebased_fn, rebased_fn_new);
 	file= fopen(filename_new, "a");
 	if (!file)
 	{
+		free(rebased_fn); rebased_fn= NULL;
+		free(rebased_fn_new); rebased_fn_new= NULL;
 		add_2sock(ts, CREATE_FAILED);
 		return;
 	}
@@ -1652,6 +1669,8 @@ static void do_oneoff(struct tsession *ts, char *line)
 
 	if (fprintf(file, "%s\n", cp) == -1)
 	{
+		free(rebased_fn); rebased_fn= NULL;
+		free(rebased_fn_new); rebased_fn_new= NULL;
 		add_2sock(ts, IO_ERROR);
 		fclose(file);
 		return;
@@ -1660,7 +1679,9 @@ static void do_oneoff(struct tsession *ts, char *line)
 	fclose(file);
 
 	/* And rename back. Ignore any errors */
-	rename(filename_new, filename);
+	rename(rebased_fn_new, rebased_fn);
+	free(rebased_fn); rebased_fn= NULL;
+	free(rebased_fn_new); rebased_fn_new= NULL;
 }
 
 #endif /* ATLAS */

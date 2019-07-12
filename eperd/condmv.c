@@ -7,8 +7,8 @@
 #include "libbb.h"
 #include "eperd.h"
 
-#define SAFE_PREFIX_FROM ATLAS_DATA_NEW
-#define SAFE_PREFIX_TO ATLAS_DATA_OUT
+#define SAFE_PREFIX_FROM_REL ATLAS_DATA_NEW_REL
+#define SAFE_PREFIX_TO_REL ATLAS_DATA_OUT_REL
 
 #define A_FLAG	(1 << 0)
 #define F_FLAG	(1 << 1)
@@ -28,6 +28,7 @@ static void *condmv_init(int argc, char *argv[],
 	void (*done)(void *state, int error) UNUSED_PARAM)
 {
 	char *opt_add, *opt_interval, *from, *to, *check;
+	char *rebased_from, *rebased_to;
 	int interval;
 	uint32_t opt;
 	struct condmvstate *state;
@@ -61,20 +62,23 @@ static void *condmv_init(int argc, char *argv[],
 	from= argv[optind];
 	to= argv[optind+1];
 
-	if (!validate_filename(from, SAFE_PREFIX_FROM))
+	rebased_from= rebased_validated_filename(from, SAFE_PREFIX_FROM_REL);
+	if (!rebased_from)
 	{
 		fprintf(stderr, "insecure from file '%s'\n", from);
 		return NULL;
 	}
-	if (!validate_filename(to, SAFE_PREFIX_TO))
+	rebased_to= rebased_validated_filename(to, SAFE_PREFIX_TO_REL);
+	if (!rebased_to)
 	{
+		free(rebased_from); rebased_from= NULL;
 		fprintf(stderr, "insecure to file '%s'\n", to);
 		return NULL;
 	}
 
 	state= malloc(sizeof(*state));
-	state->from= strdup(from);
-	state->to= strdup(to);
+	state->from= rebased_from; rebased_from= NULL;
+	state->to= rebased_to; rebased_to= NULL;
 	state->atlas= opt_add ? strdup(opt_add) : NULL;
 	state->force= !!(opt & F_FLAG);
 	state->interval= interval;

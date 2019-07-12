@@ -26,9 +26,9 @@
 #define SUFFIX 		".curr"
 #define WAIT_TIME	10	/* in seconds */
 #define NARGS		40	/* Max arguments to a built-in command */
-#define WIFIMSM_PATH	"/home/atlas/bin/wifimsm"
+#define WIFIMSM_PATH_REL	"bin/wifimsm"
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
 #ifdef __uClinux__
 #define NO_FORK	1
@@ -141,7 +141,7 @@ static void process(FILE *file)
 {
 	int i, argc, do_append, saved_fd, out_fd, flags;
 	size_t len;
-	char *cp, *ncp, *outfile;
+	char *cp, *ncp, *outfile, *validated_fn;
 	struct builtin *bp;
 	char line[2048];
 	char *argv[NARGS];
@@ -315,7 +315,9 @@ printf("got cp %p, line %p, '%s'\n", cp, line, cp);
 		{
 			/* Redirect I/O */
 			report("sending output to '%s'", outfile);
-			if (!validate_filename(outfile, SAFE_PREFIX))
+			validated_fn= rebased_validated_filename(outfile,
+				SAFE_PREFIX_REL);
+			if (!validated_fn)
 			{
 				report("insecure output file '%s'", outfile);
 				return;
@@ -323,13 +325,15 @@ printf("got cp %p, line %p, '%s'\n", cp, line, cp);
 			flags= O_CREAT | O_WRONLY;
 			if (do_append)
 				flags |= O_APPEND;
-			out_fd= open(outfile, flags, 0644);
+			out_fd= open(validated_fn, flags, 0644);
 			if (out_fd == -1)
 			{
 				report_err("unable to create output file '%s'",
-					outfile);
+					validated_fn);
+				free(validated_fn); validated_fn= NULL;
 				return;
 			}
+			free(validated_fn); validated_fn= NULL;
 			fflush(stdout);
 			saved_fd= dup(1);
 			if (saved_fd == -1)
@@ -387,6 +391,7 @@ int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
 #else
 	pid_t pid;
 	int r, status;
+	char *fn;
 
 	pid= fork();
 	if (pid == -1)
@@ -407,8 +412,10 @@ int wifimsm_main(int argc UNUSED_PARAM, char *argv[])
 		return 1;
 	}
 
-	execv(WIFIMSM_PATH, argv);
-	report_err("wifimsm_main: execv '%s' failed", WIFIMSM_PATH);
+	fn= atlas_path(WIFIMSM_PATH_REL);
+	execv(fn, argv);
+	report_err("wifimsm_main: execv '%s' failed", fn);
+	free(fn); fn= NULL;
 
 	/* Child, so we need to exit */
 	_exit(1);

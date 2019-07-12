@@ -72,13 +72,10 @@ const char atlas_force_reg[] = "./force_reg.sh";
 const char atlas_netconfig_v4[] = "./netconfig_v4.vol";
 const char atlas_netconfig_v6[] = "./netconfig_v6.vol";
 const char atlas_resolv_conf[] = "./resolv.conf.vol";
-const char atlas_network_v4_info[] = "/home/atlas/status/network_v4_info.txt";
-const char atlas_network_v4_static_info[] = "/home/atlas/status/network_v4_static_info.txt";
-const char atlas_network_v4_static_info_json[] = "/home/atlas/status/network_v4_static_info.json";
-const char atlas_network_v6_static_info[] = "/home/atlas/status/network_v6_static_info.txt";
-const char atlas_network_v6_static_info_json[] = "/home/atlas/status/network_v6_static_info.json";
-// const char atlas_network_dns_static_info[] = "/home/atlas/status/network_dns_static_info.txt";
-const char atlas_network_dns_static_info_json[] = "/home/atlas/status/network_dns_static_info.json";
+#define NETWORK_V4_STATIC_INFO_JSON_REL	"status/network_v4_static_info.json"
+#define NETWORK_V6_STATIC_INFO_JSON_REL	"status/network_v6_static_info.json"
+#define NETWORK_DNS_STATIC_INFO_JSON_REL	"status/network_dns_static_info.json"
+#define FIRMWARE_APPS_VERSION_REL "state/FIRMWARE_APPS_VERSION"
 
 const int max_lines = 16; /* maximum lines we'll process */
 const int min_rereg_time = 100; 
@@ -133,28 +130,36 @@ int atlasinit_main( int argc, char *argv[] )
 
 static void print_token_ver (FILE * write_to, int flag_rereg) 
 {
-float root_fs_ver = 0;
-FILE *fp = xfopen_for_read("/proc/version");
-FILE *fpv = fopen("/home/atlas/state/FIRMWARE_APPS_VERSION", "r");
-	char *my_mac ;
+	float root_fs_ver = 0;
+	FILE *fp = xfopen_for_read("/proc/version");
+	FILE *fpv;
+	char *my_mac, *path;
 
-bzero( line, ATLAS_BUF_SIZE );
-fscanf (fp, "%s", line);
-fscanf (fp, "%s", line);
-fscanf (fp, "%s", line);
-if(fpv)
-	fscanf (fpv, "%f", &root_fs_ver);
+	bzero( line, ATLAS_BUF_SIZE );
+	fscanf (fp, "%s", line);
+	fscanf (fp, "%s", line);
+	fscanf (fp, "%s", line);
+
+	path= atlas_path(FIRMWARE_APPS_VERSION_REL);
+	fpv = fopen(path, "r");
+	free(path); path= NULL;
+	if(fpv)
+	{
+		fscanf (fpv, "%f", &root_fs_ver);
+		fclose(fpv); fpv= NULL;
+	}
 	else 
-	  root_fs_ver=3100; 
+		root_fs_ver=3100; 
+
 	if(flag_rereg >  0)
-	fprintf(write_to, "P_TO_R_INIT\n");
+		fprintf(write_to, "P_TO_R_INIT\n");
 	my_mac = getenv("ETHER_SCANNED");
 	fprintf(write_to, "TOKEN_SPECS probev1 %s", line);
 	if (my_mac !=  NULL) 
-	fprintf(write_to, "-%s ", my_mac );
+		fprintf(write_to, "-%s ", my_mac );
 	fprintf(write_to, " %d\n", (int)root_fs_ver);
 	if(flag_rereg >  0)
-	fprintf(write_to, "REASON_FOR_REGISTRATION %s\n", str_reason);
+		fprintf(write_to, "REASON_FOR_REGISTRATION %s\n", str_reason);
 	fclose(fp);
 }
 
@@ -860,7 +865,7 @@ static int reg_init_main( int argc, char *argv[] )
 	size_t len;
 	unsigned long seconds;
 	FILE *read_from = stdin;
-	char *cp, *ecp, *check;
+	char *cp, *ecp, *check, *path;
 
 	int ret = 0;
 	int first;
@@ -1233,7 +1238,7 @@ static int reg_init_main( int argc, char *argv[] )
 				FILE *f= NULL;
 				char *ipv4_address;
 				char *netmask;
-				char *broadcast; 
+				char *broadcast;
 				char *ipv4_gw;
 
 				cp= skip_spaces(ecp+1);
@@ -1367,21 +1372,30 @@ static int reg_init_main( int argc, char *argv[] )
 			 	fprintf (f, "broadcast %s \n", broadcast); 
 			 	fprintf (f, "/sbin/route add default gw %s\n",
 					ipv4_gw); 
+
+#if 0
 				// put parts in the shell script to make network info file
 
-				fprintf (f, "echo \"P_TO_C_NETWORK_UPDATE\" >  %s \n", atlas_network_v4_info );
-				fprintf (f, "echo \"IPV4_LOCAL_ADDR %s\" >>    %s \n", ipv4_address, atlas_network_v4_info );
-				fprintf (f, "echo \"IPV4_NETMASK %s\" >>    %s \n", netmask, atlas_network_v4_info );
-				fprintf (f, "echo \"IPV4_BROADCAST %s\" >>    %s \n", broadcast, atlas_network_v4_info );
-				fprintf (f, "echo \"IPV4_GW %s\" >>    %s \n",ipv4_gw , atlas_network_v4_info );
-				fprintf (f, "echo \"DHCP False \" >>    %s \n", atlas_network_v4_info );
-				
+				fprintf (f, "IPV4_LOCAL_ADDR=%s\n",
+					ipv4_address);
+				fprintf (f, "IPV4_NETMASK=%s\n", netmask);
+				fprintf (f, "IPV4_BROADCAST=%s\n", broadcast);
+				fprintf (f, "IPV4_GW=%s\n",ipv4_gw);
+				fprintf (f, "DHCP=False\n");
 				
 				// second file for static 
-				fprintf (f, "echo \"STATIC_IPV4_LOCAL_ADDR %s\" >    %s \n", ipv4_address, atlas_network_v4_static_info );
-				fprintf (f, "echo \"STATIC_IPV4_NETMASK %s\" >>    %s \n", netmask, atlas_network_v4_static_info );
-				fprintf (f, "echo \"STATIC_IPV4_BROADCAST %s\" >>    %s \n", broadcast, atlas_network_v4_static_info );
-				fprintf (f, "echo \"STATIC_IPV4_GW %s\" >>    %s \n",ipv4_gw , atlas_network_v4_static_info );
+				fprintf (f, "STATIC_IPV4_LOCAL_ADDR=%s\n",
+					ipv4_address);
+				fprintf (f, "STATIC_IPV4_NETMASK=%s\n",
+					netmask);
+				fprintf (f, "STATIC_IPV4_BROADCAST=%s\n",
+					broadcast);
+				fprintf (f, "STATIC_IPV4_GW=%s\n", ipv4_gw);
+				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
+#endif
+
+				path= atlas_path(
+					NETWORK_V4_STATIC_INFO_JSON_REL);
 				fprintf(f, "echo '"
 					DBQ(static-inet-addresses) " : [ { "
 					DBQ(inet-addr) ": " DBQ(%s) ", "
@@ -1399,8 +1413,8 @@ static int reg_init_main( int argc, char *argv[] )
 					str_device,
 					ipv4_gw,
 					str_device,
-					atlas_network_v4_static_info_json);
-				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
+					path);
+				free(path); path= NULL;
 
 				fclose(f);
 
@@ -1516,10 +1530,14 @@ dhcpv4_end:
 			 	fprintf (f,
 			"/sbin/route -A inet6 add default gw %s dev %s\n",
 					ipv6_gw, str_device); 
+#if 0
 				// second file for static  network info
-				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s/%s\" >    %s \n", ipv6_address, prefixlen, atlas_network_v6_static_info );
-				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw , atlas_network_v6_static_info );
+				fprintf (f, "echo \"STATIC_IPV6_LOCAL_ADDR %s/%s\" >    %s \n", ipv6_address, prefixlen);
+				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw );
+#endif
 
+				path= atlas_path(
+					NETWORK_V6_STATIC_INFO_JSON_REL);
 				fprintf(f, "echo '"
 					DBQ(static-inet6-addresses) ": [ { "
 					DBQ(inet6-addr) ": " DBQ(%s) ", "
@@ -1533,7 +1551,8 @@ dhcpv4_end:
 					"' > %s\n",
 					ipv6_address, prefixlen, str_device,
 					ipv6_gw, str_device,
-					atlas_network_v6_static_info_json);
+					path);
+				free(path); path= NULL;
 			
 
 				fclose(f);
@@ -1576,17 +1595,19 @@ dhcpv6_end:
                                         return 1;
                                 }
 #endif
-				f2 = fopen(atlas_network_dns_static_info_json,
-					"wt");
+
+				path= atlas_path(
+					NETWORK_DNS_STATIC_INFO_JSON_REL);
+				f2 = fopen(path, "wt");
 				if( f2==NULL ) {
                                         atlas_log(ERROR,
 						"Unable to create  %s\n",
-					atlas_network_dns_static_info_json);
+						path);
+					free(path); path= NULL;
 					fclose(f);
-					// fclose(f1);
                                         return 1;
                                 }
-
+				free(path); path= NULL;
 
 				// Statically configured probe.
 				//DNS_SERVERS 8.8.8.8 194.109.6.66
@@ -1597,7 +1618,9 @@ dhcpv6_end:
 				{
 					atlas_log( ERROR,
 						"missing address\n");
-					goto fail;
+					fclose(f);
+					fclose(f2);
+                                        return 1;
 				}
 
 				fprintf(f2, DBQ(static-dns) ": [ ");
@@ -1622,7 +1645,9 @@ dhcpv6_end:
 					{
 						atlas_log( ERROR,
 							"missing address\n");
-						goto fail;
+						fclose(f);
+						fclose(f2);
+						return 1;
 					}
 				}
 				fprintf(f2, " ]\n");
@@ -1638,21 +1663,25 @@ dhcpv6_end:
 		{
 			// delete the static configuration 
 			unlink(atlas_netconfig_v4);
-			unlink(atlas_network_v4_static_info);
-			unlink(atlas_network_v4_static_info_json);
+			path= atlas_path(NETWORK_V4_STATIC_INFO_JSON_REL);
+			unlink(path);
+			free(path); path= NULL;
 		}
 		if(do_rm_v6_static_info)
 		{
 			// delete the static configuration 
 			unlink(atlas_netconfig_v6);
-			unlink(atlas_network_v6_static_info);
-			unlink(atlas_network_v6_static_info_json);
+			path= atlas_path(NETWORK_V6_STATIC_INFO_JSON_REL);
+			unlink(path);
+			free(path); path= NULL;
 		}
 		if (do_rm_dns_static_info)
 		{
 			// unlink(atlas_network_dns_static_info);
 			unlink(atlas_resolv_conf);
-			unlink(atlas_network_dns_static_info_json);
+			path= atlas_path(NETWORK_DNS_STATIC_INFO_JSON_REL);
+			unlink(path);
+			free(path); path= NULL;
 		}
 	}
 	else if  (strcmp(line,"WAIT") == 0 ) 

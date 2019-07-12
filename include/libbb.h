@@ -443,22 +443,25 @@ char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
-#define ATLAS_CRONS            ATLAS_HOME "/crons"
-#define ATLAS_STATUS           ATLAS_HOME "/status"
-#define ATLAS_DATA_OUT         ATLAS_HOME "/data/out"
-#define ATLAS_DATA_OOQ_OUT     ATLAS_HOME "/data/ooq.out"
-#define ATLAS_DATA_NEW         ATLAS_HOME "/data/new"
-#define ATLAS_DATA_STORAGE     ATLAS_HOME "/data/storage"
-#define ATLAS_TIMESYNC_FILE    ATLAS_DATA_NEW "/timesync.vol"
-#define ATLAS_FUZZING          ATLAS_HOME "/data"
+#define ATLAS_CRONS_REL		"crons"
+#define ATLAS_STATUS_REL	"status"
+#define ATLAS_DATA_OUT_REL	"data/out"
+#define ATLAS_DATA_OOQ_OUT_REL     "data/ooq.out"
+#define ATLAS_DATA_NEW_REL         "data/new"
+#define ATLAS_DATA_STORAGE_REL     "data/storage"
+#define ATLAS_TIMESYNC_FILE_REL    ATLAS_DATA_NEW_REL "/timesync.vol"
+#define ATLAS_FUZZING_REL          "data"
 
 extern int validate_filename(const char *path, const char *prefix);
+char *rebased_validated_filename(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);
 extern int get_atlas_fw_version(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
+extern const char *atlas_base(void);
+extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 

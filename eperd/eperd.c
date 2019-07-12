@@ -48,7 +48,7 @@
 
 #include "eperd.h"
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
 /* glibc frees previous setenv'ed value when we do next setenv()
  * of the same variable. uclibc does not do this! */
@@ -82,7 +82,7 @@
 #define MAX_INTERVAL	(2*366*24*3600)	/* No intervals bigger than 2 years */
 
 #define URANDOM_DEV	"/dev/urandom"
-#define ATLAS_FW_VERSION	"/home/atlas/state/FIRMWARE_APPS_VERSION"
+#define ATLAS_FW_VERSION_REL	"state/FIRMWARE_APPS_VERSION"
 
 #define RESOLV_CONF	"/etc/resolv.conf"
 
@@ -194,26 +194,33 @@ int get_atlas_fw_version(void)
 	static int fw_version= -1;
 
 	int r, fw;
+	char *fn;
 	FILE *file;
 
 	if (fw_version != -1)
 		return fw_version;
 
-	file= fopen(ATLAS_FW_VERSION, "r");
+	fn= atlas_path(ATLAS_FW_VERSION_REL);
+	file= fopen(fn, "r");
 	if (file == NULL)
 	{
-		crondlog(LVL9 "get_atlas_fw_version: unable to open '%s': %s",
-			ATLAS_FW_VERSION, strerror(errno));
+		crondlog(
+			LVL9 "get_atlas_fw_version: unable to open '%s': %s",
+			fn, strerror(errno));
+		free(fn); fn= NULL;
 		return -1;
 	}
 	r= fscanf(file, "%d", &fw);
 	fclose(file);
 	if (r == -1)
 	{
-		crondlog(LVL9 "get_atlas_fw_version: unable to read from '%s'",
-			ATLAS_FW_VERSION);
+		crondlog(
+		LVL9 "get_atlas_fw_version: unable to read from '%s'",
+			fn);
+		free(fn); fn= NULL;
 		return -1;
 	}
+	free(fn); fn= NULL;
 
 	fw_version= fw;
 	return fw;
@@ -288,6 +295,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	int r, fd;
 	unsigned seed;
 	size_t len;
+	char *validated_fn;
 	struct event *updateEventMin, *updateEventHour;
 	struct timeval tv;
 	struct rlimit limit;
@@ -309,10 +317,18 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 			&atlas_id, &PidFileName,&LogLevel, &out_filename);
 	/* both -d N and -l N set the same variable: LogLevel */
 
-	if (out_filename && !validate_filename(out_filename, SAFE_PREFIX))
+	if (out_filename)
 	{
-		crondlog(DIE9 "insecure file '%s'. allowed path '%s'", 
-				out_filename, SAFE_PREFIX);
+		validated_fn= rebased_validated_filename(out_filename, 
+			SAFE_PREFIX_REL);
+		if (validated_fn == NULL)
+		{
+			crondlog(DIE9 "insecure file '%s'. allowed path '%s'", 
+				out_filename, SAFE_PREFIX_REL);
+		}
+
+		/* Use validate_fn from now on instead of out_filename */
+		out_filename= validated_fn;
 	}
 
 	if (!(opt & OPT_f)) {

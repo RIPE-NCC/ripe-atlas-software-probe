@@ -23,10 +23,10 @@
 
 #include "libbb.h"
 
-#define SAFE_PREFIX_FROM1 ATLAS_DATA_NEW
-#define SAFE_PREFIX_FROM2 ATLAS_DATA_OUT
-#define SAFE_PREFIX_TO1 ATLAS_DATA_OUT
-#define SAFE_PREFIX_TO2 ATLAS_DATA_STORAGE
+#define SAFE_PREFIX_FROM1_REL ATLAS_DATA_NEW_REL
+#define SAFE_PREFIX_FROM2_REL ATLAS_DATA_OUT_REL
+#define SAFE_PREFIX_TO1_REL ATLAS_DATA_OUT_REL
+#define SAFE_PREFIX_TO2_REL ATLAS_DATA_STORAGE_REL
 
 #define A_FLAG	(1 << 0)
 #define a_FLAG	(1 << 1)
@@ -44,7 +44,10 @@ static int do_cprm(char *from_file, char *to_file);
 int condmv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int condmv_main(int argc, char *argv[])
 {
+	int r;
 	char *opt_add, *opt_age, *from, *to, *check;
+	char *rebased_from= NULL;
+	char *rebased_to= NULL;
 	uint32_t opt;
 	struct stat sb;
 	FILE *file;
@@ -70,18 +73,34 @@ int condmv_main(int argc, char *argv[])
 	from= argv[optind];
 	to= argv[optind+1];
 
-	if (!validate_filename(from, SAFE_PREFIX_FROM1) &&
-		!validate_filename(from, SAFE_PREFIX_FROM2))
+	rebased_from= rebased_validated_filename(from,
+		SAFE_PREFIX_FROM1_REL);
+	if (rebased_from == NULL)
+	{
+		rebased_from= rebased_validated_filename(from,
+			SAFE_PREFIX_FROM2_REL);
+	}
+	if (rebased_from == NULL)
 	{
 		fprintf(stderr, "insecure from file '%s'\n", from);
-		return 1;
+		goto err;
 	}
-	if (!validate_filename(to, SAFE_PREFIX_TO1) &&
-		!validate_filename(to, SAFE_PREFIX_TO2) &&
-		!validate_filename(to, SAFE_PREFIX_FROM1))
+	rebased_to= rebased_validated_filename(to,
+		SAFE_PREFIX_TO1_REL);
+	if (rebased_from == NULL)
+	{
+		rebased_to= rebased_validated_filename(to,
+			SAFE_PREFIX_TO2_REL);
+	}
+	if (rebased_from == NULL)
+	{
+		rebased_to= rebased_validated_filename(to,
+			SAFE_PREFIX_FROM1_REL);
+	}
+	if (rebased_from == NULL)
 	{
 		fprintf(stderr, "insecure to file '%s'\n", to);
-		return 1;
+		goto err;
 	}
 
 	if (opt_age)
@@ -90,7 +109,7 @@ int condmv_main(int argc, char *argv[])
 		if (check[0] != '\0' || age_value <= 0)
 		{
 			fprintf(stderr, "bad age value '%s'\n", opt_age);
-			return 1;
+			goto err;
 		}
 	}
 	else
@@ -101,15 +120,19 @@ int condmv_main(int argc, char *argv[])
 
 	if (opt & D_FLAG)
 	{
-		return do_dir(from, to);
+		r= do_dir(rebased_from, rebased_to);
+		free(rebased_from); rebased_from= NULL;
+		free(rebased_to); rebased_to= NULL;
+		return r;
 	}
 
-	if (stat(to, &sb) == 0 && !(opt & f_FLAG))
+	if (stat(rebased_to, &sb) == 0 && !(opt & f_FLAG))
 	{
 		/* Destination exists */
-		fprintf(stderr, "condmv: not moving, destination '%s' exists\n",
-			to);
-		return 1;
+		fprintf(stderr,
+			"condmv: not moving, destination '%s' exists\n",
+			rebased_to);
+		goto err;
 	}
 
 	if (opt_add)
@@ -118,38 +141,45 @@ int condmv_main(int argc, char *argv[])
 		/* We have to add something to the existing file before moving
 		 * to.
 		 */
-		file= fopen(from, "a");
+		file= fopen(rebased_from, "a");
 		if (file == NULL)
 		{
 			fprintf(stderr,
 				"condmv: unable to append to '%s': %s\n",
-				from, strerror(errno));
-			return 1;
+				rebased_from, strerror(errno));
+			goto err;
 		}
 		if (fprintf(file, "%s %lu %s\n", opt_add, mytime, from) < 0)
 		{
 			fprintf(stderr,
 				"condmv: unable to append to '%s': %s\n",
-				from, strerror(errno));
+				rebased_from, strerror(errno));
 			fclose(file);
-			return 1;
+			goto err;
 		}
 		if (fclose(file) != 0)
 		{
 			fprintf(stderr,
 				"condmv: unable to close '%s': %s\n",
-				from, strerror(errno));
-			return 1;
+				rebased_from, strerror(errno));
+			goto err;
 		}
 	}
-	if (rename(from, to) != 0)
+	if (rename(rebased_from, rebased_to) != 0)
 	{
 		fprintf(stderr, "condmv: unable to rename '%s' to '%s': %s\n",
-				from, to, strerror(errno));
-		return 1;
+				rebased_from, rebased_to, strerror(errno));
+		goto err;
 	}
 
+	free(rebased_from); rebased_from= NULL;
+	free(rebased_to); rebased_to= NULL;
 	return 0;
+
+err:
+	if (rebased_from) free(rebased_from);
+	if (rebased_to) free(rebased_to);
+	return 1;
 }
 
 static int do_dir(char *from_dir, char *to_dir)

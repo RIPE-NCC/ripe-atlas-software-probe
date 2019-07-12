@@ -16,8 +16,8 @@
 #include "eperd.h"
 #include "tcputil.h"
 
-#define SAFE_PREFIX_IN ATLAS_DATA_OUT
-#define SAFE_PREFIX_OUT ATLAS_DATA_NEW
+#define SAFE_PREFIX_IN_REL ATLAS_DATA_OUT_REL
+#define SAFE_PREFIX_OUT_REL ATLAS_DATA_NEW_REL
 
 #define CONN_TO		   5000		/* Timeout in milliseconds */
 
@@ -413,6 +413,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	char *host_arg, *post_file, *output_file, *post_footer, *post_header,
 		*A_arg, *b_arg, *store_headers, *store_body, *read_limit_str,
 		*timeout_str, *infname, *response_in, *response_out;
+	char *validated_response_in= NULL;
+	char *validated_response_out= NULL;
+	char *validated_output_file= NULL;
+	char *validated_post_header= NULL;
+	char *validated_post_file= NULL;
+	char *validated_post_footer= NULL;
 	const char *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
@@ -562,34 +568,42 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		if (!validate_filename(response_in, ATLAS_FUZZING))
+		validated_response_in= rebased_validated_filename(response_in,
+			ATLAS_FUZZING_REL);
+		if (validated_response_in == NULL)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_in);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_in);
+			goto err;
 		}
 	}
 	if (response_out)
 	{
-		if (!validate_filename(response_out, ATLAS_FUZZING))
+		validated_response_out= rebased_validated_filename(response_out,
+			ATLAS_FUZZING_REL);
+		if (validated_response_out == NULL)
 		{
-			crondlog(LVL8 "insecure fuzzing file '%s'", response_out);
-			return NULL;
+			crondlog(LVL8 "insecure fuzzing file '%s'",
+				response_out);
+			goto err;
 		}
 	}
 
 	if (output_file)
 	{
-		if (!validate_filename(output_file, SAFE_PREFIX_OUT))
+		validated_output_file= rebased_validated_filename(output_file,
+			SAFE_PREFIX_OUT_REL);
+		if (validated_output_file == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", output_file);
-			return NULL;
+			goto err;
 		}
-		fh= fopen(output_file, "a");
+		fh= fopen(validated_output_file, "a");
 		if (!fh)
 		{
 			crondlog(LVL8 "unable to append to '%s'",
-				output_file);
-			return NULL;
+				validated_output_file);
+			goto err;
 		}
 		fclose(fh);
 	}
@@ -599,7 +613,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(A_arg))
 		{
 			crondlog(LVL8 "bad atlas ID '%s'", A_arg);
-			return NULL;
+			goto err;
 		}
 	}
 	if (b_arg)
@@ -607,24 +621,39 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		if (!validate_atlas_id(b_arg))
 		{
 			crondlog(LVL8 "bad bundle ID '%s'", b_arg);
-			return NULL;
+			goto err;
 		}
 	}
 
-	if (post_header && !validate_filename(post_header, SAFE_PREFIX_IN))
+	if (post_header)
 	{
-		crondlog(LVL8 "insecure file '%s'", post_header);
-		return NULL;
+		validated_post_header= rebased_validated_filename(post_header,
+			SAFE_PREFIX_IN_REL);
+		if (validated_post_header == NULL)
+		{
+			crondlog(LVL8 "insecure file '%s'", post_header);
+			goto err;
+		}
 	}
-	if (post_file && !validate_filename(post_file, SAFE_PREFIX_IN))
+	if (post_file)
 	{
-		crondlog(LVL8 "insecure file '%s'", post_file);
-		return NULL;
+		validated_post_file= rebased_validated_filename(post_file,
+			SAFE_PREFIX_IN_REL);
+		if (validated_post_file == NULL)
+		{
+			crondlog(LVL8 "insecure file '%s'", post_file);
+			goto err;
+		}
 	}
-	if (post_footer && !validate_filename(post_footer, SAFE_PREFIX_IN))
+	if (post_footer)
 	{
-		crondlog(LVL8 "insecure file '%s'", post_footer);
-		return NULL;
+		validated_post_footer= rebased_validated_filename(post_footer,
+			SAFE_PREFIX_IN_REL);
+		if (validated_post_footer == NULL)
+		{
+			crondlog(LVL8 "insecure file '%s'", post_footer);
+			goto err;
+		}
 	}
 
 	max_headers= 0;
@@ -702,9 +731,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->base= hg_base;
 	state->atlas= A_arg ? strdup(A_arg) : NULL;
 	state->bundle= b_arg ? strdup(b_arg) : NULL;
-	state->output_file= output_file ? strdup(output_file) : NULL;
-	state->response_in= response_in ? strdup(response_in) : NULL;
-	state->response_out= response_out ? strdup(response_out) : NULL;
+	state->output_file= validated_output_file;
+		validated_output_file= NULL;
+	state->response_in= validated_response_in;
+		validated_response_in= NULL;
+	state->response_out= validated_response_out;
+		validated_response_out= NULL;
 	state->host= host;
 	state->port= port;
 	state->hostport= hostport;
@@ -715,9 +747,12 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->do_head= do_head;
 	state->do_post= do_post;
 	state->do_tls= do_tls;
-	state->post_header= post_header ? strdup(post_header) : NULL;
-	state->post_file= post_file ? strdup(post_file) : NULL;
-	state->post_footer= post_footer ? strdup(post_footer) : NULL;
+	state->post_header= validated_post_header;
+		validated_post_header= NULL;
+	state->post_file= validated_post_file;
+		validated_post_file= NULL;
+	state->post_footer= validated_post_footer;
+		validated_post_footer= NULL;
 	state->do_http10= do_http10;
 	state->user_agent= user_agent ? strdup(user_agent) : NULL;
 	state->max_headers= max_headers;
@@ -767,6 +802,15 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	hg_base->done= done;
 
 	return state;
+
+err:
+	if (validated_response_in) free(validated_response_in);
+	if (validated_response_out) free(validated_response_out);
+	if (validated_output_file) free(validated_output_file);
+	if (validated_post_header) free(validated_post_header);
+	if (validated_post_file) free(validated_post_file);
+	if (validated_post_footer) free(validated_post_footer);
+	return NULL;
 }
 
 static void report(struct hgstate *state)

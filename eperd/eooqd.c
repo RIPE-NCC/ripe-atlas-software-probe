@@ -33,14 +33,17 @@
 #include "eperd.h"
 
 #define SUFFIX 		".curr"
-#define OOQD_NEW_PREFIX	"/home/atlas/data/new/ooq"
-#define OOQD_OUT_PREFIX	"/home/atlas/data/out/ooq"
-#define ATLAS_SESSION_FILE	"/home/atlas/status/con_session_id.txt"
+#define OOQD_NEW_PREFIX_REL	"data/new/ooq"
+#define OOQD_OUT_PREFIX_REL	"data/out/ooq"
+#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
+#define REPORT_HEADER_REL	"status/p_to_c_report_header"
+#define SESSION_ID_REL		"status/con_session_id.txt"
+#define OOQ_SENT_REL		"data/new/ooq_sent.vol"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */
 
-#define SAFE_PREFIX ATLAS_DATA_NEW
+#define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
 #define DBQ(str) "\"" #str "\""
 
@@ -201,7 +204,8 @@ int eooqd_main(int argc, char *argv[])
 	strlcat(state->curr_qfile, SUFFIX, sizeof(state->curr_qfile));
 
 	snprintf(output_filename, sizeof(output_filename),
-		OOQD_OUT_PREFIX "%s/ooq.out", queue_id);
+		"%s/" OOQD_OUT_PREFIX_REL "%s/ooq.out",
+		atlas_base(), queue_id);
 
 	signal(SIGQUIT, SIG_DFL);
 	limit.rlim_cur= RLIM_INFINITY;
@@ -335,7 +339,7 @@ static int add_line(void)
 	size_t len;
 	char *cp, *ncp;
 	struct builtin *bp;
-	char *p;
+	char *p, *validated_fn;
 	const char *reason;
 	void *cmdstate;
 	FILE *fn;
@@ -395,13 +399,15 @@ static int add_line(void)
 		p= &cmdline[len];
 		while (*p != '\0' && *p == ' ')
 			p++;
-		if (!validate_filename(p, SAFE_PREFIX))
+		validated_fn= rebased_validated_filename(p,
+			SAFE_PREFIX_REL);
+		if (validated_fn == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'. allowed path '%s'", 
-				p, SAFE_PREFIX);
+				p, SAFE_PREFIX_REL);
 		}
 		state->barrier= 1;
-		state->barrier_file= strdup(p);
+		state->barrier_file= validated_fn;
 		return 0;
 	}
 
@@ -518,8 +524,9 @@ static int add_line(void)
 	if (state->slots[slot].cmdstate != NULL)
 		crondlog(DIE9 "no empty slot?");
 	argv[argc++]= "-O";
-	snprintf(filename, sizeof(filename), OOQD_NEW_PREFIX "%s.%d",
-		queue_id, slot);
+	snprintf(filename, sizeof(filename),
+		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
+		atlas_base(), queue_id, slot);
 	argv[argc++]= filename;
 
 	argv[argc]= NULL;
@@ -543,8 +550,9 @@ static int add_line(void)
 error:
 	if (cmdstate == NULL)
 	{
-		snprintf(filename, sizeof(filename), OOQD_NEW_PREFIX "%s",
-			queue_id);
+		snprintf(filename, sizeof(filename),
+			"%s/" OOQD_NEW_PREFIX_REL "%s",
+			atlas_base(), queue_id);
 		fn= fopen(filename, "a");
 		if (!fn) 
 		{
@@ -573,7 +581,8 @@ error:
 		fclose(fn);
 
 		snprintf(filename2, sizeof(filename2),
-			OOQD_OUT_PREFIX "%s/ooq", queue_id);
+			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
+			atlas_base(), queue_id);
 		if (stat(filename2, &sb) == -1 &&
 			stat(filename, &sb) == 0)
 		{
@@ -592,6 +601,7 @@ error:
 static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 {
 	int i, r;
+	char *fn_fmt;
 	char from_filename[80];
 	char to_filename[80];
 	struct stat sb;
@@ -619,9 +629,13 @@ static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 		report("cmddone: strange, cmd %p is busy", cmdstate);
 
 	snprintf(from_filename, sizeof(from_filename),
-		OOQD_NEW_PREFIX "%s.%d", queue_id, i);
-	snprintf(to_filename, sizeof(to_filename),
-		OOQD_OUT_PREFIX "%s/%d", queue_id, i);
+		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
+		atlas_base(), queue_id, i);
+	
+	fn_fmt= atlas_path(OOQD_OUT_PREFIX_REL "%s/%d");
+	snprintf(to_filename, sizeof(to_filename), fn_fmt, queue_id, i);
+	free(fn_fmt); fn_fmt= NULL;
+
 	if (stat(to_filename, &sb) == 0)
 	{
 		report("output file '%s' is busy", to_filename);
@@ -699,7 +713,7 @@ static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
 static void post_results(int force_post)
 {
 	int i, j, r, need_post, probe_id;
-	const char *session_id;
+	const char *fn_header, *fn_session_id, *fn_ooq_sent, *session_id;
 	const char *argv[20];
 	char from_filename[80];
 	char to_filename[80];
@@ -713,9 +727,11 @@ static void post_results(int force_post)
 		force_post= 0;	/* Only one time */
 
 		snprintf(from_filename, sizeof(from_filename),
-			OOQD_NEW_PREFIX "%s", queue_id);
+			"%s/" OOQD_NEW_PREFIX_REL "%s",
+			atlas_base(), queue_id);
 		snprintf(to_filename, sizeof(to_filename),
-			OOQD_OUT_PREFIX "%s/ooq", queue_id);
+			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
+			atlas_base(), queue_id);
 		if (stat(to_filename, &sb) == 0)
 		{
 			/* There is more to post */
@@ -733,9 +749,11 @@ static void post_results(int force_post)
 		for (i= 0; i<state->max_busy; i++)
 		{
 			snprintf(from_filename, sizeof(from_filename),
-				OOQD_NEW_PREFIX "%s.%d", queue_id, i);
+				"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
+				atlas_base(), queue_id, i);
 			snprintf(to_filename, sizeof(to_filename),
-				OOQD_OUT_PREFIX "%s/%d", queue_id, i);
+				"%s/" OOQD_OUT_PREFIX_REL "%s/%d",
+				atlas_base(), queue_id, i);
 			if (stat(to_filename, &sb) == 0)
 			{
 				/* There is more to post */
@@ -769,24 +787,31 @@ static void post_results(int force_post)
 			"http://127.0.0.1:8080/?PROBE_ID=%d&SESSION_ID=%s&SRC=oneoff",
 			probe_id, session_id);
 		snprintf(from_filename, sizeof(from_filename),
-			OOQD_OUT_PREFIX "%s", queue_id);
+			"%s/" OOQD_OUT_PREFIX_REL "%s",
+			atlas_base(), queue_id);
 
+		fn_header= atlas_path(REPORT_HEADER_REL);
+		fn_session_id= atlas_path(SESSION_ID_REL);
+		fn_ooq_sent= atlas_path(OOQ_SENT_REL);
 		i= 0;
 		argv[i++]= "httppost";
 		argv[i++]= "-A";
 		argv[i++]= "9015";
 		argv[i++]= "--delete-file";
 		argv[i++]= "--post-header";
-		argv[i++]= "/home/atlas/status/p_to_c_report_header";
+		argv[i++]= fn_header;
 		argv[i++]= "--post-dir";
 		argv[i++]= from_filename;
 		argv[i++]= "--post-footer";
-		argv[i++]= "/home/atlas/status/con_session_id.txt";
+		argv[i++]= fn_session_id;
 		argv[i++]= "-O";
-		argv[i++]= "/home/atlas/data/new/ooq_sent.vol";
+		argv[i++]= fn_ooq_sent;
 		argv[i++]= url;
 		argv[i]= NULL;
 		r= httppost_main(i, (char **)argv);
+		free(fn_header); fn_header= NULL;
+		free(fn_session_id); fn_session_id= NULL;
+		free(fn_ooq_sent); fn_ooq_sent= NULL;
 		if (r != 0)
 		{
 			report("httppost failed with %d", r);
@@ -800,10 +825,12 @@ static const char *get_session_id(void)
 {
 	static char session_id[80];
 
-	char *cp;
+	char *cp, *fn;
 	FILE *file;
 
-	file= fopen(ATLAS_SESSION_FILE, "r");
+	fn= atlas_path(ATLAS_SESSION_FILE_REL);
+	file= fopen(fn, "r");
+	free(fn); fn= NULL;
 	if (file == NULL)
 	{
 		return NULL;

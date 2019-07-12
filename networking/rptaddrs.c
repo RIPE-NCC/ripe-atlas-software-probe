@@ -35,12 +35,12 @@
 #define IPV6_ROUTE_FILE	"/proc/net/ipv6_route"
 #define SUFFIX		".new"
 
-#define IPV4_STATIC	ATLAS_STATUS "/network_v4_static_info.json"
-#define IPV6_STATIC	ATLAS_STATUS "/network_v6_static_info.json"
-#define DNS_STATIC	ATLAS_STATUS "/network_dns_static_info.json"
-#define NETWORK_INFO	ATLAS_STATUS "/network_v4_info.txt"
+#define IPV4_STATIC_REL	ATLAS_STATUS_REL "/network_v4_static_info.json"
+#define IPV6_STATIC_REL	ATLAS_STATUS_REL "/network_v6_static_info.json"
+#define DNS_STATIC_REL	ATLAS_STATUS_REL "/network_dns_static_info.json"
+#define NETWORK_INFO_REL ATLAS_STATUS_REL "/network_v4_info.txt"
 
-#define SAFE_PREFIX_N ATLAS_DATA_NEW
+#define SAFE_PREFIX_NEW_REL ATLAS_DATA_NEW_REL
 
 #define OPT_STRING      "A:O:c:"
 
@@ -85,6 +85,8 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 	char *opt_atlas;
        	char *cache_name;	/* temp file in an intermediate format */
 	char *out_name;		/* output file in json: timestamp opt_atlas */
+	char *rebased_out_name= NULL;
+	char *rebased_cache_name= NULL;
 	int opt_append;
 	FILE *cf;
 
@@ -97,76 +99,95 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 
 	opt= getopt32(argv, OPT_STRING, &opt_atlas, &out_name, &cache_name);
 
-	if (out_name && !validate_filename(out_name, SAFE_PREFIX_N))
+	if (out_name)
 	{
-		crondlog(LVL8 "insecure file '%s' : allowed '%s'", out_name, 
-				SAFE_PREFIX_N);
-		return 1;
+		rebased_out_name= rebased_validated_filename(out_name,
+			SAFE_PREFIX_NEW_REL);
+		if (!rebased_out_name)
+		{
+			crondlog(LVL8 "insecure file '%s' : allowed '%s'",
+				out_name, SAFE_PREFIX_NEW_REL);
+			goto err;
+		}
 	}
-	if (cache_name && !validate_filename(cache_name, SAFE_PREFIX_N))
+	if (cache_name)
 	{
-		crondlog(LVL8 "insecure file '%s' allowed %s", cache_name,
-				SAFE_PREFIX_N);
-		return 1;
+		rebased_cache_name= rebased_validated_filename(cache_name,
+			SAFE_PREFIX_NEW_REL);
+		if (!rebased_cache_name)
+		{
+			crondlog(LVL8 "insecure file '%s' allowed %s",
+				cache_name, SAFE_PREFIX_NEW_REL);
+			goto err;
+		}
 	}
 
 	if (!cache_name)  {
 		crondlog(LVL8 "missing requried option, -c <cache_file>");
-		return 1;
+		goto err;
 	}
 
 	if (opt & OPT_a) 
 		opt_append = TRUE;
 
-	cf= setup_cache(cache_name);
+	cf= setup_cache(rebased_cache_name);
 	if (cf == NULL)
-		return 1;
+		goto err;
 
 	r= setup_ipv4_rpt(cf);
 	if (r == -1)
 	{
 		fclose(cf);
-		return 1;
+		goto err;
 	}
 
 	r= setup_dhcpv4(cf);
 	if (r == -1)
 	{
 		fclose(cf);
-		return 1;
+		goto err;
 	}
 
 	r= setup_ipv6_rpt(cf);
 	if (r == -1)
 	{
 		fclose(cf);
-		return 1;
+		goto err;
 	}
 
 	r= setup_dns(cf);
 	if (r == -1)
 	{
 		fclose(cf);
-		return 1;
+		goto err;
 	}
 
 	r= setup_static_rpt(cf);
 	if (r == -1)
 	{
 		fclose(cf);
-		return 1;
+		goto err;
 	}
 	fclose(cf);
 
-	need_report= check_cache(cache_name);
+	need_report= check_cache(rebased_cache_name);
 	if (need_report)
 	{
-		r = rpt_ipv6(cache_name, out_name, opt_atlas, opt_append);
+		r = rpt_ipv6(rebased_cache_name, rebased_out_name,
+			opt_atlas, opt_append);
 		if (r != 0)
-			return r;
+			goto err;
 	}
 
+	if (rebased_out_name) free(rebased_out_name);
+	if (rebased_cache_name) free(rebased_cache_name);
+
 	return 0;
+
+err:
+	if (rebased_out_name) free(rebased_out_name);
+	if (rebased_cache_name) free(rebased_cache_name);
+	return 1;
 }
 
 static FILE *setup_cache(char *cache_name)
@@ -292,23 +313,28 @@ static int setup_dhcpv4(FILE *of)
 {
 	int found;
 	FILE *in_file;
+	char *fn;
 	const char *value;
 	char line[128];
 
-	in_file= fopen(NETWORK_INFO, "r");
+	fn= atlas_path(NETWORK_INFO_REL);
+	in_file= fopen(fn, "r");
 	if (in_file == NULL)
 	{
 		if (errno == ENOENT)
 		{
-			/* Probe is configure for DHCP but didn't get a 
+			/* Probe is configured for DHCP but didn't get a 
 			 * DHCP lease.
 			 */
 			fprintf(of, ", " DBQ(inet-dhcp) ": true");
+			free(fn); fn= NULL;
 			return 0;
 		}
-		report_err("unable to open '%s'", NETWORK_INFO);
+		report_err("unable to open '%s'", fn);
+		free(fn); fn= NULL;
 		return -1;
 	}
+	free(fn); fn= NULL;
 	found= 0;
 	while (fgets(line, sizeof(line), in_file) != NULL)
 	{
@@ -588,14 +614,21 @@ static int setup_dns(FILE *of)
 static int setup_static_rpt(FILE *of)
 {
 	int r;
+	char *fn;
 
-	r= report_line(of, IPV4_STATIC);
+	fn= atlas_path(IPV4_STATIC_REL);
+	r= report_line(of, fn);
+	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	r= report_line(of, IPV6_STATIC);
+	fn= atlas_path(IPV6_STATIC_REL);
+	r= report_line(of, fn);
+	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	r= report_line(of, DNS_STATIC);
+	fn= atlas_path(DNS_STATIC_REL);
+	r= report_line(of, fn);
+	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
 	return 0;
