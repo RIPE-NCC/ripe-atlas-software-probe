@@ -87,17 +87,17 @@ int condmv_main(int argc, char *argv[])
 	}
 	rebased_to= rebased_validated_filename(to,
 		SAFE_PREFIX_TO1_REL);
-	if (rebased_from == NULL)
+	if (rebased_to == NULL)
 	{
 		rebased_to= rebased_validated_filename(to,
 			SAFE_PREFIX_TO2_REL);
 	}
-	if (rebased_from == NULL)
+	if (rebased_to == NULL)
 	{
 		rebased_to= rebased_validated_filename(to,
 			SAFE_PREFIX_FROM1_REL);
 	}
-	if (rebased_from == NULL)
+	if (rebased_to == NULL)
 	{
 		fprintf(stderr, "insecure to file '%s'\n", to);
 		goto err;
@@ -231,7 +231,7 @@ static int do_dir(char *from_dir, char *to_dir)
 		r= stat(from_file, &sb);
 		if (r == -1)
 		{
-			fprintf(stderr, "condmv: stat %s failed: %sn",
+			fprintf(stderr, "condmv: stat %s failed: %s\n",
 				from_file, strerror(errno));
 			error= 1;
 			break;
