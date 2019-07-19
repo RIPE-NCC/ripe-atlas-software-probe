@@ -1,3 +1,8 @@
+if [ -n "$ATLAS_BASE" ]
+then
+	BASE_DIR="$ATLAS_BASE"
+fi
+
 . /usr/local/atlas/bin/common-pre.sh
 
 # Commands

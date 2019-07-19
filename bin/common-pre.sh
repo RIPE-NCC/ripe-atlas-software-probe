@@ -2,7 +2,7 @@
 # These variables are set before the platform dependend scripts are run.
 
 # Defaults, override if necessary
-BASE_DIR=/home/atlas
+: ${BASE_DIR:=/home/atlas}	# BASE_DIR if not already set
 SSH_DIR=$HOME/.ssh
 BIN_DIR=$BASE_DIR/bin
 STATUS_DIR=$BASE_DIR/status
