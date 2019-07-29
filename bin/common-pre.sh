@@ -3,7 +3,7 @@
 
 # Defaults, override if necessary
 : ${BASE_DIR:=/home/atlas}	# BASE_DIR if not already set
-SSH_DIR=$HOME/.ssh
+SSH_DIR=$BASE_DIR/.ssh
 BIN_DIR=$BASE_DIR/bin
 STATUS_DIR=$BASE_DIR/status
 STATE_DIR=$BASE_DIR/state
