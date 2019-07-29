@@ -1,4 +1,5 @@
 %define         installpath /usr/local/atlas
+%define		atlas_probe /var/atlas-probe
 
 Name:           atlasswprobe
 Summary:        RIPE Atlas probe software
@@ -6,7 +7,7 @@ Version:        4970
 Release:        13%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
-Source1:        src-6aad8b765895a75fd59c12355552ce019246e705.tar.gz
+Source1:        src-92e9713caa4a34c5d70a64341b91a385318fe26f.tar.gz
 Requires:       sudo %{?el6:daemontools} %{?el7:psmisc}
 BuildRequires:  rpm %{?el7:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
@@ -48,8 +49,8 @@ After=network-online.target syslog.target
 [Service]
 User=atlas
 Group=atlas
-Environment=HOME=/home/atlas
-WorkingDirectory=/home/atlas
+Environment=HOME=%{atlas_probe}
+WorkingDirectory=%{atlas_probe}
 ExecStart=/usr/local/atlas/bin/ATLAS
 Restart=always
 TimeoutStopSec=60
@@ -65,11 +66,11 @@ cat > %{buildroot}/etc/init/atlas.conf << EOF
 start on stopped rc
 stop on runlevel [016]
 respawn
-env HOME=/home/atlas
+env HOME=%{atlas_probe}
 exec setuidgid atlas /usr/local/atlas/bin/ATLAS
 post-stop script
-    setuidgid atlas kill \$(cat /home/atlas/run/*pid.vol 2>/dev/null) 2>/dev/null || :
-    setuidgid atlas rm -f /home/atlas/run/*pid.vol
+    setuidgid atlas kill \$(cat %{atlas_probe}/run/*pid.vol 2>/dev/null) 2>/dev/null || :
+    setuidgid atlas rm -f %{atlas_probe}/run/*pid.vol
 end script
 EOF
 %endif
@@ -95,46 +96,47 @@ killall -9 eooqd eperd perd telnetd 2>/dev/null || :
 %if 0%{?el6}
 stop atlas &>/dev/null
 %endif
-rm -fr /home/atlas/status /home/atlas/bin/reg_servers.sh
+rm -fr %{atlas_probe}/status %{atlas_probe}/bin/reg_servers.sh
 
 groupadd -g 10042 atlas 2>/dev/null
-useradd -c atlas -d /home/atlas -g atlas -s /sbin/nologin -u 10042 atlas 2>/dev/null
+useradd -c atlas -d %{atlas_probe} -g atlas -s /sbin/nologin -u 10042 atlas 2>/dev/null
 exit 0
 
 %post
 exec >/tmp/atlasprobe.out 2>/tmp/atlasprobe.err
 set -x
 
-if [ ! -f /home/atlas/state/mode ]; then
-    mkdir -p /home/atlas/state
-    echo prod > /home/atlas/state/mode
+if [ ! -f %{atlas_probe}/state/mode ]; then
+    mkdir -p %{atlas_probe}/state
+    echo prod > %{atlas_probe}/state/mode
 fi
-if [ ! -d /home/atlas/bin ]; then
-    mkdir -p /home/atlas/bin
+if [ ! -d %{atlas_probe}/bin ]; then
+    mkdir -p %{atlas_probe}/bin
 fi
-echo 'DEVICE_NAME=centos-sw-probe' > /home/atlas/bin/config.sh
-if [ ! -f /home/atlas/etc/probe_key ]; then
+echo 'DEVICE_NAME=centos-sw-probe' > %{atlas_probe}/bin/config.sh
+echo 'ATLAS_BASE="%{atlas_probe}"' >> %{atlas_probe}/bin/config.sh
+if [ ! -f %{atlas_probe}/etc/probe_key ]; then
     ether=$(ip link | awk '/link\/ether/ { print $2; exit }')
     name=$(hostname -s)
-    mkdir -p /home/atlas/etc
-    ssh-keygen -t rsa -P '' -C $name -f /home/atlas/etc/probe_key
-    chown -R atlas:atlas /home/atlas/etc
+    mkdir -p %{atlas_probe}/etc
+    ssh-keygen -t rsa -P '' -C $name -f %{atlas_probe}/etc/probe_key
+    chown -R atlas:atlas %{atlas_probe}/etc
 fi
-chown -R atlas:atlas /home/atlas
-chmod 755 /home/atlas
+chown -R atlas:atlas %{atlas_probe}
+chmod 755 %{atlas_probe}
 
-mkdir -p /home/atlas/crons/main
-mkdir -p /home/atlas/crons/2
-mkdir -p /home/atlas/crons/7
-chown -R atlas:atlas /home/atlas/crons
-mkdir -p /home/atlas/data/new
-mkdir -p /home/atlas/data/oneoff
-mkdir -p /home/atlas/data/out/ooq
-mkdir -p /home/atlas/data/out/ooq10
-chown -R atlas:atlas /home/atlas/data
-chmod -R g+rwx /home/atlas/data
-mkdir -p /home/atlas/run
-chown atlas:atlas /home/atlas/run
+mkdir -p %{atlas_probe}/crons/main
+mkdir -p %{atlas_probe}/crons/2
+mkdir -p %{atlas_probe}/crons/7
+chown -R atlas:atlas %{atlas_probe}/crons
+mkdir -p %{atlas_probe}/data/new
+mkdir -p %{atlas_probe}/data/oneoff
+mkdir -p %{atlas_probe}/data/out/ooq
+mkdir -p %{atlas_probe}/data/out/ooq10
+chown -R atlas:atlas %{atlas_probe}/data
+chmod -R g+rwx %{atlas_probe}/data
+mkdir -p %{atlas_probe}/run
+chown atlas:atlas %{atlas_probe}/run
 %if 0%{?el7}
 systemctl --now --quiet enable atlas
 systemctl --now --quiet start atlas
@@ -159,7 +161,7 @@ exit 0
 %postun
 if [ $1 -eq 0 ]; then
 	%{?el7:%systemd_postun}
-	rm -fr /home/atlas/etc/probe_key /home/atlas/status
+	rm -fr %{atlas_probe}/etc/probe_key /home/atlas/status
 fi
 
 %changelog
