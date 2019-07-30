@@ -344,7 +344,7 @@ static void report(struct trtstate *state)
 	{
 		fh= fopen(state->out_filename, "a");
 		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
+			crondlog(DIE9 "traceroute: unable to append to '%s'",
 				state->out_filename);
 	}
 	else
@@ -4060,7 +4060,7 @@ for (i= 0; argv[i] != NULL; i++)
 		fh= fopen(validated_out_filename, "a");
 		if (!fh)
 		{
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "traceroute: unable to append to '%s'",
 				validated_out_filename);
 			goto err;
 		}
@@ -4138,7 +4138,8 @@ for (i= 0; argv[i] != NULL; i++)
 	state->delay_name_res= delay_name_res;
 	state->hbhoptsize= hbhoptsize;
 	state->destoptsize= destoptsize;
-	state->out_filename= out_filename ? strdup(out_filename) : NULL;
+	state->out_filename= validated_out_filename;
+		validated_out_filename= NULL;
 	state->response_in= validated_response_in;
 		validated_response_in= NULL;
 	state->response_out= validated_response_out;
