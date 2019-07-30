@@ -84,11 +84,11 @@ static char *rebased_validated_common(const char *path, const char *prefix,
 				failed= 1;	/* property 1 */
 			}
 
-			if (!failed && path[atlas_home_len+1+prefix_len] !=
+			if (!failed && path[new_base_len+1+prefix_len] !=
 				'/')
 			{
 				if (require_slash ||
-					path[atlas_home_len+1+prefix_len] !=
+					path[new_base_len+1+prefix_len] !=
 					'\0')
 				{
 					failed =1;	/* property 2 */
