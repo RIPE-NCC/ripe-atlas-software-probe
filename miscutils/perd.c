@@ -1158,7 +1158,7 @@ static int atlas_run(char *cmdline)
 		flags= O_CREAT | O_WRONLY;
 		if (do_append)
 			flags |= O_APPEND;
-		atlas_fd= open(outfile, flags, 0644);
+		atlas_fd= open(validated_fn, flags, 0644);
 		if (atlas_fd == -1)
 		{
 			crondlog(
