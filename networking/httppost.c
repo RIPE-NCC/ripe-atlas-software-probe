@@ -263,7 +263,7 @@ int httppost_main(int argc, char *argv[])
 		cLength  +=  sbH.st_size;
 	}
 
-	if(post_footer != NULL )
+	if (post_footer != NULL )
 	{	
 		rebased_fn= rebased_validated_filename(post_footer,
 			SAFE_PREFIX_DATA_OUT_REL);
@@ -274,11 +274,11 @@ int httppost_main(int argc, char *argv[])
 		}
 		if (rebased_fn == NULL)
 		{
-			report("pretected file (for footer) '%s'",
+			report("protected file (for footer) '%s'",
 				post_footer);
 			goto err;
 		}
-		fdF = open(post_footer, O_RDONLY);
+		fdF = open(rebased_fn, O_RDONLY);
 		if(fdF == -1 )
 		{
 			report_err("unable to open footer '%s'",
@@ -338,7 +338,20 @@ int httppost_main(int argc, char *argv[])
 
 	if (post_dir)
 	{
-		filelist= do_dir(post_dir, cLength, maxpostsize, &dir_length);
+		rebased_fn= rebased_validated_filename(post_dir,
+			SAFE_PREFIX_DATA_OUT_REL);
+		if (rebased_fn == NULL)
+		{
+			rebased_fn= rebased_validated_filename(post_dir,
+				SAFE_PREFIX_STATUS_REL);
+		}
+		if (rebased_fn == NULL)
+		{
+			report("protected dir (post) '%s'", post_dir);
+			goto err;
+		}
+		filelist= do_dir(rebased_fn, cLength, maxpostsize, &dir_length);
+		free(rebased_fn); rebased_fn= NULL;
 		if (!filelist)
 		{
 			/* Something went wrong. */
