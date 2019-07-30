@@ -1471,13 +1471,22 @@ static int start_crontab(struct tsession *ts, char *line)
 	}
 
 	cp= line+strlen(CMD_CRONTAB);
-	len= strlen(cp);
+	rebased_fn= rebased_validated_filename(cp, SAFE_PREFIX_REL);
+	if (!rebased_fn)
+	{
+		add_2sock(ts, BAD_PATH);
+		return -1;
+	}
+	len= strlen(rebased_fn);
 	if (len+1 > sizeof(atlas_dirname))
 	{
+		free(rebased_fn); rebased_fn= NULL;
 		add_2sock(ts, NAME_TOO_LONG);
 		return -1;
 	}
-	strlcpy(atlas_dirname, cp, sizeof(atlas_dirname));
+
+	strlcpy(atlas_dirname, rebased_fn, sizeof(atlas_dirname));
+	free(rebased_fn); rebased_fn= NULL;
 
 	if (len + strlen(CRONTAB_NEW_SUF) + 1 > sizeof(filename))
 	{
@@ -1488,15 +1497,7 @@ static int start_crontab(struct tsession *ts, char *line)
 	strlcpy(filename, atlas_dirname, sizeof(filename));
 	strlcat(filename, CRONTAB_NEW_SUF, sizeof(filename));
 
-	rebased_fn= rebased_validated_filename(filename, SAFE_PREFIX_REL);
-	if (!rebased_fn)
-	{
-		add_2sock(ts, BAD_PATH);
-		return -1;
-	}
-
-	atlas_crontab= fopen(rebased_fn, "w");
-	free(rebased_fn); rebased_fn= NULL;
+	atlas_crontab= fopen(filename, "w");
 	if (!atlas_crontab)
 	{
 		add_2sock(ts, CREATE_FAILED);
