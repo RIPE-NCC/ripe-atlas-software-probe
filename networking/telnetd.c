@@ -1654,7 +1654,7 @@ static void do_oneoff(struct tsession *ts, char *line)
 	 * fails.
 	 */
 	rename(rebased_fn, rebased_fn_new);
-	file= fopen(filename_new, "a");
+	file= fopen(rebased_fn_new, "a");
 	if (!file)
 	{
 		free(rebased_fn); rebased_fn= NULL;
