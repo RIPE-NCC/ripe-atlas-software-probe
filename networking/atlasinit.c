@@ -1373,7 +1373,6 @@ static int reg_init_main( int argc, char *argv[] )
 			 	fprintf (f, "/sbin/route add default gw %s\n",
 					ipv4_gw); 
 
-#if 0
 				// put parts in the shell script to make network info file
 
 				fprintf (f, "IPV4_LOCAL_ADDR=%s\n",
@@ -1383,6 +1382,7 @@ static int reg_init_main( int argc, char *argv[] )
 				fprintf (f, "IPV4_GW=%s\n",ipv4_gw);
 				fprintf (f, "DHCP=False\n");
 				
+#if 0
 				// second file for static 
 				fprintf (f, "STATIC_IPV4_LOCAL_ADDR=%s\n",
 					ipv4_address);
