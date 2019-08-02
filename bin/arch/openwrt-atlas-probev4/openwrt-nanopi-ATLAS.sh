@@ -1,5 +1,5 @@
 . /home/atlas/bin/common-pre.sh
-. /home/atlas/bin/openwrt-nanopi-common.sh
+. /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-common.sh
 
 # Commands
 CHECK_RO_USB=:
@@ -9,8 +9,8 @@ DEV_FIRMWARE=/storage/etc/openwrt-sunxi-cortexa53-atlas-rootfs.tar; export DEV_F
 MODE_FILE=/home/atlas/state/mode
 KEY_PREFIX_SOURCE=$BASE_DIR/etc/2018-04-23
 
-. /home/atlas/bin/openwrt-common.sh
-. /home/atlas/bin/linux-functions.sh
+. /home/atlas/bin/arch/openwrt/openwrt-common.sh
+. /home/atlas/bin/arch/linux/linux-functions.sh
 
 setup_network()
 {
