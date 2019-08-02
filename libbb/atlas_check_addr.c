@@ -44,6 +44,20 @@ int atlas_check_addr(const struct sockaddr *sa, socklen_t len)
 	uint16_t *addr2p;
 	const struct sockaddr_in *sin4p;
 	const struct sockaddr_in6 *sin6p;
+	char *cp;
+
+	static int allow_all= -1;
+
+	if (allow_all == -1)
+	{
+		allow_all= 0;	/* Safe default */
+		cp= getenv("ATLAS_DISABLE_CHECK_ADDR");
+		if (cp != NULL && strcmp(cp, "yes") == 0)
+			allow_all= 1;
+	}
+
+	if (allow_all)
+		return 0;	/* All addresses are allowed */
 
 	switch(sa->sa_family)
 	{
