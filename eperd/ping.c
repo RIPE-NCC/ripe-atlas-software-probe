@@ -220,7 +220,7 @@ static void report(struct pingstate *state)
 	{
 		fh= fopen(state->out_filename, "a");
 		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
+			crondlog(DIE9 "ping: unable to append to '%s'",
 				state->out_filename);
 	}
 	else
@@ -230,10 +230,11 @@ static void report(struct pingstate *state)
 	if (state->atlas)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
-			", " DBQ(fw) ":%d"
+			", %s"
 			", " DBQ(lts) ":%d"
 			", " DBQ(time) ":%ld, ",
-			state->atlas, get_atlas_fw_version(), get_timesync(),
+			state->atlas, atlas_get_version_json_str(),
+			get_timesync(),
 			(long)time(NULL));
 		if (state->bundle_id)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle_id);
@@ -1312,7 +1313,7 @@ static void *ping_init(int __attribute((unused)) argc, char *argv[],
 		fh= fopen(validated_out_filename, "a");
 		if (!fh)
 		{
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "ping: unable to append to '%s'",
 				validated_out_filename);
 			goto err;
 		}

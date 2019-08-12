@@ -891,7 +891,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 		fh= fopen(validated_output_file, "a");
 		if (!fh)
 		{
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "sslgetcert: unable to append to '%s'",
 				validated_output_file);
 			goto err;
 		}
@@ -1010,7 +1010,7 @@ static void report(struct state *state)
 	{
 		fh= fopen(state->output_file, "a");
 		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
+			crondlog(DIE9 "sslgetcert: unable to append to '%s'",
 				state->output_file);
 	}
 	else
@@ -1020,11 +1020,11 @@ static void report(struct state *state)
 	if (state->atlas)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
-			DBQ(fw) ":%d, "
+			"%s, "
 			DBQ(lts) ":%d, "
 			DBQ(time) ":%ld, ",
-			state->atlas, get_atlas_fw_version(), get_timesync(),
-			state->gstart);
+			state->atlas, atlas_get_version_json_str(),
+			get_timesync(), state->gstart);
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
@@ -1160,7 +1160,7 @@ static FILE *report_head(struct state *state)
 		fh= fopen(state->output_file, "a");
 		if (!fh)
 		{
-			crondlog(DIE9 "unable to append to '%s'",
+			crondlog(DIE9 "sslgetcert: unable to append to '%s'",
 				state->output_file);
 			return NULL;
 		}
@@ -1172,9 +1172,9 @@ static FILE *report_head(struct state *state)
 	if (state->atlas)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
-			", " DBQ(fw) ":%d"
+			", %s" 
 			", " DBQ(lts) ":%d",
-			state->atlas, get_atlas_fw_version(),
+			state->atlas, atlas_get_version_json_str(),
 			get_timesync());
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);

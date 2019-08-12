@@ -67,8 +67,9 @@ int dfrm_main(int argc, char *argv[])
 	if (opt_atlas)
 	{
 		printf(
-		DBQ(id) ":" DBQ(%s) ", " DBQ(fw) ": %d, " DBQ(time) ": %ld, ",
-			opt_atlas, get_atlas_fw_version(), (long)time(NULL));
+		DBQ(id) ":" DBQ(%s) ", %s, " DBQ(time) ": %ld, ",
+			opt_atlas, atlas_get_version_json_str(),
+			(long)time(NULL));
 	}
 	printf(DBQ(bsize) ": %ld, " DBQ(blocks) ": %ld, "
 		DBQ(bfree) ": %ld, " DBQ(free) ": %ld",

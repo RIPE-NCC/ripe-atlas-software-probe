@@ -82,7 +82,6 @@
 #define MAX_INTERVAL	(2*366*24*3600)	/* No intervals bigger than 2 years */
 
 #define URANDOM_DEV	"/dev/urandom"
-#define ATLAS_FW_VERSION_REL	"state/FIRMWARE_APPS_VERSION"
 
 #define RESOLV_CONF	"/etc/resolv.conf"
 
@@ -187,43 +186,6 @@ void crondlog(const char *ctl, ...)
 	va_end(va);
 	if (ctl[0] & 0x80)
 		exit(20);
-}
-
-int get_atlas_fw_version(void)
-{
-	static int fw_version= -1;
-
-	int r, fw;
-	char *fn;
-	FILE *file;
-
-	if (fw_version != -1)
-		return fw_version;
-
-	fn= atlas_path(ATLAS_FW_VERSION_REL);
-	file= fopen(fn, "r");
-	if (file == NULL)
-	{
-		crondlog(
-			LVL9 "get_atlas_fw_version: unable to open '%s': %s",
-			fn, strerror(errno));
-		free(fn); fn= NULL;
-		return -1;
-	}
-	r= fscanf(file, "%d", &fw);
-	fclose(file);
-	if (r == -1)
-	{
-		crondlog(
-		LVL9 "get_atlas_fw_version: unable to read from '%s'",
-			fn);
-		free(fn); fn= NULL;
-		return -1;
-	}
-	free(fn); fn= NULL;
-
-	fw_version= fw;
-	return fw;
 }
 
 static void my_exit(void)
@@ -716,8 +678,8 @@ static void check_resolv_conf(void)
 		fprintf(fn, "RESULT { ");
 		if (atlas_id)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
-			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, "%s, " DBQ(time) ":%ld, ",
+			atlas_get_version_json_str(), (long)time(NULL));
 		fprintf(fn, DBQ(event) ": " DBQ(load resolv.conf)
 			", " DBQ(result) ": %d", r);
 
@@ -1108,8 +1070,8 @@ error:
 		fprintf(fn, "RESULT { ");
 		if (atlas_id)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
-			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, "%s, " DBQ(time) ":%ld, ",
+			atlas_get_version_json_str(), (long)time(NULL));
 		if (reason)
 			fprintf(fn, DBQ(reason) ":" DBQ(%s) ", ", reason);
 		fprintf(fn, DBQ(cmd) ": \"");
@@ -1319,8 +1281,8 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 			fprintf(fn, "RESULT { ");
 			if (atlas_id)
 				fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
-			fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
-				get_atlas_fw_version(), (long)time(NULL));
+			fprintf(fn, "%s, " DBQ(time) ":%ld, ",
+				atlas_get_version_json_str(), (long)time(NULL));
 			fprintf(fn, DBQ(reason) ": "
 		DBQ(inconsistent time; now %d; nexttime %d; waittime %d; cycle %d; generated %d) ", ",
 				(int)now.tv_sec, (int)line->nexttime,

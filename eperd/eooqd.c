@@ -561,8 +561,8 @@ error:
 		fprintf(fn, "RESULT { ");
 		if (state->atlas_id)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", state->atlas_id);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
-			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, "%s, " DBQ(time) ":%ld, ",
+			atlas_get_version_json_str(), (long)time(NULL));
 		if (reason)
 			fprintf(fn, DBQ(reason) ":" DBQ(%s) ", ", reason);
 		fprintf(fn, DBQ(cmd) ": \"");
@@ -689,8 +689,8 @@ static void check_resolv_conf2(const char *out_file, const char *atlasid)
 		fprintf(fn, "RESULT { ");
 		if (atlasid)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlasid);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%ld, ",
-			get_atlas_fw_version(), (long)time(NULL));
+		fprintf(fn, "%s, " DBQ(time) ":%ld, ",
+			atlas_get_version_json_str(), (long)time(NULL));
 		fprintf(fn, DBQ(event) ": " DBQ(load resolv.conf)
 			", " DBQ(result) ": %d", r);
 

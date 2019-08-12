@@ -441,6 +441,8 @@ const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
+#define ATLAS_MSM_VERSION	"2.0.0"
+
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
 #define ATLAS_CRONS_REL		"crons"
@@ -457,7 +459,7 @@ extern char *rebased_validated_dir(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);
-extern int get_atlas_fw_version(void);
+extern char *atlas_get_version_json_str(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
 extern const char *atlas_base(void);

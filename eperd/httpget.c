@@ -601,7 +601,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 		fh= fopen(validated_output_file, "a");
 		if (!fh)
 		{
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "httpget: unable to append to '%s'",
 				validated_output_file);
 			goto err;
 		}
@@ -837,7 +837,7 @@ static void report(struct hgstate *state)
 		{
 			fh= fopen(state->output_file, "a");
 			if (!fh)
-				crondlog(DIE9 "unable to append to '%s'",
+				crondlog(DIE9 "httpget: unable to append to '%s'",
 					state->output_file);
 		}
 		else
@@ -847,10 +847,10 @@ static void report(struct hgstate *state)
 		if (state->atlas)
 		{
 			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
-				DBQ(fw) ":%d, "
+				"%s, "
 				DBQ(lts) ":%d, "
 				DBQ(time) ":%ld, ",
-				state->atlas, get_atlas_fw_version(),
+				state->atlas, atlas_get_version_json_str(),
 				get_timesync(),
 				state->gstart);
 			if (state->bundle)

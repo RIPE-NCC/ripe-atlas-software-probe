@@ -354,11 +354,11 @@ static void report(struct trtstate *state)
 	if (state->atlas)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
-			", " DBQ(fw) ":%d"
+			", %s"
 			", " DBQ(lts) ":%d"
 			", " DBQ(time) ":%ld"
 			", " DBQ(endtime) ":%ld, ",
-			state->atlas, get_atlas_fw_version(),
+			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
 			state->starttime,
 			(long)time(NULL));

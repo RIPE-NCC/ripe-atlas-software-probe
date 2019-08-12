@@ -2705,7 +2705,6 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	FILE *fh;	
 	struct tdig_base *base;
 	struct query_state *qry_h;
-	u_int32_t fw;
 	struct query_state *qry;
 
 	base = h;	
@@ -2728,7 +2727,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	if (qry_h->out_filename) {
 		fh= fopen(qry_h->out_filename, "a");
 		if (!fh) {
-			crondlog(LVL8 "unable to append to '%s'", qry_h->out_filename);
+			crondlog(LVL8 "evtdig: unable to append to '%s'", qry_h->out_filename);
 			return;
 		}
 	}
@@ -2739,8 +2738,8 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 
 	AS("RESULT { ");
 	JS(id, "9201" ); 
-	fw = get_atlas_fw_version();
-	JU(fw, fw);
+	AS(atlas_get_version_json_str());
+	AS(", ");
 	gettimeofday(&now, NULL);
 	JS1(time, %ld,  now.tv_sec);
 	JU(sok , base->sentok);
@@ -3036,7 +3035,7 @@ void printErrorQuick (struct query_state *qry)
 	{
 		fh= fopen(qry->out_filename, "a");
 		if (!fh){
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "evtdig: unable to append to '%s'",
 					qry->out_filename);
 			return;
 		}
@@ -3045,7 +3044,7 @@ void printErrorQuick (struct query_state *qry)
 		fh = stdout;
 
 	fprintf(fh, "RESULT { ");
-	fprintf(fh, "\"fw\" : \"%d\",", get_atlas_fw_version());
+	fprintf(fh, "%s,", atlas_get_version_json_str());
 	fprintf(fh, "\"id\" : 9202 ,");
 	gettimeofday(&now, NULL);
 	fprintf(fh, "\"time\" : %ld ,",  now.tv_sec);
@@ -3091,7 +3090,6 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	unsigned offset;
 	unsigned char *name1= NULL, *name2= NULL;
 
-	int fw = get_atlas_fw_version();
 	int lts = get_timesync();
 
 	if(! qry->result.size){
@@ -3107,7 +3105,8 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			}
 		}
 
-		JD(fw, fw);
+		AS(atlas_get_version_json_str());
+		AS(", ");
 		if (qry->opt_rset){
 			JS1(time, %ld,  qry->xmit_time);
 			JD(lts,lts);
@@ -3390,7 +3389,7 @@ truncated:
 		{
 			fh= fopen(qry->out_filename, "a");
 			if (!fh) {
-				crondlog(LVL8 "unable to append to '%s'",
+				crondlog(LVL8 "evtdig: unable to append to '%s'",
 						qry->out_filename);
 			}
 		}

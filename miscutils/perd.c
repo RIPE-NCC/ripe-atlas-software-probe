@@ -1204,8 +1204,8 @@ error:
 		fprintf(fn, "RESULT { ");
 		if (atlas_id)
 			fprintf(fn, DBQ(id) ":" DBQ(%s) ", ", atlas_id);
-		fprintf(fn, DBQ(fw) ":" DBQ(%d) ", " DBQ(time) ":%d, ",
-			get_atlas_fw_version(), time(NULL));
+		fprintf(fn, "%s, " DBQ(time) ":%d, ",
+			atlas_get_version_json_str(), time(NULL));
 		if (reason != NULL)
 			fprintf(fn, DBQ(reason) ":" DBQ(%s) ", ", reason);
 		fprintf(fn, DBQ(err) ":%d, " DBQ(cmd) ": \"", r);

@@ -349,7 +349,7 @@ static void report(struct ntpstate *state)
 	{
 		fh= fopen(state->out_filename, "a");
 		if (!fh)
-			crondlog(DIE9 "unable to append to '%s'",
+			crondlog(DIE9 "ntp: unable to append to '%s'",
 				state->out_filename);
 	}
 	else
@@ -359,10 +359,10 @@ static void report(struct ntpstate *state)
 	if (state->atlas)
 	{
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
-			", " DBQ(fw) ":%d"
+			", %s"
 			", " DBQ(lts) ":%d"
 			", " DBQ(time) ":%ld, ",
-			state->atlas, get_atlas_fw_version(),
+			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
 			state->starttime);
 		if (state->bundle)
@@ -1788,7 +1788,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		fh= fopen(validated_out_filename, "a");
 		if (!fh)
 		{
-			crondlog(LVL8 "unable to append to '%s'",
+			crondlog(LVL8 "ntp: unable to append to '%s'",
 				validated_out_filename);
 			goto err;
 		}

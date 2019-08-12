@@ -67,7 +67,7 @@ int rxtxrpt_main(int argc, char *argv[])
 	{
 #ifdef NEW_FORMAT
 		printf("RESULT { " DBQ(id) ": " DBQ(%s) ", ", opt_atlas);
-		printf(DBQ(fw) ": %d, ", get_atlas_fw_version());
+		printf("%s, ", atlas_get_version_json_str());
 		printf(DBQ(time) ": %lld, ", (long long)time(NULL));
 		printf(DBQ(lts) ": %d, ", get_timesync());
 		printf(DBQ(interfaces) ": [");

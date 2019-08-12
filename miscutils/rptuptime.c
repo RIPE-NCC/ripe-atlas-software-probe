@@ -32,7 +32,7 @@ int rptuptime_main(int argc UNUSED_PARAM, char **argv)
 	struct sysinfo info; 
 
 	printf("RESULT { " DBQ(id) ": " DBQ(7001) ", ");
-	printf(DBQ(fw) ": %d, ", get_atlas_fw_version());
+	printf("%s, ", atlas_get_version_json_str());
 	printf(DBQ(time) ": %ld, ", (long)time(NULL));
 	printf(DBQ(lts) ": %d, ", get_timesync());
 	sysinfo(&info);
