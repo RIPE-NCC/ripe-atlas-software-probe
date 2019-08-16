@@ -36,11 +36,16 @@ get_arch()
 	echo "centos"
 }
 
+get_sub_arch()
+{
+	echo "$SUB_ARCH"
+}
+
 p_to_r_init()
 {
 	{
 		echo P_TO_R_INIT
-		echo TOKEN_SPECS `get_arch` 1000 `cat $STATE_DIR/FIRMWARE_APPS_VERSION`
+		echo TOKEN_SPECS `get_arch` 1000 `cat $STATE_DIR/FIRMWARE_APPS_VERSION` `get_sub_arch`
 		echo REASON_FOR_REGISTRATION $1
 	} | tee $P_TO_R_INIT_IN
 }
