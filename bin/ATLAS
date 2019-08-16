@@ -11,7 +11,7 @@ DEVICE_NAME=
 if [ -f bin/config.sh ]
 then
 	. bin/config.sh
-	export DEVICE_NAME
+	export DEVICE_NAME SUB_ARCH
 elif [ -f  /etc/board.json ]
 then
 	grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json &&
