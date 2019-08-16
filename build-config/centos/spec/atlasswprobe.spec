@@ -3,11 +3,11 @@
 
 Name:           atlasswprobe
 Summary:        RIPE Atlas probe software
-Version:        4970
-Release:        13%{?dist}
+Version:        4981
+Release:        27%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
-Source1:        src-92e9713caa4a34c5d70a64341b91a385318fe26f.tar.gz
+Source1:        src-c479c0db8c64756e3a7079384f1f3e72f068d9d1.tar.gz
 Requires:       sudo %{?el6:daemontools} %{?el7:psmisc}
 BuildRequires:  rpm %{?el7:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
@@ -115,6 +115,7 @@ if [ ! -d %{atlas_probe}/bin ]; then
 fi
 echo 'DEVICE_NAME=centos-sw-probe' > %{atlas_probe}/bin/config.sh
 echo 'ATLAS_BASE="%{atlas_probe}"' >> %{atlas_probe}/bin/config.sh
+echo 'SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"' >> %{atlas_probe}/bin/config.sh
 if [ ! -f %{atlas_probe}/etc/probe_key ]; then
     ether=$(ip link | awk '/link\/ether/ { print $2; exit }')
     name=$(hostname -s)
