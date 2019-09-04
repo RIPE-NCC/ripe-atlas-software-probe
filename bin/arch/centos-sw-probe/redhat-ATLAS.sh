@@ -59,6 +59,14 @@ get_ether_addr
 # Try to link in FIRMWARE_APPS_VERSION
 ln -sf $RPM_BASE_DIR/state/FIRMWARE_APPS_VERSION $BASE_DIR/state/FIRMWARE_APPS_VERSION
 
+# Create ssh keys if they are not there yet.
+if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
+    name=$(hostname -s)
+    mkdir -p "$BASE_DIR"/etc
+    ssh-keygen -t rsa -P '' -C $name -f "$BASE_DIR"/etc/probe_key
+    chown -R atlas:atlas "$BASE_DIR"/etc
+fi
+
 while :
 do
 	mode=$(cat $MODE_FILE)

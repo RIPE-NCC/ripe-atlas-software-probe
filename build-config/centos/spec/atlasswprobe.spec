@@ -116,13 +116,6 @@ fi
 echo 'DEVICE_NAME=centos-sw-probe' > %{atlas_probe}/bin/config.sh
 echo 'ATLAS_BASE="%{atlas_probe}"' >> %{atlas_probe}/bin/config.sh
 echo 'SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"' >> %{atlas_probe}/bin/config.sh
-if [ ! -f %{atlas_probe}/etc/probe_key ]; then
-    ether=$(ip link | awk '/link\/ether/ { print $2; exit }')
-    name=$(hostname -s)
-    mkdir -p %{atlas_probe}/etc
-    ssh-keygen -t rsa -P '' -C $name -f %{atlas_probe}/etc/probe_key
-    chown -R atlas:atlas %{atlas_probe}/etc
-fi
 chown -R atlas:atlas %{atlas_probe}
 chmod 755 %{atlas_probe}
 
