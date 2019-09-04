@@ -1,6 +1,6 @@
-REG_1_HOST=tbd-reg-server-1
-REG_2_HOST=tbd-ipv4-reg-server-1
-REG_3_HOST=tbd-ipv6-reg-server-1
-REG_4_HOST=tbd-reg-server-2
-REG_5_HOST=tbd-ipv4-reg-server-2
-REG_6_HOST=tbd-ipv6-reg-server-2
+REG_1_HOST=reg03
+REG_2_HOST=193.0.19.246
+REG_3_HOST=2001:67c:2e8:11::c100:13f6
+REG_4_HOST=reg04
+REG_5_HOST=193.0.19.247
+REG_6_HOST=2001:67c:2e8:11::c100:13f7
