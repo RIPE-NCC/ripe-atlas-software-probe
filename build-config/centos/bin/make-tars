@@ -4,3 +4,5 @@ git_id=$(cd ripe-atlas-software-probe && git rev-parse HEAD)
 mkdir -p rpmbuild/SOURCES
 rm -f rpmbuild/SOURCES/*.tar.gz
 tar cvzf rpmbuild/SOURCES/src-$git_id.tar.gz ripe-atlas-software-probe
+mkdir -p rpmbuild/SPECS
+sed < ripe-atlas-software-probe/build-config/centos/spec/atlasswprobe.spec.in >rpmbuild/SPECS/atlasswprobe.spec "s/COMMIT_ID/$git_id/"
