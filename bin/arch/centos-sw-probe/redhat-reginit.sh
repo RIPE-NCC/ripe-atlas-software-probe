@@ -33,7 +33,7 @@ fi
 
 get_arch()
 {
-	echo "centos"
+	echo "fluffy"
 }
 
 get_sub_arch()
