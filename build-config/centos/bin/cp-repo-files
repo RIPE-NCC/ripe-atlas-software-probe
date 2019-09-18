@@ -1,0 +1,10 @@
+#!/bin/sh
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.spec rpmbuild/SPECS
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.repo rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.pgp rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.daily rpmbuild/SOURCES
+
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo-test.spec rpmbuild/SPECS
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.repo rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.pgp rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo.daily rpmbuild/SOURCES
