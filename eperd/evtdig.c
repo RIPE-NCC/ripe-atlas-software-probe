@@ -382,7 +382,9 @@ struct query_state {
 
 	time_t xmit_time;	
 	struct timespec xmit_time_ts;	
+	struct timespec qxmit_time_ts;	
 	double triptime;
+	double querytime;
 
 	//tdig_callback_type user_callback;
 	void *user_callback;
@@ -1424,6 +1426,8 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	}
 	free(outbuff);
 	free(wire);
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->qxmit_time_ts);
 }
 
 static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr) 
@@ -1511,6 +1515,10 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 					qry->xmit_time_ts.tv_sec)*1000 +
 					(rectime.tv_nsec -
 					qry->xmit_time_ts.tv_nsec)/1e6;
+				qry->querytime = (rectime.tv_sec -
+					qry->qxmit_time_ts.tv_sec)*1000 +
+					(rectime.tv_nsec -
+					qry->qxmit_time_ts.tv_nsec)/1e6;
 				printReply (qry, qry->packet.size, (unsigned char *)qry->packet.buf);
 			}
 			else {
@@ -3183,6 +3191,13 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	{
 		snprintf(line, DEFAULT_LINE_LENGTH, ",\"result\" : { \"rt\" : %.3f,", qry->triptime);
 		buf_add(&qry->result,line, strlen(line));
+
+		if (qry->opt_proto == 6)
+		{
+			/* Add query time for TCP */
+			snprintf(line, DEFAULT_LINE_LENGTH, "\"qt\" : %.3f,", qry->querytime);
+			buf_add(&qry->result,line, strlen(line));
+		}
 
 		JD_NC (size,  wire_size);
 
