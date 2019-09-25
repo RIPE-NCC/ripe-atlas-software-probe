@@ -70,6 +70,7 @@
 #include <time.h>
 #endif
 #include <sys/stat.h>
+#include <net/if.h>
 
 #include "event2/util.h"
 #include "util-internal.h"
@@ -809,8 +810,10 @@ int
 evutil_getaddrinfo_common(const char *nodename, const char *servname,
     struct evutil_addrinfo *hints, struct evutil_addrinfo **res, int *portnum)
 {
-	int port = 0;
+	int r, port = 0;
+	unsigned int if_index;
 	const char *pname;
+	char *cp, *check, *tmp_nodename;
 
 	if (nodename == NULL && servname == NULL)
 		return EVUTIL_EAI_NONAME;
@@ -883,10 +886,41 @@ evutil_getaddrinfo_common(const char *nodename, const char *servname,
 	if (hints->ai_family == PF_INET6 || hints->ai_family == PF_UNSPEC) {
 		struct sockaddr_in6 sin6;
 		memset(&sin6, 0, sizeof(sin6));
-		if (1==evutil_inet_pton(AF_INET6, nodename, &sin6.sin6_addr)) {
+
+		/* Nodename may contain a zone id */
+		if_index= 0;
+		cp= strchr(nodename, '%');
+		if (cp != NULL)
+		{
+			/* Found a zone ID. Assume that an IPv4 address
+			 * literal cannot contain a percent sign, so
+			 * bail out if anything fails.
+			 */
+			if_index= if_nametoindex(cp+1);
+			if (if_index == 0)
+			{
+				/* Could be numeric */
+				if_index= strtoul(cp+1, &check, 10);
+				if (check[0] != '\0')
+					return EVUTIL_EAI_NEED_RESOLVE;
+			}
+			tmp_nodename= strdup(nodename);
+			cp= strchr(tmp_nodename, '%');
+			*cp= '\0';
+			r= evutil_inet_pton(AF_INET6, tmp_nodename,
+				&sin6.sin6_addr);
+			free(tmp_nodename);
+		}
+		else
+		{
+			r= evutil_inet_pton(AF_INET6, nodename,
+				&sin6.sin6_addr);
+		}
+		if (r == 1) {
 			/* Got an ipv6 address. */
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_port = htons(port);
+			sin6.sin6_scope_id= if_index;
 			*res = evutil_new_addrinfo((struct sockaddr*)&sin6,
 			    sizeof(sin6), hints);
 			if (!*res)
