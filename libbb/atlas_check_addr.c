@@ -117,3 +117,42 @@ int atlas_check_addr(const struct sockaddr *sa, socklen_t len)
 	return -1;	/* Default to not allowed */
 }
 
+#if 0	/* Not yet needed */
+int ipv6_match_prefix(struct in6_addr *addr,
+	struct in6_addr *prefix, int prefix_len)
+{
+	int i;
+	uint16_t mask;
+
+	for (i= 0; i<prefix_len; i += 16)
+	{
+		if (i+16 <= prefix_len)
+		{
+			/* Match entire word */
+			if (addr->s6_addr16[i/16] !=
+				prefix->s6_addr16[i/16])
+			{
+				/* Different prefix */
+				break;
+			}
+			continue;
+		}
+		mask= ~((1ul << (16-(prefix_len % 16)))-1);
+		mask= htons(mask);
+		if ((addr->s6_addr16[i/16] & mask) ==
+			prefix->s6_addr16[i/16])
+		{
+			return 1;
+		}
+		break;
+	}
+	if (i < prefix_len)
+	{
+		/* No match */
+		return 0;
+	}
+
+	/* Match */
+	return 1;
+}
+#endif 

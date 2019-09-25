@@ -56,6 +56,7 @@ struct opt_rdnss             /* RDNSS option */
 static int solicit_retries;
 static int solicit_sock;
 static char *update_cmd;
+static char *interface_name;
 
 static void usage(void)
 {
@@ -75,7 +76,8 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 	struct nd_opt_hdr *oh;
 	struct opt_rdnss *rdnss;
 	FILE *f;
-	char namebuf[NI_MAXHOST];
+	char namebuf[NI_MAXHOST+16];	/* Space for address plus
+					 * interface name */
 	char dnsnext[N_DNS][INET6_ADDRSTRLEN];
 
 	ra= (struct nd_router_advert *)packet;
@@ -122,6 +124,14 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 				}
 				inet_ntop(AF_INET6, ((char *)oh)+i,
 					namebuf, sizeof(namebuf));
+				if (IN6_IS_ADDR_LINKLOCAL(((char *)oh)+i)
+					&& interface_name != NULL)
+				{
+					strlcat(namebuf, "%",
+						sizeof(namebuf));
+					strlcat(namebuf, interface_name,
+						sizeof(namebuf));
+				}
 				if (n_dns < N_DNS)
 				{
 					strcpy(dnsnext[n_dns], namebuf);
@@ -518,8 +528,10 @@ int rptra6_main(int argc, char *argv[])
 		return 1;
 	}
 
+	interface_name= NULL;
 	if (str_interface)
 	{
+		interface_name= strdup(str_interface);
 		if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE,
 			str_interface, strlen(str_interface)+1) == -1)
 		{
