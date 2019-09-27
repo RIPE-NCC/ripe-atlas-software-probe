@@ -1834,9 +1834,11 @@ evutil_inet_pton(int af, const char *src, void *dst)
 int
 evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *outlen)
 {
-	int port;
+	int r, port;
+	unsigned int if_index;
 	char buf[128];
 	const char *cp, *addr_part, *port_part;
+	char *p, *check, *tmp_addr_part;
 	int is_ipv6;
 	/* recognized formats are:
 	 * [ipv6]:port
@@ -1904,10 +1906,38 @@ evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *
 #endif
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_port = htons(port);
-		if (1 != evutil_inet_pton(AF_INET6, addr_part, &sin6.sin6_addr))
+
+		/* addr_part may contain a zone id */
+		if_index= 0;
+		p= strchr(addr_part, '%');
+		if (p != NULL)
+		{
+			/* Found a zone ID. */
+			if_index= if_nametoindex(p+1);
+			if (if_index == 0)
+			{
+				/* Could be numeric */
+				if_index= strtoul(p+1, &check, 10);
+				if (check[0] != '\0')
+					return -1;
+			}
+			tmp_addr_part= strdup(addr_part);
+			p= strchr(tmp_addr_part, '%');
+			*p= '\0';
+			r= evutil_inet_pton(AF_INET6, tmp_addr_part,
+				&sin6.sin6_addr);
+			free(tmp_addr_part);
+		}
+		else
+		{
+			r= evutil_inet_pton(AF_INET6, addr_part,
+				&sin6.sin6_addr);
+		}
+		if (r != 1)
 			return -1;
 		if ((int)sizeof(sin6) > *outlen)
 			return -1;
+		sin6.sin6_scope_id= if_index;
 		memset(out, 0, *outlen);
 		memcpy(out, &sin6, sizeof(sin6));
 		*outlen = sizeof(sin6);
