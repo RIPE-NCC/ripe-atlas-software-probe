@@ -67,16 +67,7 @@ rm -f $SSH_ERR
 
 # Try to get the date from a previous incarnation
 $LOAD_STORAGE_CURRENT_TIME
-if [ -f $STATUS_DIR/currenttime.txt ]
-then
-	t=`cat $STATUS_DIR/currenttime.txt`
-	echo Setting time to $t
-	date -S -s "$t"
-	D=`epoch`
-	echo "RESULT 9004 done $D after setting time from currenttime.txt to $t" >> $DATA_NEW_DIR/simpleping
-else
-	echo no file $STATUS_DIR/currenttime.txt
-fi
+$SET_DATE_FROM_CURRENTTIME_TXT
 
 # Source system specific initializing files
 if [ -f $BIN_DIR/passwdset ] ; then

@@ -142,3 +142,16 @@ get_ether_addr()
 	ETHER_ADDR=$2; export ETHER_ADDR
 	ETHER_SCANNED=`echo $ETHER_ADDR | sed -e s/\://g`; export ETHER_SCANNED
 }
+set_date_from_currenttime_txt()
+{
+	if [ -f $STATUS_DIR/currenttime.txt ]
+	then
+		t=`cat $STATUS_DIR/currenttime.txt`
+		echo Setting time to $t
+		date -S -s "$t"
+		D=`epoch`
+		echo "RESULT 9004 done $D after setting time from currenttime.txt to $t" >> $DATA_NEW_DIR/simpleping
+	else
+		echo no file $STATUS_DIR/currenttime.txt
+	fi
+}
