@@ -67,7 +67,7 @@ rm -f $SSH_ERR
 
 # Try to get the date from a previous incarnation
 $LOAD_STORAGE_CURRENT_TIME
-if [ -f $STATUS_DIR/currenttime.txt ]
+if [ -f $STATUS_DIR/currenttime.txt ] && [ "$ENABLE_DATE_CHANGE" != "false" ]
 then
 	t=`cat $STATUS_DIR/currenttime.txt`
 	echo Setting time to $t
