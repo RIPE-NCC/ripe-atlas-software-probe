@@ -153,6 +153,7 @@ if [ "$need_rereg" == 1 ]; then
 		echo "RESULT 9011 done $D $ETHER_SCANNED ERR $ERR stdout" `cat $REG_INIT_REPLY`  >> $DATA_NEW_DIR/simpleping
 		echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
 		echo "$ERR  REGINIT exit with error"
+		$SET_LEDS_CMD reginit-fail
 		rm  -f $STATE_FILE
 		exit;
 	fi                     
