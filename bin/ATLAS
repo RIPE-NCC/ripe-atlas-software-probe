@@ -38,8 +38,17 @@ fi
 
 . $BIN_DIR/common.sh
 
-# Common config
-CON_KEEP_PID=con_keep_pid.vol
+# config variables
+CONFIG_TXT="$STATE_DIR/config.txt"
+
+# Look for options in config.txt
+if [ -f "$CONFIG_TXT" ]
+then
+	if grep "^[ 	]*RXTXRPT=yes" "$CONFIG_TXT"
+	then
+		do_rxtxrpt=yes
+	fi
+fi
 
 $MOUNT_FS_CMD
 
@@ -274,8 +283,11 @@ do
 		reboot_probe
 	fi
 
-	rxtxrpt -A "9002" >> $DATA_NEW_DIR/simpleping
-	rxtxrpt
+	if [ -n "$do_rxtxrpt" ]
+	then
+		rxtxrpt -A "9002" >> $DATA_NEW_DIR/simpleping
+		rxtxrpt
+	fi
 	rptaddrs -A 9104 -c $DATA_NEW_DIR/v6addr.vol -O $DATA_NEW_DIR/v6addr.txt
 	rptuptime >> $DATA_NEW_DIR/simpleping
 	condmv $DATA_NEW_DIR/v6addr.txt $DATA_OUT_DIR/v6addr.txt
