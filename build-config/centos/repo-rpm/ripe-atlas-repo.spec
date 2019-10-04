@@ -1,7 +1,7 @@
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
 Version:        1
-Release:        1%{?dist}
+Release:        2%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        ripe-atlas-probe.repo
