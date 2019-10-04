@@ -1,2 +1,2 @@
 #!/bin/sh
-yum update ripe-atlas-repo-test atlasswprobe
+yum update -y ripe-atlas-repo-test atlasswprobe
