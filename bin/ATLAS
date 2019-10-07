@@ -39,7 +39,7 @@ fi
 . $BIN_DIR/common.sh
 
 # config variables
-CONFIG_TXT="$STATE_DIR/config.txt"
+CONFIG_TXT="$BASE_DIR/state/config.txt"
 
 # Look for options in config.txt
 if [ -f "$CONFIG_TXT" ]
