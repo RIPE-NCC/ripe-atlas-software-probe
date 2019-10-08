@@ -11,6 +11,9 @@ STATE_FILE=$1
 if [ X"${DEVICE_NAME}" = X"centos-sw-probe" ]
 then
 	. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-reginit.sh
+elif [ X"${DEVICE_NAME}" = X"turris-sw-probe" ]
+then
+	. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-reginit.sh
 elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
 then
         . /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-reginit.sh
