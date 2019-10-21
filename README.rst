@@ -11,7 +11,7 @@ of the license can be found in LICENSE.
 Runtime Configuration Options
 -----------------------------
 
-Currently there is one runtime configration option that enables sending
+Currently there is one runtime configuration option that enables sending
 interface traffic statistics as Atlas measurement results. 
 This option can be enabled by creating the file
 /var/atlas-probe/state/config.txt and adding the line 'RXTXRPT=yes'.
