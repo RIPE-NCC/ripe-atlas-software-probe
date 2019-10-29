@@ -3,7 +3,8 @@ Building:
 
 The BusyBox build process is similar to the Linux kernel build:
 
-  cd libevent-2.0.20-stable  # first build libevent
+  cd libevent-2.1.11-stable  # first build libevent
+  autoreconf --install
   ./configure --prefix=/usr/local/atlas
   make install
   cd ../
