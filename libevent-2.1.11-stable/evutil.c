@@ -74,6 +74,7 @@
 #endif
 #include <time.h>
 #include <sys/stat.h>
+#include <net/if.h>
 #ifdef EVENT__HAVE_IFADDRS_H
 #include <ifaddrs.h>
 #endif
@@ -101,6 +102,9 @@
 #endif
 #define mode_t int
 #endif
+
+static int evutil_inet_pton_scope(int af, const char *src, void *dst,
+	unsigned *indexp);
 
 int
 evutil_open_closeonexec_(const char *pathname, int flags, unsigned mode)
@@ -990,6 +994,7 @@ evutil_getaddrinfo_common_(const char *nodename, const char *servname,
     struct evutil_addrinfo *hints, struct evutil_addrinfo **res, int *portnum)
 {
 	int port = 0;
+	unsigned int if_index;
 	const char *pname;
 
 	if (nodename == NULL && servname == NULL)
@@ -1063,10 +1068,13 @@ evutil_getaddrinfo_common_(const char *nodename, const char *servname,
 	if (hints->ai_family == PF_INET6 || hints->ai_family == PF_UNSPEC) {
 		struct sockaddr_in6 sin6;
 		memset(&sin6, 0, sizeof(sin6));
-		if (1==evutil_inet_pton(AF_INET6, nodename, &sin6.sin6_addr)) {
+		if (1==evutil_inet_pton_scope(AF_INET6, nodename,
+			&sin6.sin6_addr, &if_index))
+		{
 			/* Got an ipv6 address. */
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_port = htons(port);
+			sin6.sin6_scope_id= if_index;
 			*res = evutil_new_addrinfo_((struct sockaddr*)&sin6,
 			    sizeof(sin6), hints);
 			if (!*res)
@@ -1981,6 +1989,42 @@ evutil_inet_ntop(int af, const void *src, char *dst, size_t len)
 #endif
 }
 
+static int
+evutil_inet_pton_scope(int af, const char *src, void *dst, unsigned *indexp)
+{
+	int r;
+	unsigned if_index;
+	char *check, *cp, *tmp_src;
+
+	*indexp= 0;	/* Reasonable default */
+
+	/* Bail out if not IPv6 */
+	if (af != AF_INET6)
+		return evutil_inet_pton(af, src, dst);
+
+	cp= strchr(src, '%');
+
+	/* Bail out if no zone ID */
+	if (cp == NULL)
+		return evutil_inet_pton(af, src, dst);
+	
+	if_index= if_nametoindex(cp+1);
+	if (if_index == 0)
+	{
+		/* Could be numeric */
+		if_index= strtoul(cp+1, &check, 10);
+		if (check[0] != '\0')
+			return EVUTIL_EAI_NEED_RESOLVE;
+	}
+	*indexp= if_index;
+	tmp_src= strdup(src);
+	cp= strchr(tmp_src, '%');
+	*cp= '\0';
+	r= evutil_inet_pton(af, tmp_src, dst);
+	free(tmp_src);
+	return r;
+}
+
 int
 evutil_inet_pton(int af, const char *src, void *dst)
 {
@@ -2097,6 +2141,7 @@ int
 evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *outlen)
 {
 	int port;
+	unsigned int if_index;
 	char buf[128];
 	const char *cp, *addr_part, *port_part;
 	int is_ipv6;
@@ -2166,10 +2211,14 @@ evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *
 #endif
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_port = htons(port);
-		if (1 != evutil_inet_pton(AF_INET6, addr_part, &sin6.sin6_addr))
+		if (1 != evutil_inet_pton_scope(AF_INET6, addr_part,
+			&sin6.sin6_addr, &if_index))
+		{
 			return -1;
+		}
 		if ((int)sizeof(sin6) > *outlen)
 			return -1;
+		sin6.sin6_scope_id= if_index;
 		memset(out, 0, *outlen);
 		memcpy(out, &sin6, sizeof(sin6));
 		*outlen = sizeof(sin6);
