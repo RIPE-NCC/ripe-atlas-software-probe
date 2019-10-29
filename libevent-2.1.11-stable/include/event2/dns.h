@@ -283,6 +283,14 @@ EVENT2_EXPORT_SYMBOL
 void evdns_base_clear_host_addresses(struct evdns_base *base);
 
 /**
+  Set the outging interface to be used for DNS queries
+
+  @param base the evdns base to modify
+  @param interface_name the name of the interface to be used
+ */
+int evdns_base_set_interface(struct evdns_base *base, char *interface_name);
+
+/**
   Convert a DNS error code to a string.
 
   @param err the DNS error code

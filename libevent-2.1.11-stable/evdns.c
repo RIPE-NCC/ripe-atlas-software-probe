@@ -316,6 +316,8 @@ struct evdns_base {
 
 	struct event_base *event_base;
 
+	char *interface_name;
+
 	/* The number of good nameservers that we have */
 	int global_good_nameservers;
 
@@ -2530,6 +2532,16 @@ evdns_nameserver_add_impl_(struct evdns_base *base, const struct sockaddr *addre
 	ns->socket = evutil_socket_(address->sa_family,
 	    SOCK_DGRAM|EVUTIL_SOCK_NONBLOCK|EVUTIL_SOCK_CLOEXEC, 0);
 	if (ns->socket < 0) { err = 1; goto out1; }
+	if (ns->base->interface_name)
+	{
+		if (setsockopt(ns->socket, SOL_SOCKET, SO_BINDTODEVICE,
+			ns->base->interface_name,
+			strlen(ns->base->interface_name)+1) == -1)
+		{
+			err= 2;
+			goto out2;
+		}
+	}
 
 	if (base->global_outgoing_addrlen &&
 	    !evutil_sockaddr_is_loopback_(address)) {
@@ -4131,6 +4143,12 @@ evdns_base_free_and_unlock(struct evdns_base *base, int fail_requests)
 	base->server_head = NULL;
 	base->global_good_nameservers = 0;
 
+	if (base->interface_name)
+	{
+		free(base->interface_name);
+		base->interface_name= NULL;
+	}
+
 	if (base->global_search_state) {
 		for (dom = base->global_search_state->head; dom; dom = dom_next) {
 			dom_next = dom->next;
@@ -4173,6 +4191,22 @@ evdns_base_clear_host_addresses(struct evdns_base *base)
 		mm_free(victim);
 	}
 	EVDNS_UNLOCK(base);
+}
+
+int evdns_base_set_interface(struct evdns_base *base, char *interface_name)
+{
+	if (base->interface_name)
+	{
+		free(base->interface_name);
+		base->interface_name= NULL;
+	}
+	if (!interface_name)
+		return 0;
+
+	base->interface_name= strdup(interface_name);
+	if (!base->interface_name)
+		return -1;
+	return 0;
 }
 
 void
@@ -4248,6 +4282,15 @@ evdns_base_load_hosts_impl(struct evdns_base *base, const char *hosts_fname)
 	int err=0;
 
 	ASSERT_LOCKED(base);
+
+	{
+		struct hosts_entry *victim;
+		while ((victim = TAILQ_FIRST(&base->hostsdb))) {
+			TAILQ_REMOVE(&base->hostsdb, victim, next);
+			mm_free(victim);
+		}
+	}
+
 
 	if (hosts_fname == NULL ||
 	    (err = evutil_read_file_(hosts_fname, &str, &len, 0)) < 0) {
