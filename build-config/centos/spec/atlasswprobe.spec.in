@@ -4,12 +4,12 @@
 Name:           atlasswprobe
 Summary:        RIPE Atlas probe software
 Version:        5000
-Release:        2%{?dist}
+Release:        3%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        src-COMMIT_ID.tar.gz
-Requires:       sudo %{?el6:daemontools} %{?el7:psmisc}
-BuildRequires:  rpm %{?el7:systemd} openssl-devel
+Requires:       sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute sysvinit-tools net-tools
+BuildRequires:  rpm %{?el7:systemd} %{?el8:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
 
 %description
@@ -19,7 +19,8 @@ This is the RIPE Atlas probe software. It's designed to run on CentOS Linux syst
 tar xf %{SOURCE1}
 
 %build
-cd ripe-atlas-software-probe/probe-busybox/libevent-2.0.20-stable
+cd ripe-atlas-software-probe/probe-busybox/libevent-2.1.11-stable
+autoreconf --install
 ./configure
 make
 cd ..
@@ -30,8 +31,8 @@ cd ripe-atlas-software-probe/probe-busybox
 make install
 mkdir -p %{buildroot}%{installpath}/{bin,bin/arch/centos-sw-probe,bin/arch/linux,bb-13.3,etc,lib,state}
 cp -r ./_install/* %{buildroot}%{installpath}/bb-13.3
-cp ./libevent-2.0.20-stable/.libs/libevent-*so* %{buildroot}%{installpath}/lib
-cp ./libevent-2.0.20-stable/.libs/libevent_openssl-*so* %{buildroot}%{installpath}/lib
+cp ./libevent-2.1.11-stable/.libs/libevent-*so* %{buildroot}%{installpath}/lib
+cp ./libevent-2.1.11-stable/.libs/libevent_openssl-*so* %{buildroot}%{installpath}/lib
 cd ..
 cp bin/{ATLAS,common-pre.sh,common.sh,reginit.sh} %{buildroot}%{installpath}/bin
 cp bin/arch/centos-sw-probe/* %{buildroot}%{installpath}/bin/arch/centos-sw-probe
@@ -39,7 +40,7 @@ cp bin/arch/linux/* %{buildroot}%{installpath}/bin/arch/linux
 cp atlas-config/state/* %{buildroot}%{installpath}/state
 cp atlas-config/etc/* %{buildroot}%{installpath}/etc
 
-%if 0%{?el7}
+%if 0%{?el7} || 0%{?el8}
 mkdir -p %{buildroot}%{_unitdir}
 cat > %{buildroot}%{_unitdir}/atlas.service << EOF
 [Unit]
@@ -81,7 +82,7 @@ rm -rf %{buildroot}
 %files
 %{installpath}
 %caps(cap_net_raw=ep) %{installpath}/bb-13.3/bin/busybox
-%if 0%{?el7}
+%if 0%{?el7} || 0%{?el8}
 %{_unitdir}/atlas.service
 %endif
 %if 0%{?el6}
@@ -89,7 +90,7 @@ rm -rf %{buildroot}
 %endif
 
 %pre
-%if 0%{?el7}
+%if 0%{?el7} || 0%{?el8}
 systemctl stop atlas &>/dev/null
 killall -9 eooqd eperd perd telnetd 2>/dev/null || :
 %endif
@@ -131,7 +132,7 @@ chown -R atlas:atlas %{atlas_probe}/data
 chmod -R g+rwx %{atlas_probe}/data
 mkdir -p %{atlas_probe}/run
 chown atlas:atlas %{atlas_probe}/run
-%if 0%{?el7}
+%if 0%{?el7} || 0%{?el8}
 systemctl --now --quiet enable atlas
 systemctl --now --quiet start atlas
 %endif
@@ -143,7 +144,7 @@ exit 0
 %preun
 if [ $1 -eq 0 ]; then
     # uninstall, otherwise upgrade
-%if 0%{?el7}
+%if 0%{?el7} || 0%{?el8}
     systemctl --now --quiet disable atlas
 %endif
 %if 0%{?el6}
@@ -155,6 +156,7 @@ exit 0
 %postun
 if [ $1 -eq 0 ]; then
 	%{?el7:%systemd_postun}
+	%{?el8:%systemd_postun}
 	rm -fr %{atlas_probe}/etc/probe_key /home/atlas/status
 fi
 
