@@ -2014,7 +2014,7 @@ evutil_inet_pton_scope(int af, const char *src, void *dst, unsigned *indexp)
 		/* Could be numeric */
 		if_index= strtoul(cp+1, &check, 10);
 		if (check[0] != '\0')
-			return EVUTIL_EAI_NEED_RESOLVE;
+			return 0;
 	}
 	*indexp= if_index;
 	tmp_src= strdup(src);
