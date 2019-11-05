@@ -4,7 +4,7 @@ then
 	export ATLAS_BASE
 fi
 
-. /usr/local/atlas/bin/common-pre.sh
+. $ATLAS_STATIC/bin/common-pre.sh
 
 # Commands
 MANUAL_UPGRADE_CMD=:
@@ -36,7 +36,7 @@ MODE_FILE=$BASE_DIR/state/mode
 TELNETD_PORT=2023
 DHCP=False
 
-. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-common.sh
+. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
 
 # Directories
 STATE_DIR=$RPM_BASE_DIR/state; export STATE_DIR
@@ -46,7 +46,7 @@ BB_BIN_DIR=$BB_BASE_DIR/bin; export BB_BIN_DIR
 # Files
 REG_SERVERS_SOURCE=$RPM_ETC_DIR/reg_servers.sh  
 
-. /usr/local/atlas/bin/arch/linux/linux-functions.sh
+. $ATLAS_STATIC/bin/arch/linux/linux-functions.sh
 
 chmod_for_msm()
 {

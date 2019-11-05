@@ -38,7 +38,7 @@ MODE_FILE=$BASE_DIR/state/mode
 TELNETD_PORT=2023
 DHCP=False
 
-. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-common.sh
+. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-sw-probe-common.sh
 
 # Directories
 STATE_DIR=$WRT_BASE_DIR/state; export STATE_DIR

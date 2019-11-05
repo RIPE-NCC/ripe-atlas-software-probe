@@ -8,24 +8,7 @@
 
 STATE_FILE=$1 
 
-if [ X"${DEVICE_NAME}" = X"centos-sw-probe" ]
-then
-	. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-reginit.sh
-elif [ X"${DEVICE_NAME}" = X"turris-sw-probe" ]
-then
-	. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-reginit.sh
-elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
-then
-        . /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-reginit.sh
-elif [ -f /bin/dbug-config ]	# Should only exist on Xport.
-then
-	. /home/atlas/bin/xport-reginit.sh
-elif [ -f /etc/redhat-release ]
-then
-	. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-reginit.sh
-else	# assume OpenWRT TP-Link probe
-	. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-reginit.sh
-fi
+. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
 
 . $BIN_DIR/common.sh
 

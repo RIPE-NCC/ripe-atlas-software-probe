@@ -1,8 +1,9 @@
 . /home/atlas/bin/common-pre.sh
-. /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-common.sh
+. /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-atlas-probev4-common.sh
 
 # Commands
 CHECK_RO_USB=:
+SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt
 
 # Various files and directories
 DEV_FIRMWARE=/storage/etc/openwrt-sunxi-cortexa53-atlas-rootfs.tar; export DEV_FIRMWARE

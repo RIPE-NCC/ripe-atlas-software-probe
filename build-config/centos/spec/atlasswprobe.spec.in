@@ -116,6 +116,7 @@ if [ ! -d %{atlas_probe}/bin ]; then
 fi
 echo 'DEVICE_NAME=centos-sw-probe' > %{atlas_probe}/bin/config.sh
 echo 'ATLAS_BASE="%{atlas_probe}"' >> %{atlas_probe}/bin/config.sh
+echo 'ATLAS_STATIC="%{installpath}"' >> %{atlas_probe}/bin/config.sh
 echo 'SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"' >> %{atlas_probe}/bin/config.sh
 chown -R atlas:atlas %{atlas_probe}
 chmod 755 %{atlas_probe}
@@ -159,23 +160,3 @@ if [ $1 -eq 0 ]; then
 	%{?el8:%systemd_postun}
 	rm -fr %{atlas_probe}/etc/probe_key /home/atlas/status
 fi
-
-%changelog
-* Thu Jul 6 2017 Anand Buddhdev <anandb@ripe.net>
-- Updated the SPEC file to build for both CentOS 6 and 7
-
-* Thu Mar 28 2013 Anand Buddhdev <anandb@ripe.net>
-- Removed some redundant kill commands, because the upstart script takes care of that
-- Added code to the post-stop hook in the upstart script to delete all PID files
-* Wed Mar 27 2013 Anand Buddhdev <anandb@ripe.net>
-- Embedded the upstart script into the spec file; switched from "su" to "setuidgid"
-- Added a post-stop hook to the upstart script to kill all atlas child processes
-- Fixed a typo in the "stop on" stanza in the upstart script
-- Added shell code to the the pre-install and pre-uninstall hooks to kill atlas child processes
-- Added dependency on daemontools for setuidgid
-- Some misc clean-ups in the spec file itself
-- Removed the "setcap" call in the post-install hook; the capability is set by RPM itself
-* Thu Jan 31 2013 Philip Homburg <phomburg@ripe.net>
-- First real release
-* Wed Oct 17 2012 Anand Buddhdev <anandb@ripe.net>
-- First version of spec file

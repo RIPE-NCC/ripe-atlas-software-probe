@@ -1,5 +1,5 @@
 . /home/atlas/bin/common-pre.sh
-. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-common.sh
+. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-atlas-probev3-common.sh
 
 # Commands
 CHECK_RO_USB=check_ro_usb

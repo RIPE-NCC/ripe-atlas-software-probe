@@ -4,7 +4,7 @@ then
 	export ATLAS_BASE
 fi
 
-. /usr/local/atlas/bin/common-pre.sh
+. /usr/libexec/atlas-probe-scripts/bin/common-pre.sh
 
 # Directories
 
@@ -28,8 +28,8 @@ if [ ! -n "$STATE_FILE" ] ; then
 	STATE_FILE=$STATUS_DIR/reginit.vol
 fi
 
-. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-common.sh
-. /usr/local/atlas/bin/arch/linux/linux-functions.sh
+. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-sw-probe-common.sh
+. /usr/libexec/atlas-probe-scripts/bin/arch/linux/linux-functions.sh
 
 get_arch()
 {

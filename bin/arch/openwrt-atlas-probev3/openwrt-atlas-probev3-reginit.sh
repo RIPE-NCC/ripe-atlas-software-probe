@@ -1,5 +1,5 @@
 . /home/atlas/bin/common-pre.sh
-. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-common.sh
+. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-atlas-probev3-common.sh
 
 # Commands
 CHECK_FOR_NEW_KERNEL_CMD=check_for_new_kernel

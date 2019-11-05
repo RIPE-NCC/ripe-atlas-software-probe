@@ -7,7 +7,7 @@ CHECK_FOR_NEW_KERNEL_CMD=:
 KERNEL_STATE_DIR=/home/atlas/state
 
 . $BIN_DIR/arch/openwrt/openwrt-common.sh
-. $BIN_DIR/arch/openwrt-atlas-probev4/openwrt-nanopi-common.sh
+. $BIN_DIR/arch/openwrt-atlas-probev4/openwrt-atlas-probev4-common.sh
 . $BIN_DIR/arch/linux/linux-functions.sh
 
 install_firmware()

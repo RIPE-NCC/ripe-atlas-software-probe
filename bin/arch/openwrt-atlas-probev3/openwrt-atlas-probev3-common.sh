@@ -7,6 +7,9 @@ LEDS_SPARE=/tmp/leds/spare
 # Commands
 SET_LEDS_CMD=set_leds
 
+# Config
+IPV6_INF="br-lan"
+
 set_leds()
 {
 	state="$1"

@@ -7,38 +7,16 @@
 #exec >/tmp/ATLAS.out 2>/tmp/ATLAS.err
 #set -x
 
-DEVICE_NAME=
 if [ -f bin/config.sh ]
 then
 	. bin/config.sh
-	export DEVICE_NAME SUB_ARCH
-elif [ -f  /etc/board.json ]
-then
-	grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json &&
-		export DEVICE_NAME=nanopi-neo-plus2
+	export DEVICE_NAME SUB_ARCH ATLAS_STATIC
+else
+	echo no 'bin/config.sh' >&2
+	exit 1
 fi
 
-if [ X"${DEVICE_NAME}" = X"centos-sw-probe" ]
-then
-	. /usr/local/atlas/bin/arch/centos-sw-probe/redhat-ATLAS.sh
-	echo "DEVICE_NAME=${DEVICE_NAME}"
-elif [ X"${DEVICE_NAME}" = X"turris-sw-probe" ]
-then
-	. /usr/libexec/atlas-probe-scripts/bin/arch/turris-sw-probe/turris-ATLAS.sh
-        echo "DEVICE_NAME=${DEVICE_NAME}"
-elif [ X"${DEVICE_NAME}" = X"nanopi-neo-plus2" ]
-then
-	. /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-nanopi-ATLAS.sh
-	echo "DEVICE_NAME=${DEVICE_NAME}"
-elif [ -f /etc/redhat-release ]
-then
-	. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-ATLAS.sh
-elif [ -f /bin/dbug-config ]	# Should only exist on Xport.
-then
-	. /home/atlas/bin/xport-ATLAS.sh
-else	# assume tplink
-	. /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-tplink-ATLAS.sh
-fi
+. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
 
 . $BIN_DIR/common.sh
 
