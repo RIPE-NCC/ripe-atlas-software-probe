@@ -1,0 +1,124 @@
+#!/bin/sh
+VERSION=5000-1
+
+set -e
+
+stadir="$PWD/atlasswprobe-$VERSION"
+builddir="$PWD/atlasswprobe-$VERSION"-work
+
+srcdir="$PWD/ripe-atlas-software-probe"
+
+atlas_local_rel="usr/local/atlas"
+var_atlas_rel="var/atlas-probe"
+sta_atlas_local="$stadir/$atlas_local_rel"
+sta_var_atlas="$stadir/$var_atlas_rel"
+
+systemd_unit_rel="etc/systemd/system"
+
+rm -rf "$stadir" 
+mkdir -p "$stadir"
+rm -rf "$builddir"
+mkdir -p "$builddir"
+cp -r "$srcdir/probe-busybox" "$builddir/probe-busybox"
+
+# Build
+(
+	cd "$builddir/probe-busybox/libevent-2.1.11-stable"
+	autoreconf --install
+	./configure
+	make
+	cd ..
+	make
+)
+
+# Install
+(
+	cd "$builddir/probe-busybox"
+	make install
+	mkdir -p "$sta_atlas_local/bb-13.3"
+	cp -r ./_install/* "$sta_atlas_local/bb-13.3"
+	mkdir -p "$sta_atlas_local/lib"
+	cp ./libevent-2.1.11-stable/.libs/libevent-*so* "$sta_atlas_local/lib"
+	cp ./libevent-2.1.11-stable/.libs/libevent_openssl-*so* "$sta_atlas_local/lib"
+	mkdir -p "$sta_atlas_local/bin/arch/debian-sw-probe"
+	mkdir -p "$sta_atlas_local/bin/arch/linux"
+)
+
+(
+	cd "$srcdir"
+	cp bin/ATLAS "$sta_atlas_local/bin"
+	cp bin/common-pre.sh "$sta_atlas_local/bin"
+	cp bin/common.sh "$sta_atlas_local/bin"
+	cp bin/reginit.sh "$sta_atlas_local/bin"
+	cp bin/arch/debian-sw-probe/* "$sta_atlas_local/bin/arch/debian-sw-probe"
+	cp bin/arch/linux/* "$sta_atlas_local/bin/arch/linux"
+	mkdir -p "$sta_atlas_local/etc"
+	cp atlas-config/etc/* "$sta_atlas_local/etc"
+	mkdir -p "$sta_atlas_local/state"
+	cp atlas-config/state/* "$sta_atlas_local/state"
+)
+
+	mkdir -p "$sta_var_atlas/state"
+	echo prod > "$sta_var_atlas/state/mode"
+	mkdir -p "$sta_var_atlas/bin"
+	ln -s /var/atlasdata "$sta_var_atlas/data"
+
+echo 'DEVICE_NAME=debian-sw-probe' > "$sta_var_atlas/bin/config.sh"
+echo 'ATLAS_BASE="'"/$var_atlas_rel"'"' >> "$sta_var_atlas/bin/config.sh"
+echo 'ATLAS_STATIC="'"/$atlas_local_rel"'"' >> "$sta_var_atlas/bin/config.sh"
+echo 'SUB_ARCH="'"debian-atlasswprobe-$VERSION"'"' >> "$sta_var_atlas/bin/config.sh"
+
+mkdir -p "$stadir/$systemd_unit_rel"
+cat > "$stadir/$systemd_unit_rel/atlas.service" << EOF
+[Unit]
+Description=Atlas Probe
+After=network-online.target syslog.target
+
+[Service]
+User=atlas
+Group=nogroup
+Environment=HOME=/$var_atlas_rel
+WorkingDirectory=/$var_atlas_rel
+ExecStart=/usr/local/atlas/bin/ATLAS
+Restart=always
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > "$stadir/$systemd_unit_rel/var-atlasdata.mount" << EOF
+[Unit]
+Description=Atlas Data
+Before=local-fs.target
+
+[Mount]
+What=tmpfs
+Where=/var/atlasdata
+Type=tmpfs
+Options=noatime,nosuid,nodev,noexec,mode=1777
+
+[Install]
+WantedBy=atlas.service
+EOF
+
+cp -r "$srcdir/build-config/debian/DEBIAN" "$stadir"
+case $(uname -m) in
+x86_64)
+	ARCH=amd64
+;;
+armv7l)
+	ARCH=armhf
+;;
+*)
+	echo "Unsupported architecture $(uname -m)"
+	exit 1
+;;
+esac
+
+sed < "$stadir/DEBIAN/control.in" > "$stadir/DEBIAN/control" "s/ARCH/$ARCH/"
+rm -f "$stadir/DEBIAN/control.in"
+
+chmod -R og+rX,ugo-st "$stadir"
+
+fakeroot dpkg-deb --build atlasswprobe-$VERSION

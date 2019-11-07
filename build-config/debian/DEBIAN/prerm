@@ -1,0 +1,13 @@
+#!/bin/sh
+systemctl stop atlas
+systemctl disable atlas
+systemctl stop var-atlasdata.mount
+systemctl disable var-atlasdata.mount
+rmdir /var/atlasdata
+rm -r /var/atlas-probe/.ssh
+rm -r /var/atlas-probe/bin
+rm -r /var/atlas-probe/crons
+rm -r /var/atlas-probe/etc
+rm -r /var/atlas-probe/run
+rm -r /var/atlas-probe/state
+rm -r /var/atlas-probe/status

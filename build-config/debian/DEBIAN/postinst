@@ -1,0 +1,15 @@
+#!/bin/sh
+USER=atlas
+
+set -e
+grep "$USER" /etc/passwd || adduser --system "$USER"
+chown -R "$USER" /var/atlas-probe
+mkdir -p /var/atlasdata
+chown "$USER" /var/atlasdata
+chmod 0 /var/atlasdata
+
+setcap cap_net_raw=ep /usr/local/atlas/bb-13.3/bin/busybox
+
+systemctl --now --quiet enable var-atlasdata.mount
+systemctl --now --quiet enable atlas
+systemctl --now --quiet start atlas
