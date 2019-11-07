@@ -116,7 +116,7 @@ else
 	
 fi 
 
-if [ "$need_rereg" == 1 ]; then 
+if [ "$need_rereg" = 1 ]; then
 	rm -f $CON_KEEP_CONF
 	R_HOST=`rchoose $REG_1_HOST $REG_2_HOST $REG_3_HOST $REG_4_HOST $REG_5_HOST $REG_6_HOST`
 	echo "REGHOSTS $REG_1_HOST $REG_2_HOST $REG_3_HOST $REG_4_HOST $REG_5_HOST $REG_6_HOST"
@@ -266,7 +266,7 @@ if [ "$need_rereg" == 1 ]; then
 			NEED_REBOOT=1
 		fi
 	fi
-	if [ $NEED_REBOOT == 1 ]
+	if [ $NEED_REBOOT = 1 ]
 	then
 		reboot_probe
 		exit
@@ -330,7 +330,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 		set $MD5FULL
 		MD5=$1
 
-		if [ $MD5 ==  $FIRMWARE_APPS_CS_COMP ] ; then 
+		if [ $MD5 =  $FIRMWARE_APPS_CS_COMP ] ; then
 			# the checksums match schedule an upgrade 
 			echo "checksums match $MD5 $FIRMWARE_APPS_CS_COMP "
 			checksum_okay=true
@@ -417,7 +417,7 @@ else
 	con_reinit=1
 fi
 
-if [ "$con_reinit" == "1" ] ; then
+if [ "$con_reinit" = "1" ] ; then
 ## Controller  INIT 
 	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
 	if [ $? -eq 1 ] ; then

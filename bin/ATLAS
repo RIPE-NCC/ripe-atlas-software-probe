@@ -165,7 +165,7 @@ while :
 do
 	$CHECK_RO_USB
 
-	if [ $DHCP == "Temp" ] ; then	
+	if [ $DHCP = "Temp" ] ; then
 		#static config failed started DHCP tempeorly
 		evping -c 2 $IPV4_GW 
 		ARP=`arp -n $IPV4_GW`
