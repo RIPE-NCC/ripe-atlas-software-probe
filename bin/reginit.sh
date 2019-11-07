@@ -6,7 +6,7 @@
 #exec >/tmp/reginit.out 2>/tmp/reginit.err
 #set -x
 
-STATE_FILE=$1 
+STATE_FILE=$1
 
 . $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
 
@@ -14,10 +14,10 @@ STATE_FILE=$1
 
 ## Probe
 
-# Common 
+# Common
 [ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$BASE_DIR/etc/probe_key
 # Set REG_SERVERS if it isn't set already
-[ -z "$REG_SERVERS" ] && REG_SERVERS=$BIN_DIR/reg_servers.sh  
+[ -z "$REG_SERVERS" ] && REG_SERVERS=$BIN_DIR/reg_servers.sh
 CON_INIT_CONF=./con_init_conf.txt
 CON_INIT_REPLY=con_init_reply.txt
 CON_KEEP_CONF=./con_keep_conf.txt
@@ -29,13 +29,13 @@ export TZ=UTC
 
 if [ -f $STATE_FILE ] ; then
 	echo "there is a state file $STATE_FILE. another copy running".
-	exit 0                    
-else                              
+	exit 0
+else
 	echo "ATLAS registeration starting"
 	touch  $STATE_FILE
-fi                           
+fi
 
-## Connect to reg server 
+## Connect to reg server
 cd $STATUS_DIR
 
 . $REG_SERVERS
@@ -44,29 +44,29 @@ need_rereg=1
 R=NEW
 
 if [ -f $FORCE_REG ] ; then
-	# Ignore the reason. 
+	# Ignore the reason.
 	rm -f $CON_INIT_CONF
 	rm -f $CON_KEEP_CONF
-	R=FORCE_REG                            
+	R=FORCE_REG
 	need_rereg=1
 	echo "REASON_FOR_REGISTRATION $R FORCED"
 elif [ ! -f $CON_INIT_CONF ] ; then
 	R="NEW"
 	need_rereg=1
 	echo "REASON_FOR_REGISTRATION $R NO previous state files"
-else 
+else
 	unset CONTROLLER_1_HOST
 	unset CONTROLLER_1_PORT
 	unset REREG_TIMER
 	while read line
 	do
 		if [ -z "$line" ]
-		then                                            
+		then
 			echo >&2 "Shell returned empty line in CON_INIT_CONF (1)"
-			break                                               
-		fi   
-		set -- $line  
-                kw="$1"                   
+			break
+		fi
+		set -- $line
+                kw="$1"
                 value="$2"
 		case "$kw" in
 		CONTROLLER_1_HOST) CONTROLLER_1_HOST="$value" ;;
@@ -89,14 +89,14 @@ else
 	done < $CON_INIT_CONF
 	NOW=`epoch`
 	# the wait one came from previous reg attemp reply was wait.
-	if [ -n "$REG_WAIT_UNTIL" ] ; then 
+	if [ -n "$REG_WAIT_UNTIL" ] ; then
 		echo "there is WAIT, REG_WAIT_UNTIL  $REG_WAIT_UNTI, now is $NOW"
 		if [ $REG_WAIT_UNTIL -le $NOW ] ; then
 			echo " REG_WAIT_UNTIL expired go re-reg $REG_WAIT_UNTIL now $NOW"
 			need_rereg=1
 			R=WAIT_OVER
 			REG_WAIT_UNTIL=1
-		else 
+		else
 			need_rereg=0
 			echo "wait to re-register is not over, REG_WAIT_UNTIL $REG_WAIT_UNTIL , now is $NOW "
        			exit;
@@ -105,16 +105,15 @@ else
 		if [ $REREG_TIMER -le $NOW ] ; then
 	      		echo "REREG_TIMER $REREG_TIMER expired now is $NOW"
               		R=REREG_TIMER_EXPIRED
-              		need_rereg=1   
+              		need_rereg=1
 	      		REREG_TIMER=1
   	      		echo "REREG_TIMER_EXPIRED  go re register REREG_TIMER $REREG_TIMER  , now is $NOW  "
-		else 
+		else
 			echo "registeration info is still valid till $REREG_TIMER, now $NOW"
 			need_rereg=0
 		fi
 	fi
-	
-fi 
+fi
 
 if [ "$need_rereg" = 1 ]; then
 	rm -f $CON_KEEP_CONF
@@ -133,8 +132,8 @@ if [ "$need_rereg" = 1 ]; then
 	echo "$SSH_CMD -i $SSH_PVT_KEY -p 443 atlas@$R_HOST INIT"
 	$SET_LEDS_CMD reg-init
 	$P_TO_R_INIT_CMD $R | $SSH_CMD $SSH_OPT -i $SSH_PVT_KEY -p 443 atlas@$R_HOST INIT > $REG_INIT_REPLY 2>$SSH_ERR
-	ERR=$?                                                            
-	if [ $ERR != "0" ] ; then                                         
+	ERR=$?
+	if [ $ERR != "0" ] ; then
 		D=`epoch`
 		echo "RESULT 9011 done $D $ETHER_SCANNED ERR $ERR stdout" `cat $REG_INIT_REPLY`  >> $DATA_NEW_DIR/simpleping
 		echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
@@ -142,8 +141,8 @@ if [ "$need_rereg" = 1 ]; then
 		$SET_LEDS_CMD reginit-fail
 		rm  -f $STATE_FILE
 		exit;
-	fi                     
-	    
+	fi
+
 	if [ -f $FORCE_REG ] ; then
 		rm $FORCE_REG
 	fi
@@ -154,12 +153,12 @@ if [ "$need_rereg" = 1 ]; then
 	while read line
 	do
 		if [ -z "$line" ]
-		then                                            
+		then
 			echo >&2 "Shell returned empty line in CON_INIT_CONF (2)"
-			break                                               
-		fi   
-		set -- $line  
-		kw="$1"                   
+			break
+		fi
+		set -- $line
+		kw="$1"
 		value="$2"
 		case "$kw" in
 		CONTROLLER_1_HOST) CONTROLLER_1_HOST="$value" ;;
@@ -208,11 +207,11 @@ if [ "$need_rereg" = 1 ]; then
 			rm -f $RESOLV_CONF_STATIC
 		fi
 	fi
-	if [ -f $NETCONFIG_V4_VOL ] ; then 
+	if [ -f $NETCONFIG_V4_VOL ] ; then
                 MD5FULL=`md5sum $NETCONFIG_V4_VOL`
 		set $MD5FULL
                 MD5NEW=$1
-		
+
 		if [ -f $NETCONFIG_V4_DEST ] ; then
                		MD5FULL=`md5sum $NETCONFIG_V4_DEST`
 			set $MD5FULL
@@ -229,7 +228,7 @@ if [ "$need_rereg" = 1 ]; then
 			$STATIC_V4_CMD $REG_INIT_REPLY
 			NEED_REBOOT=1
 		fi
-	else 
+	else
 		if [ -f $NETCONFIG_V4_DEST ] ; then
 			echo "Delete the static configuration and reboot"
 			rm -f $NETCONFIG_V4_DEST
@@ -237,11 +236,11 @@ if [ "$need_rereg" = 1 ]; then
 			NEED_REBOOT=1
 		fi
 	fi
-	if [ -f $NETCONFIG_V6_VOL ] ; then 
+	if [ -f $NETCONFIG_V6_VOL ] ; then
                 MD5FULL=`md5sum $NETCONFIG_V6_VOL`
 		set $MD5FULL
                 MD5NEW=$1
-		
+
 		if [ -f $NETCONFIG_V6_DEST ] ; then
                		MD5FULL=`md5sum $NETCONFIG_V6_DEST`
 			set $MD5FULL
@@ -258,7 +257,7 @@ if [ "$need_rereg" = 1 ]; then
 			$STATIC_V6_CMD $REG_INIT_REPLY
 			NEED_REBOOT=1
 		fi
-	else 
+	else
 		if [ -f $NETCONFIG_V6_DEST ] ; then
 			echo "Delete the static configuration and reboot"
 			rm -f $NETCONFIG_V6_DEST
@@ -281,7 +280,7 @@ then
 	echo Moving failed log
 	mv $STATUS_DIR/upgrade_firmware $DATA_NEW_DIR/upgrade_firmware
 	condmv $DATA_NEW_DIR/upgrade_firmware $DATA_OUT_DIR/upgrade_firmware
-elif [ -n "$FIRMWARE_APPS" ] ; then 
+elif [ -n "$FIRMWARE_APPS" ] ; then
 	FIRMWARE_APPS_VERSION_MY=`cat $STATE_DIR/FIRMWARE_APPS_VERSION`
 	if [ $FIRMWARE_APPS_VERSION -gt  $FIRMWARE_APPS_VERSION_MY ] ; then
 		echo "there is a newer FIRMWARE_APPS_VERSION  $FIRMWARE_APPS_VERSION, current one is $FIRMWARE_APPS_VERSION_MY"
@@ -331,12 +330,12 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 		MD5=$1
 
 		if [ $MD5 =  $FIRMWARE_APPS_CS_COMP ] ; then
-			# the checksums match schedule an upgrade 
+			# the checksums match schedule an upgrade
 			echo "checksums match $MD5 $FIRMWARE_APPS_CS_COMP "
 			checksum_okay=true
-		else 
+		else
 			#AA if the checksum faile what next??
-			echo "checksums failed. $FIRMWARE_APPS" 
+			echo "checksums failed. $FIRMWARE_APPS"
 			echo "Ignore upgrade and proceed to Controller for INIT"
 		fi
 
@@ -355,7 +354,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 			mv $FIRMWARE_FETCH_DIR/$FIRMWARE_APPS  $FIRMWARE_TARGET_DIR
 			if [ -n "$DESKTOP" ] ; then
 				echo "ready to reboot, but no this is not a probe";
-			else 
+			else
 				$INSTALL_FIRMWARE_CMD $FIRMWARE_TARGET_DIR/$FIRMWARE_APPS
 				rm $STATE_FILE
 				reboot_probe
@@ -367,7 +366,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 	fi
 fi
 
-###### Controller INIT 
+###### Controller INIT
 echo "check cached controller info from previous registeration"
 if [ -f $CON_KEEP_CONF ] ; then
 	unset REMOTE_PORT
@@ -375,12 +374,12 @@ if [ -f $CON_KEEP_CONF ] ; then
 	while read line
 	do
 		if [ -z "$line" ]
-		then                                            
+		then
 			echo >&2 "Shell returned empty line in CON_KEEP_CONF (1)"
-			break                                               
-		fi   
-		set -- $line  
-		kw="$1"                   
+			break
+		fi
+		set -- $line
+		kw="$1"
 		value="$2"
 		case "$kw" in
 		REMOTE_PORT) REMOTE_PORT="$value" ;;
@@ -392,15 +391,15 @@ if [ -f $CON_KEEP_CONF ] ; then
 	done < $CON_KEEP_CONF
 fi
 con_reinit=1
-NOW=`epoch`  
+NOW=`epoch`
 
 if [ -n "$CON_WAIT_TIMER" ] ; then
 	if [ $CON_WAIT_TIMER -le $NOW ] ; then
   		echo "CON_WAIT_TIMER  $CON_WAIT_TIMER, timer expired now $NOW"
 		rm $CON_KEEP_CONF
-  		con_reinit=1  
+  		con_reinit=1
 		CON_WAIT_TIMER=1
-	else 
+	else
   		echo "WAIT CON_WAIT_TIMER  $CON_WAIT_TIMER, now $NOW"
 		rm -f $STATE_FILE
 		exit
@@ -418,11 +417,11 @@ else
 fi
 
 if [ "$con_reinit" = "1" ] ; then
-## Controller  INIT 
+## Controller  INIT
 	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
 	if [ $? -eq 1 ] ; then
 		D=`epoch`
-		echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "                
+		echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "
 		echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks " >> $DATA_NEW_DIR/simpleping
 		reboot_probe
 		exit
@@ -432,8 +431,8 @@ if [ "$con_reinit" = "1" ] ; then
 	echo "Controller init -p  $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST  INIT"
 	$SET_LEDS_CMD ctrl-init
 	$SSH_CMD $SSH_OPT -p $CONTROLLER_1_PORT -i $SSH_PVT_KEY atlas@$CONTROLLER_1_HOST INIT > $CON_INIT_REPLY 2>$SSH_ERR
-	ERR=$?                                                            
-	if [ $ERR != "0" ] ; then                                         
+	ERR=$?
+	if [ $ERR != "0" ] ; then
 		D=`epoch`
 		echo "RESULT 9011 done $D $ETHER_SCANNED ERR $ERR stdout" `cat $CON_INIT_REPLY`  >> $DATA_NEW_DIR/simpleping
 		echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
@@ -447,12 +446,12 @@ if [ "$con_reinit" = "1" ] ; then
 	while read line
 	do
 		if [ -z "$line" ]
-		then                                            
+		then
 			echo >&2 "Shell returned empty line in CON_KEEP_CONF (2)"
-			break                                               
-		fi   
-		set -- $line  
-		kw="$1"                   
+			break
+		fi
+		set -- $line
+		kw="$1"
 		value="$2"
 		case "$kw" in
 		REMOTE_PORT) REMOTE_PORT="$value" ;;
@@ -470,14 +469,14 @@ if [ -n "$CON_WAIT_TIMER" ] ; then
 		echo "Controller INIT told us to wait or there was an error wait until $CON_WAIT_TIMER"
 		rm -f  $STATE_FILE
 		exit;
-	fi 
+	fi
 fi
 
-###### Controller  KEEP 
+###### Controller  KEEP
 buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
 if [ $? -eq 1 ] ; then
 	D=`epoch`
-	echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "                
+	echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "
 	echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks " >> $DATA_NEW_DIR/simpleping
 	reboot_probe
 	exit
@@ -490,10 +489,10 @@ $SSH_CMD_EXEC $SSH_OPT -R $REMOTE_PORT:127.0.0.1:$TELNETD_PORT -L 8080:127.0.0.1
 KEEP_PID=$!
 echo $KEEP_PID > $CON_KEEP_PID
 
-ERR=$?                                                            
-if [ $ERR != "0" ] ; then                                         
- echo "non zero exit $ERR from controller KEEP"                                       
+ERR=$?
+if [ $ERR != "0" ] ; then
+ echo "non zero exit $ERR from controller KEEP"
  rm  -f $STATE_FILE
  exit
-fi 
-## END 
+fi
+## END

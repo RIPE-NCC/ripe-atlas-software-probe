@@ -1,6 +1,6 @@
 #!/bin/sh
 # The ATLAS Main Loop
-# 2010 atlas@ripe.net  
+# 2010 atlas@ripe.net
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
 
@@ -44,8 +44,8 @@ $CHOWN_DATA_DIRS
 if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR/home/atlas/data/new $DATA_DIR/home/atlas/data/out >> $DATA_NEW_DIR/simpleping
 then
 	D=`epoch`
-	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" 
-	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping 
+	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB"
+	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping
 fi
 
 buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
@@ -62,8 +62,8 @@ $SET_DATE_FROM_CURRENTTIME_TXT
 
 # Source system specific initializing files
 if [ -f $BIN_DIR/passwdset ] ; then
-. $BIN_DIR/passwdset 
-rm -f $BIN_DIR/passwdset 
+. $BIN_DIR/passwdset
+rm -f $BIN_DIR/passwdset
 $AFTER_PASSWDSET
 fi
 
@@ -110,23 +110,23 @@ else
 	echo 0 > $DATA_NEW_DIR/reboot-count.txt
 fi
 
-D=`epoch` 
+D=`epoch`
 MSG="RESULT 9000 done $D $ETHER_SCANNED STARTING ATLAS system initialized (reboot count `cat $DATA_NEW_DIR/reboot-count.txt`)"
 echo "$MSG" >> $DATA_NEW_DIR/simpleping
 echo "$MSG"
 
-echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY" 
+echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY"
 echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY" >> $DATA_NEW_DIR/simpleping
 telnetd -b 127.0.0.1 -p $TELNETD_PORT -P $RUN_DIR/telnetd-port$TELNETD_PORT-pid.vol &
 
 buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
-buddyinfo $LOW_MEM_T 
+buddyinfo $LOW_MEM_T
 ifconfig
 
 mkdir -p $BASE_DIR/crons/main
-mkdir -p $BASE_DIR/crons/2  $BASE_DIR/crons/3  $BASE_DIR/crons/4 
-mkdir -p $BASE_DIR/crons/5  $BASE_DIR/crons/6  $BASE_DIR/crons/7 
-mkdir -p $BASE_DIR/crons/8  $BASE_DIR/crons/9  $BASE_DIR/crons/10 
+mkdir -p $BASE_DIR/crons/2  $BASE_DIR/crons/3  $BASE_DIR/crons/4
+mkdir -p $BASE_DIR/crons/5  $BASE_DIR/crons/6  $BASE_DIR/crons/7
+mkdir -p $BASE_DIR/crons/8  $BASE_DIR/crons/9  $BASE_DIR/crons/10
 mkdir -p $BASE_DIR/crons/11  $BASE_DIR/crons/12  $BASE_DIR/crons/13
 mkdir -p $BASE_DIR/crons/14  $BASE_DIR/crons/15  $BASE_DIR/crons/16
 mkdir -p $BASE_DIR/crons/17  $BASE_DIR/crons/18  $BASE_DIR/crons/19
@@ -150,10 +150,10 @@ else
 	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 fi
 
-buddyinfo 4096               
-if [ $? -eq 0 ] ; then 
+buddyinfo 4096
+if [ $? -eq 0 ] ; then
 	$NTPCLIENT_CMD &
-fi  
+fi
 
 if [ -n "$RESOLVCONF_CMD" ]
 then
@@ -161,17 +161,17 @@ then
 	$RESOLVCONF_CMD
 fi
 
-while : 
+while :
 do
 	$CHECK_RO_USB
 
 	if [ $DHCP = "Temp" ] ; then
 		#static config failed started DHCP tempeorly
-		evping -c 2 $IPV4_GW 
+		evping -c 2 $IPV4_GW
 		ARP=`arp -n $IPV4_GW`
 		set $ARP
 		MAC=$4
-		
+
 		# Use dynamic resolvers until we switch to static
 		# addresses
 		if [ -n "$RESOLVCONF_CMD" ]
@@ -182,7 +182,7 @@ do
 		if [ -n $MAC ] ; then
 			if [ $MAC != '<incomplete>' ] ; then
 				$KILL_DHCPC_CMD
-				/sbin/route del default 
+				/sbin/route del default
 				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP" > $DATA_NEW_DIR/simpleping
 				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP"
 				. $NETCONFIG_V4_DEST
@@ -197,8 +197,6 @@ do
 				fi
 			fi
 		fi
-
-		
 	fi
 
 	# Check if ssh is still running (when we expect it to be running)
@@ -209,7 +207,7 @@ do
 			echo "no ssh client matching $KEEP_PID. cleanup state files. for next restart"
 			rm -f $NETCONFIG_V4_VOL
 			rm -f $NETCONFIG_V6_VOL
-			rm -f $STATUS_DIR/reginit.vol 
+			rm -f $STATUS_DIR/reginit.vol
 			rm -f $STATUS_DIR/con_hello_sent.vol
 			rm -f $STATUS_DIR/network_info.vol
 			rm -f $STATUS_DIR/network_info_sent.vol
@@ -232,14 +230,14 @@ do
 		rm -f $STATUS_DIR/reginit.vol
 		D=`epoch`
 		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP" >> $DATA_NEW_DIR/simpleping
-		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP" 
+		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP"
 	fi
 
 	$TRIGGER_MANUAL_UPGRADE_CMD
 
-	if [ ! -f  $STATUS_DIR/reginit.vol ] ; then 
+	if [ ! -f  $STATUS_DIR/reginit.vol ] ; then
 		D=`epoch`
-		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registeration" 
+		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registeration"
 		echo "$STATUS_DIR/reginit.vol does not exist try new reg"
 		UPTIME=`onlyuptime`
 		$SET_LEDS_CMD net-try
@@ -260,8 +258,8 @@ do
 	buddyinfo $LOW_MEM_T
 	if [ $? -eq 1 ] ; then
 		D=`epoch`
-		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks " 
-		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks " >> $DATA_NEW_DIR/simpleping 
+		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks "
+		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks " >> $DATA_NEW_DIR/simpleping
 		reboot_probe
 	fi
 
@@ -293,8 +291,8 @@ do
 		if dfrm -A 9018 $DATA_DIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR >> $DATA_NEW_DIR/simpleping
 		then
 			D=`epoch`
-			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB" 
-			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping 
+			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB"
+			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping
 			reboot_probe
 		fi
 	fi
@@ -307,4 +305,4 @@ do
 
 	sync
 	$DROP_CACHES
-done 
+done
