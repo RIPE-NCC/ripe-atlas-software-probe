@@ -3,6 +3,8 @@ VERSION=5000-1
 
 set -e
 
+job_count=${JOB_COUNT:-"$(grep -c ^processor /proc/cpuinfo)"}
+
 stadir="$PWD/atlasswprobe-$VERSION"
 builddir="$PWD/atlasswprobe-$VERSION"-work
 
@@ -26,9 +28,9 @@ cp -r "$srcdir/probe-busybox" "$builddir/probe-busybox"
 	cd "$builddir/probe-busybox/libevent-2.1.11-stable"
 	autoreconf --install
 	./configure
-	make
+	make -j$job_count
 	cd ..
-	make
+	make -j$job_count
 )
 
 # Install
