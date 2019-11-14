@@ -25,7 +25,7 @@ SET_HOSTNAME=:
 # For OpenWRT we need telnetd to run as root.
 telnetd()
 {
-	$SU_CMD $BB_BASE_DIR/usr/sbin/telnetd "$@"
+	$SU_CMD "$BB_BASE_DIR/usr/sbin/telnetd" "$@"
 }
 
 # Various files and directories
@@ -52,7 +52,7 @@ REG_SERVERS_SOURCE=$WRT_ETC_DIR/reg_servers.sh
 
 chmod_for_msm()
 {
-	chmod -R g+rwX $BASE_DIR/data
+	chmod -R g+rwX "$BASE_DIR"/data
 }
 
 # Get ethernet address
@@ -60,7 +60,7 @@ get_ether_addr
 
 # Create ssh keys if they are not there yet.
 if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
-    name=$(hostname -s)
+    name="$(hostname -s)"
     mkdir -p "$BASE_DIR"/etc
     ssh-keygen -t rsa -P '' -C turris-atlas -f "$BASE_DIR"/etc/probe_key
     chown -R atlas:atlas "$BASE_DIR"/etc
@@ -68,13 +68,13 @@ fi
 
 while :
 do
-	mode=$(cat $MODE_FILE)
+	mode=$(cat "$MODE_FILE")
 	case X$mode in
 	Xdev|Xtest|Xprod)
 		# Okay
-		if [ ! -f $REG_SERVERS ]
+		if [ ! -f "$REG_SERVERS" ]
 		then
-			mkdir -p $BASE_DIR/bin
+			mkdir -p "$BASE_DIR"/bin
 			cp $REG_SERVERS_SOURCE.$mode $REG_SERVERS
 		fi
 	;;
