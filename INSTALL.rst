@@ -11,6 +11,7 @@ To create a RPM for CentOS 7 or CentOS 8:
 - This will leave the RPM in rpmbuild/RPMS/x86_64
 
 To create a deb for Debian or Debian-based distros:
+
 - apt install git tar fakeroot libssl-dev autoconf automake libtool build-essential
 - git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 - Run ./ripe-atlas-software-probe/build-config/debian/bin/make-deb
