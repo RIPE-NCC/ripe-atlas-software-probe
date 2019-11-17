@@ -6,7 +6,11 @@ set -e
 stadir="$PWD/atlasswprobe-$VERSION"
 builddir="$PWD/atlasswprobe-$VERSION"-work
 
-srcdir="$PWD/ripe-atlas-software-probe"
+if [ -d "probe-busybox" ]; then
+        srcdir="$PWD"
+else
+        srcdir="$PWD/ripe-atlas-software-probe"
+fi
 
 atlas_local_rel="usr/local/atlas"
 var_atlas_rel="var/atlas-probe"
