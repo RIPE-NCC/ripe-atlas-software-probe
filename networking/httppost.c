@@ -473,6 +473,7 @@ int httppost_main(int argc, char *argv[])
 	if (tolerance && server_time > 0)
 	{
 		/* Try to set time from server */
+		int need_set_time;
 		struct timeval now;
 		double rtt;
 
@@ -480,8 +481,9 @@ int httppost_main(int argc, char *argv[])
 		rtt= now.tv_sec-start_time.tv_sec;
 		rtt += (now.tv_usec-start_time.tv_usec)/1e6;
 		if (rtt < 0) rtt= 0;
-		if (now.tv_sec < server_time-tolerance-rtt ||
-			now.tv_sec > server_time+tolerance+rtt)
+		need_set_time= (now.tv_sec < server_time-tolerance-rtt ||
+			now.tv_sec > server_time+tolerance+rtt);
+		if (need_set_time && getenv("HTTPPOST_ALLOW_STIME"))
 		{
 			fprintf(stderr,
 				"setting time, time difference is %ld\n",
@@ -491,6 +493,20 @@ int httppost_main(int argc, char *argv[])
 			{
 				printf(
 	"RESULT %s ongoing %ld httppost setting time, local %ld, remote %ld\n",
+					atlas_id, (long)time(NULL),
+					(long)now.tv_sec,
+					(long)server_time);
+			}
+		}
+		else if (need_set_time)
+		{
+			fprintf(stderr,
+				"not setting time, time difference is %ld\n",
+				(long)server_time-now.tv_sec);
+			if (atlas_id)
+			{
+				printf(
+	"RESULT %s ongoing %ld httppost not in sync, local %ld, remote %ld\n",
 					atlas_id, (long)time(NULL),
 					(long)now.tv_sec,
 					(long)server_time);
