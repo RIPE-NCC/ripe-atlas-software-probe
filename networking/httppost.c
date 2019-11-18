@@ -342,6 +342,11 @@ int httppost_main(int argc, char *argv[])
 			SAFE_PREFIX_DATA_OUT_REL);
 		if (rebased_fn == NULL)
 		{
+			rebased_fn= rebased_validated_dir(post_dir,
+				SAFE_PREFIX_DATA_STORAGE_REL);
+		}
+		if (rebased_fn == NULL)
+		{
 			report("protected dir (post) '%s'", post_dir);
 			goto err;
 		}

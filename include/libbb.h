@@ -441,7 +441,7 @@ const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
-#define ATLAS_MSM_VERSION	"2.1.1"
+#define ATLAS_MSM_VERSION	"2.2.0"
 
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
