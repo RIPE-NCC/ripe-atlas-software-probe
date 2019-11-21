@@ -1,6 +1,9 @@
 . /home/atlas/bin/common-pre.sh
 . /home/atlas/bin/arch/openwrt-atlas-probev4/openwrt-atlas-probev4-common.sh
 
+# Tell httppost that it should set update the system time 
+export HTTPPOST_ALLOW_STIME=true
+
 # Commands
 CHECK_RO_USB=:
 SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt

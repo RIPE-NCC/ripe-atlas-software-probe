@@ -25,6 +25,10 @@ evping()
 {
 	$BB_BIN_DIR/evping "$@"
 }
+evping_no_check()
+{
+	ATLAS_DISABLE_CHECK_ADDR=yes $BB_BIN_DIR/evping "$@"
+}
 httppost()
 {
 	$BB_BIN_DIR/httppost "$@"

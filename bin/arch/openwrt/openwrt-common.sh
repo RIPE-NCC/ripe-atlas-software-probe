@@ -26,7 +26,7 @@ MOUNT_FS_CMD=:
 SETUP_NETWORK_CMD=setup_network
 NTPCLIENT_CMD=:
 RESOLVCONF_CMD=/home/atlas/bin/resolvconf
-SU_CMD="sudo -u atlas"
+SU_CMD="sudo -E -u atlas"
 CHOWN_FOR_MSM=chown_for_msm
 CHMOD_FOR_MSM=:
 AFTER_PASSWDSET=after_passwdset
@@ -276,7 +276,7 @@ static_config()
 		echo "RESULT 9100 done $D FOUND STATIC CONFIGURATION USING IT"
 		DHCP=False
 		. $NETCONFIG_V4_DEST
-		evping -4 -c 2 $IPV4_GW 
+		evping_no_check -4 -c 2 $IPV4_GW 
 		ARP=`arp -n $IPV4_GW`
 		set $ARP
 		MAC=$4

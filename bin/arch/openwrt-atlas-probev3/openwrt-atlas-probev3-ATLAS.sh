@@ -1,8 +1,12 @@
 . /home/atlas/bin/common-pre.sh
 . /home/atlas/bin/arch/openwrt-atlas-probev3/openwrt-atlas-probev3-common.sh
 
+# Tell httppost that it should set update the system time 
+export HTTPPOST_ALLOW_STIME=true
+
 # Commands
 CHECK_RO_USB=check_ro_usb
+SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt
 
 # Various files and directories
 DEV_FIRMWARE=/storage/etc/openwrt-ar71xx-atlas-rootfs.tar; export DEV_FIRMWARE
