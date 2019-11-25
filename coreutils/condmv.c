@@ -165,6 +165,15 @@ int condmv_main(int argc, char *argv[])
 			goto err;
 		}
 	}
+
+	
+	/* Make sure that rebased_from exists before trying to rename */
+	if (stat(rebased_from, &sb) == -1 && errno == ENOENT)
+	{
+		/* Leave now to avoid a diagnostic from the rename code */
+		goto err;
+	}
+
 	if (rename(rebased_from, rebased_to) != 0)
 	{
 		fprintf(stderr, "condmv: unable to rename '%s' to '%s': %s\n",
