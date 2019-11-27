@@ -98,6 +98,8 @@
 #define O_TLS 1012
 #endif
 
+#define O_TTL 1013
+
 #define DNS_FLAG_RD 0x0100
 
 #define MIN(a, b) (a < b ? a : b)
@@ -351,6 +353,7 @@ struct query_state {
 	int retry;
 	int resolv_i;
 	bool opt_do_tls;
+	bool opt_do_ttl;
 	bool client_cookie_mismatch;
 
 	char * str_Atlas; 
@@ -385,6 +388,7 @@ struct query_state {
 	struct timespec qxmit_time_ts;	
 	double triptime;
 	double querytime;
+	int rcvdttl;
 
 	//tdig_callback_type user_callback;
 	void *user_callback;
@@ -562,32 +566,31 @@ static struct option longopts[]=
 	{ "version.server", no_argument, NULL, 'r' },
 
 	// flags
-	{ "edns0", required_argument, NULL, 'e' },
-	{ "nsid", no_argument, NULL, 'n' },
+	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
+	{ "cd", no_argument, NULL, O_CD},
 	{ "client-subnet", no_argument, NULL, 'c' },
 	{ "cookies", no_argument, NULL, 'C' },
 	{ "do", no_argument, NULL, 'd' },
-	{ "cd", no_argument, NULL, O_CD},
-
+	{ "evdns", no_argument, NULL, O_EVDNS },
+	{ "noabuf", no_argument, NULL, 1002 },
+	{ "nsid", no_argument, NULL, 'n' },
+	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
+	{ "qbuf", no_argument, NULL, 1001 },
+	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
 #if ENABLE_FEATURE_EVTDIG_TLS
 	{ "tls", no_argument, NULL, O_TLS},
 #endif
-	{ "port", required_argument, NULL, 'p'},
- 	
-	{ "retry",  required_argument, NULL, O_RETRY },
-	{ "resolv", no_argument, NULL, O_RESOLV_CONF },
-	{ "qbuf", no_argument, NULL, 1001 },
-	{ "noabuf", no_argument, NULL, 1002 },
-	{ "timeout", required_argument, NULL, 'T' },
+	{ "ttl", no_argument, NULL, O_TTL },
 
-	{ "evdns", no_argument, NULL, O_EVDNS },
-	{ "edns-version", required_argument, NULL, '1' },
+	{ "edns0", required_argument, NULL, 'e' },
 	{ "edns-flags", required_argument, NULL, '2' },
 	{ "edns-option", required_argument, NULL, '3' },
+	{ "edns-version", required_argument, NULL, '1' },
 	{ "ipv6-dest-option", required_argument, NULL, '5' },
 	{ "out-file", required_argument, NULL, 'O' },
-	{ "p_probe_id", no_argument, NULL, O_PREPEND_PROBE_ID },
-	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
+	{ "port", required_argument, NULL, 'p'},
+	{ "retry",  required_argument, NULL, O_RETRY },
+	{ "timeout", required_argument, NULL, 'T' },
 
 	{ "write-response", required_argument, NULL, 200000 + 'W'},
 	{ "read-response", required_argument, NULL, 200000 + 'R'},
@@ -606,7 +609,8 @@ void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state, int error);
 static void *tdig_init(int argc, char *argv[],
 	void (*done)(void *state, int error));
-static void process_reply(void * arg, int nrecv, struct timespec now);
+static void process_reply(void * arg, int nrecv, struct timespec now,
+	struct msghdr *msgp);
 static void update_server_cookie(struct query_state *qry, uint8_t *packet,
 	int packlen);
 static int get_edns_opt(int *optoffp, int target_code,
@@ -1058,7 +1062,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 /* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	int r, fd;
+	int r, fd, on;
 	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
@@ -1109,6 +1113,19 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		{
 			do_ipv6_option(fd, 1 /* dest */,
 				qry->opt_ipv6_dest_option);
+		}
+
+		if (qry->opt_do_ttl)
+		{
+			on = 1;
+			if (af == AF_INET6) {
+				setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
+					&on, sizeof(on));
+			}
+			else {
+				setsockopt(fd, IPPROTO_IP, IP_RECVTTL,
+					&on, sizeof(on));
+			}
 		}
 
 		qry->udp_fd= fd;
@@ -1553,15 +1570,42 @@ static void tcp_writecb(struct bufferevent *bev UNUSED_PARAM, void *ptr UNUSED_P
  *  o the one we are looking for (matching the same identifier of all the packets the program is able to send)
  */
 
-static void process_reply(void * arg, int nrecv, struct timespec now)
+static void process_reply(void * arg, int nrecv, struct timespec now,
+	struct msghdr *msgp)
 {
+	int rcvdttl;
 	struct DNS_HEADER *dnsR = NULL;
 	struct tdig_base * base;
-
 	struct query_state * qry;
+	struct cmsghdr *cmsgptr;
 
 	qry= arg;
 	base= qry->base;
+
+	rcvdttl= -42;
+	if (msgp)
+	{
+		for (cmsgptr= CMSG_FIRSTHDR(msgp); cmsgptr; 
+			cmsgptr= CMSG_NXTHDR(msgp, cmsgptr))
+		{
+			if (cmsgptr->cmsg_len == 0)
+				break;	/* Can this happen? */
+			if (cmsgptr->cmsg_level == IPPROTO_IP &&
+				cmsgptr->cmsg_type == IP_TTL)
+			{
+				rcvdttl= *(int *)CMSG_DATA(cmsgptr);
+				continue;
+			}
+			if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+				cmsgptr->cmsg_type == IPV6_HOPLIMIT)
+			{
+				rcvdttl= *(int *)CMSG_DATA(cmsgptr);
+				continue;
+			}
+			fprintf(stderr, "process_reply: level %d, type %d\n",
+				cmsgptr->cmsg_level, cmsgptr->cmsg_type);
+		}
+	}
 
 	if (nrecv < sizeof (struct DNS_HEADER)) {
 		base->shortpkt++;
@@ -1583,6 +1627,7 @@ static void process_reply(void * arg, int nrecv, struct timespec now)
 	qry->base->recvbytes += nrecv;
 	qry->triptime = (now.tv_sec-qry->xmit_time_ts.tv_sec)*1000 +
 		(now.tv_nsec-qry->xmit_time_ts.tv_nsec)/1e6;
+	qry->rcvdttl= rcvdttl;
 
 	/* Clean the noreply timer */
 	evtimer_del(&qry->noreply_timer);
@@ -1767,9 +1812,13 @@ static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
 static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
 	struct query_state * qry;
-	int nrecv;
+	int len, nrecv;
 	struct timespec rectime;
 	FILE *fh;
+	struct msghdr msg;
+	struct iovec iov[1];
+	struct sockaddr_in remote;
+	char cmsgbuf[256];
 
 	// printf("in ready_callback\n");
 
@@ -1780,16 +1829,68 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 
 	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
 
+	iov[0].iov_base= qry->base->packet;
+	iov[0].iov_len= sizeof(qry->base->packet);
+	msg.msg_name= &remote;
+	msg.msg_namelen= sizeof(remote);
+	msg.msg_iov= iov;
+	msg.msg_iovlen= 1;
+	msg.msg_control= cmsgbuf;
+	msg.msg_controllen= sizeof(cmsgbuf);
+	msg.msg_flags= 0;			/* Not really needed */
+
 	/* Receive data from the network */
 	if (qry->response_in)
 	{
-		nrecv= read(qry->udp_fd, qry->base->packet,
-			sizeof(qry->base->packet));
+		if (read(qry->udp_fd, &len, sizeof(len)) != sizeof(len))
+		{
+			crondlog(
+			DIE9 "ready_callback: error reading from '%s'",
+				qry->response_in);
+		}
+		if (len > sizeof(qry->base->packet))
+		{
+			crondlog(
+				DIE9 "ready_callback: bad value for len: %u",
+				len);
+		}
+		if (read(qry->udp_fd, qry->base->packet, len) != len)
+		{
+			crondlog(
+			DIE9 "ready_callback: error reading from '%s'",
+				qry->response_in);
+		}
+		nrecv= len;
+		if (read(qry->udp_fd, &remote, sizeof(remote)) !=
+			sizeof(remote))
+		{
+			crondlog(
+			DIE9 "ready_callback: error reading from '%s'",
+				qry->response_in);
+		}
+		if (read(qry->udp_fd, &len, sizeof(len)) != sizeof(len))
+		{
+			crondlog(
+			DIE9 "ready_callback: error reading from '%s'",
+				qry->response_in);
+		}
+		if (len > sizeof(cmsgbuf))
+		{
+			crondlog(
+				DIE9 "ready_callback: bad value for len: %u",
+				len);
+		}
+		msg.msg_controllen= len;
+		if (read(qry->udp_fd, cmsgbuf, len) != len)
+		{
+			crondlog(
+			DIE9 "ready_callback: error reading from '%s'",
+				qry->response_in);
+		}
 	}
 	else
 	{
-		nrecv = recv(qry->udp_fd, qry->base->packet,
-			sizeof(qry->base->packet), MSG_DONTWAIT);
+		nrecv= recvmsg(qry->udp_fd, &msg, MSG_DONTWAIT);
 	}
 	if (nrecv < 0) {
 		/* One more failure */
@@ -1801,11 +1902,19 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 		fh= fopen(qry->response_out, "w");
 		if (fh)
 		{
-			fwrite(qry->base->packet, nrecv, 1, fh);
+			len= nrecv;
+			fwrite(&len, sizeof(len), 1, fh);
+			fwrite(qry->base->packet, len, 1, fh);
+			fwrite(&remote, sizeof(remote), 1, fh);
+			len= msg.msg_controllen;
+			fwrite(&len, sizeof(len), 1, fh);
+			fwrite(cmsgbuf, len, 1, fh);
+
 			fclose(fh);
 		}
 	}
-	process_reply(arg, nrecv, rectime);
+
+	process_reply(arg, nrecv, rectime, &msg);
 	return;
 } 
 
@@ -1977,9 +2086,11 @@ static void *tdig_init(int argc, char *argv[],
 	qry->loc_sin6.sin6_family = 0;
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
+	qry->rcvdttl= -42;
 	qry->opt_query_arg = 0;
 	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
 	qry->opt_do_tls = 0;
+	qry->opt_do_ttl = 0;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -2133,6 +2244,10 @@ static void *tdig_init(int argc, char *argv[],
 				qry->opt_do_tls = 1;
 				break;
 #endif
+
+			case O_TTL:
+				qry->opt_do_ttl = 1;
+				break;
 
 			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
@@ -3178,6 +3293,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	if(qry->retry) {
 		JS1(retry, %d,  qry->retry);
 	}
+
+	if (qry->rcvdttl >= 0)
+		JD(ttl,  qry->rcvdttl);
 
 	JS_NC(proto, qry->opt_proto == 6 ? "TCP" : "UDP" );
 
