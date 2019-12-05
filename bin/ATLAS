@@ -157,7 +157,13 @@ fi
 
 if [ -n "$RESOLVCONF_CMD" ]
 then
-	rptra6 -P $RUN_DIR/rptra6.pid.vol -r $DATA_NEW_DIR/resolv.conf.ra6 &
+	if [ -n "$IPV6_INF" ]
+	then
+		rptra6_inf="-I $IPV6_INF"
+	else
+		rptra6_inf=''
+	fi
+	rptra6 -P $RUN_DIR/rptra6.pid.vol -r $DATA_NEW_DIR/resolv.conf.ra6 $rptra6_inf &
 	$RESOLVCONF_CMD
 fi
 
@@ -167,7 +173,7 @@ do
 
 	if [ $DHCP = "Temp" ] ; then
 		#static config failed started DHCP tempeorly
-		evping -c 2 $IPV4_GW
+		evping_no_check -4 -c 2 $IPV4_GW
 		ARP=`arp -n $IPV4_GW`
 		set $ARP
 		MAC=$4

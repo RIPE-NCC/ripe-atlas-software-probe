@@ -192,6 +192,18 @@ if [ "$need_rereg" = 1 ]; then
 	cat known_hosts_controllers >> $SSH_DIR/known_hosts
 	NEED_REBOOT=0
 	if [ -f $RESOLV_CONF_VOL ] ; then
+		# If we have a default IPv6 interface then add that to
+		# any link local addresses.
+		if [ -n "$IPV6_INF" ]
+		then
+			# Only check for fe80. The prefix is in theory a
+			# /10 but in practice a /64
+			sed <$RESOLV_CONF_VOL >$RESOLV_CONF_VOL.tmp \
+			"s/nameserver [fF][eE]80:[a-fA-F0-9:]*/&%$IPV6_INF/"
+			mv $RESOLV_CONF_VOL.tmp $RESOLV_CONF_VOL
+
+		fi
+
 		if cmp $RESOLV_CONF_VOL $RESOLV_CONF_STATIC
 		then
 			:
