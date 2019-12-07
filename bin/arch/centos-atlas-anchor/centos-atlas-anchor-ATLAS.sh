@@ -30,7 +30,7 @@ MODE_FILE=$BASE_DIR/state/mode
 TELNETD_PORT=2023
 DHCP=False
 
-. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-common.sh
+. /usr/local/atlas/bin/arch/centos-atlas-anchor/centos-atlas-anchor-common.sh
 
 # Directories
 STATE_DIR=$RPM_BASE_DIR/state; export STATE_DIR

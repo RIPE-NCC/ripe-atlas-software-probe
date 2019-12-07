@@ -22,7 +22,7 @@ if [ ! -n "$STATE_FILE" ] ; then
 	STATE_FILE=$STATUS_DIR/reginit.vol
 fi
 
-. /usr/local/atlas/bin/arch/centos-atlas-anchor/redhat-common.sh
+. /usr/local/atlas/bin/arch/centos-atlas-anchor/centos-atlas-anchor-common.sh
 . /usr/local/atlas/bin/arch/linux/linux-functions.sh
 
 get_arch()
