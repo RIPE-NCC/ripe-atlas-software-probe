@@ -1,4 +1,7 @@
 #!/bin/sh
+mkdir -p rpmbuild/SPECS
+mkdir -p rpmbuild/SOURCES
+
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.spec rpmbuild/SPECS
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.repo rpmbuild/SOURCES
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.pgp rpmbuild/SOURCES
