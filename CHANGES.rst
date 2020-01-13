@@ -9,13 +9,12 @@ Release History
 - Removed some bash-isms
 - Support Debian
 - Measurement changes (version 2.2.0):
-  - "qt" field for DNS measurements to report query time without setup
-    overhead
-  - Handle IPv6 scope IDs
-  - Switch to libevent 2.1.11
-  - 'httppost' should only set the system if the environment variable
-    HTTPPOST_ALLOW_STIME is set
-  - Add '--ttl' option to DNS measurements
+
+  * "qt" field for DNS measurements to report query time without setup overhead
+  * Handle IPv6 scope IDs
+  * Switch to libevent 2.1.11
+  * 'httppost' should only set the system if the environment variable HTTPPOST_ALLOW_STIME is set
+  * Add '--ttl' option to DNS measurements
 
 
 5000.2 (released 2019-10-07)
