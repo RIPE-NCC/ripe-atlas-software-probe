@@ -65,22 +65,22 @@
 #include <event2/util.h>
 #define DQ(str) "\"" #str "\""
 #define DQC(str) "\"" #str "\" : "
-#define ADDRESULT buf_add(&qry->result, line, strlen(line));
-#define AS(val)  buf_add(&qry->result, val, strlen (val));
-#define JS(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s\" , ",  val); ADDRESULT  
-#define JS_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH,"\"" #key"\" : \"%s\" ",  val); ADDRESULT 
-#define JSDOT(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s.\" , ",  val); ADDRESULT
-#define JS1(key, fmt, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : "#fmt" , ",  val); ADDRESULT
-#define JD(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d , ",  val); ADDRESULT
-#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d ",  val); ADDRESULT
-#define JU(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u , ",  val); ADDRESULT
-#define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val); ADDRESULT
-#define JC snprintf(line, DEFAULT_LINE_LENGTH, ","); ADDRESULT
+#define ADDRESULT buf_add(&qry->result, line, strlen(line))
+#define AS(val)  buf_add(&qry->result, val, strlen (val))
+#define JS(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s\" , ",  val), ADDRESULT  
+#define JS_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH,"\"" #key"\" : \"%s\" ",  val), ADDRESULT 
+#define JSDOT(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s.\" , ",  val), ADDRESULT
+#define JS1(key, fmt, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : "#fmt" , ",  val), ADDRESULT
+#define JD(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d , ",  val), ADDRESULT
+#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d ",  val), ADDRESULT
+#define JU(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u , ",  val), ADDRESULT
+#define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val), ADDRESULT
+#define JC snprintf(line, DEFAULT_LINE_LENGTH, ","), ADDRESULT
 
 #define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
-#define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);crondlog
-#define IAMHERE crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__);
+#define BLURT crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__),crondlog
+#define IAMHERE crondlog (LVL5 "%s:%d %s()", __FILE__, __LINE__,  __func__)
 
 #undef MIN	/* just in case */
 #undef MAX	/* also, just in case */
