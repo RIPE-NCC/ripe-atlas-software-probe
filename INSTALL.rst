@@ -19,4 +19,4 @@ Currently only the Debian Build system includes support for amd64, arm64, and ar
 - ```./ripe-atlas-software-probe/build-config/debian/bin/make-deb```
 - This will leave the .deb in the current working directory.
 - ```dpkg -i atlasswprobe-??????.deb```
-
+- The public key will be stored in /var/atlas-probe/etc/probe_key.pub
