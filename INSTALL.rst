@@ -14,7 +14,7 @@ Installation Instructions
 
 Currently only the Debian Build system includes support for amd64, arm64, and armhf.
 
-- ```apt update && apt install git tar fakeroot libssl-dev autoconf automake libtool build-essential```
+- ```apt update && apt install git tar fakeroot libssl-dev libcap2-bin autoconf automake libtool build-essential```
 - ```git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git```
 - ```./ripe-atlas-software-probe/build-config/debian/bin/make-deb```
 - This will leave the .deb in the current working directory.
