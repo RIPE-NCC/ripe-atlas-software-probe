@@ -12,7 +12,7 @@ Installation Instructions
 
 ##### To create a deb for Debian or Debian-based distros
 
-Currently only the Debian Build system includes support for arm64 and armhf
+Currently only the Debian Build system includes support for amd64, arm64, and armhf.
 
 - ```apt update && apt install git tar fakeroot libssl-dev autoconf automake libtool build-essential```
 - ```git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git```
