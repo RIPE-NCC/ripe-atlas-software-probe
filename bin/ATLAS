@@ -247,7 +247,7 @@ do
 		echo "$STATUS_DIR/reginit.vol does not exist try new reg"
 		UPTIME=`onlyuptime`
 		$SET_LEDS_CMD net-try
-		if evping -A "9017" -e -O $DATA_NEW_DIR/simpleping "U$UPTIME.M$ETHER_SCANNED.sos.atlas.ripe.net"
+		if evping -A "9017" -e -O $DATA_NEW_DIR/simpleping "U$UPTIME.$SOS_ID.sos.atlas.ripe.net"
 		then
 			echo "Ping works"
 			$SET_LEDS_CMD net-ok

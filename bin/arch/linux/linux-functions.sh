@@ -159,3 +159,9 @@ set_date_from_currenttime_txt()
 		echo no file $STATUS_DIR/currenttime.txt
 	fi
 }
+hash_ssh_pubkey()
+{
+	hash=$(sed < "$1" 's/^ssh-rsa *\([^ ]*\).*/\1/' |
+		tr -d '\n' | sha256sum)
+	expr "$hash" : "\(.\{16\}\)"
+}
