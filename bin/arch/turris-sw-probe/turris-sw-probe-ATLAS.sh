@@ -58,6 +58,9 @@ chmod_for_msm()
 # Get ethernet address
 get_ether_addr
 
+# Set SOS_ID to the hash of the public key
+export SOS_ID="H$(hash_ssh_pubkey $BASE_DIR/etc/probe_key.pub)"
+
 # Create ssh keys if they are not there yet.
 if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
     name="$(hostname -s)"

@@ -56,6 +56,9 @@ chmod_for_msm()
 # Get ethernet address
 get_ether_addr
 
+# Set SOS_ID to the hash of the public key
+export SOS_ID="H$(hash_ssh_pubkey $BASE_DIR/etc/probe_key.pub)"
+
 # Try to link in FIRMWARE_APPS_VERSION
 ln -sf $RPM_BASE_DIR/state/FIRMWARE_APPS_VERSION $BASE_DIR/state/FIRMWARE_APPS_VERSION
 
