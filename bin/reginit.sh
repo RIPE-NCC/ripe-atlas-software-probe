@@ -174,6 +174,7 @@ if [ "$need_rereg" = 1 ]; then
 		FIRMWARE_APPS_CS_UNCOMP) FIRMWARE_APPS_CS_UNCOMP="$value" ;;
 		FIRMWARE_APPS) FIRMWARE_APPS="$value" ;;
 		REREG_TIMER) REREG_TIMER="$value" ;;
+		REG_WAIT_UNTIL) REG_WAIT_UNTIL="$value" ;;
 		*)
 			echo >&2 "unknown keyword '$kw' in CON_INIT_CONF (2)"
 		;;
@@ -184,8 +185,13 @@ if [ "$need_rereg" = 1 ]; then
 		if [ $REG_WAIT_UNTIL -ge 2 ] ; then
 			echo "reg server asked us to wait or there was an error. REG_WAIT_UNTIL $REG_WAIT_UNTIL"
 			rm  -f $STATE_FILE
- 			exit;
+ 			exit
 		fi
+	fi
+	if [ -z "$CONTROLLER_1_HOST" ]; then
+		echo "reg server didn't give a controller"
+		rm -f "$STATE_FILE"
+		exit
 	fi
 	echo "Got good controller info"
 	cp $KNOWN_HOSTS_REG $SSH_DIR/known_hosts
