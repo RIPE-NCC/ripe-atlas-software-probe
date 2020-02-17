@@ -1,5 +1,5 @@
 #!/bin/sh
-VERSION=5010-1
+VERSION=5010-2
 
 set -e
 
@@ -108,14 +108,17 @@ EOF
 
 cp -r "$srcdir/build-config/debian/DEBIAN" "$stadir"
 case $(uname -m) in
-x86_64)
-	ARCH=amd64
-;;
 aarch64)
 	ARCH=arm64
 ;;
 armv7l)
 	ARCH=armhf
+;;
+i686)
+	ARCH=i386
+;;
+x86_64)
+	ARCH=amd64
 ;;
 *)
 	echo "Unsupported architecture $(uname -m)"
