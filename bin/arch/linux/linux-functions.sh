@@ -159,6 +159,17 @@ set_date_from_currenttime_txt()
 		echo no file $STATUS_DIR/currenttime.txt
 	fi
 }
+do_buddyinfo()
+{
+	lowmem="$1"
+	logfile="$2"
+
+	if [ -n "$logfile" ]
+	then
+		buddyinfo "$lowmem" >> "$logfile"
+	fi
+	buddyinfo "$lowmem"
+}
 hash_ssh_pubkey()
 {
 	hash=$(sed < "$1" 's/^ssh-rsa *\([^ ]*\).*/\1/' |

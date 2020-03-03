@@ -99,7 +99,7 @@ else
 		else
 			need_rereg=0
 			echo "wait to re-register is not over, REG_WAIT_UNTIL $REG_WAIT_UNTIL , now is $NOW "
-       			exit;
+       			exit
 		fi
 	elif [ -n "$REREG_TIMER" ] ; then
 		if [ $REREG_TIMER -le $NOW ] ; then
@@ -119,7 +119,7 @@ if [ "$need_rereg" = 1 ]; then
 	rm -f $CON_KEEP_CONF
 	R_HOST=`rchoose $REG_1_HOST $REG_2_HOST $REG_3_HOST $REG_4_HOST $REG_5_HOST $REG_6_HOST`
 	echo "REGHOSTS $REG_1_HOST $REG_2_HOST $REG_3_HOST $REG_4_HOST $REG_5_HOST $REG_6_HOST"
-	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+	$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 	if [ $? -eq 1 ] ; then
                 D=`epoch`
                 echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "
@@ -140,7 +140,7 @@ if [ "$need_rereg" = 1 ]; then
 		echo "$ERR  REGINIT exit with error"
 		$SET_LEDS_CMD reginit-fail
 		rm  -f $STATE_FILE
-		exit;
+		exit
 	fi
 
 	if [ -f $FORCE_REG ] ; then
@@ -322,7 +322,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 
 		# Remove any old firmware downloads left behind.  next line  could be removed.
 		rm -f $FIRMWARE_FETCH_DIR/app_* $FIRMWARE_TARGET_DIR/app_*
-		buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+		$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
         	if [ $? -eq 1 ] ; then
                 	D=`epoch`
                 	echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "
@@ -436,7 +436,7 @@ fi
 
 if [ "$con_reinit" = "1" ] ; then
 ## Controller  INIT
-	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+	$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 	if [ $? -eq 1 ] ; then
 		D=`epoch`
 		echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "
@@ -486,12 +486,12 @@ if [ -n "$CON_WAIT_TIMER" ] ; then
 	if [ $CON_WAIT_TIMER -gt $NOW ] ; then
 		echo "Controller INIT told us to wait or there was an error wait until $CON_WAIT_TIMER"
 		rm -f  $STATE_FILE
-		exit;
+		exit
 	fi
 fi
 
 ###### Controller  KEEP
-buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
+$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 if [ $? -eq 1 ] ; then
 	D=`epoch`
 	echo "RESULT 9009 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T K blocks "

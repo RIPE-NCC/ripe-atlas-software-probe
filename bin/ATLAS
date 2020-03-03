@@ -48,8 +48,7 @@ then
 	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB" >> $DATA_NEW_DIR/simpleping
 fi
 
-buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
-buddyinfo $LOW_MEM_T
+$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 
 /bin/mkdir -p $BASE_DIR/crons/main $BASE_DIR/crons/2
 rm -f $DATA_NEW_DIR/v6addr.vol
@@ -119,8 +118,8 @@ echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY"
 echo "RESULT 9000 done $D $ETHER_SCANNED STARTING TELNETD LOCALLY" >> $DATA_NEW_DIR/simpleping
 telnetd -b 127.0.0.1 -p $TELNETD_PORT -P $RUN_DIR/telnetd-port$TELNETD_PORT-pid.vol &
 
-buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
-buddyinfo $LOW_MEM_T
+$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
+
 ifconfig
 
 mkdir -p $BASE_DIR/crons/main
@@ -150,7 +149,7 @@ else
 	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 fi
 
-buddyinfo 4096
+$BUDDYINFO 4096
 if [ $? -eq 0 ] ; then
 	$NTPCLIENT_CMD &
 fi
@@ -260,8 +259,7 @@ do
 		$BIN_DIR/reginit.sh $STATUS_DIR/reginit.vol
 	fi
 
-	buddyinfo $LOW_MEM_T >> $DATA_NEW_DIR/simpleping
-	buddyinfo $LOW_MEM_T
+	$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 	if [ $? -eq 1 ] ; then
 		D=`epoch`
 		echo "RESULT 9005 done $D $ETHER_SCANNED REBOOT low memeory. $LOW_MEM_T  K blocks "

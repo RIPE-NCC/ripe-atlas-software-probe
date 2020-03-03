@@ -2,6 +2,7 @@
 # Commands
 
 SET_LEDS_CMD=set_leds_nanopi_neo_plus2
+BUDDYINFO=do_buddyinfo
 
 # Config
 IPV6_INF="br-lan"
