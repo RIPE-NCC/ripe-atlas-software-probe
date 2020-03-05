@@ -1,4 +1,7 @@
 #!/bin/sh
+
+action="$1"
+
 systemctl stop atlas
 systemctl disable atlas
 systemctl stop var-atlasdata.mount
@@ -7,7 +10,12 @@ rmdir /var/atlasdata
 rm -r /var/atlas-probe/.ssh
 rm -r /var/atlas-probe/bin
 rm -r /var/atlas-probe/crons
-rm -r /var/atlas-probe/etc
+if [ X"$action" = Xupgrade ]
+then
+	: # Keep key material
+else
+	rm -r /var/atlas-probe/etc
+fi
 rm -r /var/atlas-probe/run
 rm -r /var/atlas-probe/state
 rm -r /var/atlas-probe/status
