@@ -62,7 +62,7 @@ get_ether_addr
 if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
     name="$(hostname -s)"
     mkdir -p "$BASE_DIR"/etc
-    ssh-keygen -t rsa -P '' -C turris-atlas -f "$BASE_DIR"/etc/probe_key
+    ssh-keygen -t rsa -b 2048 -P '' -C turris-atlas -f "$BASE_DIR"/etc/probe_key
     chown -R atlas:atlas "$BASE_DIR"/etc
 fi
 
