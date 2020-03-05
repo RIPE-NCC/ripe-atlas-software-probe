@@ -1,5 +1,5 @@
 #!/bin/sh
-VERSION=5010-2
+VERSION=5010-3
 
 set -e
 
@@ -18,6 +18,35 @@ sta_atlas_local="$stadir/$atlas_local_rel"
 sta_var_atlas="$stadir/$var_atlas_rel"
 
 systemd_unit_rel="etc/systemd/system"
+
+get_arch()
+{
+	case $(uname -m) in
+	aarch64) echo arm64 ;;
+	armv6l) echo armhf ;;
+	armv7l) echo armhf ;;
+	i686) echo i386 ;;
+	x86_64) echo amd64 ;;
+	*)
+		return 1
+	;;
+	esac
+	return 0
+}
+
+# Check if the current architecture is supported
+get_arch > /dev/null ||
+{
+	sysarch=$(uname -m)
+	echo "Unsupported architecture $sysarch" >&2
+	# Try to find out what it should be
+	binarch=$(file -L /bin/sh | sed -n 's/.*ELF 64-bit LSB shared object, \([^,]*\), .*/\1/p')
+	if [ -n "$binarch" ]
+	then
+		echo "Add '$sysarch) echo $binarch ;;' to get_arch()" >&2
+	fi
+	exit
+}
 
 rm -rf "$stadir" 
 mkdir -p "$stadir"
@@ -107,26 +136,10 @@ WantedBy=atlas.service
 EOF
 
 cp -r "$srcdir/build-config/debian/DEBIAN" "$stadir"
-case $(uname -m) in
-aarch64)
-	ARCH=arm64
-;;
-armv7l)
-	ARCH=armhf
-;;
-i686)
-	ARCH=i386
-;;
-x86_64)
-	ARCH=amd64
-;;
-*)
-	echo "Unsupported architecture $(uname -m)"
-	exit 1
-;;
-esac
+ARCH=$(get_arch)
 
-sed < "$stadir/DEBIAN/control.in" > "$stadir/DEBIAN/control" "s/ARCH/$ARCH/"
+sed < "$stadir/DEBIAN/control.in" > "$stadir/DEBIAN/control" \
+	"s/ARCH/$ARCH/;s/VERSION/$VERSION/"
 rm -f "$stadir/DEBIAN/control.in"
 
 chmod -R og+rX,ugo-st "$stadir"
