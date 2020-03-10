@@ -4,6 +4,8 @@
 # Tell httppost that it should set update the system time 
 export HTTPPOST_ALLOW_STIME=true
 
+export do_rxtxrpt=yes
+
 # Commands
 CHECK_RO_USB=check_ro_usb
 SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt

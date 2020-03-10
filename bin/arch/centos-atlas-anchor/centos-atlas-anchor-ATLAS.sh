@@ -29,6 +29,7 @@ MODE_FILE=$BASE_DIR/state/mode
 # Other conf
 TELNETD_PORT=2023
 DHCP=False
+do_rxtxrpt=yes
 
 . /usr/local/atlas/bin/arch/centos-atlas-anchor/centos-atlas-anchor-common.sh
 
