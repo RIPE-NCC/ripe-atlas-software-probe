@@ -86,10 +86,7 @@ int dfrm_main(int argc, char *argv[])
 		return 1;
 	}
 	if (avail > limit)
-	{
-		fprintf(stderr, "enough space free, no need to do anything\n");
 		return 1;
-	}
 
 	for (i= optind+2; i < argc; i++)
 	{
