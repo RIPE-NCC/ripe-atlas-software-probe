@@ -1,13 +1,32 @@
 #!/bin/sh
+
+if [ "$#" -lt 1 ]
+then
+	echo "Usage: cp-repo-files centos[78]" >&2
+	exit 1
+fi
+
+centos_version="$1"
+
+case "$centos_version" in
+centos7|centos8)
+	: # okay
+;;
+*)
+	echo "cp-repo-files: only 'centos7' and 'centos8' are supported" >&2
+	exit 1
+;;
+esac
+
 mkdir -p rpmbuild/SPECS
 mkdir -p rpmbuild/SOURCES
 
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.spec rpmbuild/SPECS
-cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.repo rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.repo-"$centos_version" rpmbuild/SOURCES/ripe-atlas-probe.repo
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.pgp rpmbuild/SOURCES
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.daily rpmbuild/SOURCES
 
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo-test.spec rpmbuild/SPECS
-cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.repo rpmbuild/SOURCES
+cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.repo-"$centos_version" rpmbuild/SOURCES/ripe-atlas-probe-test.repo
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.pgp rpmbuild/SOURCES
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo.daily rpmbuild/SOURCES

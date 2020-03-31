@@ -1,0 +1,7 @@
+[ripe-atlas-probe-test]
+name=RIPE Atlas Probe Test Repo
+baseurl=https://ftp.ripe.net/ripe/atlas/software-probe/centos8-test
+gpgkey=file:///etc/pki/rpm-gpg/ripe-atlas-probe-test
+enabled=1
+repo_gpgcheck=1
+gpgcheck=0
