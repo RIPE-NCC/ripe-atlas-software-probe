@@ -1,6 +1,14 @@
 Release History
 ===============
 
+5020 (released 2020-04-06)
+--------------------------
+- Support for a centos 8 binary repo
+- Use the hash of the public key in sos messages for virtual probes and anchors
+- Fix bug in dns measurements where a json field gets duplicated (measurement busybox 2.2.1)
+- Suppress some debug output from dfrm (measurement busybox 2.2.1)
+- Make response to a reg. server returning WAIT more robust
+
 5010 (released 2020-01-13)
 ---------------------------
 - Support for Turris routers
