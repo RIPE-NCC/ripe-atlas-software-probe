@@ -93,15 +93,18 @@ do
 done
 
 # Make sure /var/atlasdata is mounted on tmpfs. This is needed for 
-# devices that run for small/cheap flash. We may need a switch to turn
+# devices that run for small/cheap flash. Set CHECK_TMPFS to no to turn
 # this off
-while :
-do
-	if mount | grep -q '/var/atlasdata.*tmpfs'
-	then
-		# ready to go
-		break
-	fi
-	echo '/var/atlasdata is not mounted' >&2
-	sleep 60
-done
+CHECK_TMPFS=${CHECK_TMPFS:-yes}
+if [ "$CHECK_TMPFS" = "yes" ]; then
+	while :
+	do
+		if mount | grep -q '/var/atlasdata.*tmpfs'
+		then
+			# ready to go
+			break
+		fi
+		echo '/var/atlasdata is not mounted' >&2
+		sleep 60
+	done
+fi
