@@ -42,6 +42,7 @@ STATIC_V6_CMD=:
 CHECK_SIG_CMD=check_sig
 DROP_CACHES=drop_caches
 SET_HOSTNAME=hostname
+[ -z "$MOUNT_ROOT_RO" ] && MOUNT_ROOT_RO=mount_root_ro_common
 
 # Files
 ATLASINIT=$BB_BIN_DIR/atlasinit; export REG_INIT_BIN
@@ -75,7 +76,7 @@ ATLASINIT_DEVICE_OPT='-I br-lan'
 after_passwdset()
 {
 	# Remount root read-only 
-	mount -o remount,ro /
+	$MOUNT_ROOT_RO
 }
 arp()
 {
@@ -156,6 +157,9 @@ get_arch()
 	elif [ -f  /etc/board.json ] && grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json
 	then
 		echo 'nanopi-neo-plus2'
+	elif [ -f  /etc/board.json ] && grep -q '"cznic,turris-mox"' /etc/board.json
+	then
+		echo 'turris-mox'
 	else
 		echo 'unknown board'
 		exit 1
@@ -184,6 +188,10 @@ load_storage_current_time()
 			cp /storage/currenttime.txt $STATUS_DIR/currenttime.txt 
 		fi
 	fi
+}
+mount_root_ro_common()
+{
+	mount -o remount,ro /
 }
 trigger_manual_upgrade()
 {
@@ -257,7 +265,7 @@ openwrt_atlas_init()
 	# Set up for user atlas
 	setcap "cap_net_raw=ep cap_sys_time=ep" /home/atlas/bb-13.3/bin/busybox
 
-	mount -o remount,ro /
+	$MOUNT_ROOT_RO
 }
 rptra6()
 {
