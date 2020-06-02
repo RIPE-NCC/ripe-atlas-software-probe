@@ -134,7 +134,7 @@ static int rpt_rxtx(void)
 		return 1;
 	}
 
-	for (i= 0; i<4; i++)
+	for (i= 0; i<100; i++)
 	{
 		if (fgets(buf, sizeof(buf), file) == NULL)
 		{
