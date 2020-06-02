@@ -163,11 +163,13 @@ void tu_cleanup(struct tu_env *env)
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
 	int r, count;
+	long err;
 	struct tu_env *env;
 	struct bufferevent *bev;
 	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
+	char errbuf[80];
 
 	env= ctx;
 
@@ -257,6 +259,18 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 				crondlog(DIE9 "dns_cb: dns_res not null");
 			return;
 		}
+
+		err= bufferevent_get_openssl_error(bev);
+		if (err)
+		{
+			ERR_error_string_n(err, errbuf, sizeof(errbuf));
+			env->reporterr(env, TU_CONNECT_ERR, errbuf);
+		}
+		else
+		{
+			env->reporterr(env, TU_CONNECT_ERR, strerror(errno));
+		}
+
 		env->dns_curr= env->dns_curr->ai_next;
 	}
 
