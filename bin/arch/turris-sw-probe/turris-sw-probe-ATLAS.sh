@@ -63,9 +63,9 @@ export SOS_ID="H$(hash_ssh_pubkey $BASE_DIR/etc/probe_key.pub)"
 
 # Create ssh keys if they are not there yet.
 if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
-    name="$(hostname -s)"
+    name="$(uci -q get system.@system[0].hostname || echo -e turris)"
     mkdir -p "$BASE_DIR"/etc
-    ssh-keygen -t rsa -b 2048 -P '' -C turris-atlas -f "$BASE_DIR"/etc/probe_key
+    ssh-keygen -t rsa -b 4096 -P '' -C "$name" -f "$BASE_DIR"/etc/probe_key
     chown -R atlas:atlas "$BASE_DIR"/etc
 fi
 
