@@ -82,6 +82,7 @@ else
 		FIRMWARE_APPS_CS_UNCOMP) FIRMWARE_APPS_CS_UNCOMP="$value" ;;
 		FIRMWARE_APPS) FIRMWARE_APPS="$value" ;;
 		REREG_TIMER) REREG_TIMER="$value" ;;
+		REG_WAIT_UNTIL) REG_WAIT_UNTIL="$value" ;;
 		*)
 			echo >&2 "unknown keyword '$kw' in CON_INIT_CONF (1)"
 		;;
