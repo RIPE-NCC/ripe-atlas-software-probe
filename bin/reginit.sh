@@ -31,7 +31,7 @@ if [ -f $STATE_FILE ] ; then
 	echo "there is a state file $STATE_FILE. another copy running".
 	exit 0
 else
-	echo "ATLAS registeration starting"
+	echo "ATLAS registration starting"
 	touch  $STATE_FILE
 fi
 
@@ -110,7 +110,7 @@ else
 	      		REREG_TIMER=1
   	      		echo "REREG_TIMER_EXPIRED  go re register REREG_TIMER $REREG_TIMER  , now is $NOW  "
 		else
-			echo "registeration info is still valid till $REREG_TIMER, now $NOW"
+			echo "registration info is still valid till $REREG_TIMER, now $NOW"
 			need_rereg=0
 		fi
 	fi
@@ -386,7 +386,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 fi
 
 ###### Controller INIT
-echo "check cached controller info from previous registeration"
+echo "check cached controller info from previous registration"
 if [ -f $CON_KEEP_CONF ] ; then
 	unset REMOTE_PORT
 	unset CON_WAIT_TIMER
