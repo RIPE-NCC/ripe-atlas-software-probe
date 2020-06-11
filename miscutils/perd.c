@@ -216,12 +216,6 @@ static void crondlog(const char *ctl, ...)
 		exit(20);
 }
 
-static void my_exit(void)
-{
-	crondlog(LVL8 "in my_exit (exit was called!)");
-	abort();
-}
-
 static void kick_watchdog(void)
 {
 	if(do_kick_watchdog) 
@@ -240,7 +234,6 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned seed;
 
 	const char *PidFileName = NULL;
-	atexit(my_exit);
 
 	INIT_G();
 

@@ -191,12 +191,6 @@ void crondlog(const char *ctl, ...)
 		exit(20);
 }
 
-static void my_exit(void)
-{
-	crondlog(LVL8 "in my_exit (exit was called!)");
-	abort();
-}
-
 static void kick_watchdog(void)
 {
 	if(do_kick_watchdog) 
@@ -268,8 +262,6 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 
 	const char *PidFileName = NULL;
 	char *interface_name= NULL;
-
-	atexit(my_exit);
 
 	INIT_G();
 
