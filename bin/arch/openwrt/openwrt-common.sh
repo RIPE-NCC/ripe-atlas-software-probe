@@ -78,10 +78,6 @@ after_passwdset()
 	# Remount root read-only 
 	$MOUNT_ROOT_RO
 }
-arp()
-{
-	$BB_SBIN_DIR/arp "$@"
-}
 check_sig()
 {
 	file="$1"
@@ -166,10 +162,6 @@ get_arch()
 	fi
 }
 
-hostname()
-{
-	$BB_BIN_DIR/hostname "$@"
-}
 kill_dhcpc()
 {
 	if [ -f $DHCPC_PID ]
