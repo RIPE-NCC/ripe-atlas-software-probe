@@ -726,7 +726,6 @@ static void local_exit(void *state UNUSED_PARAM, int error)
 	   event_base_free(event_base);
 	   terminator(qry);
 	*/
-	fprintf(stderr, "And we are done\n");
 	exit(error);
 }
 

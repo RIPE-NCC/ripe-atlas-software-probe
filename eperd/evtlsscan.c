@@ -1153,7 +1153,6 @@ static void local_exit(void *state UNUSED_PARAM)
 {
 
 	struct timeval asap = { 0, 2 };
-	fprintf(stderr, "And we are done\n");
 	event_base_loopexit (EventBase,  &asap);
 	return;
 }

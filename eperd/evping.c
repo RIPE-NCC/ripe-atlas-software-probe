@@ -35,7 +35,6 @@
 
 static void done(void *state UNUSED_PARAM, int error)
 {
-	fprintf(stderr, "And we are done\n");
 	exit(error);
 }
 
