@@ -1,3 +1,0 @@
-# This must not be interpreted as an assignment
-a''=b true
-echo $?

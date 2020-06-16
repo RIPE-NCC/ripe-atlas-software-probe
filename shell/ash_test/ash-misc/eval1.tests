@@ -1,4 +1,0 @@
-# empty eval nevertheless sets $? = 0
-false
-eval
-echo Ok:$?

@@ -18,6 +18,9 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
 # define dst_name (file_header->name)
 #endif
 
+#ifndef ENABLE_FEATURE_TAR_SELINUX
+#define ENABLE_FEATURE_TAR_SELINUX 0
+#endif
 #if ENABLE_FEATURE_TAR_SELINUX
 	char *sctx = archive_handle->tar__sctx[PAX_NEXT_FILE];
 	if (!sctx)

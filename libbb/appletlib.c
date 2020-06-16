@@ -281,6 +281,9 @@ void lbb_prepare(const char *applet
 	if (ENABLE_LOCALE_SUPPORT)
 		setlocale(LC_ALL, "");
 
+#ifndef ENABLE_TEST
+#define ENABLE_TEST 0
+#endif
 #if ENABLE_FEATURE_INDIVIDUAL
 	/* Redundant for busybox (run_applet_and_exit covers that case)
 	 * but needed for "individual applet" mode */
@@ -710,6 +713,16 @@ static void install_links(const char *busybox UNUSED_PARAM,
 
 # if ENABLE_BUSYBOX
 static void run_applet_and_exit(const char *name, char **argv) NORETURN;
+
+#ifndef ENABLE_FEATURE_AUTOWIDTH
+#define ENABLE_FEATURE_AUTOWIDTH 0
+#endif
+#ifndef IF_NOT_FEATURE_SH_STANDALONE
+#define IF_NOT_FEATURE_SH_STANDALONE(x)
+#endif
+#ifndef IF_FEATURE_SH_STANDALONE
+#define IF_FEATURE_SH_STANDALONE(x)
+#endif
 
 /* If we were called as "busybox..." */
 static int busybox_main(char **argv)

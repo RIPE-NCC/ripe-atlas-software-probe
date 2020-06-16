@@ -1,4 +1,0 @@
-echo 'test\
-best' | (read reply; echo "$reply")
-echo 'test\
-best' | (read -r reply; echo "$reply")

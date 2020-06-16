@@ -85,6 +85,9 @@
 
 #define RESOLV_CONF	"/etc/resolv.conf"
 
+#ifndef ENABLE_FEATURE_CROND_CALL_SENDMAIL
+#define ENABLE_FEATURE_CROND_CALL_SENDMAIL 0
+#endif
 struct CronLine {
 	struct CronLine *cl_Next;
 	char *cl_Shell;         /* shell command                        */

@@ -28,6 +28,9 @@ enum {
 #endif
 };
 
+#ifndef ENABLE_FEATURE_TAR_UNAME_GNAME
+#define ENABLE_FEATURE_TAR_UNAME_GNAME 0
+#endif
 typedef struct file_header_t {
 	char *name;
 	char *link_target;
@@ -45,6 +48,30 @@ typedef struct file_header_t {
 
 struct hardlinks_t;
 
+#ifndef ENABLE_TAR
+#define ENABLE_TAR 0
+#endif
+#ifndef ENABLE_DPKG
+#define ENABLE_DPKG 0
+#endif
+#ifndef ENABLE_DPKG_DEB
+#define ENABLE_DPKG_DEB 0
+#endif
+#ifndef ENABLE_FEATURE_TAR_LONG_OPTIONS
+#define ENABLE_FEATURE_TAR_LONG_OPTIONS 0
+#endif
+#ifndef ENABLE_CPIO
+#define ENABLE_CPIO 0
+#endif
+#ifndef ENABLE_RPM2CPIO
+#define ENABLE_RPM2CPIO 0
+#endif
+#ifndef ENABLE_RPM
+#define ENABLE_RPM 0
+#endif
+#ifndef ENABLE_FEATURE_AR_CREATE
+#define ENABLE_FEATURE_AR_CREATE 0
+#endif
 typedef struct archive_handle_t {
 	/* Flags. 1st since it is most used member */
 	unsigned ah_flags;

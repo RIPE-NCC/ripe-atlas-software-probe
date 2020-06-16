@@ -48,7 +48,7 @@ config VERBOSE_RESOLUTION_ERRORS
 
 INSERT
 
-source networking/udhcp/Config.in
+#source networking/udhcp/Config.in
 
 config IFUPDOWN_UDHCPC_CMD_OPTIONS
 	string "ifup udhcpc command line options"

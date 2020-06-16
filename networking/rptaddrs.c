@@ -514,7 +514,7 @@ static int setup_ipv6_rpt(FILE *of)
 				 nh6p[4], nh6p[5], nh6p[6], nh6p[7]);
 
 		
-		set_flags(flags, (iflags & IPV6_MASK));
+		route_set_flags(flags, (iflags & IPV6_MASK));
 		memset(&sdst6, '\0', sizeof(sdst6));
 		inet_pton(AF_INET6, dst6in, (struct sockaddr *) &sdst6.sin6_addr);
 		sdst6.sin6_family = AF_INET6;

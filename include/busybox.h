@@ -19,6 +19,12 @@ extern const uint8_t applet_flags[] ALIGN1;
 extern const uint8_t applet_suid[] ALIGN1;
 extern const uint8_t applet_install_loc[] ALIGN1;
 
+#ifndef ENABLE_FEATURE_SH_STANDALONE
+#define ENABLE_FEATURE_SH_STANDALONE 0
+#endif
+#ifndef ENABLE_FEATURE_SH_NOFORK
+#define ENABLE_FEATURE_SH_NOFORK 0
+#endif
 #if ENABLE_FEATURE_PREFER_APPLETS \
  || ENABLE_FEATURE_SH_STANDALONE \
  || ENABLE_FEATURE_SH_NOFORK

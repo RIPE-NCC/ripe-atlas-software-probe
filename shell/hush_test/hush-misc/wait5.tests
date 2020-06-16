@@ -1,5 +1,0 @@
-sleep 0 | (sleep 0;exit 3) &
-sleep 1
-echo Zero:$?
-wait %1
-echo Three:$?

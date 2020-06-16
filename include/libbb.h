@@ -54,6 +54,9 @@
 #include <sys/param.h>
 #include <pwd.h>
 #include <grp.h>
+#ifndef ENABLE_FEATURE_SHADOWPASSWDS
+#define ENABLE_FEATURE_SHADOWPASSWDS 0
+#endif
 #if ENABLE_FEATURE_SHADOWPASSWDS
 # if !ENABLE_USE_BB_SHADOW
 /* If using busybox's shadow implementation, do not include the shadow.h
@@ -218,6 +221,9 @@ int klogctl(int type, char *b, int len);
 PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 
 
+#ifndef ENABLE_USE_BB_PWD_GRP
+#define ENABLE_USE_BB_PWD_GRP 0
+#endif
 #if ENABLE_USE_BB_PWD_GRP
 # include "pwd_.h"
 # include "grp_.h"
@@ -358,6 +364,9 @@ extern char *strrstr(const char *haystack, const char *needle) FAST_FUNC;
 //TODO: supply a pointer to char[11] buffer (avoid statics)?
 extern const char *bb_mode_string(mode_t mode) FAST_FUNC;
 extern int is_directory(const char *name, int followLinks) FAST_FUNC;
+#ifndef ENABLE_FEATURE_VERBOSE
+#define ENABLE_FEATURE_VERBOSE 0
+#endif
 enum {	/* cp.c, mv.c, install.c depend on these values. CAREFUL when changing them! */
 	FILEUTILS_PRESERVE_STATUS = 1 << 0, /* -p */
 	FILEUTILS_DEREFERENCE     = 1 << 1, /* !-d */
@@ -466,6 +475,7 @@ extern const char *atlas_base(void);
 extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
+extern void route_set_flags(char *flagstr, int flags);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;
@@ -644,6 +654,9 @@ int setsockopt_broadcast(int fd) FAST_FUNC;
 int setsockopt_bindtodevice(int fd, const char *iface) FAST_FUNC;
 /* NB: returns port in host byte order */
 unsigned bb_lookup_port(const char *port, const char *protocol, unsigned default_port) FAST_FUNC;
+#ifndef ENABLE_FEATURE_IPV6
+#define ENABLE_FEATURE_IPV6 1
+#endif
 typedef struct len_and_sockaddr {
 	socklen_t len;
 	union {
@@ -1013,6 +1026,9 @@ const char* get_cached_groupname(gid_t gid) FAST_FUNC;
 void clear_username_cache(void) FAST_FUNC;
 /* internally usernames are saved in fixed-sized char[] buffers */
 enum { USERNAME_MAX_SIZE = 32 - sizeof(uid_t) };
+#ifndef ENABLE_FEATURE_CHECK_NAMES
+#define ENABLE_FEATURE_CHECK_NAMES 0
+#endif
 #if ENABLE_FEATURE_CHECK_NAMES
 void die_if_bad_username(const char* name) FAST_FUNC;
 #else
@@ -1227,26 +1243,59 @@ extern void bb_logenv_override(void) FAST_FUNC;
 /* Applets which are useful from another applets */
 int bb_cat(char** argv);
 /* If shell needs them, they exist even if not enabled as applets */
+#ifndef IF_ECHO
+#define IF_ECHO(x)
+#endif
 int echo_main(int argc, char** argv) IF_ECHO(MAIN_EXTERNALLY_VISIBLE);
+#ifndef IF_PRINTF
+#define IF_PRINTF(x)
+#endif
 int printf_main(int argc, char **argv) IF_PRINTF(MAIN_EXTERNALLY_VISIBLE);
+#ifndef ENABLE_TEST
+#define ENABLE_TEST 0
+#endif
+#ifndef ENABLE_TEST1
+#define ENABLE_TEST1 0
+#endif
+#ifndef ENABLE_TEST2
+#define ENABLE_TEST2 0
+#endif
 int test_main(int argc, char **argv)
 #if ENABLE_TEST || ENABLE_TEST1 || ENABLE_TEST2
 		MAIN_EXTERNALLY_VISIBLE
 #endif
 ;
+#ifndef ENABLE_KILL
+#define ENABLE_KILL 0
+#endif
+#ifndef ENABLE_KILLALL
+#define ENABLE_KILLALL 0
+#endif
+#ifndef ENABLE_KILLALL6
+#define ENABLE_KILLALL5 0
+#endif
 int kill_main(int argc, char **argv)
 #if ENABLE_KILL || ENABLE_KILLALL || ENABLE_KILLALL5
 		MAIN_EXTERNALLY_VISIBLE
 #endif
 ;
 /* Similar, but used by chgrp, not shell */
+#ifndef IF_CHOWN
+#define IF_CHOWN(x)
+#endif
 int chown_main(int argc, char **argv) IF_CHOWN(MAIN_EXTERNALLY_VISIBLE);
 /* Used by ftpd */
+#ifndef IF_LS
+#define IF_LS(x)
+#endif
 int ls_main(int argc, char **argv) IF_LS(MAIN_EXTERNALLY_VISIBLE);
 /* Don't need IF_xxx() guard for these */
 int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 
+#ifndef ENABLE_ROUTE
+#define ENABLE_ROUTE 0
+#endif
 #if ENABLE_ROUTE
 void bb_displayroutes(int noresolve, int netstatfmt) FAST_FUNC;
 #endif
@@ -1331,6 +1380,9 @@ int bb_parse_mode(const char* s, unsigned cur_mode) FAST_FUNC;
 /*
  * Config file parser
  */
+#ifndef ENABLE_FEATURE_CROND_D
+#define ENABLE_FEATURE_CROND_D 0
+#endif
 enum {
 	PARSE_COLLAPSE  = 0x00010000, // treat consecutive delimiters as one
 	PARSE_TRIM      = 0x00020000, // trim leading and trailing delimiters
@@ -1433,6 +1485,9 @@ int check_password(const struct passwd *pw, const char *plaintext) FAST_FUNC;
 int ask_and_check_password_extended(const struct passwd *pw, int timeout, const char *prompt) FAST_FUNC;
 int ask_and_check_password(const struct passwd *pw) FAST_FUNC;
 /* Returns a malloced string */
+#ifndef ENABLE_USE_BB_CRYPT
+#define ENABLE_USE_BB_CRYPT 0
+#endif
 #if !ENABLE_USE_BB_CRYPT
 #define pw_encrypt(clear, salt, cleanup) pw_encrypt(clear, salt)
 #endif
@@ -1451,6 +1506,12 @@ extern int crypt_make_salt(char *p, int cnt /*, int rnd*/) FAST_FUNC;
 #define MAX_PW_SALT_LEN (3 + 16 + 1)
 extern char* crypt_make_pw_salt(char p[MAX_PW_SALT_LEN], const char *algo) FAST_FUNC;
 
+#ifndef ENABLE_FEATURE_ADDUSER_TO_GROUP
+#define ENABLE_FEATURE_ADDUSER_TO_GROUP 0
+#endif
+#ifndef ENABLE_FEATURE_DEL_USER_FROM_GROUP
+#define ENABLE_FEATURE_DEL_USER_FROM_GROUP 0
+#endif
 
 /* Returns number of lines changed, or -1 on error */
 #if !(ENABLE_FEATURE_ADDUSER_TO_GROUP || ENABLE_FEATURE_DEL_USER_FROM_GROUP)
@@ -1656,6 +1717,9 @@ struct smaprec {
 	char *smap_name;
 };
 
+#ifndef ENABLE_PMAP
+#define ENABLE_PMAP 0
+#endif
 #if !ENABLE_PMAP
 #define procps_read_smaps(pid, total, cb, data) \
 	procps_read_smaps(pid, total)
@@ -1663,6 +1727,18 @@ struct smaprec {
 int FAST_FUNC procps_read_smaps(pid_t pid, struct smaprec *total,
 		void (*cb)(struct smaprec *, void *), void *data);
 
+#ifndef IF_FEATURE_SHOW_THREADS
+#define IF_FEATURE_SHOW_THREADS(x)
+#endif
+#ifndef ENABLE_FEATURE_TOPMEM
+#define ENABLE_FEATURE_TOPMEM 0
+#endif
+#ifndef ENABLE_FEATURE_TOP_SMP_PROCESS
+#define ENABLE_FEATURE_TOP_SMP_PROCESS 0
+#endif
+#ifndef ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
+#define ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS 0
+#endif
 typedef struct procps_status_t {
 	DIR *dir;
 	IF_FEATURE_SHOW_THREADS(DIR *task_dir;)
@@ -1705,6 +1781,33 @@ typedef struct procps_status_t {
 #endif
 } procps_status_t;
 /* flag bits for procps_scan(xx, flags) calls */
+#ifndef ENABLE_KILLALL
+#define ENABLE_KILLALL 0
+#endif
+#ifndef ENABLE_PGREP
+#define ENABLE_PGREP 0
+#endif 
+#ifndef ENABLE_PKILL
+#define ENABLE_PKILL 0
+#endif
+#ifndef ENABLE_PIDOF
+#define ENABLE_PIDOF 0
+#endif
+#ifndef ENABLE_SESTATUS
+#define ENABLE_SESTATUS 0
+#endif
+#ifndef ENABLE_FEATURE_TOP_SMP_PROCESS
+#define ENABLE_FEATURE_TOP_SMP_PROCESS 0
+#endif
+#ifndef ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
+#define ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS 0
+#endif
+#ifndef ENABLE_FEATURE_SHADOWPASSWDS
+#define ENABLE_FEATURE_SHADOWPASSWDS 0
+#endif
+#ifndef ENABLE_FEATURE_SHOW_THREADS
+#define ENABLE_FEATURE_SHOW_THREADS 0
+#endif
 enum {
 	PSSCAN_PID      = 1 << 0,
 	PSSCAN_PPID     = 1 << 1,
@@ -1925,6 +2028,10 @@ extern const char bb_default_login_shell[] ALIGN1;
 /* The following devices are the same on all systems.  */
 #define CURRENT_TTY "/dev/tty"
 #define DEV_CONSOLE "/dev/console"
+
+#ifndef ENABLE_FEATURE_DEVFS
+#define ENABLE_FEATURE_DEVFS 0
+#endif
 
 #if defined(__FreeBSD_kernel__)
 # define CURRENT_VC CURRENT_TTY

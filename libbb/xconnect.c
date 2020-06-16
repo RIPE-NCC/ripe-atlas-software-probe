@@ -195,6 +195,19 @@ void FAST_FUNC set_nport(struct sockaddr *sa, unsigned port)
 /* It doesn't hurt because we will remove this bit anyway */
 #define DIE_ON_ERROR AI_CANONNAME
 
+#ifndef IF_NOT_FEATURE_IPV6
+#define IF_NOT_FEATURE_IPV6(x)
+#endif
+#ifndef IF_FEATURE_IPV6
+#define IF_FEATURE_IPV6(...) __VA_ARGS__
+#endif
+#ifndef ENABLE_FEATURE_UNIX_LOCAL
+#define ENABLE_FEATURE_UNIX_LOCAL 0
+#endif
+#ifndef ENABLE_FEATURE_IPV6
+#define ENABLE_FEATURE_IPV6 1
+#endif
+
 /* host: "1.2.3.4[:port]", "www.google.com[:port]"
  * port: if neither of above specifies port # */
 static len_and_sockaddr* str2sockaddr(

@@ -79,6 +79,7 @@ void FAST_FUNC xget_uidgid(struct bb_uidgid_t *u, const char *ug)
 		bb_error_msg_and_die("unknown user/group %s", ug);
 }
 
+#if 0 /* Not need and pulls in other stuff */
 /* chown-like:
  * "user" sets uid only,
  * ":group" sets gid only
@@ -110,6 +111,7 @@ void FAST_FUNC parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_gr
 		xget_uidgid(u, user_group);
 	}
 }
+#endif
 
 #if 0
 #include <stdio.h>

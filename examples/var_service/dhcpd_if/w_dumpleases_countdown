@@ -1,3 +1,0 @@
-#!/bin/sh
-
-watch -n1 'dumpleases -f udhcpd.leases'

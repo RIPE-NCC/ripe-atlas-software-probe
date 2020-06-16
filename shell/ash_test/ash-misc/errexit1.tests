@@ -1,5 +1,0 @@
-set -e
-(true)
-echo OK
-(false)
-echo FAIL
