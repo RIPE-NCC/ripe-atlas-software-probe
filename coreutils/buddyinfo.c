@@ -94,7 +94,7 @@ int buddyinfo_main(int argc UNUSED_PARAM, char **argv)
 
 	if(need_reboot)
 	{
-		fprintf(stderr, "buddy info returned 1 for block %d\n", lowmem);
+		fprintf(stderr, "buddyinfo: nothing found for size %d\n", lowmem);
 		return (EXIT_FAILURE);
 	}
 	return 0;
