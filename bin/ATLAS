@@ -149,10 +149,7 @@ else
 	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 fi
 
-$BUDDYINFO 4096
-if [ $? -eq 0 ] ; then
-	$NTPCLIENT_CMD &
-fi
+$NTPCLIENT_CMD &
 
 if [ -n "$RESOLVCONF_CMD" ]
 then
