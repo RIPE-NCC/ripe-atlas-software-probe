@@ -20,7 +20,12 @@ else
 	RESOLV_RA6=/tmp/resolv.conf.ra6
 fi
 
-CHRONY="/etc/init.d/ntpd restart"       # Kick chrony
+if [ -f /etc/init.d/chronyd ]
+then
+	CHRONY="/etc/init.d/chronyd restart"       # Kick chrony
+else
+	CHRONY="/etc/init.d/ntpd restart"       # Kick chrony
+fi
 
 # Static address configuration may be broken. When switching back to DHCP
 # also ignore statically configured DNS resolvers
