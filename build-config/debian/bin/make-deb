@@ -1,5 +1,5 @@
 #!/bin/sh
-VERSION=5020-1
+VERSION=5020-2
 
 set -e
 
