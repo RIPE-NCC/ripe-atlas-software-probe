@@ -11,3 +11,4 @@ RUN_DIR=$BASE_DIR/run
 CON_KEEP_PID=con_keep_pid.vol
 RESOLV_CONF_STATIC='/etc/resolv.conf.static'
 REG_INIT_REPLY=$STATUS_DIR/reg_init_reply.txt
+CONFIG_TXT="$BASE_DIR/state/config.txt"

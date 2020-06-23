@@ -21,15 +21,9 @@ fi
 . $BIN_DIR/common.sh
 
 # config variables
-CONFIG_TXT="$BASE_DIR/state/config.txt"
-
-# Look for options in config.txt
-if [ -f "$CONFIG_TXT" ]
+if [ $(config_lookup RXTXRPT no) = yes ]
 then
-	if grep "^[ 	]*RXTXRPT=yes" "$CONFIG_TXT"
-	then
-		do_rxtxrpt=yes
-	fi
+	do_rxtxrpt=yes
 fi
 
 $MOUNT_FS_CMD

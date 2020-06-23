@@ -176,3 +176,23 @@ hash_ssh_pubkey()
 		tr -d '\n' | sha256sum)
 	expr "$hash" : "\(.\{16\}\)"
 }
+config_lookup()
+{
+	key="$1"
+	default_value="$2"
+
+	# Look for options in config.txt
+	if [ ! -f "$CONFIG_TXT" ]
+	then
+		echo "$default_value"
+		return
+	fi
+	value=$(sed < "$CONFIG_TXT" -n "s/^[ 	]*$key=\(.*\)/\1/p" |
+		head -1 | sed 's/[ 	]*$//')
+	if [ -n "$value" ]
+	then
+		echo "$value"
+	else
+		echo "$default_value"
+	fi
+}
