@@ -246,6 +246,9 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 	if (*argv)
 		bb_show_usage();
 
+    /* Clear ts.tv_nsec, in case we need to set the time later */
+  	ts.tv_nsec= 0;
+
 	/* Now we have parsed all the information except the date format
 	 * which depends on whether the clock is being set or read */
 
@@ -310,7 +313,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 		}
 
 		/* if setting time, set it */
-		if ((opt & OPT_SET) && stime(&ts.tv_sec) < 0) {
+		if ((opt & OPT_SET) && clock_settime(CLOCK_REALTIME, &ts) < 0) {
 			bb_perror_msg("can't set date");
 		}
 	}
