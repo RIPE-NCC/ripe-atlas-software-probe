@@ -93,6 +93,7 @@
 #define O_QUERY 1009
 #define O_OUTPUT_COBINED 1101
 #define O_CD 1010
+#define O_AD 1011
 
 #if ENABLE_FEATURE_EVTDIG_TLS
 #define O_TLS 1012
@@ -343,6 +344,7 @@ struct query_state {
 	int opt_abuf;
 	int opt_resolv_conf;
 	int opt_rd;
+	int opt_ad;
 	int opt_cd;
 	int opt_prepend_probe_id;
 	int opt_evdns;
@@ -567,6 +569,7 @@ static struct option longopts[]=
 
 	// flags
 	{ "c_output", no_argument, NULL, O_OUTPUT_COBINED},
+	{ "ad", no_argument, NULL, O_AD},
 	{ "cd", no_argument, NULL, O_CD},
 	{ "client-subnet", no_argument, NULL, 'c' },
 	{ "cookies", no_argument, NULL, 'C' },
@@ -828,6 +831,8 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		dns->rd = 1;
 	}
 
+	if (qry->opt_ad)
+		dns->ad = 1;
 	if (qry->opt_cd)
 		dns->cd = 1;
 
@@ -2068,6 +2073,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_qbuf = 0; 
 	qry->opt_abuf = 1; 
 	qry->opt_rd = 0;
+	qry->opt_ad = 0;
 	qry->opt_cd = 0;
 	qry->opt_evdns = 0;
 	qry->opt_rset = 0;
@@ -2265,6 +2271,10 @@ static void *tdig_init(int argc, char *argv[],
 					tdig_delete(qry);
 					return (0);
 				}
+				break;
+
+			case O_AD:
+				qry->opt_ad = 1;
 				break;
 
 			case O_CD:
