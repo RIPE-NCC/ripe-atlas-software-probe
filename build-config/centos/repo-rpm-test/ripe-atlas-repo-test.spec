@@ -1,7 +1,7 @@
 Name:           ripe-atlas-repo-test
 Summary:        RIPE Atlas Software Probe Test Repo
 Version:        1
-Release:        2%{?dist}
+Release:        3%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        ripe-atlas-probe-test.repo
