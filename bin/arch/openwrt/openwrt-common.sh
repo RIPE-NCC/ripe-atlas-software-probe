@@ -155,7 +155,7 @@ get_arch()
 		echo 'nanopi-neo-plus2'
 	elif [ -f  /etc/board.json ] && grep -q '"cznic,turris-mox"' /etc/board.json
 	then
-		echo 'turris-mox'
+		echo 'atlas-mox'
 	else
 		echo 'unknown board'
 		exit 1
