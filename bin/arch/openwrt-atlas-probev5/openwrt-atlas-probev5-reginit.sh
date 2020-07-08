@@ -99,6 +99,9 @@ install_firmware()
 		fi
 	done
 
+	cp /etc/config/network $TMP_ROOT/etc/config
+	cp /etc/config/system $TMP_ROOT/etc/config
+
 	umount /mnt/.snapshots
 
 	# Record current time

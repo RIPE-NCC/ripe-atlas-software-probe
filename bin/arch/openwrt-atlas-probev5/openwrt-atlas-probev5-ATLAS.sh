@@ -20,6 +20,20 @@ KEY_PREFIX_SOURCE=$BASE_DIR/etc/2018-04-23
 
 setup_network()
 {
+	need_reload=no
+
+	# Make sure we have a stable mac addr
+	macaddr=$(uci get network.lan.macaddr)
+	if [ !  -n "$macaddr" ]
+	then
+		mount -o remount,rw /
+		macaddr="$(cat /sys/class/net/eth0/address)"
+		uci set network.lan.macaddr="$macaddr"
+		uci commit
+		need_reload=yes
+		$MOUNT_ROOT_RO
+	fi
+
 	case "X$(uci get network.lan.proto)" in
 	Xstatic)
 		# Nothing to do
@@ -31,6 +45,13 @@ setup_network()
 		# A dummy IP address is required.
 		uci set network.lan.ipaddr="10.1.2.3"
 		uci commit
+		need_reload=yes
+		$MOUNT_ROOT_RO
+	;;
+	esac
+
+	if [ "$need_reload" = yes ]
+	then
 		echo before reload
 		ifconfig
 		echo ===
@@ -39,26 +60,12 @@ setup_network()
 		echo after reload
 		ifconfig
 		echo ===
-		$MOUNT_ROOT_RO
-	;;
-	esac
-
-	## Make sure the one on the built-in flash is set to dynamic
-	#case "X$(uci get network.lan.proto)" in
-	#Xdhcp)
-	#	# Nothing to do
-	#;;
-	#*)
-	#	echo Enabling dhcp in /etc/config/network
-	#	uci set network.lan.proto=dhcp
-	#	uci commit
-	#;;
-	#esac
+	fi
 
 	kill_dhcpc
 
 	# Bounce interface to get RAs to be sent
-	echo Bouncing br-lan.
+	#echo Bouncing br-lan.
 	#ifconfig br-lan down up
 
 	#/sbin/ifconfig lo 127.0.0.1
