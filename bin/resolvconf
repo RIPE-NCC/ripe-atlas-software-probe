@@ -2,6 +2,9 @@
 
 # Create /etc/resolv.conf from various sources.
 
+#exec > /tmp/resolvconf.out 2>/tmp/resolvconf.err
+#set -x
+
 interface="$1"
 dynamic="$2"
 
