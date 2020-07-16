@@ -13,7 +13,7 @@ SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt
 # Various files and directories
 DEV_FIRMWARE=/storage/etc/turrisos-*-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz; export DEV_FIRMWARE
 MODE_FILE=/home/atlas/state/mode
-KEY_PREFIX_SOURCE=$BASE_DIR/etc/2018-04-23
+KEY_PREFIX_SOURCE=$BASE_DIR/etc/2020-07-08
 
 . /home/atlas/bin/arch/openwrt/openwrt-common.sh
 . /home/atlas/bin/arch/linux/linux-functions.sh
@@ -98,14 +98,12 @@ setup_storage()
 	btrfs subvolume create /storage
 	mount -o subvol=/@/storage /dev/mmcblk1p1 /storage
 
-	#STORAGE_DEV=/dev/mmcblk2p4
-	#e2fsck -p $STORAGE_DEV ||
-	#{
-	#	echo 'e2fsck failed, creating new fs'
-	#	mke2fs -F -t ext4 $STORAGE_DEV
-	#}
-	#mkdir /storage
-	#mount $STORAGE_DEV /storage
+	if [ -d /storage.saved ]
+	then
+		mv /storage.saved/* /storage
+		rmdir /storage.saved
+	fi
+
 	mkdir -p /storage/data
 
 	mkdir -p /tmp/data

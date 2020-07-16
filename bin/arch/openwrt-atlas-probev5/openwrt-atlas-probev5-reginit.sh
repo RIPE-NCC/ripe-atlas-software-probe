@@ -99,8 +99,12 @@ install_firmware()
 		fi
 	done
 
+	# Copy system configuration
 	cp /etc/config/network $TMP_ROOT/etc/config
 	cp /etc/config/system $TMP_ROOT/etc/config
+
+	# Save /storage
+	cp -r /storage $TMP_ROOT/storage.saved
 
 	umount /mnt/.snapshots
 
