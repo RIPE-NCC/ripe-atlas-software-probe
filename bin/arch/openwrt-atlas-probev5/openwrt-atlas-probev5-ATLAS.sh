@@ -50,6 +50,16 @@ setup_network()
 	;;
 	esac
 
+	macaddr=$(uci get network.lan.macaddr)
+	if [ -n "$(uci get network.globals.ula_prefix)" ]
+	then
+		mount -o remount,rw /
+		uci delete network.globals.ula_prefix
+		uci commit
+		need_reload=yes
+		$MOUNT_ROOT_RO
+	fi
+
 	if [ "$need_reload" = yes ]
 	then
 		echo before reload
