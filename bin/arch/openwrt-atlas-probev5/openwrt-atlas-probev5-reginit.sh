@@ -23,6 +23,8 @@ clean_snapshots()
 	btrfs subvolume list / |
 		grep '@[0-9][0-9]*$' |
 		sed 's/.*\(@[0-9]*\)$/\1/' |
+		tac |
+		tail +11 |
 		head -3 |
 		while read a
 		do
