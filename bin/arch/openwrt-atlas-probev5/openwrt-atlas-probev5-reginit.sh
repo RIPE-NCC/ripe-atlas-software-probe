@@ -6,11 +6,11 @@ CHECK_FOR_NEW_KERNEL_CMD=:
 # Files
 KERNEL_STATE_DIR=/home/atlas/state
 
+TMP_FW=/storage/turrisos-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz
+
 . $BIN_DIR/arch/openwrt/openwrt-common.sh
 . $BIN_DIR/arch/openwrt-atlas-probev5/openwrt-atlas-probev5-common.sh
 . $BIN_DIR/arch/linux/linux-functions.sh
-
-TMP_FW=/storage/turrisos-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz
 
 clean_snapshots()
 {
@@ -70,11 +70,11 @@ install_firmware()
 	#mount $target_dev /altroot
 	if [ "$fw" = manual ]
 	then
-		# Uncompress image. Note that DEV_FIRMWARE has a wildcard
+		# Move image to /storage. Note that DEV_FIRMWARE has a wildcard
 		mv $DEV_FIRMWARE "$TMP_FW"
 	else
-		# Uncompress image
-		bunzip2 -cd $1 > $TMP_FW
+		# Remove bz2 compression
+		bzip2 -dc "$1" >"$TMP_FW"
 	fi
 	# Create new snapshot
 	schnapps import -f "$TMP_FW"
