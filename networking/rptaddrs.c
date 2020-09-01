@@ -67,7 +67,7 @@ enum {
 static FILE *setup_cache(char *cache_name);
 static int setup_ipv4_rpt(FILE *of);
 static int setup_dhcpv4(FILE *of);
-static int setup_ipv6_rpt(FILE *of);
+static int setup_ipv6_rpt(FILE *of, char *filename);
 static int setup_dns(FILE *of);
 static int setup_static_rpt(FILE *of);
 static int report_line(FILE *of, const char *fn);
@@ -148,7 +148,7 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 		goto err;
 	}
 
-	r= setup_ipv6_rpt(cf);
+	r= setup_ipv6_rpt(cf, rebased_cache_name);
 	if (r == -1)
 	{
 		fclose(cf);
@@ -362,10 +362,9 @@ static int setup_dhcpv4(FILE *of)
 	return -1;
 }
 
-static int setup_ipv6_rpt(FILE *of)
+static int setup_ipv6_rpt(FILE *of, char *filename)
 {
 	int r, n;
-	char filename[80];
 	char dst6in[INET6_ADDRSTRLEN];
 	char nh6in[INET6_ADDRSTRLEN]; /* next hop */
 	char *dst6out = NULL;
