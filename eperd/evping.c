@@ -14,16 +14,26 @@
 //kbuild:lib-$(CONFIG_EVPING) += evping.o
 
 //usage:#define evping_trivial_usage
-//usage:       "todo"
+//usage:	"-[46ep] [-c <count>] [-s <size>] [-A <Atlas ID>] "
+//usage:	"[-B <bundle ID>\n\t[-O <output file>] [-i <interval>] "
+//usage:	"[-I <interface>] [-R <response in>]\n\t[-W <response out>] "
+//usage:	"<target>"
 //usage:#define evping_full_usage "\n\n"
 //usage:       "\nOptions:"
+//usage:       "\n     -4              IPv4"
+//usage:       "\n     -6              IPv6"
+//usage:       "\n     -e              use the libc stub resolver"
+//usage:       "\n     -r              use the libevent resolver (default)"
 //usage:       "\n     -c <count>      Number of packets"
 //usage:       "\n     -s <size>       Size"
 //usage:       "\n     -A <id>         Atlas measurement ID"
+//usage:       "\n     -B <id>         bundle ID"
 //usage:       "\n     -O <out file>   Output file name"
-//usage:       "\n     -4              IPv4"
-//usage:       "\n     -6              IPv6"
-//usage:     "todo"
+//usage:       "\n     -i <interval>   Inter packet interval"
+//usage:       "\n     -I <interface>  Outgoing interface"
+//usage:       "\n     -R <response in> Read response from a file"
+//usage:       "\n     -W <response out> Write responses to a file"
+//usage:       "\n"
 
 #include "libbb.h"
 #include <syslog.h>
