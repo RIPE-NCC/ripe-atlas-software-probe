@@ -8,6 +8,10 @@ static char *rebased_validated_common(const char *path, const char *prefix,
 	const char *new_base;
 	char *new_path;
 
+
+	if (atlas_unsafe())
+		return strdup(path);
+
 	/* Check for the following properties:
 	 * 1) path starts with prefix or if prefix is relative,
 	 * ether '/home/atlas' or atlas_base() followed by the prefix.

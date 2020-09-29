@@ -468,14 +468,18 @@ extern char *rebased_validated_dir(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);
+extern int gettime_mono(struct timespec *tsp);
 extern char *atlas_get_version_json_str(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
 extern const char *atlas_base(void);
 extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
+extern time_t atlas_time(void);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 extern void route_set_flags(char *flagstr, int flags);
+extern void read_response(int fd, int type, size_t *sizep, void *data);
+extern void write_response(FILE *file, int type, size_t size, void *data);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;

@@ -65,6 +65,11 @@ enum
 #define PING_ERR_CANCEL   12       /* The request was canceled via a call to evping_cancel_request */
 #define PING_ERR_UNKNOWN  16       /* An unknown error occurred */
 
+#define RESP_PACKET	1
+#define RESP_PEERNAME	2
+#define RESP_SOCKNAME	3
+#define RESP_TTL	4
+#define RESP_DSTADDR	5
 
 /* Definition for various types of counters */
 typedef uint64_t counter_t;
@@ -235,7 +240,7 @@ static void report(struct pingstate *state)
 			", " DBQ(time) ":%ld, ",
 			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
-			(long)time(NULL));
+			(long)atlas_time());
 		if (state->bundle_id)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle_id);
 	}
@@ -300,7 +305,8 @@ static void report(struct pingstate *state)
 		fclose(fh);
 
 	/* Kill the event and close socket */
-	event_del(&state->event);
+	if (!state->response_in)
+		event_del(&state->event);
 	if (state->socket != -1)
 	{
 		close(state->socket);
@@ -542,7 +548,7 @@ static void fmticmp4(u_char *buffer, size_t *sizep, u_int8_t seq,
 	icmp->icmp_seq  = htons(seq);            /* message identifier */
 
 	/* User data */
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 	data->ts    = now;                       /* current uptime time */
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
@@ -618,7 +624,7 @@ static void fmticmp6(u_char *buffer, size_t *sizep,
 	icmp->icmp6_seq  = htons(seq);           /* message identifier */
 
 	/* User data */
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 	data->ts    = now;                       /* current uptime time */
 	data->index = idx;                     /* index into an array */
 	data->cookie= *cookiep;
@@ -686,7 +692,26 @@ static void ping_xmit(struct pingstate *host)
 			base->pid, &host->cookie, host->include_probe_id);
 
 		host->loc_socklen= sizeof(host->loc_sin6);
-		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
+		if (host->response_in)
+		{
+			size_t len;
+
+			len= sizeof(host->loc_sin6);
+			read_response(host->socket, RESP_SOCKNAME,
+				&len, &host->loc_sin6);
+			host->loc_socklen= len;
+		}
+		else
+		{
+			getsockname(host->socket, &host->loc_sin6,
+				&host->loc_socklen);
+			if (host->resp_file_out)
+			{
+				write_response(host->resp_file_out,
+					RESP_SOCKNAME, host->loc_socklen,
+					&host->loc_sin6);
+			}
+		}
 
 		if (host->response_in)
 		{
@@ -812,45 +837,21 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	ip = (struct ip *) base->packet;
 
 	/* Time the packet has been received */
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 
 	/* Receive data from the network */
 	if (state->response_in)
 	{
-		uint32_t len;
-		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
-		if (len > sizeof(base->packet))
-		{
-			//printf("ready_callback4: bad value for len: %u\n", len);
-			//abort();
-			crondlog(DIE9 "ready_callback4: bad value for len: %u",
-				 len);
-		}
-		if (read(state->socket, base->packet, len) != len)
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
-		if (read(state->socket, &remote, sizeof(remote)) !=
-			sizeof(remote))
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
+		size_t len;
+
+		len= sizeof(base->packet);
+		read_response(state->socket, RESP_PACKET,
+			&len, base->packet);
 		nrecv= len;
+
+		len= sizeof(remote);
+		read_response(state->socket, RESP_PEERNAME,
+			&len, &remote);
 	}
 	else nrecv = recvfrom(state->socket, base->packet, sizeof(base->packet), MSG_DONTWAIT, (struct sockaddr *) &remote, &slen);
 	if (nrecv < 0)
@@ -860,11 +861,10 @@ static void ready_callback4 (int __attribute((unused)) unused,
 
 	if (state->resp_file_out)
 	{
-		uint32_t len= nrecv;
-
-		fwrite(&len, sizeof(len), 1, state->resp_file_out);
-		fwrite(base->packet, len, 1, state->resp_file_out);
-		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+		write_response(state->resp_file_out, RESP_PACKET,
+			nrecv, base->packet);
+		write_response(state->resp_file_out, RESP_PEERNAME,
+			sizeof(remote), &remote);
 	}
 
 #if 0
@@ -1020,7 +1020,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	data = (struct evdata *) (base->packet + icmp_len);
 
 	/* Time the packet has been received */
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 
 	iov[0].iov_base= base->packet;
 	iov[0].iov_len= sizeof(base->packet);
@@ -1035,41 +1035,15 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	/* Receive data from the network */
 	if (state->response_in)
 	{
-		uint32_t len;
-		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
-		{
-			//printf("ready_callback6: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback6: error reading from '%s'",
-				state->response_in);
-		}
-		if (len > sizeof(base->packet))
-		{
-			//printf("ready_callback6: bad value for len: %u\n", len);
-			//abort();
-			crondlog(DIE9 "ready_callback6: bad value for len: %u",
-				 len);
-		}
-		if (read(state->socket, base->packet, len) != len)
-		{
-			//printf("ready_callback6: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback6: error reading from '%s'",
-				state->response_in);
-		}
-		if (read(state->socket, &remote, sizeof(remote)) !=
-			sizeof(remote))
-		{
-			//printf("ready_callback6: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback6: error reading from '%s'",
-				state->response_in);
-		}
+		size_t len;
 
+		len= sizeof(base->packet);
+		read_response(state->socket,
+				RESP_PACKET, &len, base->packet);
 		nrecv= len;
+		len= sizeof(remote);
+		read_response(state->socket,
+				RESP_PEERNAME, &len, &remote);
 
 		/* Do not try to fuzz the cmsgbuf. We assume stuff returned by
 		 * the kernel can be trusted.
@@ -1086,11 +1060,10 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 	if (state->resp_file_out)
 	{
-		uint32_t len= nrecv;
-
-		fwrite(&len, sizeof(len), 1, state->resp_file_out);
-		fwrite(base->packet, len, 1, state->resp_file_out);
-		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+		write_response(state->resp_file_out,
+				RESP_PACKET, nrecv, base->packet);
+		write_response(state->resp_file_out,
+				RESP_PEERNAME, sizeof(remote), &remote);
 	}
 
 	if (nrecv < icmp_len+sizeof(struct evdata))
@@ -1145,24 +1118,45 @@ static void ready_callback6 (int __attribute((unused)) unused,
 
 	    /* Set destination address of packet as local address */
 	    memset(&loc_sin6, '\0', sizeof(loc_sin6));
-	    for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
-		    cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
+	    if (state->response_in)
 	    {
-		    if (cmsgptr->cmsg_len == 0)
-			    break;	/* Can this happen? */
-		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
-			    cmsgptr->cmsg_type == IPV6_PKTINFO)
-		    {
-			    sin6p= &loc_sin6;
-			    sin6p->sin6_family= AF_INET6;
-			    sin6p->sin6_addr= ((struct in6_pktinfo *)
-				    CMSG_DATA(cmsgptr))->ipi6_addr;
-		    }
-		    if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
-			    cmsgptr->cmsg_type == IPV6_HOPLIMIT)
-		    {
-			    state->rcvd_ttl= *(int *)CMSG_DATA(cmsgptr);
-		    }
+		size_t len;
+
+		len= sizeof(loc_sin6);
+		read_response(state->socket, RESP_DSTADDR, &len, &loc_sin6);
+		len= sizeof(state->rcvd_ttl);
+		read_response(state->socket, RESP_TTL, &len,
+			&state->rcvd_ttl);
+	    }
+	    else
+	    {
+		for (cmsgptr= CMSG_FIRSTHDR(&msg); cmsgptr; 
+			cmsgptr= CMSG_NXTHDR(&msg, cmsgptr))
+		{
+			if (cmsgptr->cmsg_len == 0)
+				break;	/* Can this happen? */
+			if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+				cmsgptr->cmsg_type == IPV6_PKTINFO)
+			{
+				sin6p= &loc_sin6;
+				sin6p->sin6_family= AF_INET6;
+				sin6p->sin6_addr= ((struct in6_pktinfo *)
+					CMSG_DATA(cmsgptr))->ipi6_addr;
+			}
+			if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+				cmsgptr->cmsg_type == IPV6_HOPLIMIT)
+			{
+				state->rcvd_ttl= *(int *)CMSG_DATA(cmsgptr);
+			}
+		}
+	    }
+	    if (state->resp_file_out)
+	    {
+		write_response(state->resp_file_out,
+				RESP_DSTADDR, sizeof(*sin6p), sin6p);
+		write_response(state->resp_file_out,
+				RESP_TTL, sizeof(state->rcvd_ttl),
+				&state->rcvd_ttl);
 	    }
 
 	    /* Report everything with the wrong sequence number as a dup. 
@@ -1538,11 +1532,16 @@ static void ping_start2(void *state)
 
 		pingstate->socket= fd;
 
-		/* Define the callback to handle ICMP Echo Reply and add the
-		 * raw file descriptor to those monitored for read events */
-		event_assign(&pingstate->event, pingstate->base->event_base,
-			pingstate->socket, EV_READ | EV_PERSIST,
-			ready_callback6, state);
+		if (!pingstate->response_in)
+		{
+			/* Define the callback to handle ICMP Echo Reply and
+			 * add the raw file descriptor to those monitored
+			 * for read events */
+			event_assign(&pingstate->event,
+				pingstate->base->event_base,
+				pingstate->socket, EV_READ | EV_PERSIST,
+				ready_callback6, state);
+		}
 	}
 
 	evutil_make_socket_nonblocking(pingstate->socket);
@@ -1579,10 +1578,29 @@ static void ping_start2(void *state)
 	}
 
 	pingstate->loc_socklen= sizeof(pingstate->loc_sin6);
-	getsockname(pingstate->socket, &pingstate->loc_sin6,
-		&pingstate->loc_socklen);
+	if (pingstate->response_in)
+	{
+		size_t len;
+		
+		len= sizeof(pingstate->loc_sin6);
+		read_response(pingstate->socket, RESP_SOCKNAME, &len,
+			&pingstate->loc_sin6);
+		pingstate->loc_socklen= len;
+	}
+	else
+	{
+		getsockname(pingstate->socket, &pingstate->loc_sin6,
+			&pingstate->loc_socklen);
+		if (pingstate->resp_file_out)
+		{
+			write_response(pingstate->resp_file_out,
+				RESP_SOCKNAME, pingstate->loc_socklen,
+				&pingstate->loc_sin6);
+		}
+	}
 
-	event_add(&pingstate->event, NULL);
+	if (!pingstate->response_in)
+		event_add(&pingstate->event, NULL);
 
 	ping_xmit(pingstate);
 }
@@ -1606,7 +1624,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		return;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
 	if (now.tv_nsec < env->start_time.tv_sec)
 	{
@@ -1732,7 +1750,7 @@ static void ping_start(void *state)
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= pingstate->af;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &pingstate->start_time);
+	gettime_mono(&pingstate->start_time);
 	(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
 		&hints, dns_cb, pingstate);
 }

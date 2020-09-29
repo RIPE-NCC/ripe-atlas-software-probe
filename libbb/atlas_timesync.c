@@ -10,6 +10,9 @@ int get_timesync(void)
 	FILE *fh;
 	int lastsync;
 
+	if (atlas_tests())
+		return 123;
+
 	fn= atlas_path(ATLAS_TIMESYNC_FILE_REL);
 	fh= fopen(fn, "r");
 	free(fn); fn= NULL;
