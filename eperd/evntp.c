@@ -14,9 +14,23 @@
 //kbuild:lib-$(CONFIG_EVNTP) += evntp.o
 
 //usage:#define evntp_trivial_usage
-//usage:       "todo"
+//usage:	"-[46] [-c <count>] [-i <interface>] [-w <timeout>]"
+//usage:	"\n\t[-A <Atlas ID>] [-B <bundle ID>] [-O <output file>]"
+//usage:	"\n\t[-R <response in>] [-W <response out>] "
+//usage:	"<target>\n"
 //usage:#define evntp_full_usage
-//usage:       "todo"
+//usage:       "\nOptions:"
+//usage:       "\n     -4              IPv4"
+//usage:       "\n     -6              IPv6"
+//usage:       "\n     -c <count>      Number of packets"
+//usage:       "\n     -i <interface>  Outgoing interface"
+//usage:       "\n     -w <timeout>    Time to wait for reply"
+//usage:       "\n     -A <id>         Atlas measurement ID"
+//usage:       "\n     -B <id>         bundle ID"
+//usage:       "\n     -O <out file>   Output file name"
+//usage:       "\n     -R <response in> Read response from a file"
+//usage:       "\n     -W <response out> Write responses to a file"
+//usage:       "\n"
 
 #include "libbb.h"
 #include <syslog.h>
