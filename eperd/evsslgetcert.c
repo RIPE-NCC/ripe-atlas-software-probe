@@ -10,9 +10,24 @@
 //kbuild:lib-$(CONFIG_EVSSLGETCERT) += evsslgetcert.o
 
 //usage:#define evsslgetcert_trivial_usage
-//usage:       "todo"
-//usage:#define evsslgetcert_full_usage "\n\n"
-//usage:     "todo"
+//usage:	"-[46] [-A <Atlas ID>] [-B <bundle ID>] [-h <host name>]"
+//usage:	"\n\t[-O <output file>] [-R <response in>] [-V <version>] "
+//usage:	"\n\t[-W <response out>] [-i <interface>] [-p <port>] "
+//usage:	"<target>\n"
+//usage:#define evsslgetcert_full_usage 
+//usage:       "\nOptions:"
+//usage:       "\n     -4              IPv4"
+//usage:       "\n     -6              IPv6"
+//usage:       "\n     -A <id>         Atlas measurement ID"
+//usage:       "\n     -B <id>         bundle ID"
+//usage:       "\n     -h <host name>  Host name for SNI"
+//usage:       "\n     -O <out file>   Output file name"
+//usage:       "\n     -R <response in> Read response from a file"
+//usage:       "\n     -V <version>    Client TLS version"
+//usage:       "\n     -W <response out> Write responses to a file"
+//usage:       "\n     -i <interface>  Outgoing interface"
+//usage:       "\n     -p <port>       TCP port of service"
+//usage:       "\n"
 
 #include "libbb.h"
 #include <syslog.h>
