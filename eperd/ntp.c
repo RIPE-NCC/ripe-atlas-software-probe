@@ -43,6 +43,11 @@
 
 #define DBQ(str) "\"" #str "\""
 
+#define RESP_PACKET	1
+#define RESP_SOCKNAME	2
+#define RESP_DSTADDR	3
+#define RESP_TIMEOFDAY	4
+
 struct ntp_ts
 {
 	uint32_t ntp_seconds;
@@ -514,9 +519,17 @@ static void send_pkt(struct ntpstate *state)
 		/* Set port */
 		state->sin6.sin6_port= htons(NTP_PORT);
 
-		r= sendto(state->socket, base->packet, len, 0,
-			(struct sockaddr *)&state->sin6,
-			state->socklen);
+		if (state->response_in)
+		{
+			/* Assume the send succeeded */
+			r= len;
+		}
+		else
+		{
+			r= sendto(state->socket, base->packet, len, 0,
+				(struct sockaddr *)&state->sin6,
+				state->socklen);
+		}
 
 #if 0
  { static int doit=1; if (doit && r != -1)
@@ -621,48 +634,41 @@ static void ready_callback(int __attribute((unused)) unused,
 	struct sockaddr_in remote;
 	char line[80];
 
-	gettimeofday(&now, NULL);
-
 	state= s;
+
+	if (state->response_in)
+	{
+		size_t len;
+
+		len= sizeof(now);
+		read_response(state->socket, RESP_TIMEOFDAY,
+				&len, &now);
+	}
+	else
+	{
+		gettimeofday(&now, NULL);
+		if (state->resp_file_out)
+		{
+			write_response(state->resp_file_out, RESP_TIMEOFDAY,
+				sizeof(now), &now);
+		}
+	}
+
 	base= state->base;
 
 	slen= sizeof(remote);
 	if (state->response_in)
 	{
-		uint32_t len;
-		if (read(state->socket, &len, sizeof(len)) != sizeof(len))
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
-		if (len > sizeof(base->packet))
-		{
-			//printf("ready_callback4: bad value for len: %u\n", len);
-			//abort();
-			crondlog(DIE9 "ready_callback4: bad value for len: %u",
-				 len);
-		}
-		if (read(state->socket, base->packet, len) != len)
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
-		if (read(state->socket, &remote, sizeof(remote)) !=
-			sizeof(remote))
-		{
-			//printf("ready_callback4: error reading from '%s'\n",
-			//	state->response_in);
-			//abort();
-			crondlog(DIE9 "ready_callback4: error reading from '%s'",
-				state->response_in);
-		}
+		size_t len;
+
+		len= sizeof(base->packet);
+		read_response(state->socket, RESP_PACKET,
+			&len, base->packet);
 		nrecv= len;
+		len= sizeof(remote);
+		read_response(state->socket, RESP_DSTADDR,
+			&len, &remote);
+		slen= len;
 	}
 	else
 	{
@@ -680,11 +686,10 @@ static void ready_callback(int __attribute((unused)) unused,
 
 	if (state->resp_file_out)
 	{
-		uint32_t len= nrecv;
-
-		fwrite(&len, sizeof(len), 1, state->resp_file_out);
-		fwrite(base->packet, len, 1, state->resp_file_out);
-		fwrite(&remote, sizeof(remote), 1, state->resp_file_out);
+		write_response(state->resp_file_out, RESP_PACKET,
+			nrecv, base->packet);
+		write_response(state->resp_file_out, RESP_DSTADDR,
+			sizeof(remote), &remote);
 	}
 
 
@@ -1899,7 +1904,7 @@ static void traceroute_start2(void *state)
 	ntpstate->result= xmalloc(ntpstate->resmax);
 	ntpstate->reslen= 0;
 	ntpstate->open_result= 0;
-	ntpstate->starttime= time(NULL);
+	ntpstate->starttime= atlas_time();
 
 	ntpstate->socket= -1;
 
@@ -1992,11 +1997,29 @@ static int create_socket(struct ntpstate *state)
 		return -1;
 	}
 	state->loc_socklen= sizeof(state->loc_sin6);
-	if (!state->response_in && getsockname(state->socket,
-		&state->loc_sin6,
-		&state->loc_socklen) == -1)
+	if (state->response_in)
 	{
-		crondlog(DIE9 "getsockname failed");
+		size_t len;
+
+		len= sizeof(state->loc_sin6);
+		read_response(state->socket, RESP_SOCKNAME,
+			&len, &state->loc_sin6);
+		state->loc_socklen= len;
+	}
+	else
+	{
+		if (getsockname(state->socket,
+			&state->loc_sin6,
+			&state->loc_socklen) == -1)
+		{
+			crondlog(DIE9 "getsockname failed");
+		}
+		if (state->resp_file_out)
+		{
+			write_response(state->resp_file_out,
+				RESP_SOCKNAME, state->loc_socklen,
+				&state->loc_sin6);
+		}
 	}
 #if 0
 	printf("Got localname: %s\n",
@@ -2011,7 +2034,8 @@ static int create_socket(struct ntpstate *state)
 		EV_READ | EV_PERSIST,
 		(af == AF_INET6 ? ready_callback : ready_callback),
 		state);
-	event_add(&state->event_socket, NULL);
+	if (!state->response_in)
+		event_add(&state->event_socket, NULL);
 
 	return 0;
 }
@@ -2036,7 +2060,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		return;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
 	if (now.tv_nsec < env->start_time.tv_sec)
 	{
@@ -2151,7 +2175,7 @@ static void ntp_start(void *state)
 	hints.ai_socktype= SOCK_DGRAM;
 	hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
 	ntpstate->dnsip= 1;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &ntpstate->start_time);
+	gettime_mono(&ntpstate->start_time);
 	(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
 		ntpstate->destportstr, &hints, dns_cb, ntpstate);
 }
