@@ -2,10 +2,11 @@
 
 # Commands
 CHECK_FOR_NEW_KERNEL_CMD=:
+SSH_CMD=probev5_ssh
+SSH_CMD_EXEC=probev5_ssh_exec
 
 # Files
 KERNEL_STATE_DIR=/home/atlas/state
-
 TMP_FW=/storage/turrisos-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz
 
 . $BIN_DIR/arch/openwrt/openwrt-common.sh
@@ -124,6 +125,21 @@ p_to_r_init()
 		echo TOKEN_SPECS `get_arch` `uname -r` `cat $STATE_DIR/FIRMWARE_APPS_VERSION`
 		echo REASON_FOR_REGISTRATION "$reason"
 	} | tee $P_TO_R_INIT_IN
+}
+
+probev5_ssh()
+{
+	/usr/bin/ssh -o 'PKCS11Provider /usr/lib/libmox-pkcs11.so' \
+		-o "ServerAliveInterval 60" \
+		-o "StrictHostKeyChecking yes" \
+		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+}
+probev5_ssh_exec()
+{
+	exec /usr/bin/ssh -o 'PKCS11Provider /usr/lib/libmox-pkcs11.so' \
+		-o "ServerAliveInterval 60"\
+		-o "StrictHostKeyChecking yes" \
+		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
 }
 
 manual_firmware_upgrade
