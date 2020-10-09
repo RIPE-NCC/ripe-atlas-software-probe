@@ -76,6 +76,7 @@ install_firmware()
 	else
 		# Remove bz2 compression
 		bzip2 -dc "$1" >"$TMP_FW"
+		rm -f "$1"
 	fi
 	# Create new snapshot
 	schnapps import -f "$TMP_FW"
