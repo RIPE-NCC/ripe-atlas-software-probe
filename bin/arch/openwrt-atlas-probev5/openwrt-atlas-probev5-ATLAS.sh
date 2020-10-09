@@ -170,3 +170,6 @@ disable_sshd()
 }
 
 openwrt_atlas_init
+
+echo ssh public key:
+ssh-keygen -D /usr/lib/libmox-pkcs11.so
