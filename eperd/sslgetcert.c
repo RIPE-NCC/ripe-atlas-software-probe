@@ -29,6 +29,10 @@ Created:	April 2013 by Philip Homburg for RIPE NCC
 #define MAX_LINE_LEN	2048	/* We don't deal with lines longer than this */
 #define POST_BUF_SIZE	2048	/* Big enough to be efficient? */
 
+#define RESP_PACKET	1
+#define RESP_SOCKNAME	2
+#define RESP_DSTADDR	3
+
 static struct option longopts[]=
 {
 	{ NULL, }
@@ -302,12 +306,12 @@ static int buf_read(struct state *state, struct buf *buf)
 
 	if (state->response_in)
 	{
-		r= fread(buf->buf+buf->size, 1, 1, state->resp_file);
-		if (r == -1 || r == 0)
-		{
-			timeout_callback(0, 0, &state->tu_env);
-			return -1;
-		}
+		size_t tmplen;
+
+		tmplen= buf->maxsize-buf->size;
+		read_response_file(state->resp_file, RESP_PACKET,
+			&tmplen, buf->buf+buf->size);
+		r= tmplen;
 	}
 	else
 	{
@@ -318,8 +322,8 @@ static int buf_read(struct state *state, struct buf *buf)
 	{
 		if (state->response_out)
 		{
-			fwrite(buf->buf+buf->size, r, 1, 
-				state->resp_file);
+			write_response(state->resp_file, RESP_PACKET,
+				r, buf->buf+buf->size);
 		}
 		buf->size += r;
 		return 0;
@@ -1130,7 +1134,8 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		case READ_DONE:
 			msgbuf_cleanup(&state->msginbuf);
 			buf_cleanup(&state->inbuf);
-			tu_cleanup(&state->tu_env);
+			if (!state->response_in)
+				tu_cleanup(&state->tu_env);
 			state->busy= 0;
 			if (state->base->done)
 				state->base->done(state, 0);
@@ -1152,7 +1157,7 @@ static FILE *report_head(struct state *state)
 	struct timespec endtime;
 	char hostbuf[NI_MAXHOST];
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+	gettime_mono(&endtime);
 
 	fh= NULL;
 	if (state->output_file)
@@ -1181,7 +1186,7 @@ static FILE *report_head(struct state *state)
 	}
 
 	fprintf(fh, "%s" DBQ(time) ":%ld",
-		state->atlas ? ", " : "", time(NULL));
+		state->atlas ? ", " : "", atlas_time());
 	fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
 		DBQ(dst_port) ":" DBQ(%s),
 		state->hostname, state->portname);
@@ -1619,7 +1624,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 		switch(state->writestate)
 		{
 		case WRITE_HELLO:
-			clock_gettime(CLOCK_MONOTONIC_RAW, &state->t_connect);
+			gettime_mono(&state->t_connect);
 
 			buf_init(&outbuf, bev);
 			msgbuf_init(&msgoutbuf, NULL, &outbuf);
@@ -1690,6 +1695,11 @@ static void beforeconnect(struct tu_env *env,
 
 	state->socklen= addrlen;
 	memcpy(&state->sin6, addr, state->socklen);
+	if (state->response_out)
+	{
+		write_response(state->resp_file, RESP_DSTADDR,
+			addrlen, addr);
+	}
 
 	state->connecting= 1;
 	state->readstate= READ_HELLO;
@@ -1702,7 +1712,7 @@ static void beforeconnect(struct tu_env *env,
 	//if (!state->do_all || !state->do_combine)
 	state->reslen= 0;
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &state->start);
+	gettime_mono(&state->start);
 }
 
 
@@ -1779,15 +1789,30 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	msgbuf_init(&state->msginbuf, &state->inbuf, NULL);
 
 	state->loc_socklen= sizeof(state->loc_sin6);
-	if (!state->response_in)
+	if (state->response_in)
+	{
+		size_t len;
+
+		len= state->loc_socklen;
+		read_response_file(state->resp_file, RESP_SOCKNAME,
+				&len, &state->loc_sin6);
+		state->loc_socklen= len;
+	}
+	else
 	{
 		getsockname(bufferevent_getfd(bev),	
 			&state->loc_sin6, &state->loc_socklen);
+		if (state->response_out)
+		{
+			write_response(state->resp_file, RESP_SOCKNAME,
+				state->loc_socklen, &state->loc_sin6);
+		}
 	}
 }
 
 static void sslgetcert_start(void *vstate)
 {
+	size_t len;
 	struct state *state;
 	struct evutil_addrinfo hints;
 	struct timeval interval;
@@ -1805,7 +1830,7 @@ static void sslgetcert_start(void *vstate)
 	state->connecting= 0;
 	state->readstate= READ_HELLO;
 	state->writestate= WRITE_HELLO;
-	state->gstart= time(NULL);
+	state->gstart= atlas_time();
 
 	if (state->response_out)
 	{
@@ -1835,7 +1860,20 @@ static void sslgetcert_start(void *vstate)
 			crondlog(DIE9 "unable to read from '%s'",
 				state->response_in);
 		}
+
+		/* Emulate ttr */
+		tu_fake_ttr(&state->tu_env, state->hostname);
+
+		len= sizeof(state->sin6);
+		read_response_file(state->resp_file, RESP_DSTADDR,
+			&len, &state->sin6);
+		state->socklen= len;
+
+		/* Start time */
+		gettime_mono(&state->start);
+
 		connected(&state->tu_env, NULL);
+
 		writecb(NULL, &state->tu_env);
 		while(state->resp_file != NULL)
 			readcb(NULL, &state->tu_env);
