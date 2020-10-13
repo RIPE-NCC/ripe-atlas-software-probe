@@ -479,6 +479,8 @@ extern time_t atlas_time(void);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 extern void route_set_flags(char *flagstr, int flags);
 extern void read_response(int fd, int type, size_t *sizep, void *data);
+extern void read_response_file(FILE *file, int type, size_t *sizep,
+	void *data);
 extern void write_response(FILE *file, int type, size_t size, void *data);
 
 int ndelay_on(int fd) FAST_FUNC;
