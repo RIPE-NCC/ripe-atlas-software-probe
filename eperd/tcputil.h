@@ -53,4 +53,5 @@ void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	void (*readcb)(struct bufferevent *bev, void *env),
 	void (*writecb)(struct bufferevent *bev, void *env));
 void tu_restart_connect(struct tu_env *env);
+void tu_fake_ttr(void *ctx, char *host);
 void tu_cleanup(struct tu_env *env);

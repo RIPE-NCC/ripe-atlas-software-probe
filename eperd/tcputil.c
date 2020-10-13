@@ -66,7 +66,7 @@ void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 
 	env->dnsip= 1;
 	env->connecting= 0;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &env->start_time);
+	gettime_mono(&env->start_time);
 	(void) evdns_getaddrinfo(DnsBase, host, port, hints, dns_cb, env);
 }
 
@@ -138,6 +138,44 @@ void tu_restart_connect(struct tu_env *env)
 	env->reporterr(env, TU_OUT_OF_ADDRS, "");
 }
 
+void tu_fake_ttr(void *ctx, char *host)
+{
+	int r;
+	struct tu_env *env;
+	struct addrinfo *ai;
+	struct timespec now, elapsed;
+	double nsecs;
+	struct addrinfo loc_hints;
+
+	env= ctx;
+
+	/* Check if hostname is numeric or had to be resolved */
+	env->host_is_literal= 0;
+	memset(&loc_hints, '\0', sizeof(loc_hints));
+	loc_hints.ai_flags= AI_NUMERICHOST;
+	r= getaddrinfo(host, NULL, &loc_hints, &ai);
+	if (r == 0)
+	{
+		/* Getaddrinfo succeded so hostname is an address literal */
+		freeaddrinfo(ai);
+		env->host_is_literal= 1;
+	}
+
+
+	gettime_mono(&env->start_time);
+	gettime_mono(&now);
+	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
+	if (now.tv_nsec < env->start_time.tv_sec)
+	{
+		elapsed.tv_sec--;
+		now.tv_nsec += 1000000000;
+	}
+	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
+	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
+	env->ttr= nsecs/1e6;
+
+}
+
 void tu_cleanup(struct tu_env *env)
 {
 	if (env->dns_res)
@@ -182,7 +220,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		return;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	gettime_mono(&now);
 	elapsed.tv_sec= now.tv_sec - env->start_time.tv_sec;
 	if (now.tv_nsec < env->start_time.tv_sec)
 	{
