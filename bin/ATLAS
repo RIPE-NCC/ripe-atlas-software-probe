@@ -211,8 +211,8 @@ do
 			echo "RESULT 9010 done $D $ETHER_SCANNED no ssh client running restart registeration"  >> $DATA_NEW_DIR/simpleping
 			echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
 		else
-			$SET_LEDS_CMD keep-found
 			$SET_LEDS_CMD net-ok
+			$SET_LEDS_CMD keep-found
 			echo "found KEEP ssh client running"
 		fi
 	fi
