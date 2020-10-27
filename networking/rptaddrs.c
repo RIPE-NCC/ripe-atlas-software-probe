@@ -452,13 +452,13 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}	
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
+		if (fwrite(buf2, 1, r, of) != r)
+		{
+			report_err("error writing to '%s'", filename);
+			fclose(in_file);
+			return -1;
+		}
 	}		
-	if (fwrite(buf2, 1, r, of) != r)
-	{
-		report_err("error writing to '%s'", filename);
-		fclose(in_file);
-		return -1;
-	}
 
 	fclose(in_file);
 
@@ -567,14 +567,13 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
+		if (fwrite(buf2, 1, r, of) != r)
+		{
+			report_err("error writing to '%s'", filename);
+			fclose(in_file);
+			return -1;
+		}
 	}		
-	if (fwrite(buf2, 1, r, of) != r)
-	{
-		report_err("error writing to '%s'", filename);
-		fclose(in_file);
-		return -1;
-	}
-
 
 	if (ferror(in_file))
 	{
