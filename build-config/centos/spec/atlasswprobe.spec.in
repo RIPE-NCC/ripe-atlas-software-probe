@@ -4,7 +4,7 @@
 Name:           atlasswprobe
 Summary:        RIPE Atlas probe software
 Version:        5020
-Release:        3%{?dist}
+Release:        4%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        src-COMMIT_ID.tar.gz
