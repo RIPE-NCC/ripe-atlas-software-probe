@@ -173,7 +173,6 @@ void tu_fake_ttr(void *ctx, char *host)
 	elapsed.tv_nsec= now.tv_nsec - env->start_time.tv_nsec;
 	nsecs= (elapsed.tv_sec * 1e9 + elapsed.tv_nsec);
 	env->ttr= nsecs/1e6;
-
 }
 
 void tu_cleanup(struct tu_env *env)
