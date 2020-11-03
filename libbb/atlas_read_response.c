@@ -43,7 +43,7 @@ void read_response(int fd, int type, size_t *sizep, void *data)
 
 void read_response_file(FILE *file, int type, size_t *sizep, void *data)
 {
-	int tmp_type;
+	int r, tmp_type;
 	size_t tmp_size;
 
 	if (fread(&tmp_type, sizeof(tmp_type), 1, file) != 1)
@@ -70,10 +70,16 @@ void read_response_file(FILE *file, int type, size_t *sizep, void *data)
 		exit(1);
 	}
 	*sizep= tmp_size;
-	if (fread(data, tmp_size, 1, file) != 1)
+	if (tmp_size != 0)
 	{
-		fprintf(stderr, "read_response_file: error reading\n");
-		exit(1);
+		r= fread(data, tmp_size, 1, file);
+		if (r != 1)
+		{
+			fprintf(stderr,
+		"read_response_file: error reading %u bytes, got %d: %s\n",
+				(unsigned)tmp_size, r, strerror(errno));
+			exit(1);
+		}
 	}
 }
 
