@@ -29,6 +29,10 @@
 #define MAX_LINE_LEN	2048	/* We don't deal with lines longer than this */
 #define POST_BUF_SIZE	2048	/* Big enough to be efficient? */
 
+#define RESP_PACKET	1
+#define RESP_SOCKNAME	2
+#define RESP_DSTADDR	3
+
 static struct option longopts[]=
 {
 	{ "all",	no_argument, NULL, 'a' },
@@ -997,7 +1001,8 @@ static void report(struct hgstate *state)
 
 	state->bev= NULL;
 
-	tu_cleanup(&state->tu_env);
+	if (!state->response_in)
+		tu_cleanup(&state->tu_env);
 
 	if (state->resp_file)
 	{
@@ -1048,7 +1053,7 @@ static int get_input(struct hgstate *state)
 
 	if (state->etim >= 2 && state->report_roffset)
 	{
-		clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+		gettime_mono(&endtime);
 		t= (endtime.tv_sec-state->start.tv_sec)*1e3 +
 			(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 		if (state->roffset != 0)
@@ -1062,17 +1067,12 @@ static int get_input(struct hgstate *state)
 
 	if (state->response_in)
 	{
-		if (!state->resp_file)
-			abort();
-		n= fread(&state->line[state->linelen], 1, 1, state->resp_file);
-		if (n == -1 || n == 0)
-		{
-			fclose(state->resp_file);
-			state->resp_file= NULL;
-			timeout_callback(0, 0, &state->tu_env);
-			report(state);
-			return -1;
-		}
+		size_t tmplen;
+
+		tmplen= state->linemax-state->linelen;
+		read_response_file(state->resp_file, RESP_PACKET,
+			&tmplen, &state->line[state->linelen]);
+		n= tmplen;
 	}
 	else
 	{
@@ -1084,8 +1084,8 @@ static int get_input(struct hgstate *state)
 		return -1;
 	if (state->response_out)
 	{
-		fwrite(&state->line[state->linelen], n, 1, 
-			state->resp_file);
+		write_response(state->resp_file, RESP_PACKET,
+				n, &state->line[state->linelen]);
 	}
 	state->linelen += n;
 	state->roffset += n;
@@ -1223,7 +1223,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		switch(state->readstate)
 		{
 		case READ_FIRST:
-			clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+			gettime_mono(&endtime);
 			state->ttfb= (endtime.tv_sec-
 				state->start.tv_sec)*1e3 +
 				(endtime.tv_nsec-state->start.tv_nsec)/1e6;
@@ -1731,7 +1731,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			if (state->bev || state->response_in)
 			{
 				state->bev= NULL;
-				clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+				gettime_mono(&endtime);
 				state->resptime=
 					(endtime.tv_sec-
 					state->start.tv_sec)*1e3 +
@@ -1806,7 +1806,7 @@ static void writecb(struct bufferevent *bev, void *ptr)
 		switch(state->writestate)
 		{
 		case WRITE_FIRST:
-			clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+			gettime_mono(&endtime);
 			state->ttc= (endtime.tv_sec-
 				state->start.tv_sec)*1e3 +
 				(endtime.tv_nsec-state->start.tv_nsec)/1e6;
@@ -1947,7 +1947,7 @@ static void err_reading(struct hgstate *state)
 			add_str(state, DBQ(err) ":" DBQ(error reading body)
 				", ");
 		}
-		clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+		gettime_mono(&endtime);
 		state->resptime= (endtime.tv_sec-state->start.tv_sec)*1e3 +
 			(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 		report(state);
@@ -1976,6 +1976,11 @@ static void beforeconnect(struct tu_env *env,
 
 	state->socklen= addrlen;
 	memcpy(&state->sin6, addr, state->socklen);
+	if (state->response_out)
+	{
+		write_response(state->resp_file, RESP_DSTADDR,
+			addrlen, addr);
+	}
 
 	state->connecting= 1;
 	state->in_writecb= 0;
@@ -1997,12 +2002,12 @@ static void beforeconnect(struct tu_env *env,
 
 	if (state->first_connect)
 	{
-		clock_gettime(CLOCK_MONOTONIC_RAW, &endtime);
+		gettime_mono(&endtime);
 		state->ttr= (endtime.tv_sec-state->start.tv_sec)*1e3 +
 			(endtime.tv_nsec-state->start.tv_nsec)/1e6;
 		state->first_connect= 0;
 	}
-	clock_gettime(CLOCK_MONOTONIC_RAW, &state->start);
+	gettime_mono(&state->start);
 }
 
 
@@ -2086,18 +2091,34 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	state->bev= bev;
 
 	state->loc_socklen= sizeof(state->loc_sin6);
-	if (!state->response_in)
+	if (state->response_in)
+	{
+		size_t len;
+
+		len= state->loc_socklen;
+		read_response_file(state->resp_file, RESP_SOCKNAME,
+				&len, &state->loc_sin6);
+		state->loc_socklen= len;
+	}
+	else
 	{
 		getsockname(bufferevent_getfd(bev),	
 			&state->loc_sin6, &state->loc_socklen);
+		if (state->response_out)
+		{
+			write_response(state->resp_file, RESP_SOCKNAME,
+				state->loc_socklen, &state->loc_sin6);
+		}
 	}
 }
 
 static void httpget_start(void *state)
 {
+	size_t len;
 	struct hgstate *hgstate;
 	struct evutil_addrinfo hints;
 	struct timeval interval;
+	struct timespec endtime;
 
 	hgstate= state;
 
@@ -2112,8 +2133,8 @@ static void httpget_start(void *state)
 	hgstate->connecting= 0;
 	hgstate->readstate= READ_STATUS;
 	hgstate->writestate= WRITE_HEADER;
-	hgstate->gstart= time(NULL);
-	clock_gettime(CLOCK_MONOTONIC_RAW, &hgstate->start);
+	hgstate->gstart= atlas_time();
+	gettime_mono(&hgstate->start);
 	hgstate->first_connect= 1;
 
 	if (hgstate->response_out)
@@ -2143,7 +2164,35 @@ static void httpget_start(void *state)
 			crondlog(DIE9 "unable to read from '%s'",
 				hgstate->response_in);
 		}
+		/* Emulate ttr */
+		tu_fake_ttr(&hgstate->tu_env, hgstate->host);
+
+		len= sizeof(hgstate->sin6);
+		read_response_file(hgstate->resp_file, RESP_DSTADDR,
+			&len, &hgstate->sin6);
+		hgstate->socklen= len;
+
+		add_str(hgstate, "{ ");
+		if (hgstate->first_connect)
+		{
+			gettime_mono(&endtime);
+			hgstate->ttr= (endtime.tv_sec-hgstate->start.tv_sec)*
+				1e3 + (endtime.tv_nsec-hgstate->start.tv_nsec)/
+				1e6;
+			hgstate->first_connect= 0;
+		}
+
+		/* Start time */
+		gettime_mono(&hgstate->start);
+
+		gettime_mono(&endtime);
+		hgstate->ttc= (endtime.tv_sec- hgstate->start.tv_sec)*1e3 +
+			(endtime.tv_nsec-hgstate->start.tv_nsec)/1e6;
+
+		hgstate->readstate= READ_FIRST;
+
 		connected(&hgstate->tu_env, NULL);
+
 		writecb(NULL, &hgstate->tu_env);
 		while(hgstate->resp_file != NULL)
 			readcb(NULL, &hgstate->tu_env);
