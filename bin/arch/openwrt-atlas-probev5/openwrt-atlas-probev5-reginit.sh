@@ -48,27 +48,6 @@ install_firmware()
 	# Remount root read-write
 	mount -o remount,rw /
 
-	# Find out what device we are running on
-	currdev=$(sed < /proc/cmdline 's/.*root=\([^ ]*\).*/\1/')
-	#case X"$currdev" in
-	#X/dev/mmcblk2p2)
-	#	target_partition=p3
-	#;;
-	#X/dev/mmcblk2p3)
-	#	target_partition=p2
-	#;;
-	#*)
-	#	# Weird
-	#	exit
-	#;;
-	#esac
-	#target_dev_prefix=/dev/mmcblk2
-	#target_dev="$target_dev_prefix$target_partition"
-	# Create filesystem
-	#mke2fs -F -t ext4 $target_dev
-	# Mount filesystem
-	#mkdir -p /altroot
-	#mount $target_dev /altroot
 	if [ "$fw" = manual ]
 	then
 		# Move image to /storage. Note that DEV_FIRMWARE has a wildcard
