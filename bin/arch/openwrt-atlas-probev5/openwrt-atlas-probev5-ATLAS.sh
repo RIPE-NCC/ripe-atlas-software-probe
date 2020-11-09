@@ -22,18 +22,6 @@ setup_network()
 {
 	need_reload=no
 
-	# Make sure we have a stable mac addr
-	macaddr=$(uci get network.lan.macaddr)
-	if [ !  -n "$macaddr" ]
-	then
-		mount -o remount,rw /
-		macaddr="$(cat /sys/class/net/eth0/address)"
-		uci set network.lan.macaddr="$macaddr"
-		uci commit
-		need_reload=yes
-		$MOUNT_ROOT_RO
-	fi
-
 	case "X$(uci get network.lan.proto)" in
 	Xstatic)
 		# Nothing to do
@@ -50,7 +38,6 @@ setup_network()
 	;;
 	esac
 
-	macaddr=$(uci get network.lan.macaddr)
 	if [ -n "$(uci get network.globals.ula_prefix)" ]
 	then
 		mount -o remount,rw /
