@@ -8,7 +8,7 @@ Release:        1%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        src-COMMIT_ID.tar.gz
-Requires:       sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools
+Requires:       sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
 BuildRequires:  rpm %{?el7:systemd} %{?el8:systemd} openssl-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
 
