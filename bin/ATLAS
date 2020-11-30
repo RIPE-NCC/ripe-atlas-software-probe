@@ -208,7 +208,7 @@ do
 			rm -f $STATUS_DIR/network_info.vol
 			rm -f $STATUS_DIR/network_info_sent.vol
 			D=`epoch`
-			echo "RESULT 9010 done $D $ETHER_SCANNED no ssh client running restart registeration"  >> $DATA_NEW_DIR/simpleping
+			echo "RESULT 9010 done $D $ETHER_SCANNED no ssh client running restart registration"  >> $DATA_NEW_DIR/simpleping
 			echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
 		else
 			$SET_LEDS_CMD net-ok
@@ -233,7 +233,7 @@ do
 
 	if [ ! -f  $STATUS_DIR/reginit.vol ] ; then
 		D=`epoch`
-		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registeration"
+		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registration"
 		echo "$STATUS_DIR/reginit.vol does not exist try new reg"
 		UPTIME=`onlyuptime`
 		$SET_LEDS_CMD net-try
