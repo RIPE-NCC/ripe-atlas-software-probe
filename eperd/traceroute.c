@@ -19,8 +19,6 @@
 
 #define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
-#define DBQ(str) "\"" #str "\""
-
 #ifndef STANDALONE_BUSYBOX
 #define uh_sport source
 #define uh_dport dest
@@ -412,12 +410,12 @@ static void report(struct trtstate *state)
 		state->dnsip ? (state->do_v6 ? 6 : 4) :
 		(state->sin6.sin6_family == AF_INET6 ? 6 : 4));
 
-	fprintf(fh, ", \"size\":%d", state->maxpacksize);
+	fprintf(fh, ", " DBQ(size) ":%d", state->maxpacksize);
 	if (state->parismod)
 	{
-		fprintf(fh, ", \"paris_id\":%d", state->paris);
+		fprintf(fh, ", " DBQ(paris_id) ":%d", state->paris);
 	}
-	fprintf(fh, ", \"result\": [ %s ] }\n", state->result);
+	fprintf(fh, ", " DBQ(result) ": [ %s ] }\n", state->result);
 
 	free(state->result);
 	state->result= NULL;
@@ -1737,31 +1735,32 @@ static void ready_callback4(int __attribute((unused)) unused,
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			snprintf(line, sizeof(line),
+				"%s" DBQ(from) ":" DBQ(%s),
 				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
 			snprintf(line, sizeof(line),
-				", \"ttl\":%d, \"size\":%d",
+				", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 				ip->ip_ttl, (int)nrecv - IPHDR - ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
-				snprintf(line, sizeof(line), ", \"rtt\":%.3f",
-					ms);
+				snprintf(line, sizeof(line),
+					", " DBQ(rtt) ":%.3f", ms);
 				add_str(state, line);
 			}
 
 			if (eip->ip_ttl != 1)
 			{
-				snprintf(line, sizeof(line), ", \"ittl\":%d",
-					eip->ip_ttl);
+				snprintf(line, sizeof(line),
+					", " DBQ(ittl) ":%d", eip->ip_ttl);
 				add_str(state, line);
 			}
 			if (eip->ip_tos != 0 || state->tos != 0)
 			{
-				snprintf(line, sizeof(line), ", \"itos\":%d",
-					eip->ip_tos);
+				snprintf(line, sizeof(line),
+					", " DBQ(itos) ":%d", eip->ip_tos);
 				add_str(state, line);
 			}
 
@@ -1779,7 +1778,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				sin_addr, sizeof(eip->ip_dst)) != 0)
 			{
 				snprintf(line, sizeof(line),
-					", \"edst\":\"%s\"",
+					", " DBQ(edst) ":" DBQ(%s),
 					inet_ntoa(eip->ip_dst));
 				add_str(state, line);
 			}
@@ -1811,20 +1810,23 @@ static void ready_callback4(int __attribute((unused)) unused,
 				switch(icmp->icmp_code)
 				{
 				case ICMP_UNREACH_NET:
-					add_str(state, ", \"err\":\"N\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(N));
 					break;
 				case ICMP_UNREACH_HOST:
-					add_str(state, ", \"err\":\"H\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(H));
 					break;
 				case ICMP_UNREACH_PROTOCOL:
-					add_str(state, ", \"err\":\"P\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(P));
 					break;
 				case ICMP_UNREACH_PORT:
 					break;
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", \"mtu\":%d",
+						", " DBQ(mtu) ":%d",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip)+
@@ -1843,11 +1845,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 						state->not_done= 1;
 					break;
 				case ICMP_UNREACH_FILTER_PROHIB:
-					add_str(state, ", \"err\":\"A\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(A));
 					break;
 				default:
 					snprintf(line, sizeof(line),
-						", \"err\":%d",
+						", " DBQ(err) ":%d",
 						icmp->icmp_code);
 					add_str(state, line);
 					break;
@@ -1958,30 +1961,31 @@ static void ready_callback4(int __attribute((unused)) unused,
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			snprintf(line, sizeof(line),
+				"%s" DBQ(from) ":" DBQ(%s),
 				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
 			snprintf(line, sizeof(line),
-				", \"ttl\":%d, \"size\":%d",
+				", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 				ip->ip_ttl, (int)nrecv-IPHDR-ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
-				snprintf(line, sizeof(line), ", \"rtt\":%.3f",
-					ms);
+				snprintf(line, sizeof(line),
+					", " DBQ(rtt) ":%.3f", ms);
 				add_str(state, line);
 			}
 			if (eip->ip_ttl != 1)
 			{
-				snprintf(line, sizeof(line), ", \"ittl\":%d",
-					eip->ip_ttl);
+				snprintf(line, sizeof(line),
+					", " DBQ(ittl) ":%d", eip->ip_ttl);
 				add_str(state, line);
 			}
 			if (eip->ip_tos != 0 || state->tos != 0)
 			{
-				snprintf(line, sizeof(line), ", \"itos\":%d",
-					eip->ip_tos);
+				snprintf(line, sizeof(line),
+					", " DBQ(itos) ":%d", eip->ip_tos);
 				add_str(state, line);
 			}
 
@@ -1997,7 +2001,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				sin_addr, sizeof(eip->ip_dst)) != 0)
 			{
 				snprintf(line, sizeof(line),
-					", \"edst\":\"%s\"",
+					", " DBQ(edst) ":" DBQ(%s),
 					inet_ntoa(eip->ip_dst));
 				add_str(state, line);
 			}
@@ -2029,21 +2033,23 @@ static void ready_callback4(int __attribute((unused)) unused,
 				switch(icmp->icmp_code)
 				{
 				case ICMP_UNREACH_NET:
-					add_str(state, ", \"err\":\"N\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(N));
 					break;
 				case ICMP_UNREACH_HOST:
-					add_str(state, ", \"err\":\"H\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(H));
 					break;
 				case ICMP_UNREACH_PROTOCOL:
-					add_str(state, ", \"err\":\"P\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(P));
 					break;
 				case ICMP_UNREACH_PORT:
 					break;
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", \"mtu\":%d",
-						nextmtu);
+						", " DBQ(mtu) ":%d", nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip)+
 						sizeof(*eudp))
@@ -2061,11 +2067,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 						state->not_done= 1;
 					break;
 				case ICMP_UNREACH_FILTER_PROHIB:
-					add_str(state, ", \"err\":\"A\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(A));
 					break;
 				default:
 					snprintf(line, sizeof(line),
-						", \"err\":%d",
+						", " DBQ(err) ":%d",
 						icmp->icmp_code);
 					add_str(state, line);
 					break;
@@ -2190,31 +2197,31 @@ static void ready_callback4(int __attribute((unused)) unused,
 			ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 				(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 				(late || isDup) ? ", " : "",
 				inet_ntoa(remote.sin_addr));
 			add_str(state, line);
 			snprintf(line, sizeof(line),
-				", \"ttl\":%d, \"size\":%d",
+				", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 				ip->ip_ttl, (int)nrecv-IPHDR-ICMP_MINLEN);
 			add_str(state, line);
 			if (!late)
 			{
-				snprintf(line, sizeof(line), ", \"rtt\":%.3f",
-					ms);
+				snprintf(line, sizeof(line),
+					", " DBQ(rtt) ":%.3f", ms);
 				add_str(state, line);
 			}
 
 			if (eip->ip_ttl != 1)
 			{
-				snprintf(line, sizeof(line), ", \"ittl\":%d",
-					eip->ip_ttl);
+				snprintf(line, sizeof(line),
+					", " DBQ(ittl) ":%d", eip->ip_ttl);
 				add_str(state, line);
 			}
 			if (eip->ip_tos != 0 || state->tos != 0)
 			{
-				snprintf(line, sizeof(line), ", \"itos\":%d",
-					eip->ip_tos);
+				snprintf(line, sizeof(line),
+					", " DBQ(itos) ":%d", eip->ip_tos);
 				add_str(state, line);
 			}
 
@@ -2232,7 +2239,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				sin_addr, sizeof(eip->ip_dst)) != 0)
 			{
 				snprintf(line, sizeof(line),
-					", \"edst\":\"%s\"",
+					", " DBQ(edst) ":" DBQ(%s),
 					inet_ntoa(eip->ip_dst));
 				add_str(state, line);
 			}
@@ -2264,21 +2271,25 @@ static void ready_callback4(int __attribute((unused)) unused,
 				switch(icmp->icmp_code)
 				{
 				case ICMP_UNREACH_NET:
-					add_str(state, ", \"err\":\"N\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(N));
 					break;
 				case ICMP_UNREACH_HOST:
-					add_str(state, ", \"err\":\"H\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(H));
 					break;
 				case ICMP_UNREACH_PROTOCOL:
-					add_str(state, ", \"err\":\"P\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(P));
 					break;
 				case ICMP_UNREACH_PORT:
-					add_str(state, ", \"err\":\"p\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(p));
 					break;
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", \"mtu\":%d",
+						", " DBQ(mtu) ":%d",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip) +
@@ -2297,11 +2308,12 @@ static void ready_callback4(int __attribute((unused)) unused,
 						state->not_done= 1;
 					break;
 				case ICMP_UNREACH_FILTER_PROHIB:
-					add_str(state, ", \"err\":\"A\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(A));
 					break;
 				default:
 					snprintf(line, sizeof(line),
-						", \"err\":%d",
+						", " DBQ(err) ":%d",
 						icmp->icmp_code);
 					add_str(state, line);
 					break;
@@ -2468,22 +2480,23 @@ static void ready_callback4(int __attribute((unused)) unused,
 		ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 			(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+		snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 			(late || isDup) ? ", " : "",
 			inet_ntoa(remote.sin_addr));
 		add_str(state, line);
-		snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
+		snprintf(line, sizeof(line),
+			", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 			ip->ip_ttl, (int)nrecv - IPHDR - ICMP_MINLEN);
 		add_str(state, line);
 		if (ip->ip_tos != 0 || state->tos != 0)
 		{
-			snprintf(line, sizeof(line), ", \"tos\":%d",
+			snprintf(line, sizeof(line), ", " DBQ(tos) ":%d",
 				ip->ip_tos);
 			add_str(state, line);
 		}
 		if (!late)
 		{
-			snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
+			snprintf(line, sizeof(line), ", " DBQ(rtt) ":%.3f", ms);
 			add_str(state, line);
 		}
 
@@ -2741,19 +2754,19 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 		(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-	snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+	snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 		(late || isDup) ? ", " : "",
 		inet_ntoa(remote.sin_addr));
 	add_str(state, line);
-	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
+	snprintf(line, sizeof(line), ", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 		ip->ip_ttl, (int)(nrecv - IPHDR - sizeof(*tcphdr)));
 	add_str(state, line);
 	if (ip->ip_tos != 0 || state->tos != 0)
 	{
-		snprintf(line, sizeof(line), ", \"tos\":%d", ip->ip_tos);
+		snprintf(line, sizeof(line), ", " DBQ(tos) ":%d", ip->ip_tos);
 		add_str(state, line);
 	}
-	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
+	snprintf(line, sizeof(line), ", " DBQ(flags) ":" DBQ(%s%s%s%s%s%s),
 		(tcphdr->fin ? "F" : ""),
 		(tcphdr->syn ? "S" : ""),
 		(tcphdr->rst ? "R" : ""),
@@ -2771,7 +2784,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 
 	if (!late)
 	{
-		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
+		snprintf(line, sizeof(line), ", " DBQ(rtt) ":%.3f", ms);
 		add_str(state, line);
 	}
 
@@ -3001,20 +3014,20 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	ms= (now.tv_sec-state->xmit_time.tv_sec)*1000 +
 		(now.tv_nsec-state->xmit_time.tv_nsec)/1e6;
 
-	snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+	snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 		(late || isDup) ? ", " : "",
 		inet_ntop(AF_INET6, &remote.sin6_addr, buf, sizeof(buf)));
 	add_str(state, line);
-	snprintf(line, sizeof(line), ", \"ttl\":%d, \"size\":%d",
+	snprintf(line, sizeof(line), ", " DBQ(ttl) ":%d, " DBQ(size) ":%d",
 		rcvdttl, (int)(nrecv - sizeof(*tcphdr)));
 	add_str(state, line);
 	if (rcvdtclass != 0 || state->tos != 0)
 	{
-		snprintf(line, sizeof(line), ", \"tos\":%d",
+		snprintf(line, sizeof(line), ", " DBQ(tos) ":%d",
 			rcvdtclass);
 		add_str(state, line);
 	}
-	snprintf(line, sizeof(line), ", \"flags\":\"%s%s%s%s%s%s\"",
+	snprintf(line, sizeof(line), ", " DBQ(flags) ":" DBQ(%s%s%s%s%s%s),
 		(tcphdr->fin ? "F" : ""),
 		(tcphdr->syn ? "S" : ""),
 		(tcphdr->rst ? "R" : ""),
@@ -3032,7 +3045,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 
 	if (!late)
 	{
-		snprintf(line, sizeof(line), ", \"rtt\":%.3f", ms);
+		snprintf(line, sizeof(line), ", " DBQ(rtt) ":%.3f", ms);
 		add_str(state, line);
 	}
 
@@ -3549,38 +3562,41 @@ static void ready_callback6(int __attribute((unused)) unused,
 					(now.tv_nsec-v6info->tv.tv_nsec)/1e6;
 			}
 
-			snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+			snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 				(late || isDup) ? ", " : "",
 				inet_ntop(AF_INET6, &remote.sin6_addr,
 				buf, sizeof(buf)));
 			add_str(state, line);
 			snprintf(line, sizeof(line),
-				", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
+				", " DBQ(ttl)":%d, " DBQ(rtt) ":%.3f, "
+				DBQ(size) ":%d",
 				rcvdttl, ms, (int)(nrecv-ICMP6_HDR));
 			add_str(state, line);
 			if (eip->ip6_hops != 1)
 			{
-				snprintf(line, sizeof(line), ", \"ittl\":%d",
-					eip->ip6_hops);
+				snprintf(line, sizeof(line),
+					", " DBQ(ittl) ":%d", eip->ip6_hops);
 				add_str(state, line);
 			}
 			if (IP6_TOS(eip) != 0 || state->tos != 0)
 			{
-				snprintf(line, sizeof(line), ", \"itos\":%d",
-					IP6_TOS(eip));
+				snprintf(line, sizeof(line),
+					", " DBQ(itos) ":%d", IP6_TOS(eip));
 				add_str(state, line);
 			}
 
 			if (hbhoptsize)
 			{
 				snprintf(line, sizeof(line),
-					", \"hbhoptsize\":%d", hbhoptsize);
+					", " DBQ(hbhoptsize) ":%d",
+					hbhoptsize);
 				add_str(state, line);
 			}
 			if (dstoptsize)
 			{
 				snprintf(line, sizeof(line),
-					", \"dstoptsize\":%d", dstoptsize);
+					", " DBQ(dstoptsize) ":%d",
+					dstoptsize);
 				add_str(state, line);
 			}
 
@@ -3601,8 +3617,8 @@ static void ready_callback6(int __attribute((unused)) unused,
 			else if (icmp->icmp6_type == ICMP6_PACKET_TOO_BIG)
 			{
 				nextmtu= ntohl(icmp->icmp6_mtu);
-				snprintf(line, sizeof(line), ", \"mtu\":%d",
-					nextmtu);
+				snprintf(line, sizeof(line),
+					", " DBQ(mtu) ":%d", nextmtu);
 				add_str(state, line);
 				siz= sizeof(*eip);
 				if (eudp)
@@ -3635,22 +3651,26 @@ static void ready_callback6(int __attribute((unused)) unused,
 				switch(icmp->icmp6_code)
 				{
 				case ICMP6_DST_UNREACH_NOROUTE:	/* 0 */
-					add_str(state, ", \"err\":\"N\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(N));
 					break;
 				case ICMP6_DST_UNREACH_ADMIN:	/* 1 */
-					add_str(state, ", \"err\":\"A\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(A));
 					break;
 				case ICMP6_DST_UNREACH_BEYONDSCOPE: /* 2 */
-					add_str(state, ", \"err\":\"h\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(h));
 					break;
 				case ICMP6_DST_UNREACH_ADDR:	/* 3 */
-					add_str(state, ", \"err\":\"H\"");
+					add_str(state,
+						", " DBQ(err) ":" DBQ(H));
 					break;
 				case ICMP6_DST_UNREACH_NOPORT:	/* 4 */
 					break;
 				default:
 					snprintf(line, sizeof(line),
-						", \"err\":%d",
+						", " DBQ(err) ":%d",
 						icmp->icmp6_code);
 					add_str(state, line);
 					break;
@@ -3833,18 +3853,18 @@ static void ready_callback6(int __attribute((unused)) unused,
 				(now.tv_nsec-v6info->tv.tv_nsec)/1e6;
 		}
 
-		snprintf(line, sizeof(line), "%s\"from\":\"%s\"",
+		snprintf(line, sizeof(line), "%s" DBQ(from) ":" DBQ(%s),
 			(late || isDup) ? ", " : "",
 			inet_ntop(AF_INET6, &remote.sin6_addr,
 			buf, sizeof(buf)));
 		add_str(state, line);
 		snprintf(line, sizeof(line),
-			", \"ttl\":%d, \"rtt\":%.3f, \"size\":%d",
+		", " DBQ(ttl) ":%d, " DBQ(rtt) ":%.3f, " DBQ(size) ":%d",
 			rcvdttl, ms, (int)(nrecv - ICMP6_HDR));
 		add_str(state, line);
 		if (rcvdtclass != 0 || state->tos != 0)
 		{
-			snprintf(line, sizeof(line), ", \"itos\":%d",
+			snprintf(line, sizeof(line), ", " DBQ(itos) ":%d",
 				rcvdtclass);
 			add_str(state, line);
 		}
@@ -4251,7 +4271,7 @@ static void traceroute_start2(void *state)
 	trtstate->socket_icmp= -1;
 	trtstate->socket_tcp= -1;
 
-	snprintf(line, sizeof(line), "{ \"hop\":%d", trtstate->hop);
+	snprintf(line, sizeof(line), "{ " DBQ(hop) ":%d", trtstate->hop);
 	add_str(trtstate, line);
 
 	if (trtstate->do_icmp)
@@ -4293,7 +4313,7 @@ static void traceroute_start2(void *state)
 		}
 	}
 
-	add_str(trtstate, ", \"result\": [ ");
+	add_str(trtstate, ", " DBQ(result) ": [ ");
 
 	send_pkt(trtstate);
 }
