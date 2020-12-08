@@ -478,6 +478,7 @@ extern char *atlas_name_macro(char *str);
 extern time_t atlas_time(void);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 extern void route_set_flags(char *flagstr, int flags);
+extern void peek_response(int fd, int *typep);
 extern void read_response(int fd, int type, size_t *sizep, void *data);
 extern void read_response_file(FILE *file, int type, size_t *sizep,
 	void *data);

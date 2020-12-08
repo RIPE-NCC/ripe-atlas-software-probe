@@ -5,15 +5,41 @@
 
 #include "libbb.h"
 
+static int got_type= 0;
+static int stored_type;
+
+void peek_response(int fd, int *typep)
+{
+	if (!got_type)
+	{
+		if (read(fd, &stored_type, sizeof(stored_type)) !=
+			sizeof(stored_type))
+		{
+			fprintf(stderr, "peek_response: error reading\n");
+			exit(1);
+		}
+		got_type= 1;
+	}
+	*typep= stored_type;
+}
+
 void read_response(int fd, int type, size_t *sizep, void *data)
 {
 	int tmp_type;
 	size_t tmp_size;
 
-	if (read(fd, &tmp_type, sizeof(tmp_type)) != sizeof(tmp_type))
+	if (got_type)
 	{
-		fprintf(stderr, "read_response: error reading\n");
-		exit(1);
+		tmp_type= stored_type;
+		got_type= 0;
+	}
+	else
+	{
+		if (read(fd, &tmp_type, sizeof(tmp_type)) != sizeof(tmp_type))
+		{
+			fprintf(stderr, "read_response: error reading\n");
+			exit(1);
+		}
 	}
 	if (tmp_type != type)
 	{
