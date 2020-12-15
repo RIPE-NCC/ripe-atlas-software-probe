@@ -12,7 +12,7 @@ Note
 ----
 
 The software probe uses TCP ports 2023 and 8080 internally. If another
-services is using these ports then the probe will not function correctly.
+service is using these ports then the probe will not function correctly.
 
 Runtime Configuration Options
 -----------------------------
