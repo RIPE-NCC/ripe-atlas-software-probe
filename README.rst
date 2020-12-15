@@ -8,6 +8,12 @@ INSTALL.rst for installation instructions.
 Unless specified otherwise, this code is licensed under the GPLv3. A copy
 of the license can be found in LICENSE.
 
+Note
+----
+
+The software probe uses TCP ports 2023 and 8080 internally. If another
+service is using these ports then the probe will not function correctly.
+
 Runtime Configuration Options
 -----------------------------
 
