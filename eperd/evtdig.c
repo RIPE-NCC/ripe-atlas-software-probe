@@ -30,15 +30,141 @@
 //kbuild:lib-$(CONFIG_EVTDIG) += evtdig.o
 
 //usage:#define evtdig_trivial_usage
-//usage:             "[-h|-i|-b|-s] ... <server IP address>"
+//usage:	"-[46adtbhinqRr]"
+//usage:	"[-A <atlas>][-B <bundle>][-I <interface>]"
+//usage:	"\n\t[--ad]"
+//usage:	"[--cd]"
+//usage:	"[--client-subnet]"
+//usage:	"[--cookies]"
+//usage:	"[--do]"
+//usage:	"\n\t[--edns0 <size>]"
+//usage:	"[--edns-flags <value>]"
+//usage:	"[--edns-option <value>]"
+//usage:	"\n\t[--edns-version <value>]"
+//usage:	"[--ipv6-dest-option <size>]"
+//usage:	"\n\t[--noabuf]"
+//usage:	"[--nsid]"
+//usage:	"[--out-file <name>]"
+//usage:	"[--port <value>]"
+//usage:	"[--p_probe_id]"
+//usage:	"\n\t[--qbuf]"
+//usage:	"[--read-response <name>]"
+//usage:	"[--resolv]"
+//usage:	"[--retry <count>]"
+//usage:	"\n\t[--timeout <ms>]"
+//usage:	"[--tls]"
+//usage:	"[--ttl]"
+//usage:	"[--write-response <name>]"
+//usage:	"\n\t[--type <type>][--class <class>][--query <name>]"
+//usage:	"\n\t[--a <name>]"
+//usage:	"[--aaaa <name>]"
+//usage:	"[--any <name>]"
+//usage:	"[--afsdb <name>]"
+//usage:	"\n\t[--apl <name>]"
+//usage:	"[--axfr <name>]"
+//usage:	"[--caa <name>]"
+//usage:	"[--cert <name>]"
+//usage:	"\n\t[--cname <name>]"
+//usage:	"[--dlv <name>]"
+//usage:	"[--dname <name>]"
+//usage:	"[--dnskey <name>]"
+//usage:	"\n\t[--ds <name>]"
+//usage:	"[--ipseckey <name>]"
+//usage:	"[--loc <name>]"
+//usage:	"\n\t[--mx <name>]"
+//usage:	"[--naptr <name>]"
+//usage:	"[--ns <name>]"
+//usage:	"[--nsec <name>]"
+//usage:	"\n\t[--nsec3 <name>]"
+//usage:	"[--nsec3param <name>]"
+//usage:	"[--ptr <name>]"
+//usage:	"[--rrsig <name>]"
+//usage:	"\n\t[--rp <name>]"
+//usage:	"[--soa <name>]"
+//usage:	"[--sig <name>]"
+//usage:	"[--spf <name>]"
+//usage:	"\n\t[--sshfp <name>]"
+//usage:	"[--srv <name>]"
+//usage:	"[--ta <name>]"
+//usage:	"[--tlsa <name>]"
+//usage:	"\n\t[--txt <name>]"
+//usage:	"\n\t[--hostname.bind]"
+//usage:	"[--id.server]"
+//usage:	"[--version.bind]"
+//usage:	"[--version.server]"
+//usage:	"\n\t[<server>]"
 //usage:#define evtdig_full_usage "\n\n"
-//usage:    "evtdig:  a tiny implemention dns queries which supports 4 queries\n"
-//usage:     "\n     not implemented:  recursion"
-//usage:     "\n     -h | --hostname-bind hostname.bind txt chaos "
-//usage:     "\n     -i | id-server id.server txt chaos "
-//usage:     "\n     -b | version-bind version-bind txt chaos "
-//usage:     "\n     -s | soa <zone> to be implmented "
-//usage:     "\n      RIPE NCC 2011 "
+//usage:	"\nOptions:"
+//usage:	"\n\t-4                  Restrict to IPv4"
+//usage:	"\n\t-6                  Restrict to IPv6"
+//usage:	"\n\t-a                  Both IPv4 and IPv6"
+//usage:	"\n\t-R                  Set recursion desired flag"
+//usage:	"\n\t-t                  Use TCP"
+//usage:	"\n\t-A <atlas>          Atlas measurement ID"
+//usage:	"\n\t-B <bundle>         Atlas bundle ID"
+//usage:	"\n\t-I <interface>      Outgoing interface"
+//usage:	"\n\t--ad                Set AD (Authentic Data) bit"
+//usage:	"\n\t--cd                Set CD (Checking Disabled) bit"
+//usage:	"\n\t--client-subnet     Include edns-client-subnet option"
+//usage:	"\n\t--cookies           Send and receive cookies"
+//usage:	"\n\t-d|--do             Set DO (DNSSEC answer OK) bit"
+//usage:	"\n\t-e|--edns0 <size>   Max. UDP message size"
+//usage:	"\n\t--edns-flags <value>      EDNS flags field"
+//usage:	"\n\t--edns-option <value>     Include empty EDNS option"
+//usage:	"\n\t--edns-version <value>    Set EDNS version"
+//usage:	"\n\t--ipv6-dest-option <size> Include IPv6 dest. option"
+//usage:	"\n\t--noabuf            Omit abuf from output"
+//usage:	"\n\t-n|--nsid           Include NSID option"
+//usage:	"\n\t-O|--out-file <name> Name of output file"
+//usage:	"\n\t--port <value>      Destination port number"
+//usage:	"\n\t--p_probe_id        Prepend probe ID to query name"
+//usage:	"\n\t--qbuf              Include qbuf in output"
+//usage:	"\n\t--read-response <name>    Read responses"
+//usage:	"\n\t--resolv            Use system resolvers as targets"
+//usage:	"\n\t--retry <count>     Retry query count times"
+//usage:	"\n\t--timeout <ms>      Timeout waiting for reply"
+//usage:	"\n\t--tls               Connect using TLS"
+//usage:	"\n\t--ttl               Report TTL of reply"
+//usage:	"\n\t--write-response <name>   Write responses"
+//usage:	"\n\t--type <type>       Query type"
+//usage:	"\n\t--class <class>     Query class"
+//usage:	"\n\t--query <name>      Query name"
+//usage:	"\n\t--a <name>          IPv4 address query"
+//usage:	"\n\t--aaaa <name>       IPv6 address query"
+//usage:	"\n\t--any <name>        Any available records"
+//usage:	"\n\t--afsdb <name>      AFS Data Base location query"
+//usage:	"\n\t--apl <name>        Lists of Address Prefixes query"
+//usage:	"\n\t--axfr <name>       Transfer of an entire zone"
+//usage:	"\n\t--caa <name>        Certification Authority Restriction"
+//usage:	"\n\t--cert <name>       Certificate"
+//usage:	"\n\t--cname <name>      The Canonical Name for an alias"
+//usage:	"\n\t--dlv <name>        DNSSEC Lookaside Validation"
+//usage:	"\n\t--dname <name>      DNAME"
+//usage:	"\n\t--dnskey <name>     DNSKEY"
+//usage:	"\n\t--ds <name>         Delegation Signer"
+//usage:	"\n\t--ipseckey <name>   IPSECKEY"
+//usage:	"\n\t--loc <name>        Location Information"
+//usage:	"\n\t--mx <name>         Mail Exchange"
+//usage:	"\n\t--naptr <name>      Naming Authority Pointer"
+//usage:	"\n\t--ns <name>         Authoritative Name Server"
+//usage:	"\n\t--nsec <name>       NSEC"
+//usage:	"\n\t--nsec3 <name>      NSEC3"
+//usage:	"\n\t--nsec3param <name> NSEC3PARAM"
+//usage:	"\n\t--ptr <name>        Domain Name Pointer"
+//usage:	"\n\t--rrsig <name>      RRSIG"
+//usage:	"\n\t--rp <name>         Responsible Person"
+//usage:	"\n\t-s|--soa <name>     Start Of A Zone Of Authority"
+//usage:	"\n\t--sig <name>        Security Signature"
+//usage:	"\n\t--spf <name>        Sender Policy Framework"
+//usage:	"\n\t--sshfp <name>      SSH Key Fingerprint"
+//usage:	"\n\t--srv <name>        Server Selection"
+//usage:	"\n\t--ta <name>         DNSSEC Trust Authorities"
+//usage:	"\n\t--tlsa <name>       TLSA"
+//usage:	"\n\t--txt <name>        Text Strings"
+//usage:	"\n\t-h|--hostname.bind  CHAOS TXT hostname.bind query"
+//usage:	"\n\t-i|--id.server      CHAOS TXT id.server query"
+//usage:	"\n\t-b|--version.bind   CHAOS TXT version.bind query"
+//usage:	"\n\t-r|--version.server CHAOS TXT version.server query"
 
 #include "libbb.h"
 #include "atlas_bb64.h"
@@ -269,6 +395,17 @@
 #define DNS_CLIENT_COOKIE_LEN		 8
 #define DNS_SERVER_COOKIE_MIN_LEN	 8
 #define DNS_SERVER_COOKIE_MAX_LEN	32
+
+#define RESP_PACKET	1
+#define RESP_PEERNAME	2
+#define RESP_SOCKNAME	3
+//#define RESP_TTL	4
+//#define RESP_DSTADDR	5
+#define RESP_LENGTH	6
+#define RESP_DATA	7
+#define RESP_CMSG	8
+#define RESP_TIMEOUT	9
+
 
 /* Definition for various types of counters */
 typedef uint32_t counter_t;
@@ -804,12 +941,21 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 	uint8_t sha256_buf[32];
 
 	dns = (struct DNS_HEADER *)packet;
-	r =  random();
-	r %= 65535;
-	qry->qryid = (uint16_t) r; // host is storing int host byte order
+	if (qry->response_in || qry->response_out)
+	{
+		qry->qryid= 12345;
+	}
+	else
+	{
+		r =  random();
+		r %= 65535;
+
+		// host is storing int host byte order
+		qry->qryid = (uint16_t) r;
+	}
 	// crondlog(LVL5 "%s %s() : %d base address %p",__FILE__, __func__, __LINE__, qry->base);
 	// BLURT(LVL5 "dns qyery id %d", qry->qryid);
-	dns->id = (uint16_t) htons(r); 
+	dns->id = (uint16_t) htons(qry->qryid); 
  
 	dns->qr = 0; //This is a query
 	dns->opcode = 0; //This is a standard query
@@ -945,15 +1091,6 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		}
 		if (qry->opt_cookies)
 		{
-			char addrstr[INET6_ADDRSTRLEN];
-			getnameinfo((struct sockaddr *)&qry->loc_sin6,
-				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
-				NULL, 0, NI_NUMERICHOST);
-			printf("cookies: local '%s'\n", addrstr);
-			getnameinfo(qry->res->ai_addr, qry->res->ai_addrlen, addrstr, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
-
-			printf("cookies: remote '%s'\n", addrstr);
-
 			/* Create client cookie. We should use hmac, but it
 			 * doesn't seem to be available. However, just using
 			 * sha256 should be good enough.
@@ -1082,10 +1219,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	//AA delete qry->outbuff = outbuff;
-	qry->xmit_time= time(NULL);
+	qry->xmit_time= atlas_time();
 
 	do {
-		if (qry->udp_fd != -1)
+		if (!qry->response_in && qry->udp_fd != -1)
 		{
 			event_del(&qry->event);
 			close(qry->udp_fd);
@@ -1096,7 +1233,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 
 		if (qry->response_in)
 		{
-			fd= open(qry->response_in, O_RDONLY);
+			if (qry->udp_fd != -1)
+				fd= qry->udp_fd;
+			else
+				fd= open(qry->response_in, O_RDONLY);
 			if (fd == -1)
 			{
 				crondlog(DIE9 "unable to open '%s': %s",
@@ -1138,7 +1278,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 
 		event_assign(&qry->event, tdig_base->event_base, fd, 
 			EV_READ | EV_PERSIST, ready_callback, qry);
-		event_add(&qry->event, NULL);
+		if (!qry->response_in)
+			event_add(&qry->event, NULL);
 
 		if (qry->infname)
 		{
@@ -1206,14 +1347,33 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				return;
 		}
 
-		if (!qry->response_in &&
-			getsockname(qry->udp_fd,
-			(struct sockaddr *)&qry->loc_sin6,
-			&qry->loc_socklen)  == -1) {
-			snprintf(line, DEFAULT_LINE_LENGTH,
-				"%s \"getsockname\" : \"%s\"",
-				qry->err.size ? ", " : "", strerror(errno));
-			buf_add(&qry->err, line, strlen(line));
+		if (qry->response_in)
+		{
+			size_t tmp_len;
+
+			tmp_len= sizeof(qry->loc_sin6);
+			read_response(qry->udp_fd, RESP_SOCKNAME,
+				&tmp_len, &qry->loc_sin6);
+			qry->loc_socklen= tmp_len;
+		}
+		else
+		{
+			if (getsockname(qry->udp_fd,
+				(struct sockaddr *)&qry->loc_sin6,
+				&qry->loc_socklen)  == -1) {
+				snprintf(line, DEFAULT_LINE_LENGTH,
+					"%s \"getsockname\" : \"%s\"",
+					qry->err.size ? ", " : "",
+					strerror(errno));
+				buf_add(&qry->err, line, strlen(line));
+			}
+			if (qry->response_out)
+			{
+				write_response(qry->resp_file,
+					RESP_SOCKNAME,
+					qry->loc_socklen,
+					&qry->loc_sin6);
+			}
 		}
 
 		/* Assume that we are limited to one AF. mk_dns_buff needs
@@ -1237,7 +1397,7 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			return;
 		}
 
-		clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
+		gettime_mono(&qry->xmit_time_ts);
 
 		if (qry->response_in)
 			nsent= qry->pktsize;
@@ -1256,7 +1416,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			err  = 0;
 			/* Add the timer to handle no reply condition in the given timeout */
 			msecstotv(qry->opt_timeout, &tv_noreply);
-			evtimer_add(&qry->noreply_timer, &tv_noreply);
+			if (!qry->response_in)
+			{
+				evtimer_add(&qry->noreply_timer, &tv_noreply);
+			}
 			if(qry->opt_qbuf) {
 				buf_init(&qry->qbuf, -1);
 				buf_add_b64(&qry->qbuf, outbuff, qry->pktsize, 0);
@@ -1270,8 +1433,6 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 					, strerror(errno) ,  qry->res->ai_family == AF_INET ? "AF_INET" :"NOT AF_INET"); 
 			buf_add(&qry->err, line, strlen(line));
 		}
-		if (qry->response_in)
-			ready_callback(0, 0, qry);
 	} while ((qry->res = qry->res->ai_next) != NULL);
 	free (outbuff);
 	outbuff = NULL;
@@ -1280,6 +1441,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 		return;
 	}
 	qry->qst = STATUS_WAIT_RESPONSE;
+	if (qry->response_in)
+		ready_callback(0, 0, qry);
 }
 static void done_qry_cb(int unused  UNUSED_PARAM, const short event UNUSED_PARAM, void *h) {
 	struct query_state *qry = h;
@@ -1304,7 +1467,18 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 	snprintf(line, DEFAULT_LINE_LENGTH, "%s \"timeout\" : %d", qry->err.size ? ", " : "", qry->opt_timeout);
 	buf_add(&qry->err, line, strlen(line));
 
-	BLURT(LVL5 "AAA timeout for %s retry %d/%d ", qry->server_name, qry->retry,  qry->opt_retry_max);
+	if (qry->response_in)
+	{
+		size_t tmp_len;
+
+		tmp_len= 0;
+		read_response(qry->udp_fd, RESP_TIMEOUT, &tmp_len, NULL);
+	}
+	if (qry->response_out)
+		write_response(qry->resp_file, RESP_TIMEOUT, 0, NULL);
+
+	//BLURT(LVL5 "AAA timeout for %s retry %d/%d ", qry->server_name, qry->retry,  qry->opt_retry_max);
+
 	if (qry->retry < qry->opt_retry_max) {
 		qry->retry++;
 		qry->qst = STATUS_RETRANSMIT_QUERY;
@@ -1391,7 +1565,7 @@ static void tcp_reporterr(struct tu_env *env, enum tu_err cause,
 	}
 }
 
-static void tcp_dnscount(struct tu_env *env, int count)
+static void tcp_dnscount(struct tu_env *env, int count UNUSED_PARAM)
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
@@ -1404,12 +1578,18 @@ static void tcp_beforeconnect(struct tu_env *env,
 {
 	struct query_state * qry;
 	qry = ENV2QRY(env); 
-	qry->xmit_time= time(NULL);
+	qry->xmit_time= atlas_time();
 	qry->dst_ai_family = addr->sa_family;
 	// BLURT(LVL5 "time : %d",  qry->xmit_time);
 	getnameinfo(addr, addrlen, qry->dst_addr_str, INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->xmit_time_ts);
+	if (qry->response_out)
+	{
+		write_response(qry->resp_file, RESP_PEERNAME, addrlen,
+			addr);
+	}
+
+	gettime_mono(&qry->xmit_time_ts);
 }
 
 static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
@@ -1421,8 +1601,24 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	qry = ENV2QRY(env); 
 
 	qry->loc_socklen= sizeof(qry->loc_sin6);
-	if (!qry->response_in)
+	if (qry->response_in)
+	{
+		size_t tmp_len;
+
+		tmp_len= sizeof(qry->loc_sin6);
+		read_response_file(qry->resp_file, RESP_SOCKNAME,
+			&tmp_len, &qry->loc_sin6);
+		qry->loc_socklen= tmp_len;
+	}
+	else
+	{
 		getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
+		if (qry->response_out)
+		{
+			write_response(qry->resp_file, RESP_SOCKNAME,
+				qry->loc_socklen, &qry->loc_sin6);
+		}
+	}
 
 	qry->bev_tcp =  bev;
 	outbuff = xzalloc(MAX_DNS_OUT_BUF_SIZE);
@@ -1448,7 +1644,7 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	free(outbuff);
 	free(wire);
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &qry->qxmit_time_ts);
+	gettime_mono(&qry->qxmit_time_ts);
 }
 
 static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr) 
@@ -1461,7 +1657,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
+	gettime_mono(&rectime);
 
         qry = ENV2QRY(ptr);
 	// BLURT(LVL5 "TCP readcb %s", qry->server_name );
@@ -1480,15 +1676,33 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
 	if (!qry->response_in)
 		input = bufferevent_get_input(bev);
+	else
+		input= NULL;	/* lint */
         if(qry->wire_size == 0) {
 		if (qry->response_in)
-			n= fread(b2, 1, 2, qry->resp_file);
+		{
+			size_t tmp_len;
+
+			tmp_len= sizeof(b2);
+			read_response_file(qry->resp_file,
+				RESP_LENGTH, &tmp_len, b2);
+			if (tmp_len != sizeof(b2))
+			{
+				crondlog(
+				DIE9 "tcp_readcb: error reading from '%s'",
+					qry->response_in);
+			}
+			n= tmp_len;
+		}
 		else
 			n = evbuffer_remove(input, b2, 2 );
 		// printf("got %d bytes for response size\n", n);
 		if(n == 2){
 			if (qry->response_out)
-				fwrite(b2, 2, 1, qry->resp_file);
+			{
+				write_response(qry->resp_file,
+					RESP_LENGTH, sizeof(b2), b2);
+			}
 			qry->wire_size = ldns_read_uint16(b2);
 			buf_init(&qry->packet, -1);
 		}
@@ -1512,18 +1726,30 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	}
 	for (;;) {
 		if (qry->response_in)
-			n= fread(line, 1, 1, qry->resp_file);
+		{
+			size_t tmp_len;
+
+			tmp_len= sizeof(line);
+			read_response_file(qry->resp_file,
+				RESP_DATA, &tmp_len, line);
+			n= tmp_len;
+		}
 		else
 			n = evbuffer_remove(input,line , DEFAULT_LINE_LENGTH );
 		// printf("got %d bytes for data size\n", n);
 		if (n <= 0)
 		{
 			if (qry->response_in)
+			{
 				noreply_callback(0,0,qry);
+			}
 			break;
 		}
 		if (qry->response_out)
-			fwrite(line, n, 1, qry->resp_file);
+		{
+			write_response(qry->resp_file,
+				RESP_DATA, n, line);
+		}
 		buf_add(&qry->packet, line, n);
 		// crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
 		if(qry->wire_size == qry->packet.size) {
@@ -1624,7 +1850,8 @@ static void process_reply(void * arg, int nrecv, struct timespec now,
 	if (ntohs(dnsR->id) != qry->qryid)
 	{
 		base->martian++;
-		crondlog(LVL7 "DBG: wrong id %d for qry", ntohs(dnsR->id));
+		crondlog(LVL7 "DBG: wrong id %d for qry, expected %d",
+			ntohs(dnsR->id), qry->qryid);
 		return;
 	}
 
@@ -1661,7 +1888,6 @@ static void update_server_cookie(struct query_state *qry, uint8_t *packet,
 	optlen= get_edns_opt(&optoff, EDNS_OPT_COOKIE, packet, packlen);
 	if (optlen == -1)
 	{
-		printf("update_server_cookie: cookie opt not found\n");
 		return;
 	}
 
@@ -1729,8 +1955,6 @@ static int get_edns_opt(int *optoffp, int target_code,
 			if (namelen != 1)
 				continue;
 			type= (packet[rr_o] << 8) | packet[rr_o+1];
-			printf("get_edns_opt: type %d\n", type);
-			printf("ns_t_opt = %d\n", ns_t_opt);
 			if (type != ns_t_opt)
 				continue;
 			break;
@@ -1771,8 +1995,6 @@ static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
 {
 	int label_len, name_len, rdlength, rr_len;
 
-	printf("get_rr_len:\n");
-	
 	/* Handle name */
 	name_len= 0;
 	for(;;)
@@ -1780,7 +2002,6 @@ static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
 		if (offset+name_len >= len)
 			return -1;
 		label_len= packet[offset+name_len];
-		printf("get_rr_len: label_len %d\n", label_len);
 		if (label_len > 63)
 		{
 			if (label_len < 192)
@@ -1802,36 +2023,44 @@ static int get_rr_len(int *namelenp, uint8_t *packet, int offset, int len,
 		return name_len + /*qtype*/ 2 + /*qclass*/ 2;
 
 	rr_len= name_len + /*type*/ 2 + /*class*/ 2 + /*ttl*/ 4;
-	printf("offset %d, rr_len %d, len %d\n", offset, rr_len, len);
 	if (offset+rr_len+2 > len)
 		return -1;
 	rdlength= (packet[offset+rr_len] << 8) | packet[offset+rr_len+1];
 
 	rr_len += 2 + rdlength;
 
-	printf("returning %d\n", rr_len);
 	return rr_len;
 }
 
 static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PARAM, void * arg)
 {
 	struct query_state * qry;
-	int len, nrecv;
+	int nrecv;
 	struct timespec rectime;
-	FILE *fh;
 	struct msghdr msg;
 	struct iovec iov[1];
 	struct sockaddr_in remote;
 	char cmsgbuf[256];
 
-	// printf("in ready_callback\n");
-
 	qry = arg;
-	
-	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
-	/* Time the packet has been received */
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &rectime);
+	if (qry->response_in)
+	{
+		int type;
+
+		peek_response(qry->udp_fd, &type);
+		if (type == RESP_TIMEOUT)
+		{
+			noreply_callback(0, 0, qry);
+			return;
+		}
+	}
+
+	
+	/* Time the packet has been received */
+	gettime_mono(&rectime);
+
+	bzero(qry->base->packet, MAX_DNS_BUF_SIZE);
 
 	iov[0].iov_base= qry->base->packet;
 	iov[0].iov_len= sizeof(qry->base->packet);
@@ -1846,51 +2075,26 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	/* Receive data from the network */
 	if (qry->response_in)
 	{
-		if (read(qry->udp_fd, &len, sizeof(len)) != sizeof(len))
+		size_t tmp_len;
+
+		tmp_len= sizeof(qry->base->packet);
+		read_response(qry->udp_fd, RESP_PACKET, &tmp_len,
+			qry->base->packet);
+		nrecv= tmp_len;
+
+		tmp_len= sizeof(remote);
+		read_response(qry->udp_fd, RESP_PEERNAME, &tmp_len,
+			&remote);
+		if (tmp_len != sizeof(remote))
 		{
 			crondlog(
 			DIE9 "ready_callback: error reading from '%s'",
 				qry->response_in);
 		}
-		if (len > sizeof(qry->base->packet))
-		{
-			crondlog(
-				DIE9 "ready_callback: bad value for len: %u",
-				len);
-		}
-		if (read(qry->udp_fd, qry->base->packet, len) != len)
-		{
-			crondlog(
-			DIE9 "ready_callback: error reading from '%s'",
-				qry->response_in);
-		}
-		nrecv= len;
-		if (read(qry->udp_fd, &remote, sizeof(remote)) !=
-			sizeof(remote))
-		{
-			crondlog(
-			DIE9 "ready_callback: error reading from '%s'",
-				qry->response_in);
-		}
-		if (read(qry->udp_fd, &len, sizeof(len)) != sizeof(len))
-		{
-			crondlog(
-			DIE9 "ready_callback: error reading from '%s'",
-				qry->response_in);
-		}
-		if (len > sizeof(cmsgbuf))
-		{
-			crondlog(
-				DIE9 "ready_callback: bad value for len: %u",
-				len);
-		}
-		msg.msg_controllen= len;
-		if (read(qry->udp_fd, cmsgbuf, len) != len)
-		{
-			crondlog(
-			DIE9 "ready_callback: error reading from '%s'",
-				qry->response_in);
-		}
+
+		tmp_len= sizeof(cmsgbuf);
+		read_response(qry->udp_fd, RESP_CMSG, &tmp_len, cmsgbuf);
+		msg.msg_controllen= tmp_len;
 	}
 	else
 	{
@@ -1903,19 +2107,12 @@ static void ready_callback (int unused UNUSED_PARAM, const short event UNUSED_PA
 	}
 	if (qry->response_out)
 	{
-		fh= fopen(qry->response_out, "w");
-		if (fh)
-		{
-			len= nrecv;
-			fwrite(&len, sizeof(len), 1, fh);
-			fwrite(qry->base->packet, len, 1, fh);
-			fwrite(&remote, sizeof(remote), 1, fh);
-			len= msg.msg_controllen;
-			fwrite(&len, sizeof(len), 1, fh);
-			fwrite(cmsgbuf, len, 1, fh);
-
-			fclose(fh);
-		}
+		write_response(qry->resp_file, RESP_PACKET, nrecv,
+			qry->base->packet);
+		write_response(qry->resp_file, RESP_PEERNAME, sizeof(remote),
+			&remote);
+		write_response(qry->resp_file, RESP_CMSG, msg.msg_controllen,
+			cmsgbuf);
 	}
 
 	process_reply(arg, nrecv, rectime, &msg);
@@ -2096,6 +2293,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
 	qry->opt_do_tls = 0;
 	qry->opt_do_ttl = 0;
+	qry->resp_file= NULL;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -2513,13 +2711,11 @@ static void *tdig_init(int argc, char *argv[],
 				break;
 
 			case 200000 + 'W':
-				printf("write-response: to %s\n", optarg);
 				if (qry->response_out) free(qry->response_out);
 				qry->response_out= strdup(optarg);
 				break;
 
 			case 200000 + 'R':
-				printf("read-response: from %s\n", optarg);
 				if (qry->response_in) free(qry->response_in);
 				qry->response_in= strdup(optarg);
 				break;
@@ -2660,6 +2856,7 @@ void tdig_start (void *arg)
 	struct query_state *qry;
 	struct addrinfo hints, *res;
 	char port[] = "domain";
+	struct sockaddr_in6 sin6;
 
 	qry= arg;
 
@@ -2686,7 +2883,7 @@ void tdig_start (void *arg)
 			}
 
 			/* Get time in case we don't send any packet */
-			qry->xmit_time= time(NULL);
+			qry->xmit_time= atlas_time();
 			qry->resolv_i = 0;
 			// crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  qry->resolv_max);
 			if( qry->opt_resolv_conf) {
@@ -2727,7 +2924,7 @@ void tdig_start (void *arg)
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = 0;
 
-	qry->xmit_time= time(NULL);
+	qry->xmit_time= atlas_time();
 	qry->qst =  STATUS_DNS_RESOLV;
 
 	if(qry->opt_v6_only == 1) 
@@ -2742,6 +2939,16 @@ void tdig_start (void *arg)
 	if( (qry->opt_v4_only == 1 )  && (qry->opt_v6_only == 1) )
 	{
 		hints.ai_family = AF_UNSPEC;
+	}
+
+	if (qry->response_out && !qry->resp_file)
+	{
+		qry->resp_file= fopen(qry->response_out, "w");
+		if (!qry->resp_file)
+		{
+			crondlog(DIE9 "unable to write to '%s'",
+				qry->response_out);
+		}
 	}
 
 	if(qry->opt_proto == 17) {  //UDP 
@@ -2768,16 +2975,6 @@ void tdig_start (void *arg)
 	}
 	else { // TCP Query
 
-		if (qry->response_out)
-		{
-			qry->resp_file= fopen(qry->response_out, "w");
-			if (!qry->resp_file)
-			{
-				crondlog(DIE9 "unable to write to '%s'",
-					qry->response_out);
-			}
-		}
-
 		qry->wire_size =  0;
 		// crondlog(LVL5 "TCP QUERY %s", qry->server_name);
 		interval.tv_sec = CONN_TO;
@@ -2785,12 +2982,23 @@ void tdig_start (void *arg)
 
 		if (qry->response_in)
 		{
+			size_t len;
+
 			qry->resp_file= fopen(qry->response_in, "r");
 			if (!qry->resp_file)
 			{
 				crondlog(DIE9 "unable to read from '%s'",
 					qry->response_in);
 			}
+
+			len= sizeof(sin6);
+			read_response_file(qry->resp_file, RESP_PEERNAME,
+				&len, &sin6);
+			qry->dst_ai_family = sin6.sin6_family;
+			getnameinfo((struct sockaddr *)&sin6, len,
+				qry->dst_addr_str,
+				INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
+
 			tcp_connected(&qry->tu_env, NULL);
 			tcp_writecb(NULL, &qry->tu_env);
 			while(qry->resp_file != NULL)
@@ -3002,13 +3210,23 @@ static void free_qry_inst(struct query_state *qry)
 	}
 
 	if(qry->opt_proto == 6)
-		tu_cleanup(&qry->tu_env);
+	{
+		if (!qry->response_in)
+			tu_cleanup(&qry->tu_env);
+	}
 
 	if (qry->udp_fd != -1)
 	{
-		event_del(&qry->event);
-		close(qry->udp_fd);
-		qry->udp_fd= -1;
+		if (qry->response_in && qry->resolv_i < qry->resolv_max)
+		{
+			/* Keep input open */
+		}
+		else
+		{
+			event_del(&qry->event);
+			close(qry->udp_fd);
+			qry->udp_fd= -1;
+		}
 	}
 
 	if ( qry->opt_resolv_conf) {
@@ -3048,7 +3266,7 @@ static void free_qry_inst(struct query_state *qry)
 			if(qry->base->done) {
 				evtimer_add(&qry->done_qry_timer, &asap);
 			}
-			if (qry->response_in && qry->resp_file)
+			if (qry->resp_file)
 			{
 				fclose(qry->resp_file);
 				qry->resp_file= NULL;
@@ -3162,7 +3380,6 @@ static int tdig_delete(void *state)
 void printErrorQuick (struct query_state *qry)
 {
 	FILE *fh; 
-	struct timeval now;
 	if (qry->out_filename)
 	{
 		fh= fopen(qry->out_filename, "a");
@@ -3178,8 +3395,7 @@ void printErrorQuick (struct query_state *qry)
 	fprintf(fh, "RESULT { ");
 	fprintf(fh, "%s,", atlas_get_version_json_str());
 	fprintf(fh, "\"id\" : 9202 ,");
-	gettimeofday(&now, NULL);
-	fprintf(fh, "\"time\" : %ld ,",  now.tv_sec);
+	fprintf(fh, "\"time\" : %ld ,",  atlas_time());
 
 	fprintf(fh, "\"error\" : [{ ");
 	fprintf(fh, "\"query busy\": \"not starting a new one. previous one is not done yet\"}");
