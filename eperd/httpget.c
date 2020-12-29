@@ -1607,7 +1607,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 #endif
 
 				}
-				printf(
+				fprintf(stderr,
 				"readcb: should add truncation indicator\n");
 			}
 
@@ -1718,7 +1718,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 #endif
 
 				}
-				printf(
+				fprintf(stderr,
 				"readcb: should add truncation indicator\n");
 			}
 
