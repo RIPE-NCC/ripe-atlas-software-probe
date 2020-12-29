@@ -1,0 +1,1 @@
+RESULT { "result":[ { "header": [ "Date: Mon, 28 Dec 2020 15:22:39 GMT", "Server: Apache", "Content-Length: 94384", "Content-Language: en", "Expires: S[...]" ], "method":"GET", "af": 4, "dst_addr":"193.0.6.139", "src_addr":"192.168.1.166", "rt":3000.003000, "res":200, "ver":"1.1", "hsize":316, "bsize":94384 } ] }

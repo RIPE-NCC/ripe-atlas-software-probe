@@ -1,0 +1,1 @@
+RESULT { "dst_name":"ping.ripe.net", "ttr":1000.001000, "af":6, "dst_addr":"2001:67c:2e8:3::c100:a4", "src_addr":"2001:982:5830:20::c7a", "proto":"ICMP", "ttl":57, "size":128, "result": [ { "rtt":1000.001000 }, { "rtt":1000.001000 }, { "rtt":1000.001000 } ] }

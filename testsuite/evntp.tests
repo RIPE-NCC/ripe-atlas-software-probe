@@ -1,0 +1,26 @@
+#!/bin/sh
+
+. ./testing.sh
+
+evntp_test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=evntp-data/"evntp-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	export ATLAS_TESTS=yes ATLAS_UNSAFE=yes
+	r=$(cat "$output"; echo x); r=${r%?}
+	testing "evntp-$name" "evntp $opt -R $packets $target" "$r" "" ""
+}
+
+evntp_test "-6" "ntp.ripe.net" "6"
+evntp_test "-4" "ntp.ripe.net" "4"
+evntp_test "-6 -c1" "ntp.ripe.net" "c1"
+evntp_test "-6 -A42" "ntp.ripe.net" "A42"
+evntp_test "-6 -A42 -B43" "ntp.ripe.net" "B43"
+
+exit $FAILCOUNT
+

@@ -1,0 +1,24 @@
+#!/bin/sh
+
+test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=testsuite/evping-data/"evping-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	rm -f "$output" "$packets"
+	ATLAS_TESTS=yes ATLAS_UNSAFE=yes ./busybox evping $opt -O "$output" -W "$packets" "$target"
+}
+
+test "-6" "ping.ripe.net" "6"
+test "-4" "ping.ripe.net" "4"
+test "-6 -c1" "ping.ripe.net" "c1"
+test "-6 -s0" "ping.ripe.net" "s0"
+test "-6 -s128" "ping.ripe.net" "s128"
+test "-6 -s1024" "ping.ripe.net" "s1024"
+test "-6 -s2048" "ping.ripe.net" "s2048"
+test "-6 -A42" "ping.ripe.net" "A42"
+test "-6 -A42 -B43" "ping.ripe.net" "B43"

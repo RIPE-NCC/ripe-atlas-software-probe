@@ -1,0 +1,40 @@
+#!/bin/sh
+
+. ./testing.sh
+
+evtraceroute_test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=evtraceroute-data/"evtraceroute-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	export ATLAS_TESTS=yes ATLAS_UNSAFE=yes
+	r=$(cat "$output"; echo x); r=${r%?}
+	testing "evtraceroute-$name" "evtraceroute $opt -R $packets $target" "$r" "" ""
+}
+
+evtraceroute_test "-6 -I" ping.ripe.net "6"
+evtraceroute_test "-4 -I" ping.ripe.net "4"
+evtraceroute_test "-6 -U" ping.ripe.net "6U"
+evtraceroute_test "-4 -U" ping.ripe.net "4U"
+evtraceroute_test "-6 -T" ping.ripe.net "6T"
+evtraceroute_test "-4 -T" ping.ripe.net "4T"
+evtraceroute_test "-6 -A 42 -I" ping.ripe.net "A42"
+evtraceroute_test "-6 -A 42 -B 43 -I" ping.ripe.net "B43"
+evtraceroute_test "-6 -a 32 -I" ping.ripe.net "a32"
+evtraceroute_test "-6 -a 32 -b 2 -I" ping.ripe.net "b2"
+evtraceroute_test "-6 -c 4 -I" ping.ripe.net "c4"
+evtraceroute_test "-6 -f 3 -I" ping.ripe.net "f3"
+evtraceroute_test "-6 -m 2 -I" ping.ripe.net "m2"
+evtraceroute_test "-6 -g 2 -I" g.root-servers.net "g2"
+evtraceroute_test "-6 -p 443 -T" www.ripe.net "p443"
+evtraceroute_test "-6 -S 0 -I" ping.ripe.net "S0"
+evtraceroute_test "-6 -S 1024 -I" ping.ripe.net "S1024"
+evtraceroute_test "-6 -S 2048 -I" ping.ripe.net "S2048"
+evtraceroute_test "-6 -F -S 1352 -I" ping.ripe.net "F"
+evtraceroute_test "-6 -H 512 -I" ping.ripe.net "H512"
+evtraceroute_test "-6 -D 512 -I" ping.ripe.net "D512"
+evtraceroute_test "-6 -t 128 -I" ping.ripe.net "t128"
