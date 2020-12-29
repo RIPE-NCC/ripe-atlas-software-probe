@@ -773,7 +773,8 @@ static void ping_xmit(struct pingstate *host)
 
 	/* Add the timer to handle no reply condition in the given timeout */
 	msecstotv(host->interval, &tv_interval);
-	evtimer_add(&host->ping_timer, &tv_interval);
+	if (!host->response_in)
+		evtimer_add(&host->ping_timer, &tv_interval);
 
 	if (host->response_in)
 	{
@@ -975,7 +976,8 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	}
 
 done:
-	;
+	if (state->response_in)
+	  	noreply_callback (-1, -1, state);
 }
 
 /*
@@ -1182,7 +1184,8 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  noreply_callback (-1, -1, state);
 
 done:
-	;
+	if (state->response_in)
+	  	noreply_callback (-1, -1, state);
 }
 
 
