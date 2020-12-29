@@ -1711,7 +1711,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 		}
 		if (proto == 6)
 		{
-			printf("ready_callback4: proto 6 -> TCP\n");
 			ready_tcp4(0, 0, s);
 			return;
 		}
@@ -3311,7 +3310,6 @@ static void ready_callback6(int __attribute((unused)) unused,
 		}
 		if (proto == 6)
 		{
-			printf("ready_callback6: proto 6 -> TCP\n");
 			ready_tcp6(0, 0, s);
 			return;
 		}
@@ -3759,7 +3757,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 				ntohs(eicmp->icmp6_cksum) !=
 				state->paris + 1)
 			{
-				printf(
+				fprintf(stderr,
 			"ready_callback6: got checksum 0x%x, expected 0x%x\n",
 					ntohs(eicmp->icmp6_cksum),
 					state->paris + 1);
