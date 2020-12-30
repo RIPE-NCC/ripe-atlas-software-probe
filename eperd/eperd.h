@@ -57,7 +57,3 @@ extern struct testops tlsscan_ops;
 extern struct testops traceroute_ops;
 
 void crondlog(const char *ctl, ...);
-
-#ifndef CLOCK_MONOTONIC_RAW
-#define CLOCK_MONOTONIC_RAW 4
-#endif

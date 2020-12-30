@@ -17,6 +17,6 @@ int gettime_mono(struct timespec *tsp)
 		return 0;
 	}
 
-	return clock_gettime(CLOCK_MONOTONIC_RAW, tsp);
+	return clock_gettime(CLOCK_MONOTONIC, tsp);
 }
 
