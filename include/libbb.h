@@ -475,6 +475,7 @@ extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
 extern const char *atlas_base(void);
 extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
+extern int atlas_tests(void);
 extern time_t atlas_time(void);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 extern void route_set_flags(char *flagstr, int flags);
