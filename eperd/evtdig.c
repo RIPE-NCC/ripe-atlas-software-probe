@@ -3469,6 +3469,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	JS1(time, %ld,  qry->xmit_time);
 	JD(lts,lts);
 
+	if (qry->opt_do_tls && ssl_version != NULL)
+		JS(sslvers, ssl_version);
+
 	if ( qry->opt_resolv_conf ) {
 		JD (subid, (qry->resolv_i+1));
 		JD (submax, qry->resolv_max);

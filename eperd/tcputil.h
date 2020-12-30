@@ -39,6 +39,8 @@ struct tu_env
 	void (*writecb)(struct bufferevent *bev, void *env);
 };
 
+extern char *ssl_version;
+
 void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	struct timeval *timeout,
 	struct evutil_addrinfo *hints,

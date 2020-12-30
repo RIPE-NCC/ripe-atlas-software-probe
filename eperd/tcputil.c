@@ -13,6 +13,8 @@
 
 #include "tcputil.h"
 
+char *ssl_version= NULL;
+
 static int ssl_initialized= 0;
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
@@ -341,6 +343,11 @@ static int create_bev(struct tu_env *env)
 			ERR_load_crypto_strings();
 			SSL_load_error_strings();
 			OpenSSL_add_all_algorithms();
+
+			/* SSLeay_version seems work everywhere.
+			 * What about OpenSSL_version(OPENSSL_VERSION)?
+			 */
+			ssl_version= SSLeay_version(SSLEAY_VERSION);
 		}
 		/* fancy ssl options yet. just what is default in lib */
 		if ((env->tls_ctx = SSL_CTX_new(SSLv23_client_method())) == NULL)
