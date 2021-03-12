@@ -17,7 +17,6 @@ SSH_CMD_EXEC=ssh_exec
 
 # Options
 SSH_OPT=''
-TELNETD_PORT=2023
 
 NETCONFIG_V4_DEST=$HOME/etc/netconfig_v4.sh
 NETCONFIG_V6_DEST=$HOME/etc/netconfig_v6.sh

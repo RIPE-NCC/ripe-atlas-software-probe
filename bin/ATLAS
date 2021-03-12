@@ -31,6 +31,7 @@ then
 	export HTTPPOST_PORT="$httppost_port"
 fi
 export httppost_port
+export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
 
 $MOUNT_FS_CMD
 

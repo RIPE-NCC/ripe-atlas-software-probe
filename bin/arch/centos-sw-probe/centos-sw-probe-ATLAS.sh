@@ -33,7 +33,6 @@ RESOLV_CONF=/etc/resolv.conf
 MODE_FILE=$BASE_DIR/state/mode
 
 # Other conf
-TELNETD_PORT=2023
 DHCP=False
 
 . $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
