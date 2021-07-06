@@ -13,7 +13,7 @@
 
 #include "tcputil.h"
 
-char *ssl_version= NULL;
+const char *ssl_version= NULL;
 
 static int ssl_initialized= 0;
 

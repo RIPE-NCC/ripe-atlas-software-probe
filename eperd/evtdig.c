@@ -399,8 +399,8 @@
 #define RESP_PACKET	1
 #define RESP_PEERNAME	2
 #define RESP_SOCKNAME	3
-//#define RESP_TTL	4
-//#define RESP_DSTADDR	5
+#define RESP_N_RESOLV	4
+#define RESP_RESOLVER	5
 #define RESP_LENGTH	6
 #define RESP_DATA	7
 #define RESP_CMSG	8
@@ -1876,7 +1876,7 @@ static void update_server_cookie(struct query_state *qry, uint8_t *packet,
 	int ind, optlen, optoff;
 
 	/* Should wipe server cookie first. */
-	printf("update_server_cookie: should wipe server cookie\n");
+	fprintf(stderr, "update_server_cookie: should wipe server cookie\n");
 
 	/* Select server cookie */
 	if (qry->opt_resolv_conf)
@@ -2852,11 +2852,13 @@ void tdig_start (void *arg)
 	struct timeval asap = { 0, 0 };
 	struct timeval interval;
 
-	int err_num;
+	int i, err_num;
+	size_t len;
 	struct query_state *qry;
 	struct addrinfo hints, *res;
 	char port[] = "domain";
 	struct sockaddr_in6 sin6;
+	char strbuf[256];
 
 	qry= arg;
 
@@ -2887,10 +2889,76 @@ void tdig_start (void *arg)
 			qry->resolv_i = 0;
 			// crondlog(LVL5 "RESOLV QUERY FREE %s resolv_max %d", qry->server_name,  qry->resolv_max);
 			if( qry->opt_resolv_conf) {
-				get_local_resolvers (qry->nslist,
-					&qry->resolv_max,
-					qry->infname);
+				if (qry->response_in)
+				{
+					if (qry->udp_fd == -1)
+					{
+						qry->udp_fd=
+							open(qry->response_in,
+							O_RDONLY);
+						if (qry->udp_fd == -1)
+						{
+							crondlog(
+						DIE9 "unable to open '%s': %s",
+							qry->response_in,
+							strerror(errno));
+						}
+					}
+					len= sizeof(qry->resolv_max);
+					read_response(qry->udp_fd,
+						RESP_N_RESOLV, &len,
+						&qry->resolv_max);
+					if (len != sizeof(qry->resolv_max))
+					{
+						crondlog(
+				DIE9 "tdig_start: error reading from '%s'",
+							qry->response_in);
+					}
+					for (i= 0; i<qry->resolv_max; i++)
+					{
+						len= sizeof(strbuf)-1;
+						read_response(qry->udp_fd,
+							RESP_RESOLVER, &len,
+							strbuf);
+						strbuf[len]= '\0';
+						qry->nslist[i]= strdup(strbuf);
+					}
+				}
+				else
+				{
+					get_local_resolvers (qry->nslist,
+						&qry->resolv_max,
+						qry->infname);
+				}
 				// crondlog(LVL5 "AAA RESOLV QUERY FREE %s resolv_max %d %d", qry->server_name,  qry->resolv_max, qry->resolv_i);
+				if (qry->response_out)
+				{
+					if (!qry->resp_file)
+					{
+						qry->resp_file=
+							fopen(qry->response_out,
+							 "w");
+						if (!qry->resp_file)
+						{
+							crondlog(	
+						DIE9 "unable to write to '%s'",
+								qry->
+								response_out);
+						}
+					}
+
+					write_response(qry->resp_file,
+						RESP_N_RESOLV,
+						sizeof(qry->resolv_max),
+						&qry->resolv_max);
+					for (i= 0; i<qry->resolv_max; i++)
+					{
+						write_response(qry->resp_file,
+							RESP_RESOLVER,
+							strlen(qry->nslist[i]),
+							qry->nslist[i]);
+					}
+				}
 				if(qry->resolv_max ) {
 					free(qry->server_name);
 					qry->server_name = NULL;
@@ -3468,6 +3536,9 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 	JS1(time, %ld,  qry->xmit_time);
 	JD(lts,lts);
+
+	if (qry->response_in || qry->response_out)
+		ssl_version= "test 0.0.0";
 
 	if (qry->opt_do_tls && ssl_version != NULL)
 		JS(sslvers, ssl_version);
