@@ -214,7 +214,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
-	char errbuf[80];
+	char errbuf[128];
 
 	env= ctx;
 

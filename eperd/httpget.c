@@ -48,6 +48,7 @@ static struct option longopts[]=
 	{ "store-headers", required_argument, NULL, 'H' },
 	{ "store-body",	required_argument, NULL, 'B' },
 	{ "user-agent",	required_argument, NULL, 'u' },
+	{ "sni",	required_argument, NULL, 's' },
 	{ "timeout",	required_argument, NULL, 'S' },
 	{ "etim",	no_argument, NULL, 't' },
 	{ "eetim",	no_argument, NULL, 'T' },
@@ -112,6 +113,7 @@ struct hgstate
 	char *port;
 	char *hostport;
 	char *path;
+	char *sni;
 	struct bufferevent *bev;
 	enum readstate readstate;
 	enum writestate writestate;
@@ -423,7 +425,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	char *validated_post_header= NULL;
 	char *validated_post_file= NULL;
 	char *validated_post_footer= NULL;
-	const char *user_agent;
+	const char *sni, *user_agent;
 	char *host, *port, *hostport, *path;
 	struct hgstate *state;
 	FILE *fh;
@@ -452,6 +454,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	response_out= NULL;
 	only_v4= 0;
 	only_v6= 0;
+	sni= NULL;
 	do_etim= 0;
 	do_eetim= 0;
 	user_agent= "httpget for atlas.ripe.net";
@@ -550,6 +553,9 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 			break;
 		case 't':				/* --etim */
 			do_etim= 1;
+			break;
+		case 's':
+			sni= optarg;			/* --sni */
 			break;
 		case 'S':
 			timeout_str= optarg;		/* --timeout */
@@ -762,6 +768,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	state->max_headers= max_headers;
 	state->max_body= max_body;
 	state->read_limit= read_limit;
+	state->sni= sni ? strdup(sni) : strdup(host);
 	state->timeout= timeout;
 	state->infname= infname ? strdup(infname) : NULL;
 
@@ -2044,6 +2051,7 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 		break;
 
 	case TU_CONNECT_ERR:
+		fprintf(stderr, "reporterr: str %s\n", str);
 		snprintf(line, sizeof(line),
 			DBQ(err) ":" DBQ(connect: %s) ", ", str);
 		add_str(state, line);
@@ -2203,7 +2211,7 @@ static void httpget_start(void *state)
 		tu_connect_to_name(&hgstate->tu_env, hgstate->host,
 			hgstate->do_tls, 0, hgstate->port,
 			&interval, &hints, hgstate->infname,
-			NULL, NULL,
+			hgstate->sni, NULL,
 			timeout_callback,
 			reporterr, dnscount, beforeconnect,
 			connected, readcb, writecb);
@@ -2252,6 +2260,8 @@ static int httpget_delete(void *state)
 	hgstate->port= NULL;
 	free(hgstate->path);
 	hgstate->path= NULL;
+	free(hgstate->sni);
+	hgstate->sni= NULL;
 	free(hgstate->user_agent);
 	hgstate->user_agent= NULL;
 	free(hgstate->post_header);
