@@ -23,6 +23,20 @@ void peek_response(int fd, int *typep)
 	*typep= stored_type;
 }
 
+void peek_response_file(FILE *file, int *typep)
+{
+	if (!got_type)
+	{
+		if (fread(&stored_type, sizeof(stored_type), 1, file) != 1)
+		{
+			fprintf(stderr, "peek_response_file: error reading\n");
+			exit(1);
+		}
+		got_type= 1;
+	}
+	*typep= stored_type;
+}
+
 void read_response(int fd, int type, size_t *sizep, void *data)
 {
 	int tmp_type;
@@ -72,7 +86,12 @@ void read_response_file(FILE *file, int type, size_t *sizep, void *data)
 	int r, tmp_type;
 	size_t tmp_size;
 
-	if (fread(&tmp_type, sizeof(tmp_type), 1, file) != 1)
+	if (got_type)
+	{
+		tmp_type= stored_type;
+		got_type= 0;
+	}
+	else if (fread(&tmp_type, sizeof(tmp_type), 1, file) != 1)
 	{
 		fprintf(stderr, "read_response_file: error reading\n");
 		exit(1);
