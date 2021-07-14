@@ -570,7 +570,10 @@ static void add_ciphers(struct hsbuf *hsbuf)
 {
 	size_t len;
 	uint8_t ciphers[]= {
-		/* From Firefox 57.0.1 */
+		/* From Firefox 89.0.2 */
+		0x13,0x01,	/* TLS_AES_128_GCM_SHA256 */
+		0x13,0x03,	/* TLS_CHACHA20_POLY1305_SHA256 */
+		0x13,0x02,	/* TLS_AES_256_GCM_SHA384 */
 		0xc0,0x2b,	/* TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 */
 		0xc0,0x2f,	/* TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 */
 		0xcc,0xa9,	/* TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 */
@@ -581,8 +584,8 @@ static void add_ciphers(struct hsbuf *hsbuf)
 		0xc0,0x09,	/* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA */
 		0xc0,0x13,	/* TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA */
 		0xc0,0x14,	/* TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA */
-		0x00,0x33,	/* TLS_DHE_RSA_WITH_AES_128_CBC_SHA */
-		0x00,0x39,	/* TLS_DHE_RSA_WITH_AES_256_CBC_SHA */
+		0x00,0x9c,	/* TLS_RSA_WITH_AES_128_GCM_SHA256 */
+		0x00,0x9d,	/* TLS_RSA_WITH_AES_256_GCM_SHA384 */
 		0x00,0x2f,	/* TLS_RSA_WITH_AES_128_CBC_SHA */
 		0x00,0x35,	/* TLS_RSA_WITH_AES_256_CBC_SHA */
 		0x00,0x0a,	/* TLS_RSA_WITH_3DES_EDE_CBC_SHA */
@@ -613,17 +616,18 @@ static void ext_sigs(struct hsbuf *hsbuf)
 	uint16_t sigextlen, siglen;
 	uint8_t sigs[] =
 	{
-		/* From wget 1.19.1 */
-		0x04, 0x01,	/* SHA256, RSA */
-		0x04, 0x03,	/* SHA256, ECDSA */
-		0x05, 0x01,	/* SHA384, RSA */
-		0x05, 0x03,	/* SHA384, ECDSA */
-		0x06, 0x01,	/* SHA512, RSA */
-		0x06, 0x03,	/* SHA512, ECDSA */
-		0x03, 0x01,	/* SHA224, RSA */
-		0x03, 0x03,	/* SHA224, ECDSA */
-		0x02, 0x01,	/* SHA1, RSA */
-		0x02, 0x01,	/* SHA1, ECDSA */
+		/* From Firefox 89.0.2 */
+		0x04, 0x03,	/* ecdsa_secp256r1_sha256 */
+		0x05, 0x03,	/* ecdsa_secp256r1_sha384 */
+		0x06, 0x03,	/* ecdsa_secp256r1_sha512 */
+		0x08, 0x04,	/* rsa_pss_rsae_sha256 */
+		0x08, 0x05,	/* rsa_pss_rsae_sha384 */
+		0x08, 0x06,	/* rsa_pss_rsae_sha512 */
+		0x04, 0x01,	/* rsa_pkcs1_sha256 */
+		0x05, 0x01,	/* rsa_pkcs1_sha384 */
+		0x06, 0x01,	/* rsa_pkcs1_sha512 */
+		0x02, 0x03,	/* ecdsa_sha1 */
+		0x02, 0x01,	/* rsa_pkcs1_sha1 */
 	};
 
 	siglen= sizeof(sigs);
@@ -640,12 +644,13 @@ static void elliptic_curves(struct hsbuf *hsbuf)
 	uint16_t curvesextlen, curveslen;
 	uint8_t curves[] =
 	{
-		/* From wget 1.19.1 */
+		/* From Firefox 89.0.2 */
+		0x00, 0x1d,	/* x25519 */
 		0x00, 0x17,	/* secp256r1 */
 		0x00, 0x18,	/* secp384r1 */
 		0x00, 0x19,	/* secp521r1 */
-		0x00, 0x15,	/* secp224r1 */
-		0x00, 0x13,	/* secp192r1 */
+		0x01, 0x00,	/* ffdhe2048 */
+		0x01, 0x01,	/* ffdhe3072 */
 	};
 
 	curveslen= sizeof(curves);
