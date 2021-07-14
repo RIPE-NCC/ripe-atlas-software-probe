@@ -1472,7 +1472,17 @@ static void noreply_callback(int unused  UNUSED_PARAM, const short event UNUSED_
 		size_t tmp_len;
 
 		tmp_len= 0;
-		read_response(qry->udp_fd, RESP_TIMEOUT, &tmp_len, NULL);
+
+		if (qry->resp_file)
+		{
+			read_response_file(qry->resp_file, RESP_TIMEOUT,
+				&tmp_len, NULL);
+		}
+		else
+		{
+			read_response(qry->udp_fd, RESP_TIMEOUT,
+				&tmp_len, NULL);
+		}
 	}
 	if (qry->response_out)
 		write_response(qry->resp_file, RESP_TIMEOUT, 0, NULL);
@@ -1651,7 +1661,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 {
 
         struct query_state *qry = ptr;
-        int n;
+        int n, type;
         u_char b2[2];
         struct timespec rectime;
         struct evbuffer *input ;
@@ -1684,6 +1694,15 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			size_t tmp_len;
 
 			tmp_len= sizeof(b2);
+
+			peek_response_file(qry->resp_file, &type);
+			if (type == RESP_TIMEOUT)
+			{
+				fprintf(stderr,
+					"tcp_readcb: peek found TIMEOUT\n");
+				noreply_callback(0, 0, qry);
+				return;
+			}
 			read_response_file(qry->resp_file,
 				RESP_LENGTH, &tmp_len, b2);
 			if (tmp_len != sizeof(b2))
