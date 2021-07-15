@@ -32,6 +32,7 @@
 #define RESP_PACKET	1
 #define RESP_SOCKNAME	2
 #define RESP_DSTADDR	3
+#define RESP_READ_ERROR	4
 
 static struct option longopts[]=
 {
@@ -1927,6 +1928,8 @@ static void err_reading(struct hgstate *state)
 {
 	struct timespec endtime;
 
+	write_response(state->resp_file, RESP_READ_ERROR, 0, NULL);
+
 	switch(state->readstate)
 	{
 	case READ_STATUS:
@@ -2122,6 +2125,7 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 
 static void httpget_start(void *state)
 {
+	int type;
 	size_t len;
 	struct hgstate *hgstate;
 	struct evutil_addrinfo hints;
@@ -2203,7 +2207,18 @@ static void httpget_start(void *state)
 
 		writecb(NULL, &hgstate->tu_env);
 		while(hgstate->resp_file != NULL)
+		{
+			peek_response_file(hgstate->resp_file, &type);
+			if (type == RESP_READ_ERROR)
+			{
+				len= 0;
+				read_response_file(hgstate->resp_file,
+					RESP_READ_ERROR, &len, NULL);
+				err_reading(hgstate);
+				break;
+			}
 			readcb(NULL, &hgstate->tu_env);
+		}
 		report(hgstate);
 	}
 	else

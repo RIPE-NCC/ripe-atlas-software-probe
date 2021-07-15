@@ -1,1 +1,1 @@
-RESULT { "id":"42", "fw":5020, "mver": "2.3.0", "lts":123, "time":999999999, "ttr":1000.001000, "result":[ { "method":"GET", "af": 4, "dst_addr":"193.0.6.139", "src_addr":"192.168.1.166", "rt":3000.003000, "res":301, "ver":"1.1", "hsize":171, "bsize":229 } ] }
+RESULT { "id":"42", "fw":9999, "mver": "0.0.0", "lts":123, "time":999999999, "ttr":1000.001000, "result":[ { "method":"GET", "af": 4, "dst_addr":"104.18.20.44", "src_addr":"193.0.1.10", "rt":3000.003000, "res":301, "ver":"1.1", "hsize":387, "bsize":0 } ] }
