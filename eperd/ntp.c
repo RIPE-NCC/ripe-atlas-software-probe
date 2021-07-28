@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
- * traceroute.c
+ * ntp.c
  */
 
 #include "libbb.h"
+#include <assert.h>
 #include <math.h>
 #include <event2/dns.h>
 #include <event2/event.h>
@@ -43,10 +44,12 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define RESP_PACKET	1
-#define RESP_SOCKNAME	2
-#define RESP_DSTADDR	3
-#define RESP_TIMEOFDAY	4
+#define RESP_PACKET		1
+#define RESP_SOCKNAME		2
+#define RESP_DSTADDR		3
+#define RESP_TIMEOFDAY		4
+#define RESP_ADDRINFO		5
+#define RESP_ADDRINFO_SA	6
 
 struct ntp_ts
 {
@@ -63,7 +66,7 @@ struct ntpbase
 	struct ntpstate **table;
 	int tabsiz;
 
-	/* For standalone traceroute. Called when a traceroute instance is
+	/* For standalone ntp. Called when a ntp instance is
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
@@ -1089,7 +1092,7 @@ err:
 	return NULL;
 }
 
-static void traceroute_start2(void *state)
+static void ntp_start2(void *state)
 {
 	struct ntpstate *ntpstate;
 
@@ -1121,8 +1124,6 @@ static void traceroute_start2(void *state)
 	ntpstate->open_result= 0;
 	ntpstate->starttime= atlas_time();
 
-	ntpstate->socket= -1;
-
 	if (create_socket(ntpstate) == -1)
 		return;
 	if (ntpstate->do_v6)
@@ -1150,16 +1151,7 @@ static int create_socket(struct ntpstate *state)
 	type= SOCK_DGRAM;
 	protocol= 0;
 
-	if (state->response_in)
-	{
-		state->socket= open(state->response_in, O_RDONLY);
-		if (state->socket == -1)
-		{
-			crondlog(DIE9 "unable to open '%s'",
-				state->response_in);
-		}
-	}
-	else
+	if (!state->response_in)
 		state->socket= xsocket(af, type, protocol);
 #if 0
  { errno= ENOSYS; state->socket= -1; }
@@ -1257,11 +1249,13 @@ static int create_socket(struct ntpstate *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int r, count;
+	int r;
+	size_t tmp_len;
 	struct ntpstate *env;
-	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
+	struct addrinfo tmp_res;
+	struct sockaddr_storage tmp_sockaddr;
 	char line[160];
 
 	env= ctx;
@@ -1309,17 +1303,41 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->dns_res= res;
 	env->dns_curr= res;
 
-	count= 0;
-	for (cur= res; cur; cur= cur->ai_next)
-		count++;
-
-	// env->reportcount(env, count);
+	if (env->response_in)
+	{
+	
+		env->socket= open(env->response_in, O_RDONLY);
+		if (env->socket == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				env->response_in);
+		}
+	
+		tmp_len= sizeof(tmp_res);
+		read_response(env->socket, RESP_ADDRINFO, &tmp_len, &tmp_res);
+		assert(tmp_len == sizeof(tmp_res));
+		tmp_len= sizeof(tmp_sockaddr);
+		read_response(env->socket, RESP_ADDRINFO_SA,
+			&tmp_len, &tmp_sockaddr);
+		assert(tmp_len == tmp_res.ai_addrlen);
+		tmp_res.ai_addr= (struct sockaddr *)&tmp_sockaddr;
+		env->dns_curr= &tmp_res;
+	}
 
 	while (env->dns_curr)
 	{
+		if (env->response_out)
+		{
+			write_response(env->resp_file_out, RESP_ADDRINFO,
+				sizeof(*env->dns_curr), env->dns_curr);
+			write_response(env->resp_file_out, RESP_ADDRINFO_SA,
+				env->dns_curr->ai_addrlen,
+				env->dns_curr->ai_addr);
+		}
+
 		env->socklen= env->dns_curr->ai_addrlen;
 		if (env->socklen > sizeof(env->sin6))
-			continue;	/* Weird */
+			break;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
 
@@ -1342,16 +1360,18 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			return;
 		}
 
-		traceroute_start2(env);
+		ntp_start2(env);
 
-		evutil_freeaddrinfo(env->dns_res);
+		if (!env->response_in)
+			evutil_freeaddrinfo(env->dns_res);
 		env->dns_res= NULL;
 		env->dns_curr= NULL;
 		return;
 	}
 
 	/* Something went wrong */
-	evutil_freeaddrinfo(env->dns_res);
+	if (!env->response_in)
+		evutil_freeaddrinfo(env->dns_res);
 	env->dns_res= NULL;
 	env->dns_curr= NULL;
 	snprintf(line, sizeof(line),
@@ -1375,6 +1395,8 @@ static void ntp_start(void *state)
 	}
 	ntpstate->busy= 1;
 
+	ntpstate->socket= -1;
+
 	if (ntpstate->response_out)
 	{
 		ntpstate->resp_file_out= fopen(ntpstate->response_out, "w");
@@ -1386,13 +1408,21 @@ static void ntp_start(void *state)
 	}
 
 
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_socktype= SOCK_DGRAM;
-	hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
-	ntpstate->dnsip= 1;
-	gettime_mono(&ntpstate->start_time);
-	(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
-		ntpstate->destportstr, &hints, dns_cb, ntpstate);
+	if (ntpstate->response_in)
+	{
+		ntpstate->dnsip= 1;
+		dns_cb(0, 0, ntpstate);
+	}
+	else
+	{
+		memset(&hints, '\0', sizeof(hints));
+		hints.ai_socktype= SOCK_DGRAM;
+		hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
+		ntpstate->dnsip= 1;
+		gettime_mono(&ntpstate->start_time);
+		(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
+			ntpstate->destportstr, &hints, dns_cb, ntpstate);
+	}
 }
 
 static int ntp_delete(void *state)
