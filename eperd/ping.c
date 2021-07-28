@@ -12,6 +12,7 @@
 #include <event2/event.h>
 #include <event2/event_struct.h>
 
+#include <assert.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
@@ -65,11 +66,13 @@ enum
 #define PING_ERR_CANCEL   12       /* The request was canceled via a call to evping_cancel_request */
 #define PING_ERR_UNKNOWN  16       /* An unknown error occurred */
 
-#define RESP_PACKET	1
-#define RESP_PEERNAME	2
-#define RESP_SOCKNAME	3
-#define RESP_TTL	4
-#define RESP_DSTADDR	5
+#define RESP_PACKET		1
+#define RESP_PEERNAME		2
+#define RESP_SOCKNAME		3
+#define RESP_TTL		4
+#define RESP_DSTADDR		5
+#define RESP_ADDRINFO		6
+#define RESP_ADDRINFO_SA	7
 
 /* Definition for various types of counters */
 typedef uint64_t counter_t;
@@ -1471,28 +1474,23 @@ static void ping_start2(void *state)
 		/* Check if the ICMP protocol is available on this system */
 		p_proto= IPPROTO_ICMP;
 
-		if (pingstate->response_in)
+		if (!pingstate->response_in)
 		{
-			fd= open(pingstate->response_in, O_RDONLY);
-			if (fd == -1)
-			{
-				crondlog(DIE9 "unable to open '%s'",
-					pingstate->response_in);
+			if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
+				/* Create an endpoint for communication
+				 * using raw socket for ICMP calls */
+				snprintf(line, sizeof(line),
+					"{ " DBQ(error) ":"
+					DBQ(socket failed: %s) " }",
+					strerror(errno));
+				add_str(pingstate, line);
+				report(pingstate);
+				if (pingstate->base->done)
+					pingstate->base->done(pingstate, 1);
+				return;
 			}
+			pingstate->socket= fd;
 		}
-		else if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
-			/* Create an endpoint for communication using raw	
-			 * socket for ICMP calls */
-			snprintf(line, sizeof(line),
-				"{ " DBQ(error) ":" DBQ(socket failed: %s)
-				" }", strerror(errno));
-			add_str(pingstate, line);
-			report(pingstate);
-			if (pingstate->base->done)
-				pingstate->base->done(pingstate, 1);
-			return;
-		}
-		pingstate->socket= fd;
 
 		/* Define the callback to handle ICMP Echo Reply and add the
 		 * raw file descriptor to those monitored for read events */
@@ -1505,24 +1503,21 @@ static void ping_start2(void *state)
 		/* Check if the ICMP6 protocol is available on this system */
 		p_proto= IPPROTO_ICMPV6;
 
-		if (pingstate->response_in)
+		if (!pingstate->response_in)
 		{
-			fd= open(pingstate->response_in, O_RDONLY);
-			if (fd == -1)
-			{
-				crondlog(DIE9 "unable to open '%s'",
-					pingstate->response_in);
+			if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
+				snprintf(line, sizeof(line),
+					"{ " DBQ(error) ":"
+					DBQ(socket failed: %s) " }",
+					strerror(errno));
+				add_str(pingstate, line);
+				report(pingstate);
+				if (pingstate->base->done)
+					pingstate->base->done(pingstate, 1);
+				return;
 			}
-		}
-		else if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
-			snprintf(line, sizeof(line),
-				"{ " DBQ(error) ":" DBQ(socket failed: %s)
-				" }", strerror(errno));
-			add_str(pingstate, line);
-			report(pingstate);
-			if (pingstate->base->done)
-				pingstate->base->done(pingstate, 1);
-			return;
+			pingstate->socket= fd;
+
 		}
 
 		on = 1;
@@ -1532,8 +1527,6 @@ static void ping_start2(void *state)
 		on = 1;
 		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 			sizeof(on));
-
-		pingstate->socket= fd;
 
 		if (!pingstate->response_in)
 		{
@@ -1610,11 +1603,13 @@ static void ping_start2(void *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int r, count;
+	int r;
+	size_t tmp_len;
 	struct pingstate *env;
-	struct evutil_addrinfo *cur;
 	struct timespec now, elapsed;
 	double nsecs;
+	struct addrinfo tmp_res;
+	struct sockaddr_storage tmp_sockaddr;
 
 	env= ctx;
 
@@ -1660,15 +1655,40 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->dns_res= res;
 	env->dns_curr= res;
 
-	count= 0;
-	for (cur= res; cur; cur= cur->ai_next)
-		count++;
+	if (env->response_in)
+	{
+		env->socket= open(env->response_in, O_RDONLY);
+		if (env->socket == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				env->response_in);
+		}
+	
+		tmp_len= sizeof(tmp_res);
+		read_response(env->socket, RESP_ADDRINFO, &tmp_len, &tmp_res);
+		assert(tmp_len == sizeof(tmp_res));
+		tmp_len= sizeof(tmp_sockaddr);
+		read_response(env->socket, RESP_ADDRINFO_SA,
+			&tmp_len, &tmp_sockaddr);
+		assert(tmp_len == tmp_res.ai_addrlen);
+		tmp_res.ai_addr= (struct sockaddr *)&tmp_sockaddr;
+		env->dns_curr= &tmp_res;
+	}
 
 	while (env->dns_curr)
 	{
+		if (env->response_out)
+		{
+			write_response(env->resp_file_out, RESP_ADDRINFO,
+				sizeof(*env->dns_curr), env->dns_curr);
+			write_response(env->resp_file_out, RESP_ADDRINFO_SA,
+				env->dns_curr->ai_addrlen,
+				env->dns_curr->ai_addr);
+		}
+	
 		env->socklen= env->dns_curr->ai_addrlen;
 		if (env->socklen > sizeof(env->sin6))
-			continue;	/* Weird */
+			break;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
 
@@ -1697,9 +1717,12 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	}
 
 	/* Something went wrong */
-	evutil_freeaddrinfo(env->dns_res);
-	env->dns_res= NULL;
-	env->dns_curr= NULL;
+	if (!env->response_in)
+	{
+		evutil_freeaddrinfo(env->dns_res);
+		env->dns_res= NULL;
+		env->dns_curr= NULL;
+	}
 	ping_cb(PING_ERR_DNS_NO_ADDR, env->cursize, -1,
 		(struct sockaddr *)NULL, 0,
 		(struct sockaddr *)NULL, 0,
@@ -1749,13 +1772,19 @@ static void ping_start(void *state)
 	}
 
 	pingstate->dnsip= 1;
-
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_socktype= SOCK_DGRAM;
-	hints.ai_family= pingstate->af;
 	gettime_mono(&pingstate->start_time);
-	(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
-		&hints, dns_cb, pingstate);
+	if (pingstate->response_in)
+	{
+		dns_cb(0, 0, pingstate);
+	}
+	else
+	{
+		memset(&hints, '\0', sizeof(hints));
+		hints.ai_socktype= SOCK_DGRAM;
+		hints.ai_family= pingstate->af;
+		(void) evdns_getaddrinfo(DnsBase, pingstate->hostname, NULL,
+			&hints, dns_cb, pingstate);
+	}
 }
 
 static int ping_delete(void *state)
