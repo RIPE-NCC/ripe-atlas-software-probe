@@ -407,15 +407,17 @@
 #define DNS_SERVER_COOKIE_MIN_LEN	 8
 #define DNS_SERVER_COOKIE_MAX_LEN	32
 
-#define RESP_PACKET	1
-#define RESP_PEERNAME	2
-#define RESP_SOCKNAME	3
-#define RESP_N_RESOLV	4
-#define RESP_RESOLVER	5
-#define RESP_LENGTH	6
-#define RESP_DATA	7
-#define RESP_CMSG	8
-#define RESP_TIMEOUT	9
+#define RESP_PACKET		 1
+#define RESP_PEERNAME		 2
+#define RESP_SOCKNAME		 3
+#define RESP_N_RESOLV		 4
+#define RESP_RESOLVER		 5
+#define RESP_LENGTH		 6
+#define RESP_DATA		 7
+#define RESP_CMSG		 8
+#define RESP_TIMEOUT		 9
+#define RESP_ADDRINFO		10
+#define RESP_ADDRINFO_SA	11
 
 
 /* Definition for various types of counters */
@@ -1236,6 +1238,8 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 	u_char *outbuff= NULL;
 	int err = 0; 
 	struct timeval tv_noreply;
+	struct addrinfo tmp_res;
+	struct sockaddr_storage tmp_sockaddr;
 
 	/* Clean the no reply timer (if any was previously set) */
 	evtimer_del(&qry->noreply_timer);
@@ -1254,10 +1258,10 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 			qry->udp_fd= -1;
 		}
 
-		af = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
-
 		if (qry->response_in)
 		{
+			size_t tmp_len;
+
 			if (qry->udp_fd != -1)
 				fd= qry->udp_fd;
 			else
@@ -1267,16 +1271,44 @@ static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event 
 				crondlog(DIE9 "unable to open '%s': %s",
 				qry->response_in, strerror(errno));
 			}
+
+			tmp_len= sizeof(tmp_res);
+			read_response(fd, RESP_ADDRINFO,
+				&tmp_len, &tmp_res);
+			assert(tmp_len == sizeof(tmp_res));
+			tmp_len= sizeof(tmp_sockaddr);
+			read_response(fd, RESP_ADDRINFO_SA,
+				&tmp_len, &tmp_sockaddr);
+			assert(tmp_len == tmp_res->ai_addrlen);
+			tmp_res.ai_addr= (struct sockaddr *)&tmp_sockaddr;
+			qry->res= &tmp_res;
 		}
-		else if ((fd = socket(af, SOCK_DGRAM, 0) ) < 0 )
+
+		if (qry->response_out)
 		{
-			snprintf(line, DEFAULT_LINE_LENGTH, "%s \"socket\" : \"socket failed %s\"", qry->err.size ? ", " : "", strerror(errno));
-			buf_add(&qry->err, line, strlen(line));
-			printReply (qry, 0, NULL);
-			free (outbuff);
-			outbuff = NULL;
-			return;
-		} 
+			write_response(qry->resp_file, RESP_ADDRINFO,
+				sizeof(*qry->res), qry->res);
+			write_response(qry->resp_file, RESP_ADDRINFO_SA,
+				qry->res->ai_addrlen, qry->res->ai_addr);
+		}
+
+		af = ((struct sockaddr *)(qry->res->ai_addr))->sa_family;
+
+		if (!qry->response_in)
+		{
+			if ((fd = socket(af, SOCK_DGRAM, 0) ) < 0 )
+			{
+				snprintf(line, DEFAULT_LINE_LENGTH,
+					"%s \"socket\" : \"socket failed %s\"",
+					qry->err.size ? ", " : "",
+					strerror(errno));
+				buf_add(&qry->err, line, strlen(line));
+				printReply (qry, 0, NULL);
+				free (outbuff);
+				outbuff = NULL;
+				return;
+			} 
+		}
 
 		if (af == AF_INET6 && qry->opt_ipv6_dest_option != 0)
 		{
@@ -1703,7 +1735,6 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
         struct evbuffer *input ;
         struct DNS_HEADER *dnsR = NULL;
 
-	gettime_mono(&rectime);
 
         qry = ENV2QRY(ptr);
 	// BLURT(LVL5 "TCP readcb %s", qry->server_name );
@@ -1724,6 +1755,8 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		}
 		return;
 	}
+
+	gettime_mono(&rectime);
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
@@ -1751,8 +1784,6 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			peek_response_file(qry->resp_file, &type);
 			if (type == RESP_TIMEOUT)
 			{
-				fprintf(stderr,
-					"tcp_readcb: peek found TIMEOUT\n");
 				noreply_callback(0, 0, qry);
 				return;
 			}
@@ -3177,7 +3208,14 @@ void tdig_start (void *arg)
 	}
 
 	if(qry->opt_proto == 17) {  //UDP 
-		if(qry->opt_evdns ) {
+		if (qry->response_in)
+		{
+			qry->res = NULL;
+			qry->ressave = NULL;
+			qry->qst = STATUS_SEND;
+			tdig_send_query_callback(0, 0, qry);
+		}
+		else if(qry->opt_evdns ) {
 			// use EVDNS asynchronous call 
 			evdns_getaddrinfo(DnsBase, qry->server_name, qry->port_as_char, &hints, udp_dns_cb, qry);
 		}
@@ -3219,11 +3257,8 @@ void tdig_start (void *arg)
 			len= sizeof(sin6);
 			read_response_file(qry->resp_file, RESP_PEERNAME,
 				&len, &sin6);
-			qry->dst_ai_family = sin6.sin6_family;
-			getnameinfo((struct sockaddr *)&sin6, len,
-				qry->dst_addr_str,
-				INET6_ADDRSTRLEN , NULL, 0, NI_NUMERICHOST);
-
+			tcp_beforeconnect(&qry->tu_env,
+				(struct sockaddr *)&sin6, len);
 			tcp_connected(&qry->tu_env, NULL);
 			tcp_writecb(NULL, &qry->tu_env);
 			while(qry->resp_file != NULL)
