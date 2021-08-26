@@ -140,6 +140,10 @@ if [ "$need_rereg" = 1 ]; then
 		echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
 		echo "$ERR  REGINIT exit with error"
 		$SET_LEDS_CMD reginit-fail
+		if grep -q "Permission denied (publickey)." $SSH_ERR
+		then
+			sos "Issh-permission-denied"
+		fi
 		rm  -f $STATE_FILE
 		exit
 	fi
