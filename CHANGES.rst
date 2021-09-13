@@ -1,6 +1,20 @@
 Release History
 ===============
 
+5030 (released 2021-09-13)
+--------------------------
+- Config variable to disable the check that atlas data is on tmpfs
+- Support for software probes on OpenWrt (by Jan Pavlinec)
+- Measurement changes (version 2.4.0):
+
+  * Solve issue with duplicate src_addr in DNS measurements
+  * Remove as much as possible source files that are not used by Atlas
+  * Fix bug in sslgetcert if there is a connection failure
+  * Replace stime with clock_settime
+  * Support a lot more network interfaces in reporting traffic statistics
+  * Option to set AD bit in DNS queries 
+  * Initial support for testing Atlas measurement code
+
 5020 (released 2020-04-06)
 --------------------------
 - Support for a centos 8 binary repo
