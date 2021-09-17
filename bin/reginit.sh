@@ -27,6 +27,12 @@ SSH_OUT=ssh_out.txt
 LOW_MEM_T=512
 export TZ=UTC
 
+if [ -z "$httppost_port" ]
+then
+	# Set httppost_port to the default value
+	httppost_port="8080"
+fi
+
 if [ -f $STATE_FILE ] ; then
 	echo "there is a state file $STATE_FILE. another copy running".
 	exit 0
@@ -505,10 +511,10 @@ if [ $? -eq 1 ] ; then
 	exit
 fi
 D=`epoch`
-echo "RESULT 9011 done $D $ETHER_SCANNED Starting $SSH_CMD -R $REMOTE_PORT:127.0.0.1:$TELNETD_PORT -L 8080:127.0.0.1:8080 -i $SSH_PVT_KEY -p $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST KEEP"  >> $DATA_NEW_DIR/simpleping
+echo "RESULT 9011 done $D $ETHER_SCANNED Starting $SSH_CMD -R $REMOTE_PORT:127.0.0.1:$TELNETD_PORT -L "$httppost_port":127.0.0.1:8080 -i $SSH_PVT_KEY -p $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST KEEP"  >> $DATA_NEW_DIR/simpleping
 echo "initiating  KEEP connection to -R $REMOTE_PORT -p  $CONTROLLER_1_PORT $CONTROLLER_1_HOST"
 $SET_LEDS_CMD keep-start
-$SSH_CMD_EXEC $SSH_OPT -R $REMOTE_PORT:127.0.0.1:$TELNETD_PORT -L 8080:127.0.0.1:8080 -p $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST KEEP > $CON_KEEP_REPLY 2>$SSH_ERR &
+$SSH_CMD_EXEC $SSH_OPT -R $REMOTE_PORT:127.0.0.1:$TELNETD_PORT -L "$httppost_port":127.0.0.1:8080 -p $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST KEEP > $CON_KEEP_REPLY 2>$SSH_ERR &
 KEEP_PID=$!
 echo $KEEP_PID > $CON_KEEP_PID
 

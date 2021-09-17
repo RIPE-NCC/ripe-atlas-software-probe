@@ -25,6 +25,12 @@ if [ $(config_lookup RXTXRPT no) = yes ]
 then
 	do_rxtxrpt=yes
 fi
+httppost_port="$(config_lookup HTTP_POST_PORT '')"
+if [ -n "$httppost_port" ]
+then
+	export HTTPPOST_PORT="$httppost_port"
+fi
+export httppost_port
 
 $MOUNT_FS_CMD
 
