@@ -5,11 +5,13 @@ stages:
 
 variables:
   DOCKER_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG
+  BRANCHES_REGEXP: "/^ci-test|devel|master$/"
 
 build_image:
   stage: docker_image
-  only:
-    changes:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ $BRANCHES_REGEXP'
+      changes:
       - .gitlab-ci.yml
       - build-config/gitlab-docker/Dockerfile
   image: docker:latest
@@ -20,10 +22,8 @@ build_image:
 
 build-ci-test:
   stage: build
-  only:
-    - ci-test
-    - devel
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ $BRANCHES_REGEXP'
   image: $DOCKER_IMAGE
   script:
     - cd libevent-2.1.11-stable  # first build libevent
@@ -40,8 +40,8 @@ build-ci-test:
 
 test-ci-test:
   stage: test
-  only:
-    - ci-test
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ $BRANCHES_REGEXP'
   image: $DOCKER_IMAGE
   script:
     - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/atlas/lib
