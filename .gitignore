@@ -9,7 +9,7 @@
 Kbuild
 Config.in
 !.config
-
+!.gitlab-ci.yml
 #
 # Never ignore these
 #
