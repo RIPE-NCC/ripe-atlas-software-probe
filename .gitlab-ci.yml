@@ -22,6 +22,8 @@ build-ci-test:
   stage: build
   only:
     - ci-test
+    - devel
+    - master
   image: $DOCKER_IMAGE
   script:
     - cd libevent-2.1.11-stable  # first build libevent
