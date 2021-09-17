@@ -21,10 +21,13 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx);
 static int create_bev(struct tu_env *env);
 static void eventcb(struct bufferevent *bev, short events, void *ptr);
 
-void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
+void tu_connect_to_name(struct tu_env *env, char *host,
+	bool do_tls, bool do_http2, char *port,
 	struct timeval *interval,
 	struct evutil_addrinfo *hints,
 	char *infname,
+	const char *server_name, 
+	const char *cert_name,
 	void (*timeout_callback)(int unused, const short event, void *s),
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *err),
@@ -50,6 +53,9 @@ void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
 	env->dns_res= NULL;
 	env->bev= NULL;
 	env->do_tls = do_tls;
+	env->do_http2 = do_http2;
+	env->server_name = server_name;
+	env->cert_name = cert_name;
 
 	evtimer_assign(&env->timer, EventBase,
 		timeout_callback, env);
@@ -336,13 +342,14 @@ static int create_bev(struct tu_env *env)
 	int af, fd, fl;
 	struct bufferevent *bev;
 	SSL *tls;
+	X509_VERIFY_PARAM *vpm = NULL;
 
 	af= env->dns_curr->ai_addr->sa_family;
 
 	/* Consistency check. These fields need to be clear */
 	assert(!env->tls_ctx);
 #if ENABLE_FEATURE_EVHTTPGET_HTTPS
-	if(env->do_tls)
+	if(env->do_tls || env->do_http2)
 	{
 		if (!ssl_initialized) {
 			ssl_initialized= 1;
@@ -362,12 +369,79 @@ static int create_bev(struct tu_env *env)
 		{
 			env->reporterr(env, TU_SSL_CTX_INIT_ERR,
 				"SSL_CTX_new call failed");
-				return -1;
+			return -1;
+		}
+		if (env->do_http2)
+		{
+			/* SSL_CTX_set_alpn_protos gets an ALPN list
+			 * in wire format. Each string is prefixed by
+			 * a length byte.
+			 */
+			const unsigned char alpn_list[]=
+				{ '\2', 'h', '2' };
+			size_t alpn_len= sizeof(alpn_list);
+			int r;
+
+			r= SSL_CTX_set_alpn_protos(env->tls_ctx,
+				alpn_list, alpn_len);
+			if (r != 0)
+			{
+				env->reporterr(env, TU_SSL_CTX_INIT_ERR,
+				"SSL_CTX_set_alpn_protos call failed");
+                                return -1;
+			}
+			if (env->cert_name)
+			{
+				if (!SSL_CTX_set_default_verify_paths
+					(env->tls_ctx))
+				{
+					env->reporterr(env,
+						TU_SSL_CTX_INIT_ERR,
+			"SSL_CTX_set_default_verify_paths call failed");
+                                	return -1;
+				}
+				vpm= X509_VERIFY_PARAM_new();
+				if (!X509_VERIFY_PARAM_set1_host(vpm,
+					env->cert_name, 0))
+				{
+					env->reporterr(env,
+						TU_SSL_CTX_INIT_ERR,
+				"X509_VERIFY_PARAM_set1_host call failed");
+					X509_VERIFY_PARAM_free(vpm);
+					vpm= NULL;
+                                	return -1;
+				}
+			}
+		}
+		if (vpm)
+		{
+			if (!SSL_CTX_set1_param(env->tls_ctx, vpm))
+			{
+				env->reporterr(env, TU_SSL_CTX_INIT_ERR,
+				"SSL_CTX_set1_param call failed");
+				X509_VERIFY_PARAM_free(vpm);
+				vpm= NULL;
+                                return -1;
+			}
+			X509_VERIFY_PARAM_free(vpm);
+			vpm= NULL;
+			SSL_CTX_set_verify(env->tls_ctx,
+				SSL_VERIFY_PEER, 0);
 		}
 		if ((tls = SSL_new(env->tls_ctx)) == NULL) {
 			env->reporterr(env, TU_SSL_OBJ_INIT_ERR,
 				"SSL_new call failed");
 				return -1;
+		}
+		if (env->server_name)
+		{
+			if (!SSL_set_tlsext_host_name(tls,
+				env->server_name))
+			{
+				env->reporterr(env, TU_SSL_OBJ_INIT_ERR,
+				"SSL_set_tlsext_host_name call failed");
+				return -1;
+			}
 		}
 		bev = bufferevent_openssl_socket_new(EventBase, -1, tls,
 				BUFFEREVENT_SSL_CONNECTING,
@@ -437,12 +511,6 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 
 	env= ptr;
 
-	if (events & BEV_EVENT_READING)
-	{
-		env->reporterr(env, TU_READ_ERR, "");
-		events &= ~BEV_EVENT_READING;
-		return;
-	}
 	if (events & BEV_EVENT_ERROR)
 	{
 		if (env->connecting)
@@ -462,10 +530,40 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 		}
 		events &= ~BEV_EVENT_ERROR;
 	}
+	if (events & BEV_EVENT_READING)
+	{
+		env->reporterr(env, TU_READ_ERR, "");
+		events &= ~BEV_EVENT_READING;
+		return;
+	}
 	if (events & BEV_EVENT_CONNECTED)
 	{
+		const unsigned char *data;
+		unsigned int len;
+
 		events &= ~BEV_EVENT_CONNECTED;
 		env->connecting= 0;
+
+		if (env->do_http2)
+		{
+			/* Check if the server accepted the h2 ALPN */
+			SSL_get0_alpn_selected(	
+				bufferevent_openssl_get_ssl(bev),
+				&data, &len);
+			if (data == NULL)
+			{
+				env->reporterr(env, TU_CONNECT_ERR,
+					"server does not offer 'h2' ALPN");
+				return;
+			}
+			else if (len != 2 || memcmp("h2", data, len) != 0)
+			{
+				env->reporterr(env, TU_CONNECT_ERR,
+					"server offers wrong ALPN");
+				return;
+			}
+		}
+
 		bufferevent_enable(bev, EV_READ);
 
 		env->connected(env, bev);

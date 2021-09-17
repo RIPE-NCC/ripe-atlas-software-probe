@@ -22,7 +22,7 @@
 
 //applet:IF_EPERD(APPLET(eperd, BB_DIR_BIN, BB_SUID_DROP))
 
-//kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
+//kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o http2.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
 
 //usage:#define eperd_trivial_usage
 //usage:       "-fbSAD -P pidfile -l N -d N -L LOGFILE -c DIR"

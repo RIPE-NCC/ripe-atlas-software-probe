@@ -2201,8 +2201,10 @@ static void httpget_start(void *state)
 	else
 	{
 		tu_connect_to_name(&hgstate->tu_env, hgstate->host,
-			hgstate->do_tls, hgstate->port,
-			&interval, &hints, hgstate->infname, timeout_callback,
+			hgstate->do_tls, 0, hgstate->port,
+			&interval, &hints, hgstate->infname,
+			NULL, NULL,
+			timeout_callback,
 			reporterr, dnscount, beforeconnect,
 			connected, readcb, writecb);
 	}

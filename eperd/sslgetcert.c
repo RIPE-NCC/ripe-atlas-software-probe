@@ -1886,9 +1886,10 @@ static void sslgetcert_start(void *vstate)
 	}
 	else
 	{
-		tu_connect_to_name(&state->tu_env, state->hostname, 0,
+		tu_connect_to_name(&state->tu_env, state->hostname, 0, 0,
 			state->portname,
-			&interval, &hints, state->infname, timeout_callback,
+			&interval, &hints, state->infname, NULL, NULL,
+			timeout_callback,
 			reporterr, dnscount, beforeconnect,
 			connected, readcb, writecb);
 	}

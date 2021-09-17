@@ -41,16 +41,19 @@
 //usage:	"[--edns-flags <value>]"
 //usage:	"[--edns-option <value>]"
 //usage:	"\n\t[--edns-version <value>]"
-//usage:	"[--ipv6-dest-option <size>]"
-//usage:	"\n\t[--noabuf]"
+//usage:	"[--https]"
+//usage:	"[--https-path <path>]"
+//usage:	"\n\t[--ipv6-dest-option <size>]"
+//usage:	"[--noabuf]"
 //usage:	"[--nsid]"
 //usage:	"[--out-file <name>]"
-//usage:	"[--port <value>]"
+//usage:	"\n\t[--port <value>]"
 //usage:	"[--p_probe_id]"
-//usage:	"\n\t[--qbuf]"
+//usage:	"[--qbuf]"
 //usage:	"[--read-response <name>]"
-//usage:	"[--resolv]"
+//usage:	"\n\t[--resolv]"
 //usage:	"[--retry <count>]"
+//usage:	"[--sni-cert-name <name>]"
 //usage:	"\n\t[--timeout <ms>]"
 //usage:	"[--tls]"
 //usage:	"[--ttl]"
@@ -112,6 +115,8 @@
 //usage:	"\n\t--edns-flags <value>      EDNS flags field"
 //usage:	"\n\t--edns-option <value>     Include empty EDNS option"
 //usage:	"\n\t--edns-version <value>    Set EDNS version"
+//usage:	"\n\t--https             Connect using HTTPS (HTTP2 over TLS)"
+//usage:	"\n\t--https-path <path> Path for HTTPS (default /dns-query)"
 //usage:	"\n\t--ipv6-dest-option <size> Include IPv6 dest. option"
 //usage:	"\n\t--noabuf            Omit abuf from output"
 //usage:	"\n\t-n|--nsid           Include NSID option"
@@ -122,6 +127,7 @@
 //usage:	"\n\t--read-response <name>    Read responses"
 //usage:	"\n\t--resolv            Use system resolvers as targets"
 //usage:	"\n\t--retry <count>     Retry query count times"
+//usage:	"\n\t--sni-cert-name <name> Name to check in cert and SNI"
 //usage:	"\n\t--timeout <ms>      Timeout waiting for reply"
 //usage:	"\n\t--tls               Connect using TLS"
 //usage:	"\n\t--ttl               Report TTL of reply"
@@ -182,6 +188,7 @@
 #include "resolv.h"
 #include "readresolv.h"
 #include "tcputil.h"
+#include "http2.h"
 
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -226,6 +233,10 @@
 #endif
 
 #define O_TTL 1013
+
+#define O_HTTPS 1014
+#define O_SNI_CERT_NAME 1015
+#define O_HTTPS_PATH 1016
 
 #define DNS_FLAG_RD 0x0100
 
@@ -493,6 +504,9 @@ struct query_state {
 	int resolv_i;
 	bool opt_do_tls;
 	bool opt_do_ttl;
+	bool opt_do_https;
+	char *sni_cert_name;
+	char *https_path;
 	bool client_cookie_mismatch;
 
 	char * str_Atlas; 
@@ -547,6 +561,9 @@ struct query_state {
 	unsigned short loc_ai_family ;
 	struct sockaddr_in6 loc_sin6;
         socklen_t loc_socklen;
+
+	/* For DNS over HTTP2 */
+	struct http2_env *http2_env;
 
 	u_char *outbuff;
 
@@ -720,6 +737,9 @@ static struct option longopts[]=
 #if ENABLE_FEATURE_EVTDIG_TLS
 	{ "tls", no_argument, NULL, O_TLS},
 #endif
+	{ "https", no_argument, NULL, O_HTTPS},
+	{ "sni-cert-name", required_argument, NULL, O_SNI_CERT_NAME },
+	{ "https-path", required_argument, NULL, O_HTTPS_PATH },
 	{ "ttl", no_argument, NULL, O_TTL },
 
 	{ "edns0", required_argument, NULL, 'e' },
@@ -773,6 +793,11 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 int dns_namelen(unsigned char *base, size_t offset, size_t size);
 
 void print_txt_json(unsigned char *rdata, int txt_len,struct query_state *qry);
+
+static void http2_reply_cb(void *ref, unsigned status,
+	u_char *data, size_t len);
+static void https_write_response(void *ref, void *buf, size_t len);
+static size_t https_read_response(void *ref, void *buf, size_t len);
 
 int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
@@ -1635,17 +1660,29 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	bzero(outbuff, MAX_DNS_OUT_BUF_SIZE);
 	mk_dns_buff(qry, outbuff, MAX_DNS_OUT_BUF_SIZE);
 	payload_len = (uint16_t) qry->pktsize;
-	wire = xzalloc (payload_len + 4);
-	ldns_write_uint16(wire, qry->pktsize);
-	memcpy(wire + 2, outbuff, qry->pktsize);
-	if (!qry->response_in)
+	if (qry->opt_do_https)
 	{
-		evbuffer_add(bufferevent_get_output(qry->bev_tcp), wire,
-			(qry->pktsize +2));
+		qry->http2_env= http2_init();
+		http2_dns(qry->http2_env, qry->bev_tcp, qry->sni_cert_name,
+			qry->port_as_char,
+			qry->https_path ? qry->https_path : "/dns-query",
+			outbuff, payload_len);
+		wire= NULL;
 	}
-	qry->base->sentok++;
-	qry->base->sentbytes+= (qry->pktsize +2);
-	// BLURT(LVL5 "send %u bytes", payload_len );
+	else
+	{
+		wire = xzalloc (payload_len + 4);
+		ldns_write_uint16(wire, qry->pktsize);
+		memcpy(wire + 2, outbuff, qry->pktsize);
+		if (!qry->response_in)
+		{
+			evbuffer_add(bufferevent_get_output(qry->bev_tcp),
+			wire, (qry->pktsize +2));
+		}
+		qry->base->sentok++;
+		qry->base->sentbytes+= (qry->pktsize +2);
+		// BLURT(LVL5 "send %u bytes", payload_len );
+	}
 
 	if(qry->opt_qbuf) {
 		buf_init(&qry->qbuf, -1);
@@ -1659,9 +1696,8 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 
 static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr) 
 {
-
         struct query_state *qry = ptr;
-        int n, type;
+        int n, r, type;
         u_char b2[2];
         struct timespec rectime;
         struct evbuffer *input ;
@@ -1671,6 +1707,23 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
         qry = ENV2QRY(ptr);
 	// BLURT(LVL5 "TCP readcb %s", qry->server_name );
+
+	if (qry->opt_do_https)
+	{
+		r= http2_dns_input(qry->http2_env, bev, http2_reply_cb,
+			ptr, qry->response_out ? https_write_response : 0,
+			qry->response_in ? https_read_response : 0);
+		if (r == -1)
+		{
+			snprintf(line, DEFAULT_LINE_LENGTH,
+				"%s \"TCPREAD\" : "
+				" \"http2_dns_input failed\""
+				, qry->err.size ? ", " : "");
+			buf_add(&qry->err, line, strlen(line));	
+			printReply (qry, 0, NULL);
+		}
+		return;
+	}
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
@@ -1795,6 +1848,71 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			}
 			return;
 		} 
+	}
+}
+
+static void https_write_response(void *ref, void *buf, size_t len)
+{
+        struct query_state *qry;
+
+        qry = ENV2QRY(ref);
+
+	write_response(qry->resp_file, RESP_DATA, len, buf);
+}
+
+static size_t https_read_response(void *ref, void *buf, size_t len)
+{
+	size_t tmp_len;
+        struct query_state *qry;
+
+        qry = ENV2QRY(ref);
+
+	tmp_len= len;
+	read_response_file(qry->resp_file, RESP_DATA, &tmp_len, buf);
+	return tmp_len;
+}
+
+static void http2_reply_cb(void *ref, unsigned status,
+	u_char *data, size_t len)
+{
+        struct query_state *qry;
+        struct DNS_HEADER *dnsR = NULL;
+        struct timespec rectime;
+
+        qry = ENV2QRY(ref);
+
+	gettime_mono(&rectime);
+
+	if (status != 200)
+	{
+		bzero(line, DEFAULT_LINE_LENGTH);
+		snprintf(line, DEFAULT_LINE_LENGTH,
+			" %s \"error\" : \"http2 request failed with %d\"",
+			qry->err.size ? ", " : "", status);
+		buf_add(&qry->err, line, strlen(line));
+		printReply (qry, 0, NULL);
+		return;
+	}
+	dnsR = (struct DNS_HEADER*) data;
+	if ( ntohs(dnsR->id)  == qry->qryid ) {
+		qry->triptime = (rectime.tv_sec -
+			qry->xmit_time_ts.tv_sec)*1000 +
+			(rectime.tv_nsec -
+			qry->xmit_time_ts.tv_nsec)/1e6;
+		qry->querytime = (rectime.tv_sec -
+			qry->qxmit_time_ts.tv_sec)*1000 +
+			(rectime.tv_nsec -
+			qry->qxmit_time_ts.tv_nsec)/1e6;
+		printReply (qry, len,
+			(unsigned char *)data);
+	}
+	else {
+		bzero(line, DEFAULT_LINE_LENGTH);
+		snprintf(line, DEFAULT_LINE_LENGTH,
+		" %s \"idmismatch\" : \"mismatch id from http2\"",
+			qry->err.size ? ", " : "");
+		buf_add(&qry->err, line, strlen(line));
+		printReply (qry, 0, NULL);
 	}
 }
 
@@ -2215,16 +2333,20 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 	}
 
 #if ENABLE_FEATURE_EVTDIG_TLS
-	if (qry->opt_do_tls)
+	if (qry->opt_do_tls || qry->opt_do_https)
 	{
-		qry->opt_proto = 6; /* switch to TCP for TLS */
+		qry->opt_proto = 6; /* switch to TCP for TLS and HTTPS */
 	}
 #endif
 
 	if (qry->port_as_char == NULL) 
 	{
 #if ENABLE_FEATURE_EVTDIG_TLS
-	      if (qry->opt_do_tls)
+	      if (qry->opt_do_https)
+	      {
+		qry->port_as_char = strdup("443");
+	      } 
+	      else if (qry->opt_do_tls)
 	      {
 		qry->port_as_char = strdup("853");
 	      } 
@@ -2312,7 +2434,11 @@ static void *tdig_init(int argc, char *argv[],
 	qry->opt_timeout= DEFAULT_NOREPLY_TIMEOUT;
 	qry->opt_do_tls = 0;
 	qry->opt_do_ttl = 0;
+	qry->opt_do_https = 0;
+	qry->sni_cert_name = NULL;
+	qry->https_path = NULL;
 	qry->resp_file= NULL;
+	qry->http2_env= NULL;
 
 	/* initialize callbacks : */
 	/* sendpacket  called by UDP send */
@@ -2469,6 +2595,18 @@ static void *tdig_init(int argc, char *argv[],
 
 			case O_TTL:
 				qry->opt_do_ttl = 1;
+				break;
+
+			case O_HTTPS:
+				qry->opt_do_https = 1;
+				break;
+
+			case O_SNI_CERT_NAME:
+				qry->sni_cert_name = strdup(optarg);
+				break;
+
+			case O_HTTPS_PATH:
+				qry->https_path = strdup(optarg);
 				break;
 
 			case O_TYPE:
@@ -3095,8 +3233,11 @@ void tdig_start (void *arg)
 		else
 		{
 			tu_connect_to_name (&qry->tu_env,   qry->server_name,
-					qry->opt_do_tls, qry->port_as_char,
+					qry->opt_do_tls, qry->opt_do_https,
+					qry->port_as_char,
 					&interval, &hints, qry->infname,
+					qry->sni_cert_name,
+					qry->sni_cert_name,
 					tcp_timeout_callback, tcp_reporterr,
 					tcp_dnscount, tcp_beforeconnect,
 					tcp_connected, tcp_readcb, tcp_writecb);
@@ -3344,6 +3485,12 @@ static void free_qry_inst(struct query_state *qry)
 		}
 	}
 
+	if (qry->http2_env)
+	{
+		http2_free(qry->http2_env);
+		qry->http2_env= NULL;
+	}
+
 	switch(qry->qst){
 		case STATUS_RETRANSMIT_QUERY:
 			break;
@@ -3402,6 +3549,16 @@ static int tdig_delete(void *state)
 	{
 		free(qry->port_as_char);
 		qry->port_as_char = NULL;
+	}
+	if (qry->sni_cert_name)
+	{
+		free(qry->sni_cert_name);
+		qry->sni_cert_name= NULL;
+	}
+	if (qry->https_path)
+	{
+		free(qry->https_path);
+		qry->https_path = NULL;
 	}
 
 	/* Delete timers */
@@ -3559,7 +3716,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	if (qry->response_in || qry->response_out)
 		ssl_version= "test 0.0.0";
 
-	if (qry->opt_do_tls && ssl_version != NULL)
+	if ((qry->opt_do_tls || qry->opt_do_https) && ssl_version != NULL)
 		JS(sslvers, ssl_version);
 
 	if ( qry->opt_resolv_conf ) {

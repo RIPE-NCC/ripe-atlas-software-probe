@@ -25,6 +25,9 @@ struct tu_env
 	struct timeval interval;
 	char *infname;
 	char do_tls;
+	char do_http2;
+	const char *server_name;
+	const char *cert_name;
 	SSL_CTX *tls_ctx;
 	struct event timer;
 	struct timespec start_time;	/* name resolution */
@@ -41,19 +44,22 @@ struct tu_env
 
 extern const char *ssl_version;
 
-void tu_connect_to_name(struct tu_env *env, char *host, bool do_tls, char *port,
-	struct timeval *timeout,
+void tu_connect_to_name(struct tu_env *env, char *host,
+	bool do_tls, bool do_http2, char *port,
+	struct timeval *interval,
 	struct evutil_addrinfo *hints,
 	char *infname,
-	void (*timeout_callback)(int unused, const short event, void *env),
+	const char *server_name, 
+	const char *cert_name,
+	void (*timeout_callback)(int unused, const short event, void *s),
 	void (*reporterr)(struct tu_env *env, enum tu_err cause,
 		const char *err),
 	void (*reportcount)(struct tu_env *env, int count),
 	void (*beforeconnect)(struct tu_env *env,
 		struct sockaddr *addr, socklen_t addrlen),
 	void (*connected)(struct tu_env *env, struct bufferevent *bev),
-	void (*readcb)(struct bufferevent *bev, void *env),
-	void (*writecb)(struct bufferevent *bev, void *env));
+	void (*readcb)(struct bufferevent *bev, void *ptr),
+	void (*writecb)(struct bufferevent *bev, void *ptr));
 void tu_restart_connect(struct tu_env *env);
 void tu_fake_ttr(void *ctx, char *host);
 void tu_cleanup(struct tu_env *env);
