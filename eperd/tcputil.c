@@ -287,8 +287,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			return;
 		}
 
-		/* Immediate error? */
-		printf("dns_cb: connect error\n");
+		/* Immediate error, for example if there is no default route */
 		
 		/* It is possible that the callback already freed dns_curr. */
 		if (!env->dns_curr)
@@ -308,6 +307,15 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		else
 		{
 			env->reporterr(env, TU_CONNECT_ERR, strerror(errno));
+		}
+
+		/* Check again... */
+		if (!env->dns_curr)
+		{
+			printf("dns_cb: reporterr ate dns_curr\n");
+			if (env->dns_res)
+				crondlog(DIE9 "dns_cb: dns_res not null");
+			return;
 		}
 
 		env->dns_curr= env->dns_curr->ai_next;
