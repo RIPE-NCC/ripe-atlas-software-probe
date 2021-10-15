@@ -7,7 +7,7 @@ SSH_CMD_EXEC=probev5_ssh_exec
 
 # Files
 KERNEL_STATE_DIR=/home/atlas/state
-TMP_FW=/storage/turrisos-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz
+TMP_FW=/storage/turrisos-mvebu-cortexa53-device-ripe-atlas-rootfs.tar.gz
 
 . $BIN_DIR/arch/openwrt/openwrt-common.sh
 . $BIN_DIR/arch/openwrt-atlas-probev5/openwrt-atlas-probev5-common.sh

@@ -11,7 +11,7 @@ CHECK_RO_USB=:
 SET_DATE_FROM_CURRENTTIME_TXT=set_date_from_currenttime_txt
 
 # Various files and directories
-DEV_FIRMWARE=/storage/etc/turrisos-*-mvebu-cortexa53-device-cznic-mox-rootfs.tar.gz; export DEV_FIRMWARE
+DEV_FIRMWARE=/storage/etc/turrisos-*-mvebu-cortexa53-device-ripe-atlas-rootfs.tar.gz; export DEV_FIRMWARE
 MODE_FILE=/home/atlas/state/mode
 KEY_PREFIX_SOURCE=$BASE_DIR/etc/2020-07-08
 
