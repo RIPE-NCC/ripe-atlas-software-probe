@@ -1,6 +1,12 @@
 Release History
 ===============
 
+5040 (released 2021-10-21)
+--------------------------
+- Measurement changes (version 2.4.1):
+
+  * Firmware 5030 introduced a regression where a specific type of TCP connect failure would cause the probe to stop performing measurements.
+
 5030 (released 2021-09-13)
 --------------------------
 - Config variable to disable the check that atlas data is on tmpfs
