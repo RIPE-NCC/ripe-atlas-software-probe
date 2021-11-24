@@ -384,6 +384,11 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	in_file= fopen(IF_INET6_FILE, "r");
 	if (in_file == NULL)
 	{
+		if (errno == ENOENT)
+		{
+			/* Some systems do not have an IPv6 interface */
+			return 0;
+		}
 		report_err("unable to open '%s'", IF_INET6_FILE);
 		return -1;
 	}
