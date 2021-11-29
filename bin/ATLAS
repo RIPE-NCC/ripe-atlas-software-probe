@@ -137,18 +137,8 @@ $CHOWN_FOR_MSM
 $CHMOD_FOR_MSM
 
 perd -c $BASE_DIR/crons/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
-if [ -n "$DO_WIFI" ]; then
-	perd -c $BASE_DIR/crons/2 -A 9802 -P $RUN_DIR/perd-2.pid.vol
-	ooqd $BASE_DIR/crons/oneoff3 &
-fi
-if [ -n "$DO_WIFI" ]; then
-	eperd -I br-lan -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
-	eooqd -I br-lan $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
-	eooqd -q10 -I wlan0 $BASE_DIR/crons/oneoff10 -A 9810 -P $RUN_DIR/eooqd10.pid.vol -i 10 &
-else
-	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
-	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
-fi
+eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
+eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 
 $NTPCLIENT_CMD &
 
