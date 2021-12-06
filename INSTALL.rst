@@ -1,7 +1,8 @@
 Installation Instructions
 =========================
 
-##### To create a RPM for CentOS 7 or CentOS 8
+To create a RPM for CentOS 7 or CentOS 8
+----------------------------------------
 
 - ``sudo yum update && yum install git tar rpm-build openssl-devel autoconf automake libtool make``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
@@ -13,9 +14,10 @@ Installation Instructions
 - ``sudo dnf -y install rpmbuild/RPMS/x86_64/atlasswprobe*``
 - The public key can be found by using 
 - ``cat /var/atlas-probe/etc/probe_key.pub``
-- Then register your probe at [here](https://atlas.ripe.net/apply/swprobe/)
+- Then register your probe at https://atlas.ripe.net/apply/swprobe/
 
-##### To create a deb for Debian or Debian-based distros
+To create a deb for Debian or Debian-based distros
+--------------------------------------------------
 
 Currently only the Debian Build system includes support for amd64, arm64, and armhf.
 
@@ -30,3 +32,4 @@ Currently only the Debian Build system includes support for amd64, arm64, and ar
  * ``./ripe-atlas-software-probe/build-config/debian/bin/make-deb`` << this will retry the build 
 - Install this .deb file: ``sudo dpkg -i atlasswprobe-??????.deb``
 - The public key is stored in ``/var/atlas-probe/etc/probe_key.pub``
+- Then register your probe at https://atlas.ripe.net/apply/swprobe/
