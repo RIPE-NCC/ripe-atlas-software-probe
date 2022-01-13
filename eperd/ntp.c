@@ -1051,6 +1051,11 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+        // sanity check: ntp_base->packet isn't smaller than expected
+        if (size > sizeof(ntp_base->packet) - sizeof(struct ntphdr)) {
+		crondlog(LVL8 "ntp: packet buffer only allows %u bytes maximum", sizeof(ntp_base->packet) - sizeof(struct ntphdr));
+		goto err;
+        }
 	// trying to avoid fragmentation: 1280 mtu - 48 ntp - 8 udp - 40 ipv6
 	// chrony has a max of 1092 byte extensions
 	if (size > 1184) {
