@@ -516,8 +516,8 @@ static void send_pkt(struct ntpstate *state)
 	if (state->size > 0) {
 		ntpextension= base->packet + len;
 		memset(ntpextension, '\0', state->size);
-		// chosen from newly proposed experimental range 0xF000-0xFFFF
-		ntpextension->ext_type= htons(0xFFFF);
+		// NTP autokey (RFC5906) no-operation request
+		ntpextension->ext_type= htons(0x0002);
 		ntpextension->ext_length= htons(state->size);
 		len+= state->size;
 	}
