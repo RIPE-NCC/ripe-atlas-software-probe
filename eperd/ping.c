@@ -131,6 +131,7 @@ struct pingstate
 
 	struct event event;		/* Used to detect read events on raw
 					 * socket */
+	int event_is_init;		/* event variable is initialized */
 
 	char *result;
 	size_t reslen;
@@ -309,7 +310,10 @@ static void report(struct pingstate *state)
 
 	/* Kill the event and close socket */
 	if (!state->response_in)
-		event_del(&state->event);
+	{
+		if (state->event_is_init)
+			event_del(&state->event);
+	}
 	if (state->socket != -1)
 	{
 		close(state->socket);
@@ -1494,6 +1498,7 @@ static void ping_start2(void *state)
 
 		/* Define the callback to handle ICMP Echo Reply and add the
 		 * raw file descriptor to those monitored for read events */
+		pingstate->event_is_init= 1;
 		event_assign(&pingstate->event, pingstate->base->event_base,
 			pingstate->socket, EV_READ | EV_PERSIST,
 			ready_callback4, state);
@@ -1533,6 +1538,7 @@ static void ping_start2(void *state)
 			/* Define the callback to handle ICMP Echo Reply and
 			 * add the raw file descriptor to those monitored
 			 * for read events */
+			pingstate->event_is_init= 1;
 			event_assign(&pingstate->event,
 				pingstate->base->event_base,
 				pingstate->socket, EV_READ | EV_PERSIST,
@@ -1752,6 +1758,7 @@ static void ping_start(void *state)
 	pingstate->got_reply= 0;
 	pingstate->no_dst= 1;
 	pingstate->busy= 1;
+	pingstate->event_is_init= 0;
 
 	pingstate->maxpkts= pingstate->pingcount;
 
