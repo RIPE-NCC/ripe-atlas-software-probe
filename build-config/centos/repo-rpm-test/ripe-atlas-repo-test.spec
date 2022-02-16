@@ -6,7 +6,7 @@ License:        RIPE NCC
 Group:          Applications/Internet
 Source1:        ripe-atlas-probe-test.repo
 Source2:        ripe-atlas-probe-test.pgp
-Source3:        ripe-atlas-repo.daily
+Source3:        ripe-atlas-repo-test.daily
 BuildArch:	noarch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
 
@@ -23,7 +23,7 @@ cp %{SOURCE1} %{buildroot}/etc/yum.repos.d
 mkdir -p %{buildroot}/etc/pki/rpm-gpg
 cp %{SOURCE2} %{buildroot}/etc/pki/rpm-gpg/ripe-atlas-probe-test
 mkdir -p %{buildroot}/etc/cron.daily
-cp %{SOURCE3} %{buildroot}/etc/cron.daily/ripe-atlas-repo
+cp %{SOURCE3} %{buildroot}/etc/cron.daily/ripe-atlas-repo-test
 
 %clean
 rm -rf %{buildroot}
@@ -31,7 +31,7 @@ rm -rf %{buildroot}
 %files
 /etc/yum.repos.d
 /etc/pki/rpm-gpg/ripe-atlas-probe-test
-%attr(755, root, root) /etc/cron.daily/ripe-atlas-repo
+%attr(755, root, root) /etc/cron.daily/ripe-atlas-repo-test
 
 
 %pre
