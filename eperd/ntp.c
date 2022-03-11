@@ -176,6 +176,22 @@ struct ntpextension
 	uint16_t ext_length;
 };
 
+/* RFC 5906 NTP Autokey extensions */
+#define	NTP_EXT_REQUEST	0x0000
+#define	NTP_EXT_MESSAGE	0x0002
+#define	NTP_EXT_ERROR		0x4000
+#define	NTP_EXT_RESPONSE	0x8000
+#define	NTP_EXT_NOOP		0x0000
+#define	NTP_EXT_ASSOC		0x0100
+#define	NTP_EXT_CERT		0x0200
+#define	NTP_EXT_COOKIE		0x0300
+#define	NTP_EXT_AUTOKEY		0x0400
+#define	NTP_EXT_LEAPSECS	0x0500
+#define	NTP_EXT_SIGN		0x0600
+#define	NTP_EXT_IFF_IDENT	0x0700
+#define	NTP_EXT_GQ_IDENT	0x0800
+#define	NTP_EXT_MV_IDENT	0x0900
+
 #define NTP_LI_MASK		0xC0
 #define NTP_LI_SHIFT		   6
 #define 	LI_NO_WARNING	0
@@ -520,7 +536,7 @@ static void send_pkt(struct ntpstate *state)
 		ntpextension= base->packet + len;
 		memset(ntpextension, '\0', state->size);
 		// NTP autokey (RFC5906) no-operation request
-		ntpextension->ext_type= htons(0x0002);
+		ntpextension->ext_type= htons(NTP_EXT_MESSAGE | NTP_EXT_REQUEST | NTP_EXT_NOOP);
 		ntpextension->ext_length= htons(state->size);
 		len+= state->size;
 	}
