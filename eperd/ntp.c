@@ -533,7 +533,7 @@ static void send_pkt(struct ntpstate *state)
 	memset(ntphdr, '\0', len);
 
 	if (state->size > 0) {
-		ntpextension= base->packet + len;
+		ntpextension = (struct ntpextension *) (base->packet + len);
 		memset(ntpextension, '\0', state->size);
 		// NTP autokey (RFC5906) no-operation request
 		ntpextension->ext_type= htons(NTP_EXT_MESSAGE | NTP_EXT_REQUEST | NTP_EXT_NOOP);
