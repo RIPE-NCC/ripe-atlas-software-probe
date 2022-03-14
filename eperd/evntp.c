@@ -16,7 +16,7 @@
 //usage:#define evntp_trivial_usage
 //usage:	"-[46] [-c <count>] [-i <interface>] [-w <timeout>]"
 //usage:	"\n\t[-A <Atlas ID>] [-B <bundle ID>] [-O <output file>]"
-//usage:	"\n\t[-R <response in>] [-W <response out>] "
+//usage:	"\n\t[-R <response in>] [-W <response out>] [-s <size>] "
 //usage:	"<target>\n"
 //usage:#define evntp_full_usage
 //usage:       "\nOptions:"
@@ -30,6 +30,7 @@
 //usage:       "\n     -O <out file>   Output file name"
 //usage:       "\n     -R <response in> Read response from a file"
 //usage:       "\n     -W <response out> Write responses to a file"
+//usage:       "\n     -s <size>       Additional size added to request"
 //usage:       "\n"
 
 #include "libbb.h"

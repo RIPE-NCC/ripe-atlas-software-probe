@@ -32,7 +32,7 @@
 
 #define NTP_PORT	123
 
-#define NTP_OPT_STRING ("!46c:i:w:A:B:O:R:W:")
+#define NTP_OPT_STRING ("!46c:i:s:w:A:B:O:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -86,6 +86,7 @@ struct ntpstate
 	char *interface;
 	char do_v6;
 	char count;
+	uint16_t size;
 	unsigned timeout;
 	char *response_in;	/* Fuzzing */
 	char *response_out;
@@ -167,6 +168,12 @@ struct ntphdr
 	struct ntp_ts ntp_origin_ts;
 	struct ntp_ts ntp_receive_ts;
 	struct ntp_ts ntp_transmit_ts;
+};
+
+struct ntpextension
+{
+	uint16_t ext_type;
+	uint16_t ext_length;
 };
 
 #define NTP_LI_MASK		0xC0
@@ -485,6 +492,7 @@ static void send_pkt(struct ntpstate *state)
 	int r, len, serrno;
 	struct ntpbase *base;
 	struct ntphdr *ntphdr;
+	struct ntpextension *ntpextension;
 	double d;
 	struct timeval interval;
 	char line[80];
@@ -507,6 +515,16 @@ static void send_pkt(struct ntpstate *state)
 	len= sizeof(*ntphdr);
 
 	memset(ntphdr, '\0', len);
+
+	if (state->size > 0) {
+		ntpextension= base->packet + len;
+		memset(ntpextension, '\0', state->size);
+		// NTP autokey (RFC5906) no-operation request
+		ntpextension->ext_type= htons(0x0002);
+		ntpextension->ext_length= htons(state->size);
+		len+= state->size;
+	}
+
 	ntphdr->ntp_flags= (NTP_VERSION << NTP_VERSION_SHIFT) | NTP_MODE_CLIENT;
 
 	gettimeofday(&state->xmit_time, NULL);
@@ -929,7 +947,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 {
 	uint32_t opt;
 	int i, do_v6;
-	unsigned count, timeout;
+	unsigned count, timeout, size;
 		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
@@ -954,6 +972,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Parse arguments */
 	count= 3;
+	size= 0;
 	interface= NULL;
 	timeout= 1000;
 	str_Atlas= NULL;
@@ -961,10 +980,10 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	out_filename= NULL;
 	response_in= NULL;
 	response_out= NULL;
-	opt_complementary = "=1:4--6:i--u:c+:w+:";
+	opt_complementary = "=1:4--6:i--u:c+:s+:w+:";
 
 	opt = getopt32(argv, NTP_OPT_STRING, &count,
-		&interface, &timeout, &str_Atlas, &str_bundle, &out_filename,
+		&interface, &size, &timeout, &str_Atlas, &str_bundle, &out_filename,
 		&response_in, &response_out);
 	hostname = argv[optind];
 
@@ -1035,11 +1054,32 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+        // sanity check: ntp_base->packet isn't smaller than expected
+        if (size > sizeof(ntp_base->packet) - sizeof(struct ntphdr)) {
+		crondlog(LVL8 "ntp: packet buffer only allows %u bytes maximum", sizeof(ntp_base->packet) - sizeof(struct ntphdr));
+		goto err;
+        }
+	// trying to avoid fragmentation: 1280 mtu - 48 ntp - 8 udp - 40 ipv6
+	// chrony has a max of 1092 byte extensions
+	if (size > 1184) {
+		crondlog(LVL8 "ntp: maximum extension size is 1184 bytes");
+		goto err;
+	}
+	if (size > 0 && size < 28) {
+		crondlog(LVL8 "ntp: mimimum extension size is 28 bytes per RFC7822");
+		goto err;
+	}
+	if (size % 4 != 0) {
+		crondlog(LVL8 "ntp: extension field size is a multiple of 4 per RFC7822");
+		goto err;
+	}
+
 	destportstr= "123";
 
 	state= xzalloc(sizeof(*state));
 	state->count= count;
 	state->interface= interface ? strdup(interface) : NULL;
+	state->size= size;
 	state->destportstr= strdup(destportstr);
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
