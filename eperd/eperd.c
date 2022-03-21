@@ -397,15 +397,20 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	tv.tv_sec= 3600;
 	tv.tv_usec= 0;
 	event_add(updateEventHour, &tv);
-		
+
+	r = 0;
 	if(PidFileName)
 	{
-		write_pidfile(PidFileName);
+		r = write_pidfile(PidFileName);
 	}
 	else 
 	{
-		write_pidfile("/var/run/crond.pid");
+		r = write_pidfile("/var/run/crond.pid");
 	}
+
+	if (r < 0)
+		crondlog(DIE9 "unable to write PID file - %s", strerror(errno));
+		
 #if 0
 	/* main loop - synchronize to 1 second after the minute, minimum sleep
 	 * of 1 second. */

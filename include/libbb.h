@@ -1205,7 +1205,7 @@ llist_t *llist_find_str(llist_t *first, const char *str) FAST_FUNC;
 #if ENABLE_FEATURE_PIDFILE || defined(WANT_PIDFILE)
 /* True only if we created pidfile which is *file*, not /dev/null etc */
 extern smallint wrote_pidfile;
-void write_pidfile(const char *path) FAST_FUNC;
+int write_pidfile(const char *path) FAST_FUNC;
 #define remove_pidfile(path) do { if (wrote_pidfile) unlink(path); } while (0)
 #else
 enum { wrote_pidfile = 0 };

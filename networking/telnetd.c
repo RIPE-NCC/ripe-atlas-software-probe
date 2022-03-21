@@ -838,7 +838,10 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 	if(PidFileName)
 	{
-		write_pidfile(PidFileName);
+		if (write_pidfile(PidFileName) < 0) {
+			syslog(LOG_ERR, "unable to open '%s': %m", PidFileName);
+			return 1;
+		}
 	}
 
 #if ENABLE_FEATURE_TELNETD_STANDALONE

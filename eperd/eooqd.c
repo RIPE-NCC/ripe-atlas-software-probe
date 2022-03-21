@@ -180,7 +180,10 @@ int eooqd_main(int argc, char *argv[])
 
 	if(pid_file_name)
 	{
-		write_pidfile(pid_file_name);
+		if (write_pidfile(pid_file_name) < 0) {
+			report("error writing PID file '%s'; %s", pid_file_name, strerror(errno));
+			return 1;
+		}
 	}
 
 	state = xzalloc(sizeof(*state));
