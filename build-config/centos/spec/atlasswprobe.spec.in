@@ -132,7 +132,8 @@ mkdir -p %{atlas_probe}/data/out/ooq10
 chown -R atlas:atlas %{atlas_probe}/data
 chmod -R g+rwx %{atlas_probe}/data
 mkdir -p %{atlas_probe}/run
-chown atlas:atlas %{atlas_probe}/run
+chown -R atlas:atlas %{atlas_probe}/run
+chmod -R g+rw %{atlas_probe}/run
 %if 0%{?el7} || 0%{?el8}
 systemctl --now --quiet enable atlas
 systemctl --now --quiet start atlas
