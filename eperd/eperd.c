@@ -261,6 +261,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	struct stat sb;
 
 	const char *PidFileName = NULL;
+	const char *path;
 	char *interface_name= NULL;
 
 	INIT_G();
@@ -398,18 +399,13 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	tv.tv_usec= 0;
 	event_add(updateEventHour, &tv);
 
-	r = 0;
-	if(PidFileName)
-	{
-		r = write_pidfile(PidFileName);
-	}
-	else 
-	{
-		r = write_pidfile("/var/run/crond.pid");
-	}
+	path = PidFileName ? PidFileName : "/var/run/crond.pid";
+	if (!check_pidfile(path))
+		crondlog(DIE9 "A process is still running");
 
+	r = write_pidfile(path);
 	if (r < 0)
-		crondlog(DIE9 "unable to write PID file - %s", strerror(errno));
+		crondlog(DIE9 "unable to write to PID file %s - %s", path, strerror(errno));
 		
 #if 0
 	/* main loop - synchronize to 1 second after the minute, minimum sleep

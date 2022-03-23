@@ -234,6 +234,7 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned seed;
 
 	const char *PidFileName = NULL;
+	const char* path;
 
 	INIT_G();
 
@@ -286,17 +287,13 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 		time_t last_hourly= 0;
 		int sleep_time = 10; /* AA previously 60 */
 		r = 0;
-		if(PidFileName)
-		{
-			r = write_pidfile(PidFileName);
-		}
-		else 
-		{
-			r = write_pidfile("/var/run/crond.pid");
-		}
+		path = PidFileName ? PidFileName : "/var/run/crond.pid";
+		if (!check_pidfile(path))
+			crondlog(DIE9 "a process is still running");
 
+		r = write_pidfile(PidFileName);
 		if (r < 0 )
-			crondlog(DIE9 "unable to write pidfile - %s", strerror(errno));
+			crondlog(DIE9 "unable to write pidfile %s - %s", path, strerror(errno));
 
 		for (;;) {
 			kick_watchdog();

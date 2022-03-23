@@ -838,6 +838,11 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 
 	if(PidFileName)
 	{
+		if (!check_pidfile(PidFileName)) {
+			syslog(LOG_ERR, "A process is still running, please check : %s", PidFileName);
+			return 1;
+		}
+
 		if (write_pidfile(PidFileName) < 0) {
 			syslog(LOG_ERR, "unable to open '%s': %m", PidFileName);
 			return 1;

@@ -180,6 +180,11 @@ int eooqd_main(int argc, char *argv[])
 
 	if(pid_file_name)
 	{
+		if (!check_pidfile(pid_file_name)) {
+			report("a process is still running");
+			return 1;
+		}
+
 		if (write_pidfile(pid_file_name) < 0) {
 			report("error writing PID file '%s'; %s", pid_file_name, strerror(errno));
 			return 1;

@@ -11,6 +11,8 @@
 #define WANT_PIDFILE 1
 #include "libbb.h"
 #include <errno.h>
+#include <signal.h>
+#include <sys/types.h>
 
 smallint wrote_pidfile;
 
@@ -53,4 +55,35 @@ int FAST_FUNC write_pidfile(const char *path)
 	errno = errno_save;
 
 	return written > 0 ? 0 : -1;
+}
+
+int FAST_FUNC check_pidfile(const char* path)
+{
+	int r;
+	pid_t pid;
+	char buf[sizeof(int)*3];
+
+	r = -1;
+
+	if (path == NULL) {
+		errno = ENOENT;
+		goto exit;
+	}
+
+	if (open_read_close(path, buf, sizeof(buf)) < 0)
+		goto exit;
+	
+	errno = 0;
+	pid = strtol(buf, NULL, 10);
+	if (errno) 
+		goto exit;
+
+	r = kill(pid, 0);
+	if ((r < 0) && (errno == EPERM)) {
+		errno = 0;
+		r = 0;
+	}
+
+exit:
+	return r;
 }
