@@ -22,12 +22,12 @@ evsslgetcert_test()
 	testing "evsslgetcert-$name" "evsslgetcert $opt -R $packets $target" "$r" "" ""
 }
 
-evsslgetcert_test "-6" "www.ripe.net" "6"
-evsslgetcert_test "-4" "www.ripe.net" "4"
-evsslgetcert_test "-6 -A42" "www.ripe.net" "A42"
-evsslgetcert_test "-6 -B43 -A42" "www.ripe.net" "B43"
-evsslgetcert_test "-6 -h foo.example.com" "www.ripe.net" "h"
-evsslgetcert_test "-6 -V TLS1.0" "www.ripe.net" "TLS1.0"
+evsslgetcert_test "-6" "atlas.ripe.net" "6"
+evsslgetcert_test "-4" "atlas.ripe.net" "4"
+evsslgetcert_test "-6 -A42" "atlas.ripe.net" "A42"
+evsslgetcert_test "-6 -B43 -A42" "atlas.ripe.net" "B43"
+evsslgetcert_test "-6 -h foo.example.com" "atlas.ripe.net" "h"
+evsslgetcert_test "-6 -V TLS1.0 -h www.ripe.net" "www.ripe.net" "TLS1.0"
 evsslgetcert_test "-4 -p 853" "8.8.8.8" "p853"
 
 exit $FAILCOUNT

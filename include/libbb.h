@@ -450,7 +450,7 @@ const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
-#define ATLAS_MSM_VERSION	"2.4.0"
+#define ATLAS_MSM_VERSION	"2.6.1"
 
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
@@ -480,6 +480,7 @@ extern time_t atlas_time(void);
 extern int do_ipv6_option(int sock, int hbh_dest, unsigned size);
 extern void route_set_flags(char *flagstr, int flags);
 extern void peek_response(int fd, int *typep);
+extern void peek_response_file(FILE *file, int *typep);
 extern void read_response(int fd, int type, size_t *sizep, void *data);
 extern void read_response_file(FILE *file, int type, size_t *sizep,
 	void *data);
@@ -1204,7 +1205,8 @@ llist_t *llist_find_str(llist_t *first, const char *str) FAST_FUNC;
 #if ENABLE_FEATURE_PIDFILE || defined(WANT_PIDFILE)
 /* True only if we created pidfile which is *file*, not /dev/null etc */
 extern smallint wrote_pidfile;
-void write_pidfile(const char *path) FAST_FUNC;
+int write_pidfile(const char *path) FAST_FUNC;
+int check_pidfile(const char *path) FAST_FUNC;
 #define remove_pidfile(path) do { if (wrote_pidfile) unlink(path); } while (0)
 #else
 enum { wrote_pidfile = 0 };

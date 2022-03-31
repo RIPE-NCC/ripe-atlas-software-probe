@@ -5,6 +5,7 @@
  */
 
 #include "libbb.h"
+#include <assert.h>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -59,13 +60,15 @@
 
 #define IP6_TOS(ip6_hdr) ((ntohl((ip6_hdr)->ip6_flow) >> 20) & 0xff)
 
-#define RESP_PACKET	1
-#define RESP_PEERNAME	2
-#define RESP_SOCKNAME	3
-#define RESP_PROTO	4
-#define RESP_RCVDTTL	5
-#define RESP_RCVDTCLASS	6
-#define RESP_SENDTO	7
+#define RESP_PACKET		1
+#define RESP_PEERNAME		2
+#define RESP_SOCKNAME		3
+#define RESP_PROTO		4
+#define RESP_RCVDTTL		5
+#define RESP_RCVDTCLASS		6
+#define RESP_SENDTO		7
+#define RESP_ADDRINFO		8
+#define RESP_ADDRINFO_SA	9
 
 struct trtbase
 {
@@ -218,6 +221,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 static void ready_tcp4(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s);
 static void ready_callback6(int __attribute((unused)) unused,
+	const short __attribute((unused)) event, void *s);
+static void noreply_callback(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s);
 
 static int in_cksum(unsigned short *buf, int sz)
@@ -1383,9 +1388,14 @@ static void send_pkt(struct trtstate *state)
 			}
 
 			/* Bind to source addr/port */
-			r= bind(sock,
-				(struct sockaddr *)&state->loc_sin6,
-				state->loc_socklen);
+			if (state->response_in)
+				r= 0;
+			else
+			{
+				r= bind(sock,
+					(struct sockaddr *)&state->loc_sin6,
+					state->loc_socklen);
+			}
 #if 0
  { static int doit=1; if (doit && r != -1)
  { errno= ENOSYS; r= -1; } doit= !doit; }
@@ -1707,6 +1717,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 
 		if (proto == 0)
 		{
+			noreply_callback(0, 0, state);
 			return;	/* Timeout */
 		}
 		if (proto == 6)
@@ -1716,7 +1727,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 		}
 		if (proto != 1)
 		{
-			printf("ready_callback4: proto != 1\n");
+			fprintf(stderr, "ready_callback4: proto != 1\n");
 			return;
 		}
 	}
@@ -1726,7 +1737,6 @@ static void ready_callback4(int __attribute((unused)) unused,
 	slen= sizeof(remote);
 	if (state->response_in)
 	{
-		uint8_t proto;
 		size_t len;
 
 		len= sizeof(base->packet);
@@ -3306,6 +3316,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 		if (proto == 0)
 		{
+			noreply_callback(0, 0, state);
 			return;	/* Timeout */
 		}
 		if (proto == 6)
@@ -3315,7 +3326,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 		}
 		if (proto != 1)
 		{
-			printf("ready_callback6: proto != 1\n");
+			fprintf(stderr, "ready_callback6: proto != 1\n");
 			return;
 		}
 	}
@@ -3335,7 +3346,6 @@ static void ready_callback6(int __attribute((unused)) unused,
 	/* Receive data from the network */
 	if (state->response_in)
 	{
-		uint8_t proto;
 		size_t len;
 
 		len= sizeof(base->packet);
@@ -3441,7 +3451,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 	if (nrecv < sizeof(*icmp))
 	{
 		/* Short packet */
-#if 1
+#if 0
 		fprintf(stderr, "ready_callback6: too short %d (icmp)\n",
 			(int)nrecv);
 #endif
@@ -4498,7 +4508,6 @@ static void traceroute_start2(void *state)
 	trtstate->open_result= 0;
 	trtstate->starttime= atlas_time();
 
-	trtstate->socket_icmp= -1;
 	trtstate->socket_tcp= -1;
 
 	snprintf(line, sizeof(line), "{ " DBQ(hop) ":%d", trtstate->hop);
@@ -4546,6 +4555,17 @@ static void traceroute_start2(void *state)
 	add_str(trtstate, ", " DBQ(result) ": [ ");
 
 	send_pkt(trtstate);
+
+	if (trtstate->response_in)
+	{
+		for (;;)
+		{
+			if (trtstate->sin6.sin6_family == AF_INET6)
+				ready_callback6(0, 0, state);
+			else
+				ready_callback4(0, 0, state);
+		}
+	}
 }
 
 static int create_socket(struct trtstate *state, int do_tcp)
@@ -4558,16 +4578,7 @@ static int create_socket(struct trtstate *state, int do_tcp)
 	type= SOCK_RAW;
 	protocol= (af == AF_INET6 ? IPPROTO_ICMPV6 : IPPROTO_ICMP);
 
-	if (state->response_in)
-	{
-		state->socket_icmp= open(state->response_in, O_RDONLY);
-		if (state->socket_icmp == -1)
-		{
-			crondlog(DIE9 "unable to open '%s'",
-				state->response_in);
-		}
-	}
-	else
+	if (!state->response_in)
 		state->socket_icmp= xsocket(af, type, protocol);
 	if (state->socket_icmp == -1)
 	{
@@ -4778,12 +4789,14 @@ static int create_socket(struct trtstate *state, int do_tcp)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int r, count;
+	int r;
+	size_t tmp_len;
 	struct trtstate *env;
-	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
 	char line[160];
+	struct addrinfo tmp_res;
+	struct sockaddr_storage tmp_sockaddr;
 
 	env= ctx;
 
@@ -4830,17 +4843,42 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->dns_res= res;
 	env->dns_curr= res;
 
-	count= 0;
-	for (cur= res; cur; cur= cur->ai_next)
-		count++;
+	if (env->response_in)
+	{
+		env->socket_icmp= open(env->response_in, O_RDONLY);
+		if (env->socket_icmp == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				env->response_in);
+		}
+	
+		tmp_len= sizeof(tmp_res);
+		read_response(env->socket_icmp, RESP_ADDRINFO,
+			&tmp_len, &tmp_res);
+		assert(tmp_len == sizeof(tmp_res));
+		tmp_len= sizeof(tmp_sockaddr);
+		read_response(env->socket_icmp, RESP_ADDRINFO_SA,
+			&tmp_len, &tmp_sockaddr);
+		assert(tmp_len == tmp_res.ai_addrlen);
+		tmp_res.ai_addr= (struct sockaddr *)&tmp_sockaddr;
+		env->dns_curr= &tmp_res;
+	}
 
-	// env->reportcount(env, count);
 
 	while (env->dns_curr)
 	{
+		if (env->response_out)
+		{
+			write_response(env->resp_file_out, RESP_ADDRINFO,
+				sizeof(*env->dns_curr), env->dns_curr);
+			write_response(env->resp_file_out, RESP_ADDRINFO_SA,
+				env->dns_curr->ai_addrlen,
+				env->dns_curr->ai_addr);
+		}
+
 		env->socklen= env->dns_curr->ai_addrlen;
 		if (env->socklen > sizeof(env->sin6))
-			continue;	/* Weird */
+			break;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
 
@@ -4864,14 +4902,18 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 
 		traceroute_start2(env);
 
-		evutil_freeaddrinfo(env->dns_res);
+		if (!env->response_in)
+			evutil_freeaddrinfo(env->dns_res);
+
 		env->dns_res= NULL;
 		env->dns_curr= NULL;
+		
 		return;
 	}
 
 	/* Something went wrong */
-	evutil_freeaddrinfo(env->dns_res);
+	if (!env->response_in)
+		evutil_freeaddrinfo(env->dns_res);
 	env->dns_res= NULL;
 	env->dns_curr= NULL;
 	snprintf(line, sizeof(line),
@@ -4894,6 +4936,7 @@ static void traceroute_start(void *state)
 		return;
 	}
 	trtstate->busy= 1;
+	trtstate->socket_icmp= -1;
 
 	if (trtstate->response_out)
 	{
@@ -4912,13 +4955,20 @@ static void traceroute_start(void *state)
 		return;
 	}
 
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_socktype= SOCK_DGRAM;
-	hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
-	trtstate->dnsip= 1;
 	gettime_mono(&trtstate->start_time);
-	(void) evdns_getaddrinfo(DnsBase, trtstate->hostname,
-		trtstate->destportstr, &hints, dns_cb, trtstate);
+	trtstate->dnsip= 1;
+	if (trtstate->response_in)
+	{
+		dns_cb(0, 0, trtstate);
+	}
+	else
+	{
+		memset(&hints, '\0', sizeof(hints));
+		hints.ai_socktype= SOCK_DGRAM;
+		hints.ai_family= trtstate->do_v6 ? AF_INET6 : AF_INET;
+		(void) evdns_getaddrinfo(DnsBase, trtstate->hostname,
+			trtstate->destportstr, &hints, dns_cb, trtstate);
+	}
 }
 
 static int traceroute_delete(void *state)

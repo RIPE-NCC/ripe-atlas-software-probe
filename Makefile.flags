@@ -124,6 +124,12 @@ CFLAGS += --sysroot=$(CONFIG_SYSROOT)
 export SYSROOT=$(CONFIG_SYSROOT)
 endif
 
+# glibc versions before 2.17 need to link with -rt to use clock_gettime
+RT_NEEDED := $(shell echo 'int main(void){struct timespec tp; return clock_gettime(CLOCK_MONOTONIC, &tp);}' >rttest.c; $(CC) $(CFLAGS) -include time.h -o /dev/null rttest.c >/dev/null 2>&1 || echo "y"; rm rttest.c)
+ifeq ($(RT_NEEDED),y)
+LDLIBS += rt
+endif
+
 # Android has no separate crypt library
 # gcc-4.2.1 fails if we try to feed C source on stdin:
 #  echo 'int main(void){return 0;}' | $(CC) $(CFLAGS) -lcrypt -o /dev/null -xc -

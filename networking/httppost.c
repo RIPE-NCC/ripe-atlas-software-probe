@@ -91,6 +91,7 @@ int httppost_main(int argc, char *argv[])
 		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
 	char *time_tolerance, *rebased_fn= NULL;
 	char *fn_new, *fn;
+	char *actual_port, *override_port;
 	FILE *tcp_file, *out_file, *fh;
 	time_t server_time, tolerance;
 	struct stat sbF, sbH, sbS;
@@ -173,6 +174,9 @@ int httppost_main(int argc, char *argv[])
 		return 1;
 	}
 	url= argv[optind];
+
+	/* Check if there is an override for the port */
+	override_port= getenv("HTTPPOST_PORT");
 
 	if (atlas_id)
 	{
@@ -371,7 +375,8 @@ int httppost_main(int argc, char *argv[])
 	alarm(10);
 	signal(SIGPIPE, SIG_IGN);
 
-	tcp_fd= connect_to_name(host, port);
+	actual_port= override_port ? override_port : port;
+	tcp_fd= connect_to_name(host, actual_port);
 	if (tcp_fd == -1)
 	{
 		report_err("unable to connect to '%s'", host);

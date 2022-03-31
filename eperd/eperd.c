@@ -22,7 +22,7 @@
 
 //applet:IF_EPERD(APPLET(eperd, BB_DIR_BIN, BB_SUID_DROP))
 
-//kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
+//kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o http2.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
 
 //usage:#define eperd_trivial_usage
 //usage:       "-fbSAD -P pidfile -l N -d N -L LOGFILE -c DIR"
@@ -261,6 +261,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	struct stat sb;
 
 	const char *PidFileName = NULL;
+	const char *path;
 	char *interface_name= NULL;
 
 	INIT_G();
@@ -397,15 +398,15 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 	tv.tv_sec= 3600;
 	tv.tv_usec= 0;
 	event_add(updateEventHour, &tv);
+
+	path = PidFileName ? PidFileName : "/var/run/crond.pid";
+	if (!check_pidfile(path))
+		crondlog(DIE9 "A process is still running");
+
+	r = write_pidfile(path);
+	if (r < 0)
+		crondlog(DIE9 "unable to write to PID file %s - %s", path, strerror(errno));
 		
-	if(PidFileName)
-	{
-		write_pidfile(PidFileName);
-	}
-	else 
-	{
-		write_pidfile("/var/run/crond.pid");
-	}
 #if 0
 	/* main loop - synchronize to 1 second after the minute, minimum sleep
 	 * of 1 second. */

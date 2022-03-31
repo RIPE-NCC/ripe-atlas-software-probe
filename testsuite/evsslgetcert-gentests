@@ -13,10 +13,10 @@ test()
 	ATLAS_TESTS=yes ATLAS_UNSAFE=yes ./busybox evsslgetcert $opt -O "$output" -W "$packets" "$target"
 }
 
-test "-6" "www.ripe.net" "6"
-test "-4" "www.ripe.net" "4"
-test "-6 -A42" "www.ripe.net" "A42"
-test "-6 -B43 -A42" "www.ripe.net" "B43"
-test "-6 -h foo.example.com" "www.ripe.net" "h"
-test "-6 -V TLS1.0" "www.ripe.net" "TLS1.0"
+test "-6" "atlas.ripe.net" "6"
+test "-4" "atlas.ripe.net" "4"
+test "-6 -A42" "atlas.ripe.net" "A42"
+test "-6 -B43 -A42" "atlas.ripe.net" "B43"
+test "-6 -h foo.example.com" "atlas.ripe.net" "h"
+test "-6 -V TLS1.0 -h www.ripe.net" "www.ripe.net" "TLS1.0"
 test "-4 -p 853" "8.8.8.8" "p853"

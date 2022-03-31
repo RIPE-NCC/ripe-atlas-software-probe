@@ -49,9 +49,18 @@ char *atlas_get_version_json_str(void)
 	{
 		first= 0;
 
-		snprintf(version_buf, sizeof(version_buf),
-			DBQ(fw) ":%d, " DBQ(mver) ": " DBQ(%s),
-			get_atlas_fw_version(), ATLAS_MSM_VERSION);
+		if (getenv("ATLAS_TESTS"))
+		{
+			snprintf(version_buf, sizeof(version_buf),
+				DBQ(fw) ":%d, " DBQ(mver) ": " DBQ(%s),
+				9999, "0.0.0");
+		}
+		else
+		{
+			snprintf(version_buf, sizeof(version_buf),
+				DBQ(fw) ":%d, " DBQ(mver) ": " DBQ(%s),
+				get_atlas_fw_version(), ATLAS_MSM_VERSION);
+		}
 	}
 	return version_buf;
 }

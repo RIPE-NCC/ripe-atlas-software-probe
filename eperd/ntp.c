@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2013-2014 RIPE NCC <atlas@ripe.net>
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
- * traceroute.c
+ * ntp.c
  */
 
 #include "libbb.h"
+#include <assert.h>
 #include <math.h>
 #include <event2/dns.h>
 #include <event2/event.h>
@@ -31,7 +32,7 @@
 
 #define NTP_PORT	123
 
-#define NTP_OPT_STRING ("!46c:i:w:A:B:O:R:W:")
+#define NTP_OPT_STRING ("!46c:i:s:w:A:B:O:R:W:")
 
 #define OPT_4	(1 << 0)
 #define OPT_6	(1 << 1)
@@ -43,10 +44,12 @@
 
 #define DBQ(str) "\"" #str "\""
 
-#define RESP_PACKET	1
-#define RESP_SOCKNAME	2
-#define RESP_DSTADDR	3
-#define RESP_TIMEOFDAY	4
+#define RESP_PACKET		1
+#define RESP_SOCKNAME		2
+#define RESP_DSTADDR		3
+#define RESP_TIMEOFDAY		4
+#define RESP_ADDRINFO		5
+#define RESP_ADDRINFO_SA	6
 
 struct ntp_ts
 {
@@ -63,7 +66,7 @@ struct ntpbase
 	struct ntpstate **table;
 	int tabsiz;
 
-	/* For standalone traceroute. Called when a traceroute instance is
+	/* For standalone ntp. Called when a ntp instance is
 	 * done. Just one pointer for all instances. It is up to the caller
 	 * to keep it consistent.
 	 */
@@ -83,6 +86,7 @@ struct ntpstate
 	char *interface;
 	char do_v6;
 	char count;
+	uint16_t size;
 	unsigned timeout;
 	char *response_in;	/* Fuzzing */
 	char *response_out;
@@ -165,6 +169,28 @@ struct ntphdr
 	struct ntp_ts ntp_receive_ts;
 	struct ntp_ts ntp_transmit_ts;
 };
+
+struct ntpextension
+{
+	uint16_t ext_type;
+	uint16_t ext_length;
+};
+
+/* RFC 5906 NTP Autokey extensions */
+#define	NTP_EXT_REQUEST	0x0000
+#define	NTP_EXT_MESSAGE	0x0002
+#define	NTP_EXT_ERROR		0x4000
+#define	NTP_EXT_RESPONSE	0x8000
+#define	NTP_EXT_NOOP		0x0000
+#define	NTP_EXT_ASSOC		0x0100
+#define	NTP_EXT_CERT		0x0200
+#define	NTP_EXT_COOKIE		0x0300
+#define	NTP_EXT_AUTOKEY		0x0400
+#define	NTP_EXT_LEAPSECS	0x0500
+#define	NTP_EXT_SIGN		0x0600
+#define	NTP_EXT_IFF_IDENT	0x0700
+#define	NTP_EXT_GQ_IDENT	0x0800
+#define	NTP_EXT_MV_IDENT	0x0900
 
 #define NTP_LI_MASK		0xC0
 #define NTP_LI_SHIFT		   6
@@ -482,6 +508,7 @@ static void send_pkt(struct ntpstate *state)
 	int r, len, serrno;
 	struct ntpbase *base;
 	struct ntphdr *ntphdr;
+	struct ntpextension *ntpextension;
 	double d;
 	struct timeval interval;
 	char line[80];
@@ -504,6 +531,16 @@ static void send_pkt(struct ntpstate *state)
 	len= sizeof(*ntphdr);
 
 	memset(ntphdr, '\0', len);
+
+	if (state->size > 0) {
+		ntpextension = (struct ntpextension *) (base->packet + len);
+		memset(ntpextension, '\0', state->size);
+		// NTP autokey (RFC5906) no-operation request
+		ntpextension->ext_type= htons(NTP_EXT_MESSAGE | NTP_EXT_REQUEST | NTP_EXT_NOOP);
+		ntpextension->ext_length= htons(state->size);
+		len+= state->size;
+	}
+
 	ntphdr->ntp_flags= (NTP_VERSION << NTP_VERSION_SHIFT) | NTP_MODE_CLIENT;
 
 	gettimeofday(&state->xmit_time, NULL);
@@ -926,7 +963,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 {
 	uint32_t opt;
 	int i, do_v6;
-	unsigned count, timeout;
+	unsigned count, timeout, size;
 		/* must be int-sized */
 	size_t newsiz;
 	char *str_Atlas;
@@ -951,6 +988,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	/* Parse arguments */
 	count= 3;
+	size= 0;
 	interface= NULL;
 	timeout= 1000;
 	str_Atlas= NULL;
@@ -958,10 +996,10 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	out_filename= NULL;
 	response_in= NULL;
 	response_out= NULL;
-	opt_complementary = "=1:4--6:i--u:c+:w+:";
+	opt_complementary = "=1:4--6:i--u:c+:s+:w+:";
 
 	opt = getopt32(argv, NTP_OPT_STRING, &count,
-		&interface, &timeout, &str_Atlas, &str_bundle, &out_filename,
+		&interface, &size, &timeout, &str_Atlas, &str_bundle, &out_filename,
 		&response_in, &response_out);
 	hostname = argv[optind];
 
@@ -1032,11 +1070,32 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 		}
 	}
 
+        // sanity check: ntp_base->packet isn't smaller than expected
+        if (size > sizeof(ntp_base->packet) - sizeof(struct ntphdr)) {
+		crondlog(LVL8 "ntp: packet buffer only allows %u bytes maximum", sizeof(ntp_base->packet) - sizeof(struct ntphdr));
+		goto err;
+        }
+	// trying to avoid fragmentation: 1280 mtu - 48 ntp - 8 udp - 40 ipv6
+	// chrony has a max of 1092 byte extensions
+	if (size > 1184) {
+		crondlog(LVL8 "ntp: maximum extension size is 1184 bytes");
+		goto err;
+	}
+	if (size > 0 && size < 28) {
+		crondlog(LVL8 "ntp: mimimum extension size is 28 bytes per RFC7822");
+		goto err;
+	}
+	if (size % 4 != 0) {
+		crondlog(LVL8 "ntp: extension field size is a multiple of 4 per RFC7822");
+		goto err;
+	}
+
 	destportstr= "123";
 
 	state= xzalloc(sizeof(*state));
 	state->count= count;
 	state->interface= interface ? strdup(interface) : NULL;
+	state->size= size;
 	state->destportstr= strdup(destportstr);
 	state->timeout= timeout*1000;
 	state->atlas= str_Atlas ? strdup(str_Atlas) : NULL;
@@ -1089,7 +1148,7 @@ err:
 	return NULL;
 }
 
-static void traceroute_start2(void *state)
+static void ntp_start2(void *state)
 {
 	struct ntpstate *ntpstate;
 
@@ -1121,8 +1180,6 @@ static void traceroute_start2(void *state)
 	ntpstate->open_result= 0;
 	ntpstate->starttime= atlas_time();
 
-	ntpstate->socket= -1;
-
 	if (create_socket(ntpstate) == -1)
 		return;
 	if (ntpstate->do_v6)
@@ -1150,16 +1207,7 @@ static int create_socket(struct ntpstate *state)
 	type= SOCK_DGRAM;
 	protocol= 0;
 
-	if (state->response_in)
-	{
-		state->socket= open(state->response_in, O_RDONLY);
-		if (state->socket == -1)
-		{
-			crondlog(DIE9 "unable to open '%s'",
-				state->response_in);
-		}
-	}
-	else
+	if (!state->response_in)
 		state->socket= xsocket(af, type, protocol);
 #if 0
  { errno= ENOSYS; state->socket= -1; }
@@ -1257,11 +1305,13 @@ static int create_socket(struct ntpstate *state)
 
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
-	int r, count;
+	int r;
+	size_t tmp_len;
 	struct ntpstate *env;
-	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
+	struct addrinfo tmp_res;
+	struct sockaddr_storage tmp_sockaddr;
 	char line[160];
 
 	env= ctx;
@@ -1309,17 +1359,41 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	env->dns_res= res;
 	env->dns_curr= res;
 
-	count= 0;
-	for (cur= res; cur; cur= cur->ai_next)
-		count++;
-
-	// env->reportcount(env, count);
+	if (env->response_in)
+	{
+	
+		env->socket= open(env->response_in, O_RDONLY);
+		if (env->socket == -1)
+		{
+			crondlog(DIE9 "unable to open '%s'",
+				env->response_in);
+		}
+	
+		tmp_len= sizeof(tmp_res);
+		read_response(env->socket, RESP_ADDRINFO, &tmp_len, &tmp_res);
+		assert(tmp_len == sizeof(tmp_res));
+		tmp_len= sizeof(tmp_sockaddr);
+		read_response(env->socket, RESP_ADDRINFO_SA,
+			&tmp_len, &tmp_sockaddr);
+		assert(tmp_len == tmp_res.ai_addrlen);
+		tmp_res.ai_addr= (struct sockaddr *)&tmp_sockaddr;
+		env->dns_curr= &tmp_res;
+	}
 
 	while (env->dns_curr)
 	{
+		if (env->response_out)
+		{
+			write_response(env->resp_file_out, RESP_ADDRINFO,
+				sizeof(*env->dns_curr), env->dns_curr);
+			write_response(env->resp_file_out, RESP_ADDRINFO_SA,
+				env->dns_curr->ai_addrlen,
+				env->dns_curr->ai_addr);
+		}
+
 		env->socklen= env->dns_curr->ai_addrlen;
 		if (env->socklen > sizeof(env->sin6))
-			continue;	/* Weird */
+			break;	/* Weird */
 		memcpy(&env->sin6, env->dns_curr->ai_addr,
 			env->socklen);
 
@@ -1342,16 +1416,18 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			return;
 		}
 
-		traceroute_start2(env);
+		ntp_start2(env);
 
-		evutil_freeaddrinfo(env->dns_res);
+		if (!env->response_in)
+			evutil_freeaddrinfo(env->dns_res);
 		env->dns_res= NULL;
 		env->dns_curr= NULL;
 		return;
 	}
 
 	/* Something went wrong */
-	evutil_freeaddrinfo(env->dns_res);
+	if (!env->response_in)
+		evutil_freeaddrinfo(env->dns_res);
 	env->dns_res= NULL;
 	env->dns_curr= NULL;
 	snprintf(line, sizeof(line),
@@ -1375,6 +1451,8 @@ static void ntp_start(void *state)
 	}
 	ntpstate->busy= 1;
 
+	ntpstate->socket= -1;
+
 	if (ntpstate->response_out)
 	{
 		ntpstate->resp_file_out= fopen(ntpstate->response_out, "w");
@@ -1386,13 +1464,21 @@ static void ntp_start(void *state)
 	}
 
 
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_socktype= SOCK_DGRAM;
-	hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
-	ntpstate->dnsip= 1;
-	gettime_mono(&ntpstate->start_time);
-	(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
-		ntpstate->destportstr, &hints, dns_cb, ntpstate);
+	if (ntpstate->response_in)
+	{
+		ntpstate->dnsip= 1;
+		dns_cb(0, 0, ntpstate);
+	}
+	else
+	{
+		memset(&hints, '\0', sizeof(hints));
+		hints.ai_socktype= SOCK_DGRAM;
+		hints.ai_family= ntpstate->do_v6 ? AF_INET6 : AF_INET;
+		ntpstate->dnsip= 1;
+		gettime_mono(&ntpstate->start_time);
+		(void) evdns_getaddrinfo(DnsBase, ntpstate->hostname,
+			ntpstate->destportstr, &hints, dns_cb, ntpstate);
+	}
 }
 
 static int ntp_delete(void *state)
