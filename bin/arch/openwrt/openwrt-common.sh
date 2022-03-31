@@ -65,7 +65,6 @@ REG_SERVERS_SOURCE=$BASE_DIR/etc/reg_servers.sh
 DHCPC_PID=$STATUS_DIR/dhcpc-pid	# Cannot be vol, then it will be removed
 
 # Other conf
-TELNETD_PORT=2023
 DHCP=False
 LANINF=br-lan
 SSH_OPT=' -C '

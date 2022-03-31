@@ -35,7 +35,6 @@ RESOLV_CONF=/etc/resolv.conf
 MODE_FILE=$BASE_DIR/state/mode
 
 # Other conf
-TELNETD_PORT=2023
 DHCP=False
 
 . /usr/libexec/atlas-probe-scripts/bin/arch/openwrt-sw-probe/openwrt-sw-probe-common.sh

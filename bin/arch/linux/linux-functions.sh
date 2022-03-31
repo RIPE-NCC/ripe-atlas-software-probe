@@ -13,6 +13,10 @@ rchoose()
 {
 	$BB_BIN_DIR/rchoose "$@"
 }
+check_pid()
+{
+	$SU_CMD kill -0 "$@"
+}
 condmv()
 {
 	$BB_BIN_DIR/condmv "$@"

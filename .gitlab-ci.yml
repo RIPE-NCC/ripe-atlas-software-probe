@@ -1,0 +1,121 @@
+stages:
+  - docker_image
+  - build
+
+variables:
+  DOCKER_IMAGE_DEBIAN9: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/debian9:$CI_COMMIT_REF_SLUG
+  DOCKER_IMAGE_DEBIAN10: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/debian10:$CI_COMMIT_REF_SLUG
+  DOCKER_IMAGE_DEBIAN11: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/debian11:$CI_COMMIT_REF_SLUG
+  DOCKER_IMAGE_CENTOS7: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/centos7:$CI_COMMIT_REF_SLUG
+  DOCKER_IMAGE_CENTOS8: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/centos8:$CI_COMMIT_REF_SLUG
+  GIT_SUBMODULE_STRATEGY: recursive
+
+.build_image_debian:
+  stage: docker_image
+  only:
+    changes:
+      - .gitlab-ci.yml
+      - $DOCKER_DIR/Dockerfile
+  image: docker:latest
+  script:
+    - echo DOCKER_IMAGE $DOCKER_IMAGE
+    - echo DOCKER_DIR $DOCKER_DIR
+    - docker build -t $DOCKER_IMAGE $DOCKER_DIR
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $DOCKER_IMAGE
+
+build_image_debian9:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/debian9
+    DOCKER_IMAGE: $DOCKER_IMAGE_DEBIAN9
+  extends: .build_image_debian
+
+build_image_debian10:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/debian10
+    DOCKER_IMAGE: $DOCKER_IMAGE_DEBIAN10
+  extends: .build_image_debian
+
+build_image_debian11:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/debian11
+    DOCKER_IMAGE: $DOCKER_IMAGE_DEBIAN11
+  extends: .build_image_debian
+
+.build_image_centos:
+  stage: docker_image
+  only:
+    changes:
+      - .gitlab-ci.yml
+      - $DOCKER_DIR/Dockerfile
+  image: docker:latest
+  script:
+    - docker build -t $DOCKER_IMAGE $DOCKER_DIR
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $DOCKER_IMAGE
+
+build_image_centos7:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/centos7
+    DOCKER_IMAGE: $DOCKER_IMAGE_CENTOS7
+  extends: .build_image_centos
+
+build_image_centos8:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/centos8
+    DOCKER_IMAGE: $DOCKER_IMAGE_CENTOS8
+  extends: .build_image_centos
+
+.build-ci-test-debian:
+  stage: build
+  only:
+    - devel
+  script:
+    - cd ..
+    - HOME=$PWD ripe-atlas-software-probe/build-config/debian/bin/make-deb
+    - cp atlasswprobe-*.deb ripe-atlas-software-probe
+  artifacts:
+    paths:
+      - atlasswprobe-*.deb
+
+build-ci-test-debian9:
+  extends: .build-ci-test-debian
+  image: $DOCKER_IMAGE_DEBIAN9
+
+build-ci-test-debian10:
+  extends: .build-ci-test-debian
+  image: $DOCKER_IMAGE_DEBIAN10
+
+build-ci-test-debian11:
+  extends: .build-ci-test-debian
+  image: $DOCKER_IMAGE_DEBIAN11
+
+.build-ci-test-centos:
+  stage: build
+  only:
+    - devel
+  script:
+    - cd ..
+    - ripe-atlas-software-probe/build-config/centos/bin/cp-repo-files $CENTOS_VERSION
+    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo.spec
+    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo-test.spec
+    - HOME=$PWD ripe-atlas-software-probe/build-config/centos/bin/make-tars
+    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/atlasswprobe.spec
+    - cp rpmbuild/RPMS/x86_64/atlasswprobe-*.rpm ripe-atlas-software-probe
+    - cp rpmbuild/RPMS/noarch/ripe-atlas-repo-*.rpm ripe-atlas-software-probe
+  artifacts:
+    paths:
+      - atlasswprobe-*.rpm
+      - ripe-atlas-repo-*.rpm
+
+build-ci-test-centos7:
+  variables:
+    CENTOS_VERSION: centos7
+  image: $DOCKER_IMAGE_CENTOS7
+  extends: .build-ci-test-centos
+
+build-ci-test-centos8:
+  variables:
+    CENTOS_VERSION: centos8
+  image: $DOCKER_IMAGE_CENTOS8
+  extends: .build-ci-test-centos

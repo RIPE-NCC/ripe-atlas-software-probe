@@ -1,5 +1,5 @@
 #!/bin/sh
-VERSION=5040-1
+VERSION=5062-1
 
 set -e
 
@@ -23,6 +23,7 @@ get_arch()
 {
 	case $(uname -m) in
 	aarch64) echo arm64 ;;
+	armv5tel) echo armel ;;
 	armv6l) echo armhf ;;
 	armv7l) echo armhf ;;
 	i686) echo i386 ;;

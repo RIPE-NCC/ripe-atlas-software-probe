@@ -27,7 +27,6 @@ RESOLV_CONF=/etc/resolv.conf
 MODE_FILE=$BASE_DIR/state/mode
 
 # Other conf
-TELNETD_PORT=2023
 DHCP=False
 do_rxtxrpt=yes
 
@@ -46,6 +45,7 @@ REG_SERVERS_SOURCE=$RPM_ETC_DIR/reg_servers.sh
 chmod_for_msm()
 {
 	chmod -R g+rwX $BASE_DIR/data
+	chmod -R g+rw $RUN_DIR
 }
 
 # Get ethernet address

@@ -25,6 +25,13 @@ if [ $(config_lookup RXTXRPT no) = yes ]
 then
 	do_rxtxrpt=yes
 fi
+httppost_port="$(config_lookup HTTP_POST_PORT '')"
+if [ -n "$httppost_port" ]
+then
+	export HTTPPOST_PORT="$httppost_port"
+fi
+export httppost_port
+export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
 
 $MOUNT_FS_CMD
 
@@ -84,6 +91,7 @@ $KILL_PERDS_CMD
 
 # the system part is done. now set env for ATLAS.
 rm -f $STATUS_DIR/*.vol
+rm -f $RUN_DIR/*.vol
 
 # Crontabs may be bad enough that we can't actually do anything. Delete them
 # after too many failed boots
@@ -129,19 +137,23 @@ mkdir -p $DATA_DIR/oneoff
 $CHOWN_FOR_MSM
 $CHMOD_FOR_MSM
 
-perd -c $BASE_DIR/crons/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
-if [ -n "$DO_WIFI" ]; then
-	perd -c $BASE_DIR/crons/2 -A 9802 -P $RUN_DIR/perd-2.pid.vol
-	ooqd $BASE_DIR/crons/oneoff3 &
-fi
-if [ -n "$DO_WIFI" ]; then
-	eperd -I br-lan -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
-	eooqd -I br-lan $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
-	eooqd -q10 -I wlan0 $BASE_DIR/crons/oneoff10 -A 9810 -P $RUN_DIR/eooqd10.pid.vol -i 10 &
-else
+start_perd()
+{
+	perd -c $BASE_DIR/crons/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
+}
+start_eperd()
+{
 	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
+}
+start_eooqd()
+{
 	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
-fi
+}
+
+start_perd
+start_eperd
+start_eooqd
+
 
 $NTPCLIENT_CMD &
 
@@ -296,6 +308,34 @@ do
 	then
 		mv $DATA_NEW_DIR/resolv.conf.ra6 /tmp/resolv.conf.ra6
 		$RESOLVCONF_CMD
+	fi
+
+	# Check if perd is still running
+	if check_pid $(cat $RUN_DIR/perd-main.pid.vol)
+	then
+		: # perd is running
+	else
+		echo restarting perd
+		start_perd
+		echo "RESULT 9801 perd died (restarted)" >> $DATA_NEW_DIR/simpleping
+	fi
+	# Check if eperd is still running
+	if check_pid $(cat $RUN_DIR/perd-7.pid.vol)
+	then
+		: # eperd is running
+	else
+		echo restarting eperd
+		start_eperd
+		echo "RESULT 9807 eperd died (restarted)" >> $DATA_NEW_DIR/simpleping
+	fi
+	# Check if eooqd is still running
+	if check_pid $(cat $RUN_DIR/eooqd.pid.vol)
+	then
+		: # eooqd is running
+	else
+		echo restarting eooqd
+		start_eooqd
+		echo "RESULT 9809 eooqd died (restarted)" >> $DATA_NEW_DIR/simpleping
 	fi
 
 	sync
