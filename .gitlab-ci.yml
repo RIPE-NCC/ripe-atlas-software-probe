@@ -70,6 +70,7 @@ build_image_centos8:
   stage: build
   only:
     - devel
+    - testing
   script:
     - cd ..
     - HOME=$PWD ripe-atlas-software-probe/build-config/debian/bin/make-deb
@@ -94,6 +95,7 @@ build-ci-test-debian11:
   stage: build
   only:
     - devel
+    - testing
   script:
     - cd ..
     - ripe-atlas-software-probe/build-config/centos/bin/cp-repo-files $CENTOS_VERSION
