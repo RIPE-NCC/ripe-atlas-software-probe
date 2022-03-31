@@ -15,7 +15,7 @@ rchoose()
 }
 check_pid()
 {
-	$SU_CMD kill -0 "$@"
+	[ -d "/proc/$@" ]
 }
 condmv()
 {
