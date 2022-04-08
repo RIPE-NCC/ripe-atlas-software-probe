@@ -76,6 +76,7 @@ build_image_centos8:
     - HOME=$PWD ripe-atlas-software-probe/build-config/debian/bin/make-deb
     - cp atlasswprobe-*.deb ripe-atlas-software-probe
   artifacts:
+    name: "$CI_PROJECT_NAME-$CI_BUILD_REF_NAME"
     paths:
       - atlasswprobe-*.deb
 
@@ -106,6 +107,7 @@ build-ci-test-debian11:
     - cp rpmbuild/RPMS/x86_64/atlasswprobe-*.rpm ripe-atlas-software-probe
     - cp rpmbuild/RPMS/noarch/ripe-atlas-repo-*.rpm ripe-atlas-software-probe
   artifacts:
+    name: "$CI_PROJECT_NAME-$CI_BUILD_REF_NAME"
     paths:
       - atlasswprobe-*.rpm
       - ripe-atlas-repo-*.rpm
