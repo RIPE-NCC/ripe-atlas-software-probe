@@ -13,6 +13,9 @@ variables:
 .build_image_debian:
   stage: docker_image
   only:
+    refs:
+      - devel
+      - tags
     changes:
       - .gitlab-ci.yml
       - $DOCKER_DIR/Dockerfile
@@ -45,6 +48,9 @@ build_image_debian11:
 .build_image_centos:
   stage: docker_image
   only:
+    refs:
+      - devel
+      - tags
     changes:
       - .gitlab-ci.yml
       - $DOCKER_DIR/Dockerfile
