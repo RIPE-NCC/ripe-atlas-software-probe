@@ -16,7 +16,7 @@ else
 	exit 1
 fi
 
-. $ATLAS_STATIC/bin/arch/generic/generic-ATLAS.sh
+. $ATLAS_STATIC/bin/arch/@probe_type@/@probe_type@-ATLAS.sh
 
 . $BIN_DIR/common.sh
 

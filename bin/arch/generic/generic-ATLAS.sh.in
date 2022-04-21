@@ -34,7 +34,7 @@ MODE_FILE=$BASE_DIR/state/mode
 # Other conf
 DHCP=False
 
-. $ATLAS_STATIC/bin/arch/generic/generic-common.sh
+. $ATLAS_STATIC/bin/arch/@probe_type@/@probe_type@-common.sh
 
 # Directories
 STATE_DIR=$RPM_BASE_DIR/state; export STATE_DIR
