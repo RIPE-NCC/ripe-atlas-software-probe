@@ -6,6 +6,15 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([foreign])
 
+AC_ARG_WITH([probe-type], [AS_HELP_STRING([--with-probe-type], [define which probe flavour should be built (v3,v4,v5)])], [], [with_probe_type=no])
+
+AS_IF([test "x${with_probe_type}" == xv3], [probe_type=openwrt-atlas-probev3],
+      [test "x${with_probe_type}" == xv4], [probe_type=openwrt-atlas-probev4],
+      [test "x${with_probe_type}" == xv5], [probe_type=openwrt-atlas-probev5],
+      [probe_type=generic])
+
+AC_SUBST(probe_type)
+
 # system paths
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
