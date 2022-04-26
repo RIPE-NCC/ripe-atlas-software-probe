@@ -106,17 +106,16 @@ build-ci-test-debian11:
   script:
     - cd ..
     - ripe-atlas-software-probe/build-config/centos/bin/cp-repo-files $CENTOS_VERSION
-    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo.spec
-    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo-test.spec
     - HOME=$PWD ripe-atlas-software-probe/build-config/centos/bin/make-tars
+    - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo.spec
     - HOME=$PWD rpmbuild --bb rpmbuild/SPECS/atlasswprobe.spec
     - cp rpmbuild/RPMS/x86_64/atlasswprobe-*.rpm ripe-atlas-software-probe
     - cp rpmbuild/RPMS/noarch/ripe-atlas-repo-*.rpm ripe-atlas-software-probe
+    - tar cvf $CENTOS_VERSION-RPM-package.tar rpmbuild/RPMS/
   artifacts:
     name: "$CI_PROJECT_NAME-$CI_BUILD_REF_NAME"
     paths:
-      - atlasswprobe-*.rpm
-      - ripe-atlas-repo-*.rpm
+      - $CENTOS_VERSION-RPM-package.tar 
 
 build-ci-test-centos7:
   variables:
