@@ -1084,7 +1084,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	/* Check the ICMP header to drop unexpected packets due to
 	 * unrecognized id
 	 */
-	if (icmp->icmp6_id != base->pid)
+	if (icmp->icmp6_id != (base->pid & 0xffff))
 	  {
 	    goto done;
 	  }
