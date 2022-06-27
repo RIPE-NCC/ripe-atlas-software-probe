@@ -14,7 +14,7 @@ variables:
   stage: docker_image
   only:
     refs:
-      - devel
+      - devel*
       - tags
     changes:
       - .gitlab-ci.yml
@@ -49,7 +49,7 @@ build_image_debian11:
   stage: docker_image
   only:
     refs:
-      - devel
+      - devel*
       - tags
     changes:
       - .gitlab-ci.yml
@@ -75,7 +75,7 @@ build_image_centos8:
 .build-ci-test-debian:
   stage: build
   only:
-    - devel
+    - devel*
     - tags
   script:
     - cd ..
@@ -101,7 +101,7 @@ build-ci-test-debian11:
 .build-ci-test-centos:
   stage: build
   only:
-    - devel
+    - devel*
     - tags
   script:
     - cd ..
