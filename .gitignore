@@ -70,3 +70,6 @@ m4/lt~obsolete.m4
 /Makefile
 /atlas-config/Makefile
 /bin/Makefile
+
+# makedeb artifacts
+atlasswprobe-*
