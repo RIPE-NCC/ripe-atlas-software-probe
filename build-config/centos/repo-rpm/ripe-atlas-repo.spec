@@ -10,7 +10,7 @@ BuildArch:	noarch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
 
 %description
-Setup the RIPE Atlas Software Probe Test Repo
+Setup the RIPE Atlas Software Probe Repo
 
 %prep
 
