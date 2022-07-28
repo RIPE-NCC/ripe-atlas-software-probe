@@ -77,7 +77,7 @@ _atlas_log_failed_command()
 	fi
 
 	${encoder} set 'fw' integer "${_atlas_log_application_version}"
-	${encoder} set 'cmd' string "${cmd}"
+	${encoder} set 'cmd' string "${cmd//\"/\\\"}"
 
 	return 0
 }
@@ -144,7 +144,7 @@ atlas_log_compose()
 
 	new json encoder
 
-	${encoder} set 'id' integer "${id}"
+	${encoder} set 'id' string "${id}"
 	${encoder} set 'time' integer $(epoch)
 
 	${handler} ${encoder} "${@}"

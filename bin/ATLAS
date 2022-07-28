@@ -20,6 +20,12 @@ fi
 
 . $BIN_DIR/common.sh
 
+source $ATLAS_BASE/bin/support.lib.sh
+source $ATLAS_BASE/bin/class.lib.sh
+source $ATLAS_BASE/bin/array.lib.sh
+source $ATLAS_BASE/bin/json.lib.sh
+source $ATLAS_BASE/bin/atlas_log.lib.sh
+
 # config variables
 if [ $(config_lookup RXTXRPT no) = yes ]
 then
@@ -317,7 +323,7 @@ do
 	else
 		echo restarting perd
 		start_perd
-		echo "RESULT 9801 perd died (restarted)" >> $DATA_NEW_DIR/simpleping
+		atlas_log 9811 'perd' 'perd died (restarted)'
 	fi
 	# Check if eperd is still running
 	if check_pid $(cat $RUN_DIR/perd-7.pid.vol)
@@ -326,7 +332,7 @@ do
 	else
 		echo restarting eperd
 		start_eperd
-		echo "RESULT 9807 eperd died (restarted)" >> $DATA_NEW_DIR/simpleping
+		atlas_log 9817 'eperd' 'eperd died (restarted)'
 	fi
 	# Check if eooqd is still running
 	if check_pid $(cat $RUN_DIR/eooqd.pid.vol)
@@ -335,7 +341,7 @@ do
 	else
 		echo restarting eooqd
 		start_eooqd
-		echo "RESULT 9809 eooqd died (restarted)" >> $DATA_NEW_DIR/simpleping
+		atlas_log 9819 'eooqd' 'eooqd died (restarted)'
 	fi
 
 	sync
