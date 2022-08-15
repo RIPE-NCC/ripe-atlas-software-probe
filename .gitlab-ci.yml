@@ -2,6 +2,7 @@ stages:
   - docker_image
   - build
   - prepare
+  - deploy
 
 variables:
   DOCKER_IMAGE_DEBIAN9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian9:${CI_COMMIT_REF_SLUG}
@@ -170,3 +171,20 @@ deployable-centos8:
     CENTOS_VERSION: centos8
   image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-centos
+
+deploy-centos7:
+  stage: deploy
+  only:
+    - /^devel.*/
+    - tags
+  needs:
+   - job: deployable-centos7
+     artifacts: true 
+  when: manual
+  variables:
+    CENTOS_VERSION: centos7
+  image: ${DOCKER_IMAGE_PREP}
+  script:
+    - 'eval ${PREPARE}'
+    - 'eval ${DEPLOY}'
+    - 'eval ${CLEANUP}'
