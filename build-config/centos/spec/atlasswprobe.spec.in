@@ -34,7 +34,7 @@ cp -r ./_install/* %{buildroot}%{installpath}/bb-13.3
 cp ./libevent-2.1.11-stable/.libs/libevent-*so* %{buildroot}%{installpath}/lib
 cp ./libevent-2.1.11-stable/.libs/libevent_openssl-*so* %{buildroot}%{installpath}/lib
 cd ..
-cp bin/{ATLAS,common-pre.sh,common.sh,reginit.sh} %{buildroot}%{installpath}/bin
+cp bin/{ATLAS,common-pre.sh,common.sh,reginit.sh,*.lib.sh} %{buildroot}%{installpath}/bin
 cp bin/arch/centos-sw-probe/* %{buildroot}%{installpath}/bin/arch/centos-sw-probe
 cp bin/arch/linux/* %{buildroot}%{installpath}/bin/arch/linux
 cp atlas-config/state/* %{buildroot}%{installpath}/state

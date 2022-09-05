@@ -20,11 +20,11 @@ fi
 
 . $BIN_DIR/common.sh
 
-source $ATLAS_BASE/bin/support.lib.sh
-source $ATLAS_BASE/bin/class.lib.sh
-source $ATLAS_BASE/bin/array.lib.sh
-source $ATLAS_BASE/bin/json.lib.sh
-source $ATLAS_BASE/bin/atlas_log.lib.sh
+source $ATLAS_STATIC/bin/support.lib.sh
+source $ATLAS_STATIC/bin/class.lib.sh
+source $ATLAS_STATIC/bin/array.lib.sh
+source $ATLAS_STATIC/bin/json.lib.sh
+source $ATLAS_STATIC/bin/atlas_log.lib.sh
 
 # config variables
 if [ $(config_lookup RXTXRPT no) = yes ]
