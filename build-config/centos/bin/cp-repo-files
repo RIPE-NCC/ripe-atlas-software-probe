@@ -24,9 +24,7 @@ mkdir -p rpmbuild/SOURCES
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.spec rpmbuild/SPECS
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.repo-"$centos_version" rpmbuild/SOURCES/ripe-atlas-probe.repo
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-probe.pgp rpmbuild/SOURCES
-cp ripe-atlas-software-probe/build-config/centos/repo-rpm/ripe-atlas-repo.daily rpmbuild/SOURCES
 
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo-test.spec rpmbuild/SPECS
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.repo-"$centos_version" rpmbuild/SOURCES/ripe-atlas-probe-test.repo
 cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-probe-test.pgp rpmbuild/SOURCES
-cp ripe-atlas-software-probe/build-config/centos/repo-rpm-test/ripe-atlas-repo.daily rpmbuild/SOURCES
