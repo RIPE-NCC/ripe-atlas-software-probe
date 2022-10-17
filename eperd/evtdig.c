@@ -3791,7 +3791,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				/* Bad format */
 				snprintf((char *)name, sizeof(name),
 					"format-error at %lu: value 0x%x",
-					offset, len);
+					(unsigned long)offset, len);
 				*count= -1;
 				free(name); name= NULL;
 				return name;
@@ -3802,7 +3802,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			{
 				snprintf((char *)name, sizeof(name),
 					"offset-error at %lu: offset %lu",
-					offset, noffset);
+					(unsigned long)offset, (unsigned long)noffset);
 				*count= -1;
 				free(name); name= NULL;
 				return name;
@@ -3813,7 +3813,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 				/* Too many */
 				snprintf((char *)name, sizeof(name),
 					"too many redirects at %lu",
-						offset);
+						(unsigned long)offset);
 				*count= -1;
 				free(name); name= NULL;
 				return name;
@@ -3835,7 +3835,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		{
 			snprintf((char *)name, sizeof(name),
 				"buf-bounds-error at %lu: len %d",
-					offset, len);
+					(unsigned long)offset, len);
 			*count= -1;
 			free(name); name= NULL;
 			return name;
@@ -3845,7 +3845,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		{
 			snprintf((char *)name, sizeof(name),
 					"name-length-error at %lu: len %d",
-					offset, p+len+1);
+					(unsigned long)offset, p+len+1);
 			*count= -1;
 			free(name); name= NULL;
 			return name;

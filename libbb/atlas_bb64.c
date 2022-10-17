@@ -43,7 +43,7 @@ int buf_add(struct buf *buf, const void *data, size_t len )
 	newbuf= malloc(maxsize);
 	if (!newbuf)
 	{
-		fprintf(stderr, "unable to allocate %ld bytes\n", maxsize);
+		fprintf(stderr, "unable to allocate %ld bytes\n", (long)maxsize);
 		return (1);
 	}
 
