@@ -1,6 +1,8 @@
 #include <platform.h>
 #include <net/route.h>
 
+#include "libbb.h"
+
 static const
 IF_NOT_FEATURE_IPV6(uint16_t)
 IF_FEATURE_IPV6(unsigned)
