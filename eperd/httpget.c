@@ -853,10 +853,10 @@ static void report(struct hgstate *state)
 			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
 				"%s, "
 				DBQ(lts) ":%d, "
-				DBQ(time) ":%ld, ",
+				DBQ(time) ":%llu, ",
 				state->atlas, atlas_get_version_json_str(),
 				get_timesync(),
-				state->gstart);
+				(unsigned long long)state->gstart);
 			if (state->bundle)
 			{
 				fprintf(fh, DBQ(bundle) ":%s, ",
@@ -876,8 +876,8 @@ static void report(struct hgstate *state)
 	{
 		if (state->do_combine)
 		{
-			snprintf(line, sizeof(line), DBQ(time) ":%ld, ",
-				state->start.tv_sec);
+			snprintf(line, sizeof(line), DBQ(time) ":%llu, ",
+				(unsigned long long)state->start.tv_sec);
 		}
 		else
 		{

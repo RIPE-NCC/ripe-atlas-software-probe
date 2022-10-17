@@ -1026,9 +1026,9 @@ static void report(struct state *state)
 		fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
 			"%s, "
 			DBQ(lts) ":%d, "
-			DBQ(time) ":%ld, ",
+			DBQ(time) ":%llu, ",
 			state->atlas, atlas_get_version_json_str(),
-			get_timesync(), state->gstart);
+			get_timesync(), (unsigned long long)state->gstart);
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
@@ -1185,8 +1185,8 @@ static FILE *report_head(struct state *state)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
 
-	fprintf(fh, "%s" DBQ(time) ":%ld",
-		state->atlas ? ", " : "", atlas_time());
+	fprintf(fh, "%s" DBQ(time) ":%llu",
+		state->atlas ? ", " : "", (unsigned long long)atlas_time());
 	fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
 		DBQ(dst_port) ":" DBQ(%s),
 		state->hostname, state->portname);

@@ -362,12 +362,12 @@ static void report(struct trtstate *state)
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", %s"
 			", " DBQ(lts) ":%d"
-			", " DBQ(time) ":%ld"
-			", " DBQ(endtime) ":%ld, ",
+			", " DBQ(time) ":%llu"
+			", " DBQ(endtime) ":%llu, ",
 			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
-			state->starttime,
-			(long)atlas_time());
+			(unsigned long long)state->starttime,
+			(unsigned long long)atlas_time());
 		if (state->bundle_id)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle_id);
 	}

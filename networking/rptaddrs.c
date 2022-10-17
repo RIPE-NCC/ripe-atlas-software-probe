@@ -802,7 +802,7 @@ static int rpt_ipv6(char *cache_name, char *out_name, char *opt_atlas, int opt_a
 		JS(id,  opt_atlas);
 	}
 	gettimeofday(&now, NULL);
-	JS1(time, %ld,  now.tv_sec);
+	JS1(time, %llu,  (unsigned long long)now.tv_sec);
 
 	/* Copy all lines */
 	while (fgets(buf, sizeof(buf), file) != NULL)

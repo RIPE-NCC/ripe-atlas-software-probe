@@ -1009,7 +1009,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 		lookup_prepend = xzalloc(DEFAULT_LINE_LENGTH +  sizeof(qry->lookupname));
 		snprintf(lookup_prepend, (sizeof(qry->lookupname) +
 			DEFAULT_LINE_LENGTH - 1),
-			 "%d.%lu.%s", probe_id, qry->xmit_time,
+			 "%d.%llu.%s", probe_id, (unsigned long long)qry->xmit_time,
 			qry->lookupname);
 
 		qnamelen= ChangetoDnsNameFormat(qname, qnamelen,
@@ -3081,7 +3081,7 @@ static void tdig_stats(int unusg_statsed UNUSED_PARAM, const short event UNUSED_
 	AS(atlas_get_version_json_str());
 	AS(", ");
 	gettimeofday(&now, NULL);
-	JS1(time, %ld,  now.tv_sec);
+	JS1(time, %llu,  (unsigned long long)now.tv_sec);
 	JU(sok , base->sentok);
 	JU(rok , base->recvok);
 	JU(sent , base->sentbytes);
@@ -3395,7 +3395,7 @@ void printErrorQuick (struct query_state *qry)
 	fprintf(fh, "RESULT { ");
 	fprintf(fh, "%s,", atlas_get_version_json_str());
 	fprintf(fh, "\"id\" : 9202 ,");
-	fprintf(fh, "\"time\" : %ld ,",  atlas_time());
+	fprintf(fh, "\"time\" : %llu ,",  (unsigned long long)atlas_time());
 
 	fprintf(fh, "\"error\" : [{ ");
 	fprintf(fh, "\"query busy\": \"not starting a new one. previous one is not done yet\"}");
@@ -3405,7 +3405,7 @@ void printErrorQuick (struct query_state *qry)
 		fprintf(fh, "\"id\" : \"%s\"",  qry->str_Atlas);
 		if (qry->str_bundle)
 			fprintf(fh, ",\"bundle\" : %s",  qry->str_bundle);
-		fprintf(fh, ",\"start time\" : %ld",  qry->xmit_time);
+		fprintf(fh, ",\"start time\" : %llu",  (unsigned long long)qry->xmit_time);
 		if(qry->retry) {
 			fprintf(fh, ",\"retry\": %d",  qry->retry);
 			
@@ -3456,7 +3456,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		AS(atlas_get_version_json_str());
 		AS(", ");
 		if (qry->opt_rset){
-			JS1(time, %ld,  qry->xmit_time);
+			JS1(time, %llu,  (unsigned long long)qry->xmit_time);
 			JD(lts,lts);
 			AS("\"resultset\" : [ {");
 		}
@@ -3466,7 +3466,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		AS (",{");
 	}
 
-	JS1(time, %ld,  qry->xmit_time);
+	JS1(time, %llu,  (unsigned long long)qry->xmit_time);
 	JD(lts,lts);
 
 	if (qry->opt_do_tls && ssl_version != NULL)

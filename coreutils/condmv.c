@@ -149,7 +149,8 @@ int condmv_main(int argc, char *argv[])
 				rebased_from, strerror(errno));
 			goto err;
 		}
-		if (fprintf(file, "%s %lu %s\n", opt_add, mytime, from) < 0)
+		if (fprintf(file, "%s %llu %s\n", opt_add,
+			(unsigned long long)mytime, from) < 0)
 		{
 			fprintf(stderr,
 				"condmv: unable to append to '%s': %s\n",

@@ -366,10 +366,10 @@ static void report(struct ntpstate *state)
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", %s"
 			", " DBQ(lts) ":%d"
-			", " DBQ(time) ":%ld, ",
+			", " DBQ(time) ":%llu, ",
 			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
-			state->starttime);
+			(unsigned long long)state->starttime);
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
