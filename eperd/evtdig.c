@@ -1612,7 +1612,8 @@ static void tcp_connected(struct tu_env *env, struct bufferevent *bev)
 	}
 	else
 	{
-		getsockname(bufferevent_getfd(bev), &qry->loc_sin6, &qry->loc_socklen);
+		getsockname(bufferevent_getfd(bev),
+			(struct sockaddr *)&qry->loc_sin6, &qry->loc_socklen);
 		if (qry->response_out)
 		{
 			write_response(qry->resp_file, RESP_SOCKNAME,

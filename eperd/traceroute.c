@@ -4631,7 +4631,7 @@ static int create_socket(struct trtstate *state, int do_tcp)
 	{
 		state->loc_socklen= sizeof(state->loc_sin6);
 		if (!state->response_in && getsockname(state->socket_icmp,
-			&state->loc_sin6,
+			(struct sockaddr *)&state->loc_sin6,
 			&state->loc_socklen) == -1)
 		{
 			crondlog(DIE9 "getsockname failed");

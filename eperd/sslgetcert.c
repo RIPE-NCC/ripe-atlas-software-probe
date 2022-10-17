@@ -1801,7 +1801,8 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	else
 	{
 		getsockname(bufferevent_getfd(bev),	
-			&state->loc_sin6, &state->loc_socklen);
+			(struct sockaddr *)&state->loc_sin6,
+			&state->loc_socklen);
 		if (state->response_out)
 		{
 			write_response(state->resp_file, RESP_SOCKNAME,
