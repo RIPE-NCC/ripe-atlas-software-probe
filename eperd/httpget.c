@@ -861,10 +861,10 @@ static void report(struct hgstate *state)
 			fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
 				"%s, "
 				DBQ(lts) ":%d, "
-				DBQ(time) ":%ld, ",
+				DBQ(time) ":%llu, ",
 				state->atlas, atlas_get_version_json_str(),
 				get_timesync(),
-				state->gstart);
+				(unsigned long long)state->gstart);
 			if (state->bundle)
 			{
 				fprintf(fh, DBQ(bundle) ":%s, ",
@@ -884,8 +884,8 @@ static void report(struct hgstate *state)
 	{
 		if (state->do_combine)
 		{
-			snprintf(line, sizeof(line), DBQ(time) ":%ld, ",
-				state->start.tv_sec);
+			snprintf(line, sizeof(line), DBQ(time) ":%llu, ",
+				(unsigned long long)state->start.tv_sec);
 		}
 		else
 		{
@@ -2114,7 +2114,8 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	else
 	{
 		getsockname(bufferevent_getfd(bev),	
-			&state->loc_sin6, &state->loc_socklen);
+			(struct sockaddr *)&state->loc_sin6,
+			&state->loc_socklen);
 		if (state->response_out)
 		{
 			write_response(state->resp_file, RESP_SOCKNAME,

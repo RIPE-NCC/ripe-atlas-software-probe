@@ -392,10 +392,10 @@ static void report(struct ntpstate *state)
 		fprintf(fh, DBQ(id) ":" DBQ(%s)
 			", %s"
 			", " DBQ(lts) ":%d"
-			", " DBQ(time) ":%ld, ",
+			", " DBQ(time) ":%llu, ",
 			state->atlas, atlas_get_version_json_str(),
 			get_timesync(),
-			state->starttime);
+			(unsigned long long)state->starttime);
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
@@ -1266,13 +1266,13 @@ static int create_socket(struct ntpstate *state)
 
 		len= sizeof(state->loc_sin6);
 		read_response(state->socket, RESP_SOCKNAME,
-			&len, &state->loc_sin6);
+			&len, (struct sockaddr *)&state->loc_sin6);
 		state->loc_socklen= len;
 	}
 	else
 	{
 		if (getsockname(state->socket,
-			&state->loc_sin6,
+			(struct sockaddr*)&state->loc_sin6,
 			&state->loc_socklen) == -1)
 		{
 			crondlog(DIE9 "getsockname failed");

@@ -99,8 +99,8 @@ static void condmv_start(void *state)
 
 	len= strlen(condmvstate->to) + 20;
 	to= malloc(len);
-	snprintf(to, len, "%s.%ld", condmvstate->to,
-		(long)time(NULL)/condmvstate->interval);
+	snprintf(to, len, "%s.%llu", condmvstate->to,
+		(unsigned long long)time(NULL)/condmvstate->interval);
 
 	crondlog(LVL7 "condmv_start: destination '%s'\n", to);
 
@@ -124,7 +124,8 @@ static void condmv_start(void *state)
 			free(to);
 			return;
 		}
-		if (fprintf(file, "%s %lu %s\n", condmvstate->atlas, mytime,
+		if (fprintf(file, "%s %llu %s\n", condmvstate->atlas,
+			(unsigned long long)mytime,
 			condmvstate->from) < 0)
 		{
 			crondlog(LVL9 "condmv: unable to append to '%s': %s\n",
