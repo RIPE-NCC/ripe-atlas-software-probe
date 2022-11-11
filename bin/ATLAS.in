@@ -1,5 +1,4 @@
-#!/bin/sh
-# The ATLAS Main Loop
+
 # 2010 atlas@ripe.net
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
@@ -16,7 +15,7 @@ else
 	exit 1
 fi
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
+. $ATLAS_STATIC/bin/arch/generic/generic-ATLAS.sh
 
 . $BIN_DIR/common.sh
 
@@ -130,15 +129,7 @@ $BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 
 ifconfig
 
-mkdir -p $BASE_DIR/crons/main
-mkdir -p $BASE_DIR/crons/2  $BASE_DIR/crons/3  $BASE_DIR/crons/4
-mkdir -p $BASE_DIR/crons/5  $BASE_DIR/crons/6  $BASE_DIR/crons/7
-mkdir -p $BASE_DIR/crons/8  $BASE_DIR/crons/9  $BASE_DIR/crons/10
-mkdir -p $BASE_DIR/crons/11  $BASE_DIR/crons/12  $BASE_DIR/crons/13
-mkdir -p $BASE_DIR/crons/14  $BASE_DIR/crons/15  $BASE_DIR/crons/16
-mkdir -p $BASE_DIR/crons/17  $BASE_DIR/crons/18  $BASE_DIR/crons/19
-mkdir -p $BASE_DIR/crons/20
-mkdir -p $DATA_DIR/oneoff
+mkdir -p $BASE_DIR/crons/{main,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20} $BASE_DIR/oneoff
 
 $CHOWN_FOR_MSM
 $CHMOD_FOR_MSM
