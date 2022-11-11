@@ -18,8 +18,8 @@ BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel
 This is the RIPE Atlas probe software.
 
 %prep
+echo "Building for software probe version: %{version}"
 git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/ripe-atlas-software-probe.git %{_builddir}/%{git_repo}
-echo %{version} > %{_builddir}/%{git_repo}/VERSION
 
 %build
 cd %{_builddir}/%{git_repo}

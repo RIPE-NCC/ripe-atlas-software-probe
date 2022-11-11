@@ -25,9 +25,9 @@ bin/common-pre.sh
 bin/common.sh
 bin/reginit.sh
 bin/resolvconf
-bin/arch/centos-sw-probe/centos-sw-probe-ATLAS.sh
-bin/arch/centos-sw-probe/centos-sw-probe-common.sh
-bin/arch/centos-sw-probe/centos-sw-probe-reginit.sh
+bin/arch/generic/generic-ATLAS.sh
+bin/arch/generic/generic-common.sh
+bin/arch/generic/generic-reginit.sh
 bin/atlas.service
 atlas-config/state/FIRMWARE_APPS_VERSION
 ])

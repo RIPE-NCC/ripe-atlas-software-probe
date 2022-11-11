@@ -2,8 +2,8 @@ AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(prefix)/bb-13.3
 SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
 
 DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/arch/linux/linux-functions.sh \
-	bin/arch/centos-sw-probe/centos-sw-probe-ATLAS.sh bin/arch/centos-sw-probe/centos-sw-probe-common.sh \
-	bin/arch/centos-sw-probe/centos-sw-probe-reginit.sh
+	bin/arch/generic/generic-ATLAS.sh bin/arch/generic/generic-common.sh \
+	bin/arch/generic/generic-reginit.sh bin/*.lib.sh
 
 ATLAS_CONFIG_FILES = state/FIRMWARE_APPS_VERSION \
 	etc/known_hosts.reg etc/reg_servers.sh.dev etc/reg_servers.sh.prod etc/reg_servers.sh.test
@@ -11,7 +11,7 @@ ATLAS_CONFIG_FILES = state/FIRMWARE_APPS_VERSION \
 install-exec-local:	install-generic-config $(DST_FILES) $(ATLAS_CONFIG_FILES)
 
 install-generic-config:
-	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/arch/centos-sw-probe,bin/arch/linux,bb-13.3,etc,lib,state}
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/arch/generic,bin/arch/linux,bb-13.3,etc,lib,state}
 
 $(DST_FILES):	$(DESTDIR)$(prefix)/
 	@echo "$@ ==> $<"
