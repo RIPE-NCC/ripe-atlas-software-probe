@@ -27,7 +27,7 @@ if [ ! -n "$STATE_FILE" ] ; then
 	STATE_FILE=$STATUS_DIR/reginit.vol
 fi
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
+. $ATLAS_STATIC/bin/arch/generic/generic-common.sh
 . $ATLAS_STATIC/bin/arch/linux/linux-functions.sh
 
 get_arch()
