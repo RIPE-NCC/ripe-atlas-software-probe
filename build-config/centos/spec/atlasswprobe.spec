@@ -11,15 +11,22 @@ Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
 Group:      	Applications/Internet
-Requires:   	sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname autoconf automake libtool make
-BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel
+Requires:   	sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname 
+BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 
 %description
 This is the RIPE Atlas probe software.
 
 %prep
 echo "Building for software probe version: %{version}"
+
+# performing the steps of '%setup' manually since we are pulling from a remote git repo
+echo "Cleaning build dir"
+cd %{_builddir}
+rm -rf %{git_repo}
+echo "Getting Sources..."
 git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/ripe-atlas-software-probe.git %{_builddir}/%{git_repo}
+cd %{git_repo}
 
 %build
 cd %{_builddir}/%{git_repo}
@@ -57,6 +64,7 @@ make DESTDIR=%{buildroot} install
 %attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7
 %attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7.0.0
 %{src_prefix_dir}/lib
+%caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
 
 %pre
 systemctl stop atlas 2>&1 1>/dev/null
