@@ -25,7 +25,12 @@ echo "Cleaning build dir"
 cd %{_builddir}
 rm -rf %{git_repo}
 echo "Getting Sources..."
-git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/ripe-atlas-software-probe.git %{_builddir}/%{git_repo}
+if [[ ! -z "${PROBE_SUBGROUP_USER}" && ! -z "${PROBE_SUBGROUP_TOKEN}" ]] ; then
+	git clone -b %{git_branch} --recursive https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{git_repo}
+else
+	echo "Creditials must be entered manually.. "
+	git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{git_repo}
+fi
 cd %{git_repo}
 
 %build
