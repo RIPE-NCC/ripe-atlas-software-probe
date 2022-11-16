@@ -1,5 +1,5 @@
 %define     git_repo         ripe-atlas-software-probe
-%define     git_branch       feature/9-evaluate-rpm-package
+%define     git_branch       devel.9-evaluate-rpm-package
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
 %define     exec_env         prod
