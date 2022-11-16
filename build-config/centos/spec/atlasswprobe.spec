@@ -3,7 +3,13 @@
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
 %define     exec_env         prod
-%define     version          %(find . -name VERSION | grep "%{git_repo}" | head -1 | xargs -I {} sh -c "cat {}")
+%define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
+
+# flag to ignore files installed in builddir but not packaged in the final RPM
+%define	    _unpackaged_files_terminate_build	0
+
+# prevent creation of the build ids in /usr/lib -> see https://access.redhat.com/discussions/5045161
+%define _build_id_links none
 
 Name:	    	atlasswprobe
 Summary:    	RIPE Atlas probe software
@@ -52,7 +58,7 @@ make DESTDIR=%{buildroot} install
 
 %files
 %ghost %{src_prefix_dir}/bin/event_rpcgen.py
-%ghost %{src_prefix_dir}/include
+%ghost %{src_prefix_dir}/include/*
 %ghost %{src_prefix_dir}/lib/pkgconfig
 %attr(644, root, root) %{_unitdir}/atlas.service
 %{src_prefix_dir}/bb-13.3
@@ -68,7 +74,6 @@ make DESTDIR=%{buildroot} install
 %attr(755, root, root) %{src_prefix_dir}/lib/libevent-2.1.so.7.0.0
 %attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7
 %attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7.0.0
-%{src_prefix_dir}/lib
 %caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
 
 %pre
