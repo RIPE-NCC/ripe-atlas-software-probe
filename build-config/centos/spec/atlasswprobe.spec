@@ -3,7 +3,7 @@
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
 %define     exec_env         prod
-%define     version          %(cat VERSION)
+%define     version          %(find . -name VERSION | grep "%{git_repo}" | head -1 | xargs -I {} sh -c "cat {}")
 
 Name:	    	atlasswprobe
 Summary:    	RIPE Atlas probe software
