@@ -1,14 +1,14 @@
 %define		git_repo         	ripe-atlas-software-probe
-%define		git_branch       	feature/9-evaluate-rpm-package
+%define		git_branch       	devel.9-evaluate-rpm-package
 %define		build_dirname		ripe-atlas-repo
 %define		local_state_dir  	/home/atlas
 %define		src_prefix_dir   	/usr/local/atlas
 %define		generic_assets_path	build-config/generic
 
-%define         yum_repo_filename       yum.repos.d
+%define         yum_repo_dirname       yum.repos.d
 %define         gpg_key_filename        RPM-GPG-KEY-ripe-atlas-probe
 
-%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{generic_assets_path}/yum.repos.d-generic
+%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{generic_assets_path}/atlas-probe.repo
 %define         gpg_key_path            %{_builddir}/%{build_dirname}/%{generic_assets_path}/%{gpg_key_filename}
 
 Name:           ripe-atlas-repo
@@ -38,19 +38,22 @@ cd %{build_dirname}
 
 %build
 cat %{yum_repo_path}
-sed -i -e "s|baseurl.*$|&%{?dist}|" %{yum_repo_path}
+STRIPPED_DIST=$(echo %{?dist} | sed -r 's/^\.//')
+[ -z ${STRIPPED_DIST} ] && echo "OS Error: No Distribution Detected! rpm macro ?dist is empty" && exit 1
+echo "OS Distro detected as: ${STRIPPED_DIST}"
+sed -i -e "s|baseurl.*$|&${STRIPPED_DIST}|" %{yum_repo_path}
 
 %install
-mkdir -p %{buildroot}/etc/yum.repos.d
-cp %{yum_repo_path} %{buildroot}/etc/yum.repos.d
-mkdir -p %{buildroot}/etc/pki/rpm-gpg
-cp %{gpg_key_path} %{buildroot}/etc/pki/rpm-gpg/
+mkdir -p %{buildroot}%{_sysconfdir}/%{yum_repo_dirname}
+cp %{yum_repo_path} %{buildroot}%{_sysconfdir}/%{yum_repo_dirname}
+mkdir -p %{buildroot}%{_sysconfdir}/pki/rpm-gpg
+cp %{gpg_key_path} %{buildroot}%{_sysconfdir}/pki/rpm-gpg/
 
 %clean
 #rm -rf %{buildroot}
 
 %files
-/etc/%{yum_repo_filename}
+/etc/%{yum_repo_dirname}
 /etc/pki/rpm-gpg/%{gpg_key_filename}
 
 %changelog
