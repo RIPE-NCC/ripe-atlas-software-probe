@@ -40,3 +40,18 @@ To build using autoconf tooling and install the software probe to a directory (i
 >> ./configure --prefix=/usr/local/atlas --localstatedir=/home/atlas
 >> make
 >> make DESTDIR=/tmp/data install
+
+The build process is performed using 'rpmbuild' for RHEL. By default the build is based on the master HEAD. Command-line defines can be set for branch and commits in order to specify specific build points. Currently two are supported
+
+- git_branch
+- git_commit
+
+The arguments are specified in a define flag in the 'rpmbuild' command. For example if a user wants to build the repo RPM from a specific commit on the master branch then use the following command:
+
+`rpmbuild -bb --define "git_commit 32c5747" ripe-atlas-software-probe/build-config/generic/ripe-atlas-repo.spec`
+
+If a specific version is to be build then:
+
+`rpmbuild -bb --define "git_branch 5083"  ripe-atlas-software-probe/build-config/generic/ripe-atlas-repo.spec`
+
+Note that build outputs will still result in '~/rpmbuild' unless otherwise specified

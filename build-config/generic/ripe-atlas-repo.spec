@@ -1,5 +1,4 @@
 %define		git_repo         	ripe-atlas-software-probe
-%define		git_branch       	devel.9-evaluate-rpm-package
 %define		build_dirname		ripe-atlas-repo
 %define		local_state_dir  	/home/atlas
 %define		src_prefix_dir   	/usr/local/atlas
@@ -26,15 +25,20 @@ Setup the RIPE Atlas Software Probe Repo
 # performing the steps of '%setup' manually since we are pulling from a remote git repo
 echo "Cleaning build dir"
 cd %{_builddir}
-rm -rf %{build_dirname}
+rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
+
+%{!?git_branch:%define git_branch master}
+
 if [[ ! -z "${PROBE_SUBGROUP_USER}" && ! -z "${PROBE_SUBGROUP_TOKEN}" ]] ; then
 	git clone -b %{git_branch} https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 else
 	echo "Creditials must be entered manually.. "
 	git clone -b %{git_branch} https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 fi
-cd %{build_dirname}
+
+cd %{_builddir}/%{build_dirname}
+%{?git_commit:git checkout %{git_commit}}
 
 %build
 cat %{yum_repo_path}
