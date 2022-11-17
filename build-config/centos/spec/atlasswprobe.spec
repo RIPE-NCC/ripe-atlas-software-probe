@@ -1,5 +1,5 @@
 %define     git_repo         ripe-atlas-software-probe
-%define     git_branch       devel.9-evaluate-rpm-package
+%define     build_dirname    %{git_repo}
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
 %define     exec_env         prod
@@ -29,26 +29,31 @@ echo "Building for software probe version: %{version}"
 # performing the steps of '%setup' manually since we are pulling from a remote git repo
 echo "Cleaning build dir"
 cd %{_builddir}
-rm -rf %{git_repo}
+rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
+
+%{!?git_branch:%define git_branch master}
+
 if [[ ! -z "${PROBE_SUBGROUP_USER}" && ! -z "${PROBE_SUBGROUP_TOKEN}" ]] ; then
-	git clone -b %{git_branch} --recursive https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{git_repo}
+	git clone -b %{git_branch} --recursive https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 else
 	echo "Creditials must be entered manually.. "
-	git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{git_repo}
+	git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 fi
-cd %{git_repo}
+
+cd %{_builddir}/%{build_dirname}
+%{?git_commit:git checkout %{git_commit}}
 
 %build
-cd %{_builddir}/%{git_repo}
+cd %{_builddir}/%{build_dirname}
 autoreconf -iv
 ./configure --prefix=%{src_prefix_dir} --localstatedir=%{local_state_dir}
 make
 
 %install
-cd %{_builddir}/%{git_repo}
+cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_unitdir}
-install -m644 %{_builddir}/%{git_repo}/bin/atlas.service %{buildroot}%{_unitdir}/atlas.service
+install -m644 %{_builddir}/%{build_dirname}/bin/atlas.service %{buildroot}%{_unitdir}/atlas.service
 make DESTDIR=%{buildroot} install
 
 %clean
