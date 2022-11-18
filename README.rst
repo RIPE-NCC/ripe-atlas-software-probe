@@ -25,9 +25,9 @@ This option can be enabled by creating the file
 Autoconf Build
 --------------
 
-To build autoconf and install using make execute the following commands in order:
+To build using autoconf tooling and install the software probe to a directory (ie. /tmp/data), execute the following commands at the top level of the git repo (specifically where $(pwd) is /path/to/ripe-atlas-software-probe):
 
->> autoreconf -i -v
->> ./configure --prefix=/opt/atlas --localstatedir=/home/atlas
+>> autoreconf -iv
+>> ./configure --prefix=/usr/local/atlas --localstatedir=/home/atlas
 >> make
->> make DESTDIR=/tmp/guy-data install
+>> make DESTDIR=/tmp/data install

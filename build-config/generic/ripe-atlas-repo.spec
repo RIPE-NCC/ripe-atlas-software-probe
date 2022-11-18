@@ -17,8 +17,6 @@ Version:        1
 Release:        3%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
-Source0:        %{_builddir}/%{git_repo}/%{generic_assets_path}/yum.repos.d-generic
-Source1:        %{_builddir}/%{git_repo}/%{generic_assets_path}/RPM-GPG-KEY-ripe-atlas-probe
 BuildArch:	noarch
 
 %description
