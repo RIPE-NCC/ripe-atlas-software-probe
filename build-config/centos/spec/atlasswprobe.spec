@@ -17,7 +17,7 @@ Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
 Group:      	Applications/Internet
-Requires:   	sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname 
+Requires:   	sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
 BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 
 %description
@@ -129,4 +129,3 @@ if [ $1 -eq 0 ]; then
         rm -fr %{local_state_dir}
 fi
 exit 0
-

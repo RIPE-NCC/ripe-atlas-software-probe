@@ -30,3 +30,13 @@ Currently there is one runtime configuration option that enables sending
 interface traffic statistics as Atlas measurement results. 
 This option can be enabled by creating the file
 /var/atlas-probe/state/config.txt and adding the line 'RXTXRPT=yes'.
+
+Autoconf Build
+--------------
+
+To build using autoconf tooling and install the software probe to a directory (ie. /tmp/data), execute the following commands at the top level of the git repo (specifically where $(pwd) is /path/to/ripe-atlas-software-probe):
+
+>> autoreconf -iv
+>> ./configure --prefix=/usr/local/atlas --localstatedir=/home/atlas
+>> make
+>> make DESTDIR=/tmp/data install
