@@ -102,16 +102,12 @@ build-ci-debian11:
     - cd ..
     - mkdir -p ${CENTOS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
-    # setup build env
-    - ripe-atlas-software-probe/build-config/centos/bin/cp-repo-files ${CENTOS_VERSION}
-    - HOME=${PWD} ripe-atlas-software-probe/build-config/centos/bin/make-tars
-
     # build repo rpm
-    - HOME=${PWD} rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo.spec
+    - HOME=${PWD} rpmbuild --bb ripe-atlas-software-probe/build-config/generic/ripe-atlas-repo.spec
     - cp -a ${REPO_RPM_PATH} ${CENTOS_VERSION}/noarch
 
     # build x86 rpm
-    - HOME=${PWD} rpmbuild --bb rpmbuild/SPECS/atlasswprobe.spec
+    - HOME=${PWD} rpmbuild --bb ripe-atlas-software-probe/build-config/centos/spec/atlasswprobe.spec
     - cp -a ${X86_RPM_PATH} ${CENTOS_VERSION}/x86_64
 
     # move artifact to right place
