@@ -3,7 +3,7 @@
 # Handel registering with ATLAS regservers
 # 2010 Oct Antony Antony
 
-#exec >/tmp/reginit.out 2>/tmp/reginit.err
+#exec >@tmpdir@/reginit.out 2>@tmpdir@/reginit.err
 #set -x
 
 STATE_FILE=$1
