@@ -4,7 +4,7 @@
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
 
-#exec >/tmp/ATLAS.out 2>/tmp/ATLAS.err
+#exec >@tmpdir@/ATLAS.out 2>@tmpdir@/ATLAS.err
 #set -x
 
 if [ -f bin/config.sh ]
@@ -48,7 +48,7 @@ mkdir -p $DATA_DIR/out/ooq10	# For wifi, can't hurt to just create this
 
 $CHOWN_DATA_DIRS
 
-if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR/home/atlas/data/new $DATA_DIR/home/atlas/data/out >> $DATA_NEW_DIR/simpleping
+if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR@localstatedir@/data/new $DATA_DIR@localstatedir@/data/out >> $DATA_NEW_DIR/simpleping
 then
 	D=`epoch`
 	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB"
@@ -57,7 +57,7 @@ fi
 
 $BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 
-/bin/mkdir -p $BASE_DIR/crons/main $BASE_DIR/crons/2
+mkdir -p $BASE_DIR/crons/main $BASE_DIR/crons/2
 rm -f $DATA_NEW_DIR/v6addr.vol
 rm -f $DATA_OUT_DIR/v6addr.txt
 rm -f $SSH_ERR
@@ -149,7 +149,7 @@ start_perd()
 }
 start_eperd()
 {
-	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O /home/atlas/data/new/7 -i 7
+	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O @localstatedir@/data/new/7 -i 7
 }
 start_eooqd()
 {
@@ -312,7 +312,7 @@ do
 
 	if [ -n "$RESOLVCONF_CMD" -a -f $DATA_NEW_DIR/resolv.conf.ra6 ]
 	then
-		mv $DATA_NEW_DIR/resolv.conf.ra6 /tmp/resolv.conf.ra6
+		mv $DATA_NEW_DIR/resolv.conf.ra6 @tmpdir@/resolv.conf.ra6
 		$RESOLVCONF_CMD
 	fi
 

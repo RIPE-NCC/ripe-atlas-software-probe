@@ -28,8 +28,8 @@ telnetd()
 }
 
 # Various files and directories
-: ${HOME:=/home/atlas}; export HOME	# Set HOME if it isn't set
-RESOLV_CONF=/etc/resolv.conf
+: ${HOME:=@localstatedir@}; export HOME	# Set HOME if it isn't set
+RESOLV_CONF=@sysconfdir@/resolv.conf
 MODE_FILE=$BASE_DIR/state/mode
 
 # Other conf

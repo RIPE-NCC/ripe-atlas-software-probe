@@ -1,0 +1,59 @@
+#!/bin/sh
+
+# Create @sysconfdir@/resolv.conf from various sources.
+
+#exec > @tmpdir@/resolvconf.out 2>@tmpdir@/resolvconf.err
+#set -x
+
+interface="$1"
+dynamic="$2"
+
+if [ "X$interface" = Xwlan0 ]
+then
+	RESOLV_CONF=@tmpdir@/resolv.conf.wlan0
+	RESOLV_CONF_TMP=@tmpdir@/resolv.conf.wlan0.tmp
+	RESOLV_STATIC=@storage_sysconfdir@/resolv.conf.wlan0.static
+	RESOLV_DHCP4=@tmpdir@/resolv.conf.wlan0.dhcp4
+	RESOLV_RA6=@tmpdir@/resolv.conf.wlan0.ra6
+else
+	RESOLV_CONF=@tmpdir@/resolv.conf
+	RESOLV_CONF_TMP=@tmpdir@/resolv.conf.tmp
+	RESOLV_STATIC=@storage_sysconfdir@/resolv.conf.static
+	RESOLV_DHCP4=@tmpdir@/resolv.conf.dhcp4
+	RESOLV_RA6=@tmpdir@/resolv.conf.ra6
+fi
+
+if [ -f @sysconfdir@/init.d/chronyd ]
+then
+	CHRONY="@sysconfdir@/init.d/chronyd restart"       # Kick chrony
+else
+	CHRONY="@sysconfdir@/init.d/ntpd restart"       # Kick chrony
+fi
+
+# Static address configuration may be broken. When switching back to DHCP
+# also ignore statically configured DNS resolvers
+if [ X"$dynamic" != Xdynamic ]
+then
+	if [ -f $RESOLV_STATIC ]
+	then
+		# Static
+		cat $RESOLV_STATIC > $RESOLV_CONF_TMP
+		mv $RESOLV_CONF_TMP $RESOLV_CONF
+		$CHRONY &
+		exit 0
+	fi
+fi
+
+# Dynamic
+if [ -f $RESOLV_DHCP4 -a -f $RESOLV_RA6 ]
+then
+	paste -d'\n' $RESOLV_DHCP4 $RESOLV_RA6 > $RESOLV_CONF_TMP
+elif [ -f $RESOLV_DHCP4 ]
+then
+	cat $RESOLV_DHCP4 > $RESOLV_CONF_TMP
+elif [ -f $RESOLV_RA6 ]
+then
+	cat $RESOLV_RA6 > $RESOLV_CONF_TMP
+fi
+mv $RESOLV_CONF_TMP $RESOLV_CONF
+$CHRONY &

@@ -1,0 +1,16 @@
+[Unit]
+Description=Atlas Probe
+After=network-online.target syslog.target
+
+[Service]
+User=atlas
+Group=atlas
+Environment=HOME=@localstatedir@
+WorkingDirectory=@localstatedir@
+ExecStart=@rpm_base_dir@/bin/ATLAS
+ExecStop=/bin/sudo -u atlasmsm /bin/killall telnetd perd eperd eooqd
+Restart=always
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

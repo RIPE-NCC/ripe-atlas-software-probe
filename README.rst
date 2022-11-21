@@ -22,3 +22,12 @@ interface traffic statistics as Atlas measurement results.
 This option can be enabled by creating the file
 /var/atlas-probe/state/config.txt and adding the line 'RXTXRPT=yes'.
 
+Autoconf Build
+--------------
+
+To build autoconf and install using make execute the following commands in order:
+
+>> autoreconf -i -v
+>> ./configure --prefix=/opt/atlas --localstatedir=/home/atlas
+>> make
+>> make DESTDIR=/tmp/guy-data install
