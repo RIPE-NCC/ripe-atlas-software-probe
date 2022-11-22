@@ -2,13 +2,13 @@
 %define		build_dirname		ripe-atlas-repo
 %define		local_state_dir  	/home/atlas
 %define		src_prefix_dir   	/usr/local/atlas
-%define		generic_assets_path	build-config/generic
+%define		assets_path	build-config/rhel
 
 %define         yum_repo_dirname       yum.repos.d
 %define         gpg_key_filename        RPM-GPG-KEY-ripe-atlas-probe
 
-%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{generic_assets_path}/atlas-probe.repo
-%define         gpg_key_path            %{_builddir}/%{build_dirname}/%{generic_assets_path}/%{gpg_key_filename}
+%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{assets_path}/atlas-probe.repo
+%define         gpg_key_path            %{_builddir}/%{build_dirname}/%{assets_path}/%{gpg_key_filename}
 
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
@@ -29,6 +29,8 @@ rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
 
 %{!?git_branch:%define git_branch master}
+
+echo %{git_branch}
 
 if ( [ ! -z "${PROBE_SUBGROUP_USER}" ] &&
      [ ! -z "${PROBE_SUBGROUP_TOKEN}" ] ) ; then

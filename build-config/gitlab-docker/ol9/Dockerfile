@@ -1,4 +1,4 @@
-FROM oraclelinux:8
+FROM oraclelinux:9
 
 MAINTAINER gmeyer@ripe.net
 
@@ -8,5 +8,5 @@ RUN dnf -y update
 RUN dnf -y swap coreutils-single coreutils
 
 # config_opts['chroot_setup_cmd'] from https://github.com/rpm-software-management/mock/blob/main/mock-core-configs/etc/mock/templates/centos-7.tpl#L3
-RUN dnf -y install tar gcc-c++ redhat-rpm-config redhat-release which xz sed make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build info patch util-linux findutils grep
+RUN dnf -y install bash bzip2 coreutils cpio diffutils redhat-release findutils gawk glibc-minimal-langpack grep gzip info patch redhat-rpm-config rpm-build sed shadow-utils tar unzip util-linux which xz
 RUN dnf -y install autoconf automake dnf-utils createrepo_c git-core libtool openssl-devel

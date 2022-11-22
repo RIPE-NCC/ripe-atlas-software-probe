@@ -9,6 +9,7 @@ variables:
   DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_CENTOS7: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos7:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_CENTOS8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos8:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
   GIT_SUBMODULE_STRATEGY: recursive
   RPMS_DIR: rpmbuild/RPMS
@@ -57,6 +58,12 @@ build_image_centos8:
     DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS8}
   extends: .build_image
 
+build_image_ol9:
+  variables:
+    DOCKER_DIR: build-config/gitlab-docker/ol9
+    DOCKER_IMAGE: ${DOCKER_IMAGE_OL9}
+  extends: .build_image
+
 build_image_prep:
   variables:
     DOCKER_DIR: build-config/gitlab-docker/prep
@@ -78,17 +85,17 @@ build_image_prep:
       - atlasswprobe-*.deb
     expire_in: never
 
-build-ci-debian9:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN9}
+# build-ci-debian9:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN9}
 
-build-ci-debian10:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN10}
+# build-ci-debian10:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN10}
 
-build-ci-debian11:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN11}
+# build-ci-debian11:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN11}
 
 .build-ci-rhel:
   stage: build
@@ -100,35 +107,47 @@ build-ci-debian11:
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/atlasswprobe-*.rpm
   script:
     - cd ..
-    - mkdir -p ${CENTOS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
+    - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
+
+    # build define list
+    - DEFINE_FLAGS=""
+    #- if [ -n "${CI_COMMIT_TAG}" ] ; then export DEFINE_FLAGS=${CI_COMMIT_TAG}; else export DEFINE_FLAGS=${CI_COMMIT_BRANCH}; fi
+    - export DEFINE_FLAGS="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
+    - set 
 
     # build repo rpm
-    - HOME=${PWD} rpmbuild -bb --define 'git_branch ${CI_COMMIT_BRANCH}' --define 'git_commit ${CI_COMMIT_SHA}' ripe-atlas-software-probe/build-config/generic/ripe-atlas-repo.spec
-    - cp -a ${REPO_RPM_PATH} ${CENTOS_VERSION}/noarch
+    - HOME=${PWD} rpmbuild -bb --define "git_branch ${DEFINE_FLAGS}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec
+    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
 
     # build x86 rpm
-    - HOME=${PWD} rpmbuild -bb --define 'git_branch ${CI_COMMIT_BRANCH}' --define 'git_commit ${CI_COMMIT_SHA}' ripe-atlas-software-probe/build-config/rhel/spec/atlasswprobe.spec
-    - cp -a ${X86_RPM_PATH} ${CENTOS_VERSION}/x86_64
+    - HOME=${PWD} rpmbuild -bb --define "git_branch ${DEFINE_FLAGS}" ripe-atlas-software-probe/build-config/rhel/atlasswprobe.spec
+    - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
 
     # move artifact to right place
-    - cd ripe-atlas-software-probe && mv ../${CENTOS_VERSION} .
+    - cd ripe-atlas-software-probe && mv ../${OS_VERSION} .
 
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
     paths:
-      - ./${CENTOS_VERSION}
+      - ./${OS_VERSION}
     expire_in: never
 
 build-ci-el7:
   variables:
-    CENTOS_VERSION: el7
+    OS_VERSION: el7
   image: ${DOCKER_IMAGE_CENTOS7}
   extends: .build-ci-rhel
 
 build-ci-el8:
   variables:
-    CENTOS_VERSION: el8
+    OS_VERSION: el8
   image: ${DOCKER_IMAGE_CENTOS8}
+  extends: .build-ci-rhel
+
+build-ci-el9:
+  variables:
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_OL9}
   extends: .build-ci-rhel
 
 .prepare-ci-rhel:
@@ -141,12 +160,12 @@ build-ci-el8:
     - 'eval ${FINALIZE}'
     - 'eval ${CLEANUP}'
 
-    - cp -a ${CENTOS_VERSION} ${CENTOS_VERSION}-deployable
+    - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
 
   artifacts:
-    name: "${CENTOS_VERSION}-deployable"
+    name: "${OS_VERSION}-deployable"
     paths:
-      - ./${CENTOS_VERSION}-deployable
+      - ./${OS_VERSION}-deployable
     expire_in: never
 
 deployable-el7:
@@ -154,7 +173,7 @@ deployable-el7:
     - job: build-ci-el7
       artifacts: true
   variables:
-    CENTOS_VERSION: el7
+    OS_VERSION: el7
   image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-rhel
 
@@ -163,6 +182,15 @@ deployable-el8:
     - job: build-ci-el8
       artifacts: true
   variables:
-    CENTOS_VERSION: el8
+    OS_VERSION: el8
+  image: ${DOCKER_IMAGE_PREP}
+  extends: .prepare-ci-rhel
+
+deployable-el9:
+  needs:
+    - job: build-ci-el9
+      artifacts: true
+  variables:
+    OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-rhel
