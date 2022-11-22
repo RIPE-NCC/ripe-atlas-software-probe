@@ -34,7 +34,8 @@ echo "Getting Sources..."
 
 %{!?git_branch:%define git_branch master}
 
-if [[ ! -z "${PROBE_SUBGROUP_USER}" && ! -z "${PROBE_SUBGROUP_TOKEN}" ]] ; then
+if ( [ ! -z "${PROBE_SUBGROUP_USER}" ] && 
+     [ ! -z "${PROBE_SUBGROUP_TOKEN}" ] ) ; then
 	git clone -b %{git_branch} --recursive https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 else
 	echo "Creditials must be entered manually.. "

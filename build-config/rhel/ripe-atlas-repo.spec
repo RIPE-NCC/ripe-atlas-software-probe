@@ -30,7 +30,8 @@ echo "Getting Sources..."
 
 %{!?git_branch:%define git_branch master}
 
-if [[ ! -z "${PROBE_SUBGROUP_USER}" && ! -z "${PROBE_SUBGROUP_TOKEN}" ]] ; then
+if ( [ ! -z "${PROBE_SUBGROUP_USER}" ] &&
+     [ ! -z "${PROBE_SUBGROUP_TOKEN}" ] ) ; then
 	git clone -b %{git_branch} https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
 else
 	echo "Creditials must be entered manually.. "
@@ -41,11 +42,14 @@ cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
 
 %build
-cat %{yum_repo_path}
 STRIPPED_DIST=$(echo %{?dist} | sed -r 's/^\.//')
-[ -z ${STRIPPED_DIST} ] && echo "OS Error: No Distribution Detected! rpm macro ?dist is empty" && exit 1
+if [ -z ${STRIPPED_DIST} ] ; then 
+	echo "OS Error: No Distribution Detected! rpm macro ?dist is empty"
+	exit 1
+fi
+
 echo "OS Distro detected as: ${STRIPPED_DIST}"
-sed -i -e "s|baseurl.*$|&${STRIPPED_DIST}|" %{yum_repo_path}
+sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{yum_repo_path}
 
 %install
 mkdir -p %{buildroot}%{_sysconfdir}/%{yum_repo_dirname}
@@ -61,3 +65,4 @@ cp %{gpg_key_path} %{buildroot}%{_sysconfdir}/pki/rpm-gpg/
 /etc/pki/rpm-gpg/%{gpg_key_filename}
 
 %changelog
+
