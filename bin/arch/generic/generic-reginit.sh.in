@@ -37,7 +37,11 @@ get_arch()
 
 get_sub_arch()
 {
-	echo "$SUB_ARCH"
+	if [ ! -z !SUB_ARCH ] ; then
+		echo "$SUB_ARCH"
+	else
+		echo ""
+	fi
 }
 
 p_to_r_init()

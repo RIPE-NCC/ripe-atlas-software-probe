@@ -38,6 +38,7 @@ then
 fi
 export httppost_port
 export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
+export SU_CMD=$(config_lookup SU_CMD '')
 
 $MOUNT_FS_CMD
 
