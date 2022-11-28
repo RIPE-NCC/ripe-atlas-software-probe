@@ -50,6 +50,7 @@ REG_SERVERS_SOURCE=$RPM_ETC_DIR/reg_servers.sh
 chmod_for_msm()
 {
 	chmod -R g+rwX $BASE_DIR/data
+	chmod -R g+rw $RUN_DIR
 }
 
 # Get ethernet address
