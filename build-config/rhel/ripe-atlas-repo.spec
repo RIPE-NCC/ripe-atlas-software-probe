@@ -28,17 +28,10 @@ cd %{_builddir}
 rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
 
-%{!?git_branch:%define git_branch master}
+%{!?git_tag:%define git_tag master}
+%{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-echo %{git_branch}
-
-if ( [ ! -z "${PROBE_SUBGROUP_USER}" ] &&
-     [ ! -z "${PROBE_SUBGROUP_TOKEN}" ] ) ; then
-	git clone -b %{git_branch} https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
-else
-	echo "Creditials must be entered manually.. "
-	git clone -b %{git_branch} https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
-fi
+git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
 cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
