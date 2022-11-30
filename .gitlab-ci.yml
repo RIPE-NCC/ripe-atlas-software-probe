@@ -105,22 +105,21 @@ build_image_prep:
   variables:
     REPO_RPM_PATH: ${RPMS_DIR}/noarch/ripe-atlas-repo-*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/atlasswprobe-*.rpm
+    REPO_GIT_SOURCE: https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@${SUBGROUP_URL}
   script:
     - cd ..
     - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build define list
-    - DEFINE_FLAGS=""
-    #- if [ -n "${CI_COMMIT_TAG}" ] ; then export DEFINE_FLAGS=${CI_COMMIT_TAG}; else export DEFINE_FLAGS=${CI_COMMIT_BRANCH}; fi
-    - export DEFINE_FLAGS="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
-    - set 
+    - REPO_GIT_TAG=""
+    - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
 
     # build repo rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_branch ${DEFINE_FLAGS}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec
+    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
 
     # build x86 rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_branch ${DEFINE_FLAGS}" ripe-atlas-software-probe/build-config/rhel/atlasswprobe.spec
+    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/build-config/rhel/atlasswprobe.spec
     - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
 
     # move artifact to right place

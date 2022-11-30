@@ -9,7 +9,7 @@
 %define	    _unpackaged_files_terminate_build	0
 
 # prevent creation of the build ids in /usr/lib -> see https://access.redhat.com/discussions/5045161
-%define _build_id_links none
+%define	    _build_id_links none
 
 Name:	    	atlasswprobe
 Summary:    	RIPE Atlas probe software
@@ -32,15 +32,10 @@ cd %{_builddir}
 rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
 
-%{!?git_branch:%define git_branch master}
+%{!?git_tag:%define git_tag master}
+%{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-if ( [ ! -z "${PROBE_SUBGROUP_USER}" ] && 
-     [ ! -z "${PROBE_SUBGROUP_TOKEN}" ] ) ; then
-	git clone -b %{git_branch} --recursive https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
-else
-	echo "Creditials must be entered manually.. "
-	git clone -b %{git_branch} --recursive https://gitlab.ripe.net/atlas/probe/%{git_repo}.git %{_builddir}/%{build_dirname}
-fi
+git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
 cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
