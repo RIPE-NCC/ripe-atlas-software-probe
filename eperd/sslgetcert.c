@@ -182,7 +182,7 @@ static void buf_add(struct buf *buf, const void *data, size_t len)
 	newbuf= malloc(maxsize);
 	if (!newbuf)
 	{
-		fprintf(stderr, "unable to allocate %ld bytes\n", maxsize);
+		fprintf(stderr, "unable to allocate %ld bytes\n", (long)maxsize);
 		exit(1);
 	}
 
@@ -1031,9 +1031,9 @@ static void report(struct state *state)
 		fprintf(fh, DBQ(id) ":" DBQ(%s) ", "
 			"%s, "
 			DBQ(lts) ":%d, "
-			DBQ(time) ":%ld, ",
+			DBQ(time) ":%llu, ",
 			state->atlas, atlas_get_version_json_str(),
-			get_timesync(), state->gstart);
+			get_timesync(), (unsigned long long)state->gstart);
 		if (state->bundle)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
@@ -1190,8 +1190,8 @@ static FILE *report_head(struct state *state)
 			fprintf(fh, DBQ(bundle) ":%s, ", state->bundle);
 	}
 
-	fprintf(fh, "%s" DBQ(time) ":%ld",
-		state->atlas ? ", " : "", atlas_time());
+	fprintf(fh, "%s" DBQ(time) ":%llu",
+		state->atlas ? ", " : "", (unsigned long long)atlas_time());
 	fprintf(fh, ", " DBQ(dst_name) ":" DBQ(%s) ", "
 		DBQ(dst_port) ":" DBQ(%s),
 		state->hostname, state->portname);
@@ -1806,7 +1806,8 @@ static void connected(struct tu_env *env, struct bufferevent *bev)
 	else
 	{
 		getsockname(bufferevent_getfd(bev),	
-			&state->loc_sin6, &state->loc_socklen);
+			(struct sockaddr *)&state->loc_sin6,
+			&state->loc_socklen);
 		if (state->response_out)
 		{
 			write_response(state->resp_file, RESP_SOCKNAME,

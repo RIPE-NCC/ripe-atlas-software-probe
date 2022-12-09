@@ -450,7 +450,7 @@ const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
-#define ATLAS_MSM_VERSION	"2.6.2"
+#define ATLAS_MSM_VERSION	"2.6.3"
 
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
@@ -463,6 +463,7 @@ char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 #define ATLAS_TIMESYNC_FILE_REL    ATLAS_DATA_NEW_REL "/timesync.vol"
 #define ATLAS_FUZZING_REL          "data"
 
+extern int atlas_unsafe(void);
 extern char *rebased_validated_filename(const char *path, const char *prefix);
 extern char *rebased_validated_dir(const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
@@ -485,6 +486,7 @@ extern void read_response(int fd, int type, size_t *sizep, void *data);
 extern void read_response_file(FILE *file, int type, size_t *sizep,
 	void *data);
 extern void write_response(FILE *file, int type, size_t size, void *data);
+extern int rxtxrpt_main(int argc, char *argv[]);
 
 int ndelay_on(int fd) FAST_FUNC;
 int ndelay_off(int fd) FAST_FUNC;

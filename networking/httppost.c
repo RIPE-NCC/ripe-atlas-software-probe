@@ -497,32 +497,32 @@ int httppost_main(int argc, char *argv[])
 		if (need_set_time && getenv("HTTPPOST_ALLOW_STIME"))
 		{
 			fprintf(stderr,
-				"setting time, time difference is %ld\n",
-				(long)server_time-now.tv_sec);
+				"setting time, time difference is %llu\n",
+				(unsigned long long)server_time-now.tv_sec);
 			ts.tv_sec= server_time;
 			ts.tv_nsec= 0;
 			clock_settime(CLOCK_REALTIME, &ts);
 			if (atlas_id)
 			{
 				printf(
-	"RESULT %s ongoing %ld httppost setting time, local %ld, remote %ld\n",
-					atlas_id, (long)time(NULL),
-					(long)now.tv_sec,
-					(long)server_time);
+	"RESULT %s ongoing %llu httppost setting time, local %llu, remote %llu\n",
+					atlas_id, (unsigned long long)time(NULL),
+					(unsigned long long)now.tv_sec,
+					(unsigned long long)server_time);
 			}
 		}
 		else if (need_set_time)
 		{
 			fprintf(stderr,
-				"not setting time, time difference is %ld\n",
-				(long)server_time-now.tv_sec);
+				"not setting time, time difference is %llu\n",
+				(unsigned long long)server_time-now.tv_sec);
 			if (atlas_id)
 			{
 				printf(
-	"RESULT %s ongoing %ld httppost not in sync, local %ld, remote %ld\n",
-					atlas_id, (long)time(NULL),
-					(long)now.tv_sec,
-					(long)server_time);
+	"RESULT %s ongoing %llu httppost not in sync, local %llu, remote %llu\n",
+					atlas_id, (unsigned long long)time(NULL),
+					(unsigned long long)now.tv_sec,
+					(unsigned long long)server_time);
 			}
 		}
 		else if (rtt <= 1)
@@ -533,7 +533,7 @@ int httppost_main(int argc, char *argv[])
 			fh= fopen(fn_new, "wt");
 			if (fh)
 			{
-				fprintf(fh, "%ld\n", (long)now.tv_sec);
+				fprintf(fh, "%llu\n", (unsigned long long)now.tv_sec);
 				fclose(fh);
 				rename(fn_new, fn);
 			}
@@ -542,8 +542,8 @@ int httppost_main(int argc, char *argv[])
 		}
 		else if (atlas_id)
 		{
-			printf("RESULT %s ongoing %ld httppost rtt %g ms\n",
-				atlas_id, (long)time(NULL), rtt*1000);
+			printf("RESULT %s ongoing %llu httppost rtt %g ms\n",
+				atlas_id, (unsigned long long)time(NULL), rtt*1000);
 		}
 	}
 

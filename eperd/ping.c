@@ -710,7 +710,8 @@ static void ping_xmit(struct pingstate *host)
 		}
 		else
 		{
-			getsockname(host->socket, &host->loc_sin6,
+			getsockname(host->socket,
+				(struct sockaddr *)&host->loc_sin6,
 				&host->loc_socklen);
 			if (host->resp_file_out)
 			{
@@ -742,7 +743,8 @@ static void ping_xmit(struct pingstate *host)
 			host->include_probe_id);
 
 		host->loc_socklen= sizeof(host->loc_sin6);
-		getsockname(host->socket, &host->loc_sin6, &host->loc_socklen);
+		getsockname(host->socket, (struct sockaddr *)&host->loc_sin6,
+			&host->loc_socklen);
 
 		if (host->response_in)
 		{
@@ -1566,7 +1568,8 @@ static void ping_start2(void *state)
 	}
 
 	if (!pingstate->response_in && 
-		connect(pingstate->socket, &pingstate->sin6, 
+		connect(pingstate->socket,
+		(struct sockaddr *)&pingstate->sin6, 
 		pingstate->socklen) == -1)
 	{
 		snprintf(line, sizeof(line),
@@ -1591,7 +1594,8 @@ static void ping_start2(void *state)
 	}
 	else
 	{
-		getsockname(pingstate->socket, &pingstate->loc_sin6,
+		getsockname(pingstate->socket,
+			(struct sockaddr *)&pingstate->loc_sin6,
 			&pingstate->loc_socklen);
 		if (pingstate->resp_file_out)
 		{

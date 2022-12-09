@@ -441,7 +441,7 @@ static int send_sol(int sock)
 	inet_pton(AF_INET6, "FF02::2", &sin6.sin6_addr);
 	sin6.sin6_family= AF_INET6;
 
-	sendto(sock, &pkt, sizeof(pkt), 0, &sin6, sizeof(sin6));
+	sendto(sock, &pkt, sizeof(pkt), 0, (struct sockaddr*)&sin6, sizeof(sin6));
 
 	alarm(RTR_SOLICITATION_INTERVAL);
 
