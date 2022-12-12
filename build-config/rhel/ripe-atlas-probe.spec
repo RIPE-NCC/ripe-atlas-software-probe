@@ -24,10 +24,14 @@ BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automa
 Essential core assets used in all probe flavours. This package must be installed for a probe to operate as expected.
 
 %package -n ripe-atlas-probe
-Summary: RIPE Atlas Probe Software Essentials
-Group: Applications/Internet
+Summary:	RIPE Atlas Probe Software Essentials
+Group:		Applications/Internet
+Provides:	atlasswprobe = %{version}-%{release}
+Obsoletes:	atlasswprobe < 5080-3%{?dist}
+Requires:	ripe-atlas-common
+
 %description -n ripe-atlas-probe
-Software Probe specific files and configurations that form a working software probe.
+Probe specific files and configurations that form a working software probe.
 
 %prep
 echo "Building for probe version: %{version}"
