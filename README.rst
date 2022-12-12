@@ -46,3 +46,7 @@ If a specific version is to be build then:
 `rpmbuild -bb --define "git_tag 5090"  ripe-atlas-software-probe/build-config/generic/ripe-atlas-repo.spec`
 
 Note that build outputs will still result in '~/rpmbuild' unless otherwise specified
+
+Two spec files are given each for the following:
+- build-config/generic/ripe-atlas-repo.spec -> used to build the package RPM
+- build-config/rhel/atlasswprobe.spec -> used to build the Probe RPM (if you are building locally this is what you should build)
