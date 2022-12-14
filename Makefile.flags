@@ -11,7 +11,6 @@ CPPFLAGS += $(call cc-option,-std=gnu99,)
 
 CPPFLAGS += \
 	-Iinclude -Ilibbb \
-	-Ilibevent-2.1.11-stable/include \
 	$(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include -I$(srctree)/libbb) \
 	-include include/autoconf.h \
 	-D_GNU_SOURCE -DNDEBUG \
@@ -171,7 +170,6 @@ ifeq ($(CONFIG_DMALLOC),y)
 LDLIBS += dmalloc
 endif
 
-LDLIBS += event 
 ifeq ($(CONFIG_FEATURE_EVHTTPGET_HTTPS),y)
 LINK_EV_TLS = y
 endif 
@@ -183,11 +181,8 @@ endif
 ifeq ($(LINK_EV_TLS),y)
 LDLIBS += crypto 
 LDLIBS += ssl
-LDLIBS += event_openssl
 LDLIBS += pthread
 endif
-
-LDFLAGS += -Llibevent-2.1.11-stable/.libs -Wl,-rpath,/usr/local/atlas/lib -Wl,-rpath,/home/atlas/busybox-1.13.3/libevent-2.1.11-stable/.libs
 
 # If a flat binary should be built, CFLAGS_busybox="-elf2flt"
 # env var should be set for make invocation.

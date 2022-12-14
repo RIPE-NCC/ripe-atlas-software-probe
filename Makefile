@@ -502,6 +502,8 @@ libs-y		:= \
 		libpwdgrp/ \
 		miscutils/ \
 		networking/ \
+		libevent-2.1.11-stable/.libs/libevent.a \
+		libevent-2.1.11-stable/.libs/libevent_openssl.a \
 
 endif # KBUILD_EXTMOD
 
