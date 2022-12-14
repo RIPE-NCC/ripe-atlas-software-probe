@@ -77,7 +77,6 @@ make DESTDIR=%{buildroot} install
 
 %files
 %ghost %{src_prefix_dir}/bin/event_rpcgen.py
-%ghost %{src_prefix_dir}/include/*
 %ghost %{src_prefix_dir}/lib/pkgconfig
 %{src_prefix_dir}/bb-13.3
 %{src_prefix_dir}/bin/arch
@@ -86,10 +85,6 @@ make DESTDIR=%{buildroot} install
 %attr(644, root, root) %{src_prefix_dir}/bin/common-pre.sh
 %attr(644, root, root) %{src_prefix_dir}/bin/common.sh
 %attr(755, root, root) %{src_prefix_dir}/bin/*.lib.sh
-%attr(755, root, root) %{src_prefix_dir}/lib/libevent-2.1.so.7
-%attr(755, root, root) %{src_prefix_dir}/lib/libevent-2.1.so.7.0.0
-%attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7
-%attr(755, root, root) %{src_prefix_dir}/lib/libevent_openssl-2.1.so.7.0.0
 %caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
 
 %files -n ripe-atlas-probe

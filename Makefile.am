@@ -1,3 +1,4 @@
+ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(prefix)/bb-13.3
 SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
 
@@ -11,7 +12,7 @@ ATLAS_CONFIG_FILES = state/FIRMWARE_APPS_VERSION \
 install-exec-local:	install-generic-config $(DST_FILES) $(ATLAS_CONFIG_FILES)
 
 install-generic-config:
-	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/arch/generic,bin/arch/linux,bb-13.3,etc,lib,state}
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_GENERIC_PATH},bin/${A_LINUX_PATH},bb-13.3,etc,state}
 
 # this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
 $(DST_FILES):	$(DESTDIR)$(prefix)/
