@@ -9,7 +9,7 @@ tmpdir=/tmp
 
 # application dependent paths
 rpm_base_dir=/usr/local/atlas
-working_dir=/var/atlas-probe
+working_dir=/home/atlas
 
 AC_SUBST(storage_sysconfdir)
 AC_SUBST(tmpdir)
