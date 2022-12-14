@@ -1,5 +1,8 @@
 AC_PREREQ([2.68])
-AC_INIT([atlasswprobe], [m4_esyscmd_s([cat VERSION])], [gmeyer@ripe.net])
+AC_INIT([ripe-atlas], [m4_esyscmd_s([cat VERSION])], [gmeyer@ripe.net])
+
+AC_CONFIG_AUX_DIR([.])
+AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([foreign])
 
@@ -16,6 +19,7 @@ AC_SUBST(tmpdir)
 AC_SUBST(rpm_base_dir)
 AC_SUBST(working_dir)
 
+AC_PROG_LIBTOOL
 AC_PROG_CC
 
 AC_CONFIG_FILES([
