@@ -5,6 +5,11 @@
 %define     exec_env         prod
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
+# define user to perform measurements
+%define     msm_user         atlas
+%define     msm_group        atlas
+%define     msm_homedir      %{local_state_dir}
+
 # flag to ignore files installed in builddir but not packaged in the final RPM
 %define	    _unpackaged_files_terminate_build	0
 
@@ -12,7 +17,7 @@
 %define	    _build_id_links none
 
 # transition directory key storage
-%define	    key_dirname	/tmp/ripe-atlas-keydir
+%define	    key_dirname	/var/tmp/ripe-atlas-keydir
 
 Name:	    	ripe-atlas-common
 Summary:    	RIPE Atlas probe
@@ -92,86 +97,88 @@ make DESTDIR=%{buildroot} install
 %{src_prefix_dir}/state
 %{src_prefix_dir}/etc
 
+
 %pre -n ripe-atlas-common
-systemctl stop atlas 2>&1 1>/dev/null
+systemctl stop atlas.service 2>&1 1>/dev/null
 
 # save probe keys
 mkdir -p %{key_dirname}
 cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
 
-# clean up remainder of Obsolete atlasswprobe package
-#rm -fr %{src_prefix_dir}
-#rm -fr /var/atlas-probe
 
 %pre -n ripe-atlas-probe
 # TODO: check cgroup and that all processes are stopped when atlas.service stops
-killall -9 eooqd eperd perd telnetd 2>/dev/null || :
-rm -fr %{local_state_dir}/status %{local_state_dir}/bin/reg_servers.sh
 
-groupadd atlas
-GID=$(getent group atlas | cut -d: -f3)
-useradd -c atlas -d %{local_state_dir} -g atlas -s /sbin/nologin -u $GID atlas 2>/dev/null
-exit 0
-
-%post -n ripe-atlas-probe
-#exec 1>/tmp/atlasprobe.out 2>/tmp/atlasprobe.err
-#set -x
-
-if [ ! -f %{local_state_dir}/state/mode ]; then
-    mkdir -p %{local_state_dir}/state
-    echo "%{exec_env}" > %{local_state_dir}/state/mode
-fi
-
-mkdir -p %{local_state_dir}/{bin,crons/{main,2,7},data/{new,oneoff,out/ooq,out/ooq10},run}
-
-# this file is likely no longer needed since the move to generic
-#cat > %{local_state_dir}/bin/config.sh << EOF
-#DEVICE_NAME=centos-sw-probe
-#ATLAS_BASE="%{local_state_dir}"
-#ATLAS_STATIC="%{src_prefix_dir}"
-#SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"
-#EOF
-
-# preserve keys from obsolete package
+# preserve keys from obsolete package - transitional
 if [ -f %{key_dirname}/probe_key ]; then
 	mkdir -p %{local_state_dir}/etc/
 	mv -f %{key_dirname}/probe_key* %{local_state_dir}/etc/
 fi
 
-chown -R atlas:atlas %{local_state_dir}
+# clean environment
+killall -9 eooqd eperd perd telnetd 2>/dev/null || :
+rm -fr %{local_state_dir}/status %{local_state_dir}/bin/reg_servers.sh
+
+# add measurement system group
+if [ ! $(getent group %{msm_group}) ]; then
+	groupadd %{msm_group}
+fi
+
+# init measurement user
+GID=$(getent group atlas | cut -d: -f3)
+useradd -c %{msm_user} -d %{local_state_dir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
+exit 0
+
+
+%post -n ripe-atlas-probe
+#exec 1>/tmp/atlasprobe.out 2>/tmp/atlasprobe.err
+#set -x
+
+# prepare mode file for execution. Default is "prod"
+if [ ! -f %{local_state_dir}/state/mode ]; then
+    mkdir -p %{local_state_dir}/state
+    echo "%{exec_env}" > %{local_state_dir}/state/mode
+fi
+
+# create file structure hierarchy used for runtime data
+mkdir -p %{local_state_dir}/{bin,crons/{main,2,7},data/{new,oneoff,out/ooq,out/ooq10},run}
+
+# this file is likely no longer needed since the move to generic
+cat > %{local_state_dir}/bin/config.sh << EOF
+DEVICE_NAME=centos-sw-probe
+ATLAS_BASE="%{local_state_dir}"
+ATLAS_STATIC="%{src_prefix_dir}"
+SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"
+EOF
+
+# pass runtime dir ownership to measurements user
+chown -R %{msm_user}:%{msm_group} %{local_state_dir}
 find %{local_state_dir} -type d -exec chmod -R 755 {} +
 find %{local_state_dir} -type f -exec chmod -R 644 {} +
 chmod 600 %{local_state_dir}/etc/probe_key
 
-systemctl --now enable atlas
-
-#rmdir %{key_dirname} || echo "Unable to place the probes ssh keys in the correct directory. They are saved here: %{key_dirname}"
+%systemd_post atlas.service
 exit 0
+
 
 %preun -n ripe-atlas-common
 # save probe keys
-if [ ! -d %{key_dirname} ]; then
+if [ ! -f %{key_dirname}/probe_key ]; then
 	mkdir -p %{key_dirname}
 	cp %{local_state_dir}/etc/probe_key* %{key_dirname}/
-fi
-
-%preun -n ripe-atlas-probe
-# save probe keys
-if [ ! -d %{key_dirname} ]; then
-	mkdir -p %{key_dirname}
-	cp %{local_state_dir}/etc/probe_key* %{key_dirname}/
-fi
-
-if [ $1 -eq 0 ]; then
-    # uninstall, otherwise upgrade
-    systemctl --now --quiet disable atlas
 fi
 exit 0
 
+
+%preun -n ripe-atlas-probe
+# save probe keys
+if [ ! -f %{key_dirname}/probe_key ]; then
+	mkdir -p %{key_dirname}
+	cp %{local_state_dir}/etc/probe_key* %{key_dirname}/
+fi
+exit 0
+
+
 %postun -n ripe-atlas-probe
-#if [ $1 -eq 0 ]; then
-        %{?el7:%systemd_postun}
-        %{?el8:%systemd_postun}
-#        rm -fr %{local_state_dir}
-#fi
+%systemd_postun
 exit 0
