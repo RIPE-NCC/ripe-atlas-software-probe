@@ -3,6 +3,7 @@
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
 %define     exec_env         prod
+%define     service_name     atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
 # define user to perform measurements
@@ -67,12 +68,12 @@ make
 %install
 cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_unitdir}
-install -m644 %{_builddir}/%{build_dirname}/bin/atlas.service %{buildroot}%{_unitdir}/atlas.service
+install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
 make DESTDIR=%{buildroot} install
 
 %clean
 #rm -rf %{buildroot}%{src_prefix_dir}/include
-#rm -rf %{buildroot}%{src_prefix_dir}/bin/atlas.service
+#rm -rf %{buildroot}%{src_prefix_dir}/bin/%{service_name}
 #rm -rf %{_builddir}
 
 %files
@@ -93,13 +94,13 @@ make DESTDIR=%{buildroot} install
 %caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
 
 %files -n ripe-atlas-probe
-%attr(644, root, root) %{_unitdir}/atlas.service
+%attr(644, root, root) %{_unitdir}/%{service_name}
 %{src_prefix_dir}/state
 %{src_prefix_dir}/etc
 
 
 %pre -n ripe-atlas-common
-systemctl stop atlas.service 2>&1 1>/dev/null
+systemctl stop %{service_name} 2>&1 1>/dev/null
 
 # save probe keys
 if [ -d /var/atlas-probe ]; then
@@ -110,7 +111,7 @@ exit 0
 
 
 %pre -n ripe-atlas-probe
-# TODO: check cgroup and that all processes are stopped when atlas.service stops
+# TODO: check cgroup and that all processes are stopped when %{service_name} stops
 
 # save files if not there already there and same - transitional
 if [ ! -e %{key_dirname}/probe_key ] || [ -e /var/atlas-probe/etc/probe_key ] || ! $(cmp -s /var/atlas-probe/etc/probe_key %{key_dirname}/probe_key); then
@@ -166,7 +167,7 @@ find %{local_state_dir} -type d -exec chmod -R 755 {} +
 find %{local_state_dir} -type f -exec chmod -R 644 {} +
 chmod 600 %{local_state_dir}/etc/probe_key
 
-%systemd_post atlas.service
+%systemd_post %{service_name}
 exit 0
 
 
@@ -189,5 +190,5 @@ exit 0
 
 
 %postun -n ripe-atlas-probe
-%systemd_postun
+%systemd_postun %{service_name}
 exit 0
