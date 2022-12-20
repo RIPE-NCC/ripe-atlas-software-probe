@@ -102,15 +102,24 @@ make DESTDIR=%{buildroot} install
 systemctl stop atlas.service 2>&1 1>/dev/null
 
 # save probe keys
-mkdir -p %{key_dirname}
-cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
+if [ -d /var/atlas-probe ]; then
+	mkdir -p %{key_dirname}
+	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
+fi
+exit 0
 
 
 %pre -n ripe-atlas-probe
 # TODO: check cgroup and that all processes are stopped when atlas.service stops
 
-# preserve keys from obsolete package - transitional
-if [ -f %{key_dirname}/probe_key ]; then
+# save files if not there already there and same - transitional
+if [ ! -e %{key_dirname}/probe_key ] || ! $(cmp -s /var/atlas-probe/etc/probe_key %{key_dirname}/probe_key); then
+	mkdir -p %{key_dirname}
+	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
+fi
+
+# move in keys from obsolete package - transitional
+if [ -e %{key_dirname}/probe_key ]; then
 	mkdir -p %{local_state_dir}/etc/
 	mv -f %{key_dirname}/probe_key* %{local_state_dir}/etc/
 fi
