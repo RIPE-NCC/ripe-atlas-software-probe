@@ -113,7 +113,7 @@ exit 0
 # TODO: check cgroup and that all processes are stopped when atlas.service stops
 
 # save files if not there already there and same - transitional
-if [ ! -e %{key_dirname}/probe_key ] || ! $(cmp -s /var/atlas-probe/etc/probe_key %{key_dirname}/probe_key); then
+if [ ! -e %{key_dirname}/probe_key ] || [ -e /var/atlas-probe/etc/probe_key ] || ! $(cmp -s /var/atlas-probe/etc/probe_key %{key_dirname}/probe_key); then
 	mkdir -p %{key_dirname}
 	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
 fi
