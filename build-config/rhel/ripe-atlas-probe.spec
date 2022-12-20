@@ -2,7 +2,6 @@
 %define     build_dirname    %{git_repo}
 %define     local_state_dir  /home/atlas
 %define     src_prefix_dir   /usr/local/atlas
-%define     exec_env         prod
 %define     service_name     atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
@@ -144,10 +143,11 @@ exit 0
 #exec 1>/tmp/atlasprobe.out 2>/tmp/atlasprobe.err
 #set -x
 
-# prepare mode file for execution. Default is "prod"
+# set to environment
 if [ ! -f %{local_state_dir}/state/mode ]; then
+    %{!?env:%define env prod}
     mkdir -p %{local_state_dir}/state
-    echo "%{exec_env}" > %{local_state_dir}/state/mode
+    echo %{env} > %{local_state_dir}/state/mode
 fi
 
 # create file structure hierarchy used for runtime data
