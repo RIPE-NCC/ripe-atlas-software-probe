@@ -21,7 +21,7 @@ To create a deb for Debian or Debian-based distros
 
 Currently only the Debian Build system includes support for amd64, arm64, and armhf.
 
-- Get the needed tools: ``sudo apt update && sudo apt install git tar fakeroot libssl-dev libcap2-bin autoconf automake libtool build-essential``
+- Get the needed tools: ``sudo apt update && sudo apt install git tar fakeroot libssl-dev libcap2-bin autoconf automake libtool build-essential libtool make``
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory: ``./ripe-atlas-software-probe/build-config/debian/bin/make-deb``
 (Please note if you are running Ubuntu it may be required to checkout the devel branch of this repo. If this is the case and the .deb build does not complete without failing this is the command sequence to follow before trying the install of the .deb);
