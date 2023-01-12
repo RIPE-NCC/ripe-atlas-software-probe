@@ -8,7 +8,7 @@ storage_sysconfdir=/storage/etc
 tmpdir=/tmp
 
 # application dependent paths
-rpm_base_dir=/usr/local/atlas
+rpm_base_dir=/usr/local/ripe-atlas
 working_dir=/home/atlas
 
 AC_SUBST(storage_sysconfdir)
@@ -28,7 +28,7 @@ bin/resolvconf
 bin/arch/generic/generic-ATLAS.sh
 bin/arch/generic/generic-common.sh
 bin/arch/generic/generic-reginit.sh
-bin/atlas.service
+bin/ripe-atlas.service
 atlas-config/state/FIRMWARE_APPS_VERSION
 ])
 

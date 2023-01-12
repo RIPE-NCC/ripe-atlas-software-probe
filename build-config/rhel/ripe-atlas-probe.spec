@@ -1,13 +1,13 @@
 %define     git_repo         ripe-atlas-software-probe
 %define     build_dirname    %{git_repo}
-%define     local_state_dir  /home/atlas
-%define     src_prefix_dir   /usr/local/atlas
-%define     service_name     atlas.service
+%define     local_state_dir  /home/ripe-atlas
+%define     src_prefix_dir   /usr/local/ripe-atlas
+%define     service_name     ripe-atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
 # define user to perform measurements
-%define     msm_user         atlas
-%define     msm_group        atlas
+%define     msm_user         ripe-atlas
+%define     msm_group        ripe-atlas
 %define     msm_homedir      %{local_state_dir}
 
 # flag to ignore files installed in builddir but not packaged in the final RPM
@@ -134,13 +134,13 @@ if [ ! $(getent group %{msm_group}) ]; then
 fi
 
 # init measurement user
-GID=$(getent group atlas | cut -d: -f3)
+GID=$(getent group ripe-atlas | cut -d: -f3)
 useradd -c %{msm_user} -d %{local_state_dir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
 exit 0
 
 
 %post -n ripe-atlas-probe
-#exec 1>/tmp/atlasprobe.out 2>/tmp/atlasprobe.err
+#exec 1>/tmp/ripe-atlas.out 2>/tmp/ripe-atlas.err
 #set -x
 
 # set to environment
