@@ -156,7 +156,7 @@ build-ci-el9:
     - tags
   script:
     - 'eval ${PREPARE}'
-    - 'eval ${FINALIZE}'
+    - 'eval ${FINALIZE_AT}'
     - 'eval ${CLEANUP}'
 
     - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
