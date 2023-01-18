@@ -2,6 +2,7 @@ stages:
   - docker_image
   - build
   - prepare
+  - test
 
 variables:
   DOCKER_IMAGE_DEBIAN9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian9:${CI_COMMIT_REF_SLUG}
@@ -193,3 +194,41 @@ deployable-el9:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-rhel
+
+.add-to-test:
+  stage: test
+  only:
+    - /^devel.*/
+    - tags
+  script:
+    - 'eval ${PREPARE}'
+    - 'eval ${DEPLOY_AT}'
+    - 'eval ${CLEANUP}'
+  when: manual
+
+add-el7-to-test:
+  needs:
+    - job: deployable-el7
+      artifacts: true
+  variables:
+    OS_VERSION: el7
+  image: ${DOCKER_IMAGE_PREP}
+  extends: .add-to-test
+
+add-el8-to-test:
+  needs:
+    - job: deployable-el8
+      artifacts: true
+  variables:
+    OS_VERSION: el8
+  image: ${DOCKER_IMAGE_PREP}
+  extends: .add-to-test
+
+add-el9-to-test:
+  needs:
+    - job: deployable-el9
+      artifacts: true
+  variables:
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_PREP}
+  extends: .add-to-test
