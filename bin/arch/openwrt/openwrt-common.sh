@@ -27,7 +27,6 @@ RESOLVCONF_CMD=/home/atlas/bin/resolvconf
 SU_CMD="sudo -E -u atlas"
 CHOWN_FOR_MSM=chown_for_msm
 CHMOD_FOR_MSM=:
-AFTER_PASSWDSET=after_passwdset
 CHOWN_DATA_DIRS=chown_data_dirs
 HANDLE_STORAGE_CURRENT_TIME=handle_storage_current_time
 LOAD_STORAGE_CURRENT_TIME=load_storage_current_time
@@ -70,11 +69,6 @@ ATLASINIT_DEVICE_OPT='-I br-lan'
 
 # Commands
 
-after_passwdset()
-{
-	# Remount root read-only 
-	$MOUNT_ROOT_RO
-}
 check_sig()
 {
 	file="$1"
