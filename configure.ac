@@ -1,4 +1,4 @@
-AC_PREREQ([2.69])
+AC_PREREQ([2.68])
 AC_INIT([atlasswprobe], [m4_esyscmd_s([cat VERSION])], [gmeyer@ripe.net])
 
 AM_INIT_AUTOMAKE([foreign])
