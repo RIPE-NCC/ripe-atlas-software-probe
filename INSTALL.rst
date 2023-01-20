@@ -33,3 +33,16 @@ Currently only the Debian Build system includes support for amd64, arm64, and ar
 - Install this .deb file: ``sudo dpkg -i atlasswprobe-??????.deb``
 - The public key is stored in ``/var/atlas-probe/etc/probe_key.pub``
 - Then register your probe at https://atlas.ripe.net/apply/swprobe/
+
+Updating the software probe
+---------------------------
+
+As of release 5080, the CentOS RPM will no longer automatically update.
+The intent of this decision is to conform to operational practices and to
+make deployment and maintenance easier on hosts (and the Atlas team) in the
+long run.
+
+If you wish to keep automatically updating your software probe, please install the
+automatic update package of your choice.
+
+Suggested solutions available are yum-cron, dnf-automatic or unattended-upgrades.
