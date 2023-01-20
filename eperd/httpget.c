@@ -906,7 +906,7 @@ static void report(struct hgstate *state)
 		add_str(state, line);
 
 		if (state->read_truncated)
-			add_str(state, ", " DBQ(read-truncated) ": True");
+			add_str(state, ", " DBQ(read-truncated) ": true");
 
 		if (state->socklen != 0)
 		{
