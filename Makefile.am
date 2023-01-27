@@ -6,22 +6,47 @@ DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/arch/li
 	bin/arch/generic/generic-ATLAS.sh bin/arch/generic/generic-common.sh \
 	bin/arch/generic/generic-reginit.sh bin/*.lib.sh
 
-ATLAS_CONFIG_FILES = state/FIRMWARE_APPS_VERSION \
-	etc/known_hosts.reg etc/reg_servers.sh.dev etc/reg_servers.sh.prod etc/reg_servers.sh.test
+A_GENERIC_PATH := arch/generic/
+A_LINUX_PATH := arch/linux/
+A_ATLAS_CONFIG := atlas-config/
+A_STATE_PATH := state
+A_ETC_PATH := etc
 
-install-exec-local:	install-generic-config $(DST_FILES) $(ATLAS_CONFIG_FILES)
+A_BIN_FILES := bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/*.lib.sh
+A_GENERIC_FILES := bin/arch/generic/generic-ATLAS.sh bin/arch/generic/generic-common.sh bin/arch/generic/generic-reginit.sh
+A_LINUX_FILES := bin/arch/linux/linux-functions.sh
+
+A_CONFIG_FILES_STATE := $(A_ATLAS_CONFIG)$(A_STATE_PATH)/FIRMWARE_APPS_VERSION
+A_CONFIG_FILES_ETC := $(A_ATLAS_CONFIG)$(A_ETC_PATH)/known_hosts.reg $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.dev $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.prod $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.test
+
+install-exec-local:	install-generic-config install-ripe-atlas-bin install-ripe-atlas-generic install-ripe-atlas-linux \
+	install-ripe-atlas-config-state install-ripe-atlas-config-etc
 
 install-generic-config:
 	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_GENERIC_PATH},bin/${A_LINUX_PATH},bb-13.3,etc,state}
 
 # this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
-$(DST_FILES):	$(DESTDIR)$(prefix)/
-	@echo "$@ ==> $<"
-	@[[ -e $< ]] || (echo "some error for $<" && false)
-	@mkdir -p $(dir $@)
-	@cp -fr $@ $<$@
+install-ripe-atlas-bin: $(DESTDIR)$(bindir)
+	$(mkinstalldirs) $<
+	install -m 0755 -t $< $(A_BIN_FILES)
 
-$(ATLAS_CONFIG_FILES):	$(DESTDIR)$(prefix)/
-	@echo "$@ ==> $<"
-	@[[ -e $< ]] || (echo "some error for $<" && false)
-	@cp -fr atlas-config/$@ $<$@
+install-ripe-atlas-generic: $(DESTDIR)$(bindir)/$(A_GENERIC_PATH)
+	$(mkinstalldirs) $<
+	install -m 0755 -t $< $(A_GENERIC_FILES)
+
+install-ripe-atlas-linux: $(DESTDIR)$(bindir)/$(A_LINUX_PATH)
+	$(mkinstalldirs) $<
+	install -m 0755 -t $< $(A_LINUX_FILES)
+
+#install-ripe-atlas-config: $(DESTDIR)/$(A_STATE_PATH) $(DESTDIR)/$(A_ETC_PATH)
+#	$(mkinstalldirs) $<
+#	install -m 0755 -t $(DESTDIR)/$(A_STATE_PATH) $(A_ATLAS_CONFIG)$(A_CONFIG_FILES_STATE)
+#	install -m 0755 -t $(DESTDIR)/$(A_ETC_PATH) $(A_ATLAS_CONFIG)$(A_CONFIG_FILES_ETC)
+
+install-ripe-atlas-config-state: $(DESTDIR)$(prefix)/$(A_STATE_PATH)
+	$(mkinstalldirs) $<
+	install -m 0755 -t $< $(A_CONFIG_FILES_STATE)
+
+install-ripe-atlas-config-etc: $(DESTDIR)$(prefix)/$(A_ETC_PATH)
+	$(mkinstalldirs) $<
+	install -m 0755 -t $< $(A_CONFIG_FILES_ETC)
