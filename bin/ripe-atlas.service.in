@@ -3,8 +3,8 @@ Description=Atlas Probe
 After=network-online.target syslog.target
 
 [Service]
-User=atlas
-Group=atlas
+User=@ripe_atlas_user@
+Group=@ripe_atlas_user@
 Environment=HOME=@localstatedir@
 WorkingDirectory=@localstatedir@
 ExecStart=@rpm_base_dir@/bin/ATLAS
