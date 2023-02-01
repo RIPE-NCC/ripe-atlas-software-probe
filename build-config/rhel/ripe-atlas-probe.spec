@@ -163,6 +163,7 @@ find %{local_state_dir} -type f -exec chmod -R 644 {} +
 chmod 600 %{local_state_dir}/etc/probe_key
 
 %systemd_post %{service_name}
+systemctl restart %{service_name}
 exit 0
 
 
