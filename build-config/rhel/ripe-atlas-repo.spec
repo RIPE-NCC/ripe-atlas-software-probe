@@ -7,7 +7,7 @@
 %define         yum_repo_dirname       yum.repos.d
 %define         gpg_key_filename        RPM-GPG-KEY-ripe-atlas-probe
 
-%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{assets_path}/atlas-probe.repo
+%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{assets_path}/ripe-atlas-probe.repo
 %define         gpg_key_path            %{_builddir}/%{build_dirname}/%{assets_path}/%{gpg_key_filename}
 
 Name:           ripe-atlas-repo
