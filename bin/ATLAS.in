@@ -308,28 +308,27 @@ do
 	fi
 
 	# Check if perd is still running
-	if check_pid $(cat $RUN_DIR/perd-main.pid.vol)
+	check_pid $(cat $RUN_DIR/perd-main.pid.vol)
+	if [ $? -ne 0 ]
 	then
-		: # perd is running
-	else
 		echo restarting perd
 		start_perd
 		atlas_log 9811 'perd' 'perd died (restarted)'
 	fi
+
 	# Check if eperd is still running
-	if check_pid $(cat $RUN_DIR/perd-7.pid.vol)
+	check_pid $(cat $RUN_DIR/perd-7.pid.vol)
+	if [ $? -ne 0 ]
 	then
-		: # eperd is running
-	else
 		echo restarting eperd
 		start_eperd
 		atlas_log 9817 'eperd' 'eperd died (restarted)'
 	fi
+
 	# Check if eooqd is still running
-	if check_pid $(cat $RUN_DIR/eooqd.pid.vol)
+	check_pid $(cat $RUN_DIR/eooqd.pid.vol)
+	if [ $? -ne 0 ]
 	then
-		: # eooqd is running
-	else
 		echo restarting eooqd
 		start_eooqd
 		atlas_log 9819 'eooqd' 'eooqd died (restarted)'
