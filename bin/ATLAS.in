@@ -187,7 +187,7 @@ do
 			if [ $MAC != '<incomplete>' ] ; then
 				$KILL_DHCPC_CMD
 				/sbin/route del default
-				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP" > $DATA_NEW_DIR/simpleping
+				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP" >> $DATA_NEW_DIR/simpleping
 				echo "RESULT 9100 done $D DEFAULT GW complete stop DHCP"
 				. $NETCONFIG_V4_DEST
 				/sbin/ifconfig $LANINF 0.0.0.0
