@@ -291,7 +291,8 @@ do
 			condmv -f $DATA_NEW_DIR/reboot-count.txt $DATA_NEW_DIR/reboot-count.old
 		fi
 	else
-		if dfrm -A 9018 $DATA_DIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR >> $DATA_NEW_DIR/simpleping
+		dfrm -A 9018 $DATA_DIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR 2>&1 >> $DATA_NEW_DIR/simpleping
+		if [ $? -eq 0 ]
 		then
 			D=`epoch`
 			echo "RESULT 9007 done $D $ETHER_SCANNED REBOOT data full available space < $LOW_DISK_LIMIT KB"
