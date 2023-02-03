@@ -68,7 +68,7 @@ else
 	do
 		if [ -z "$line" ]
 		then
-			echo >&2 "Shell returned empty line in CON_INIT_CONF (1)"
+			echo "Shell returned empty line in CON_INIT_CONF (1)" 1>&2
 			break
 		fi
 		set -- $line
@@ -90,7 +90,7 @@ else
 		REREG_TIMER) REREG_TIMER="$value" ;;
 		REG_WAIT_UNTIL) REG_WAIT_UNTIL="$value" ;;
 		*)
-			echo >&2 "unknown keyword '$kw' in CON_INIT_CONF (1)"
+			echo "unknown keyword '$kw' in CON_INIT_CONF (1)" 1>&2
 		;;
 		esac
 	done < $CON_INIT_CONF
@@ -165,7 +165,7 @@ if [ "$need_rereg" = 1 ]; then
 	do
 		if [ -z "$line" ]
 		then
-			echo >&2 "Shell returned empty line in CON_INIT_CONF (2)"
+			echo "Shell returned empty line in CON_INIT_CONF (2)" 1>&2
 			break
 		fi
 		set -- $line
@@ -187,7 +187,7 @@ if [ "$need_rereg" = 1 ]; then
 		REREG_TIMER) REREG_TIMER="$value" ;;
 		REG_WAIT_UNTIL) REG_WAIT_UNTIL="$value" ;;
 		*)
-			echo >&2 "unknown keyword '$kw' in CON_INIT_CONF (2)"
+			echo "unknown keyword '$kw' in CON_INIT_CONF (2)" 1>&2
 		;;
 		esac
 	done < $CON_INIT_CONF
@@ -404,7 +404,7 @@ if [ -f $CON_KEEP_CONF ] ; then
 	do
 		if [ -z "$line" ]
 		then
-			echo >&2 "Shell returned empty line in CON_KEEP_CONF (1)"
+			echo "Shell returned empty line in CON_KEEP_CONF (1)" 1>&2
 			break
 		fi
 		set -- $line
@@ -414,7 +414,7 @@ if [ -f $CON_KEEP_CONF ] ; then
 		REMOTE_PORT) REMOTE_PORT="$value" ;;
 		CON_WAIT_TIMER) CON_WAIT_TIMER="$value" ;;
 		*)
-			echo >&2 "unknown keyword '$kw' in CON_KEEP_CONF (1)"
+			echo "unknown keyword '$kw' in CON_KEEP_CONF (1)" 1>&2
 		;;
 		esac
 	done < $CON_KEEP_CONF
@@ -476,7 +476,7 @@ if [ "$con_reinit" = "1" ] ; then
 	do
 		if [ -z "$line" ]
 		then
-			echo >&2 "Shell returned empty line in CON_KEEP_CONF (2)"
+			echo "Shell returned empty line in CON_KEEP_CONF (2)" 1>&2
 			break
 		fi
 		set -- $line
@@ -486,7 +486,7 @@ if [ "$con_reinit" = "1" ] ; then
 		REMOTE_PORT) REMOTE_PORT="$value" ;;
 		CON_WAIT_TIMER) CON_WAIT_TIMER="$value" ;;
 		*)
-			echo >&2 "unknown keyword '$kw' in CON_KEEP_CONF (2)"
+			echo "unknown keyword '$kw' in CON_KEEP_CONF (2)" 1>&2
 		;;
 		esac
 	done < $CON_KEEP_CONF
