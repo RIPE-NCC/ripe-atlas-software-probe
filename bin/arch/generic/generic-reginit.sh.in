@@ -22,9 +22,9 @@ NETCONFIG_V4_DEST=$HOME/etc/netconfig_v4.sh
 NETCONFIG_V6_DEST=$HOME/etc/netconfig_v6.sh
 P_TO_R_INIT_IN=$STATUS_DIR/p_to_r_init.in.vol
 
-if [ ! -n "$STATE_FILE" ] ; then
-	echo "called without state file as argument"
+if [ -z "$STATE_FILE" ] ; then
 	STATE_FILE=$STATUS_DIR/reginit.vol
+	echo "Warning: STATE_FILE unset. Setting to -> $STATE_FILE"
 fi
 
 . $ATLAS_STATIC/bin/arch/generic/generic-common.sh
