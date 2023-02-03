@@ -70,11 +70,6 @@ mkdir -p %{buildroot}%{_unitdir}
 install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
 make DESTDIR=%{buildroot} install
 
-%clean
-#rm -rf %{buildroot}%{src_prefix_dir}/include
-#rm -rf %{buildroot}%{src_prefix_dir}/bin/%{service_name}
-#rm -rf %{_builddir}
-
 %files
 %ghost %{src_prefix_dir}/bin/event_rpcgen.py
 %ghost %{src_prefix_dir}/lib/pkgconfig
