@@ -146,7 +146,7 @@ if [ ! -f %{local_state_dir}/state/mode ]; then
 fi
 
 # create file structure hierarchy used for runtime data
-mkdir -p %{local_state_dir}/{bin,crons/{main,2,7},data/{new,oneoff,out/ooq,out/ooq10},run}
+mkdir -p %{local_state_dir}/{bin,crons/{main,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20},data/{new,oneoff,out/ooq,out/ooq10},run}
 
 # this file is likely no longer needed since the move to generic
 cat > %{local_state_dir}/bin/config.sh << EOF
