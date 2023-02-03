@@ -162,6 +162,9 @@ find %{local_state_dir} -type d -exec chmod -R 755 {} +
 find %{local_state_dir} -type f -exec chmod -R 644 {} +
 chmod 600 %{local_state_dir}/etc/probe_key
 
+# add version file symlink
+ln -sf %{src_prefix_dir}/state/FIRMWARE_APPS_VERSION %{local_state_dir}/state/FIRMWARE_APPS_VERSION
+
 %systemd_post %{service_name}
 systemctl restart %{service_name}
 exit 0
