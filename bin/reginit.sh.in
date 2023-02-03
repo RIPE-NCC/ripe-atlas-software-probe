@@ -18,9 +18,9 @@ STATE_FILE=$1
 [ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$BASE_DIR/etc/probe_key
 # Set REG_SERVERS if it isn't set already
 [ -z "$REG_SERVERS" ] && REG_SERVERS=$BIN_DIR/reg_servers.sh
-CON_INIT_CONF=./con_init_conf.txt
+CON_INIT_CONF=$STATUS_DIR/con_init_conf.txt
 CON_INIT_REPLY=con_init_reply.txt
-CON_KEEP_CONF=./con_keep_conf.txt
+CON_KEEP_CONF=$STATUS_DIR/con_keep_conf.txt
 CON_KEEP_REPLY=con_keep_reply.vol
 RESOLV_CONF_VOL=resolv.conf.vol
 SSH_OUT=ssh_out.txt
