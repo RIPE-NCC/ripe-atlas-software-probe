@@ -12,7 +12,7 @@ then
 	. bin/config.sh
 	export DEVICE_NAME SUB_ARCH ATLAS_STATIC
 else
-	echo no 'bin/config.sh' >&2
+	echo "no 'bin/config.sh'" 1>&2
 	exit 1
 fi
 
