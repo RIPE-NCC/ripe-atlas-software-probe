@@ -16,12 +16,14 @@ working_dir=/home/atlas
 
 # runtime info
 ripe_atlas_user=ripe-atlas
+ripe_atlas_group=ripe-atlas
 
 AC_SUBST(storage_sysconfdir)
 AC_SUBST(tmpdir)
 AC_SUBST(rpm_base_dir)
 AC_SUBST(working_dir)
 AC_SUBST(ripe_atlas_user)
+AC_SUBST(ripe_atlas_group)
 
 AC_PROG_LIBTOOL
 AC_PROG_CC
