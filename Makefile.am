@@ -46,11 +46,6 @@ install-ripe-atlas-linux: $(DESTDIR)$(bindir)/$(A_LINUX_PATH)
 	$(mkinstalldirs) $<
 	install -m 0755 -t $< $(A_LINUX_FILES)
 
-#install-ripe-atlas-config: $(DESTDIR)/$(A_STATE_PATH) $(DESTDIR)/$(A_ETC_PATH)
-#	$(mkinstalldirs) $<
-#	install -m 0755 -t $(DESTDIR)/$(A_STATE_PATH) $(A_ATLAS_CONFIG)$(A_CONFIG_FILES_STATE)
-#	install -m 0755 -t $(DESTDIR)/$(A_ETC_PATH) $(A_ATLAS_CONFIG)$(A_CONFIG_FILES_ETC)
-
 install-ripe-atlas-config-state: $(DESTDIR)$(prefix)/$(A_STATE_PATH)
 	$(mkinstalldirs) $<
 	install -m 0755 -t $< $(A_CONFIG_FILES_STATE)
