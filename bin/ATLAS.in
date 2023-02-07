@@ -269,7 +269,6 @@ do
 	if [ -n "$do_rxtxrpt" ]
 	then
 		rxtxrpt -A "9002" >> $DATA_NEW_DIR/simpleping
-		rxtxrpt
 	fi
 	rptaddrs -A 9104 -c $DATA_NEW_DIR/v6addr.vol -O $DATA_NEW_DIR/v6addr.txt
 	rptuptime >> $DATA_NEW_DIR/simpleping
