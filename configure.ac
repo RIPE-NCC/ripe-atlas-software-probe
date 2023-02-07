@@ -12,7 +12,7 @@ tmpdir=/tmp
 
 # application dependent paths
 rpm_base_dir=/usr/local/ripe-atlas
-working_dir=/home/atlas
+working_dir=/home/ripe-atlas
 
 # runtime info
 ripe_atlas_user=ripe-atlas
