@@ -4,7 +4,7 @@ Installation Instructions
 To create a RPM for RHEL
 ------------------------
 
-- ``sudo dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make``
+- ``sudo dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatability with Centos7 systems replace ``dnf`` with ``yum``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - ``rpmbuild --bb ripe-atlas-software-probe/build-config/rhel/atlasswprobe.spec``
 - This will leave the RPM in rpmbuild/RPMS/x86_64
