@@ -124,24 +124,17 @@ if [ ! $(getent group %{msm_group}) ]; then
 fi
 
 # init measurement user
-GID=$(getent group ripe-atlas | cut -d: -f3)
+GID=$(getent group %{msm_group} | cut -d: -f3)
 useradd -c %{msm_user} -d %{local_state_dir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
 exit 0
 
 
 %post -n ripe-atlas-probe
-#exec 1>/tmp/ripe-atlas.out 2>/tmp/ripe-atlas.err
-#set -x
-
 # set to environment
 if [ ! -f %{local_state_dir}/state/mode ]; then
     %{!?env:%define env prod}
-    mkdir -p %{local_state_dir}/state
     echo %{env} > %{local_state_dir}/state/mode
 fi
-
-# create file structure hierarchy used for runtime data
-mkdir -p %{local_state_dir}/{bin,crons/{main,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20},data/{new,oneoff,out/ooq,out/ooq10},run}
 
 # this file is likely no longer needed since the move to generic
 cat > %{local_state_dir}/bin/config.sh << EOF
@@ -156,9 +149,6 @@ chown -R %{msm_user}:%{msm_group} %{local_state_dir}
 find %{local_state_dir} -type d -exec chmod -R 755 {} +
 find %{local_state_dir} -type f -exec chmod -R 644 {} +
 chmod 600 %{local_state_dir}/etc/probe_key
-
-# add version file symlink
-ln -sf %{src_prefix_dir}/state/FIRMWARE_APPS_VERSION %{local_state_dir}/state/FIRMWARE_APPS_VERSION
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}
