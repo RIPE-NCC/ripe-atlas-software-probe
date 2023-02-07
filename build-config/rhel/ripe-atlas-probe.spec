@@ -75,11 +75,11 @@ make DESTDIR=%{buildroot} install
 %ghost %{src_prefix_dir}/lib/pkgconfig
 %{src_prefix_dir}/bb-13.3
 %{src_prefix_dir}/bin/arch
-%attr(755, root, root) %{src_prefix_dir}/bin/ATLAS
-%attr(755, root, root) %{src_prefix_dir}/bin/reginit.sh
-%attr(644, root, root) %{src_prefix_dir}/bin/common-pre.sh
-%attr(644, root, root) %{src_prefix_dir}/bin/common.sh
-%attr(755, root, root) %{src_prefix_dir}/bin/*.lib.sh
+%{src_prefix_dir}/bin/ATLAS
+%{src_prefix_dir}/bin/reginit.sh
+%{src_prefix_dir}/bin/common-pre.sh
+%{src_prefix_dir}/bin/common.sh
+%{src_prefix_dir}/bin/*.lib.sh
 %caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
 
 %files -n ripe-atlas-probe
