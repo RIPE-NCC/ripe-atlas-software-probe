@@ -1,13 +1,14 @@
 %define		git_repo         	ripe-atlas-software-probe
 %define		build_dirname		ripe-atlas-repo
-%define		local_state_dir  	/home/atlas
-%define		src_prefix_dir   	/usr/local/atlas
-%define		assets_path	build-config/rhel
+%define		local_state_dir  	/home/ripe-atlas
+%define		src_prefix_dir   	/usr/local/ripe-atlas
+%define		assets_path		build-config/rhel
 
-%define         yum_repo_dirname       yum.repos.d
-%define         gpg_key_filename        RPM-GPG-KEY-ripe-atlas-probe
+%define         repofile_dirname	%{_sysconfdir}/yum.repos.d
+%define		key_dirname		%{_sysconfdir}/pki/rpm-gpg
+%define         gpg_key_filename	RPM-GPG-KEY-ripe-atlas-probe
 
-%define         yum_repo_path           %{_builddir}/%{build_dirname}/%{assets_path}/ripe-atlas-probe.repo
+%define         repofile_path           %{_builddir}/%{build_dirname}/%{assets_path}/ripe-atlas-probe.repo
 %define         gpg_key_path            %{_builddir}/%{build_dirname}/%{assets_path}/%{gpg_key_filename}
 
 Name:           ripe-atlas-repo
@@ -44,20 +45,16 @@ if [ -z ${STRIPPED_DIST} ] ; then
 fi
 
 echo "OS Distro detected as: ${STRIPPED_DIST}"
-sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{yum_repo_path}
+sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{repofile_path}
 
 %install
-mkdir -p %{buildroot}%{_sysconfdir}/%{yum_repo_dirname}
-cp %{yum_repo_path} %{buildroot}%{_sysconfdir}/%{yum_repo_dirname}
-mkdir -p %{buildroot}%{_sysconfdir}/pki/rpm-gpg
-cp %{gpg_key_path} %{buildroot}%{_sysconfdir}/pki/rpm-gpg/
-
-%clean
-#rm -rf %{buildroot}
+mkdir -p %{buildroot}/{%{repofile_dirname},%{key_dirname}}
+install -m 0644 %{repofile_path} %{buildroot}%{repofile_dirname}
+install -m 0644 %{gpg_key_path} %{buildroot}%{key_dirname}
 
 %files
-/etc/%{yum_repo_dirname}
-/etc/pki/rpm-gpg/%{gpg_key_filename}
+%{repofile_dirname}
+%{key_dirname}
 
 %changelog
 
