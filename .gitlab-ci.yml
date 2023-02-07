@@ -1,6 +1,7 @@
 stages:
   - docker_image
   - build
+  - lint
   - prepare
   - test
 
@@ -149,6 +150,47 @@ build-ci-el9:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_OL9}
   extends: .build-ci-rhel
+
+.lint-ci-rhel:
+  stage: lint
+  only:
+    - /^devel.*/
+    - tags
+  script:
+    - mkdir lint_report
+    - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}-lint-report"
+    paths:
+      - ./lint_report
+    expire_in: never  
+
+lint-ci-el7:
+  needs:                                                                                                                                                          
+    - job: build-ci-el7                                                                                                                                           
+      artifacts: true 
+  variables:
+    OS_VERSION: el7
+  image: ${DOCKER_IMAGE_CENTOS7}
+  extends: .lint-ci-rhel
+
+lint-ci-el8:
+  needs:                                                                                                                                                          
+    - job: build-ci-el8                                                                                                                                           
+      artifacts: true 
+  variables:
+    OS_VERSION: el8
+  image: ${DOCKER_IMAGE_CENTOS8}
+  extends: .lint-ci-rhel
+
+lint-ci-el9:
+  needs:                                                                                                                                                          
+    - job: build-ci-el9                                                                                                                                           
+      artifacts: true 
+  variables:
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_OL9}
+  extends: .lint-ci-rhel
 
 .prepare-ci-rhel:
   stage: prepare
