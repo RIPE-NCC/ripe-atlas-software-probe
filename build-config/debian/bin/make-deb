@@ -24,7 +24,7 @@ get_arch()
 	case $(uname -m) in
 	aarch64) echo arm64 ;;
 	armv5tel) echo armel ;;
-	armv6l) echo armhf ;;
+	armv6l) echo armel ;;
 	armv7l) echo armhf ;;
 	i686) echo i386 ;;
 	x86_64) echo amd64 ;;
