@@ -28,7 +28,9 @@ install-generic-filesystem:
 	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state}
 
 install-local-filesystem:
-	$(mkinstalldirs) $(DESTDIR)$(working_dir)/{bin,crons/{main,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20},data/{new,oneoff,out/ooq,out/ooq10},run,state}
+	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
+	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
+	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir) $(DESTDIR)$(working_dir)/state
 
 install-symlinks:
 	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(working_dir)/state/FIRMWARE_APPS_VERSION
