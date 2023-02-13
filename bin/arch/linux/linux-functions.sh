@@ -59,27 +59,27 @@ onlyuptime()
 }
 #telnetd()
 #{
-#	$SU_CMD $BB_BASE_DIR/usr/sbin/telnetd "$@"
+#	$SU_CMD $BB_BIN_DIR/telnetd "$@"
 #}
 perd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/perd "$@"
+	$SU_CMD $BB_BIN_DIR/perd "$@"
 }
 root_perd()
 {
-	$BB_BASE_DIR/bin/perd "$@"
+	$BB_BIN_DIR/perd "$@"
 }
 ooqd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/ooqd "$@"
+	$SU_CMD $BB_BIN_DIR/ooqd "$@"
 }
 eperd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/eperd "$@"
+	$SU_CMD $BB_BIN_DIR/eperd "$@"
 }
 eooqd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/eooqd "$@"
+	$SU_CMD $BB_BIN_DIR/eooqd "$@"
 }
 sleepkick()
 {

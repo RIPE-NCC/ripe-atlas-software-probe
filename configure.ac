@@ -23,6 +23,12 @@ AS_CASE([$probe_type],
 AC_SUBST(probe_scripts_path)
 
 # system paths
+atlas_libexecdir=${libexecdir}/ripe-atlas
+atlas_datadir=${datadir}/ripe-atlas
+atlas_sysconfdir=${sysconfdir}/ripe-atlas
+atlas_spooldir=${localstatedir}/spool/ripe-atlas
+atlas_rundir=${localstatedir}/run/ripe-atlas
+
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
 
@@ -40,6 +46,12 @@ AC_SUBST(rpm_base_dir)
 AC_SUBST(working_dir)
 AC_SUBST(ripe_atlas_user)
 AC_SUBST(ripe_atlas_group)
+
+AC_SUBST(atlas_libexecdir)
+AC_SUBST(atlas_datadir)
+AC_SUBST(atlas_sysconfdir)
+AC_SUBST(atlas_spooldir)
+AC_SUBST(atlas_rundir)
 
 AC_PROG_LIBTOOL
 AC_PROG_CC
