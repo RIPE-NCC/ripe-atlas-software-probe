@@ -11,7 +11,7 @@
 //config:       help
 //config:           Eooqd runs Atlas measurements just once.
 
-//applet:IF_EOOQD(APPLET(eooqd, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EOOQD(APPLET(eooqd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EOOQD) += eooqd.o
 

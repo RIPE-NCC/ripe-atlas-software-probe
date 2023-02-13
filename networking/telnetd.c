@@ -90,7 +90,7 @@
 //config:	  way of running tcp services, including telnetd.
 //config:	  You most probably want to say N here.
 
-//applet:IF_TELNETD(APPLET(telnetd, BB_DIR_USR_SBIN, BB_SUID_DROP))
+//applet:IF_TELNETD(APPLET(telnetd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_TELNETD) += telnetd.o
 

@@ -25,7 +25,7 @@
 //config:       help
 //config:        extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
 
-//applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVTDIG) += evtdig.o
 

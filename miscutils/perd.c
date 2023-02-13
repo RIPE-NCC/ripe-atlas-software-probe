@@ -27,7 +27,7 @@
 //config:       help
 //config:         -d sets loglevel to 0 (most verbose) and directs all output to stderr.
 
-//applet:IF_PERD(APPLET(perd, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_PERD(APPLET(perd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_PERD) += perd.o
 

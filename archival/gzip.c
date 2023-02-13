@@ -73,7 +73,7 @@ aa:      85.1% -- replaced with aa.gz
 //config:	  If this option is not selected, -N options are ignored and -9
 //config:	  is used.
 
-//applet:IF_GZIP(APPLET(gzip, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_GZIP(APPLET(gzip, BB_DIR_ROOT, BB_SUID_DROP))
 //kbuild:lib-$(CONFIG_GZIP) += gzip.o
 
 //usage:#define gzip_trivial_usage

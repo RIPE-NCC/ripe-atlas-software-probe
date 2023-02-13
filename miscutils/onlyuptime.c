@@ -9,7 +9,7 @@
 //config:       help
 //config:         onlyuptime reports the uptime in seconds
 
-//applet:IF_CONDMV(APPLET(onlyuptime, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_CONDMV(APPLET(onlyuptime, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_ONLYUPTIME) += onlyuptime.o
 

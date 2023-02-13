@@ -9,7 +9,7 @@
 //config:       help
 //config:         rptuptime reports the uptime in a JSON structure
 
-//applet:IF_CONDMV(APPLET(rptuptime, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_CONDMV(APPLET(rptuptime, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RPTUPTIME) += rptuptime.o
 

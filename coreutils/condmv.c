@@ -9,7 +9,7 @@
 //config:       help
 //config:         condmv is used to rename a file if the destination does not exists
 
-//applet:IF_CONDMV(APPLET(condmv, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_CONDMV(APPLET(condmv, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_CONDMV) += condmv.o
 

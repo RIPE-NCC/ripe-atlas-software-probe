@@ -5,7 +5,7 @@
 //config:       help
 //config:               standalone version of event-driven sslgetcert
 
-//applet:IF_EVSSLGETCERT(APPLET(evsslgetcert, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVSSLGETCERT(APPLET(evsslgetcert, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVSSLGETCERT) += evsslgetcert.o
 

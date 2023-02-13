@@ -11,7 +11,7 @@
 //config:       RIPE NCC Atlas initialization and parsing applicaton.
 //config:       antony@rip.net. Aug 2010.
 
-//applet:IF_ATLASINIT(APPLET(atlasinit, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_ATLASINIT(APPLET(atlasinit, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_ATLASINIT) += atlasinit.o
 

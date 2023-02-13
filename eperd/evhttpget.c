@@ -16,7 +16,7 @@
 //config:       help
 //config:        Enable https:// support for httpget
 
-//applet:IF_EVHTTPGET(APPLET(evhttpget, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVHTTPGET(APPLET(evhttpget, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVHTTPGET) += evhttpget.o
 

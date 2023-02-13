@@ -9,7 +9,7 @@
 //config:       help
 //config:               standalone version of event-driven ntp
 
-//applet:IF_EVNTP(APPLET(evntp, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVNTP(APPLET(evntp, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVNTP) += evntp.o
 

@@ -9,7 +9,7 @@
 //config:       help
 //config:         httppost post files using http
 
-//applet:IF_HTTPPOST(APPLET(httppost, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_HTTPPOST(APPLET(httppost, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_HTTPPOST) += httppost.o
 

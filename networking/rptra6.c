@@ -8,7 +8,7 @@
 //config:       help
 //config:         Report received IPv6 router advertisements
 
-//applet:IF_RPTRA6(APPLET(rptra6, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_RPTRA6(APPLET(rptra6, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RPTRA6) += rptra6.o
 

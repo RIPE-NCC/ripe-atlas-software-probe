@@ -9,7 +9,7 @@
 //config:       help
 //config:         Report addresses, routes, dns both static and dynamic
 
-//applet:IF_RPTADDRS(APPLET(rptaddrs, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_RPTADDRS(APPLET(rptaddrs, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RPTADDRS) += rptaddrs.o
 
