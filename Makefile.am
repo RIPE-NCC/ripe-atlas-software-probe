@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS         = -I m4
-AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(prefix)/bb-13.3
+AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_libexecdir)/measurement
 SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
 
 DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/config.sh bin/arch/linux/linux-functions.sh \
@@ -25,7 +25,7 @@ install-exec-local:	install-generic-filesystem install-local-filesystem install-
 install-data-hook:	install-symlinks
 
 install-generic-filesystem:
-	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/$(A_SCRIPTS_PATH),bin/$(A_LINUX_PATH),bb-13.3,etc,state}
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state}
 
 install-local-filesystem:
 	$(mkinstalldirs) $(DESTDIR)$(working_dir)/{bin,crons/{main,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20},data/{new,oneoff,out/ooq,out/ooq10},run,state}

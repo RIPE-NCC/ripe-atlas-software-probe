@@ -23,7 +23,7 @@ SET_HOSTNAME=:
 # For OpenWRT we need telnetd to run as root.
 telnetd()
 {
-	$SU_CMD $BB_BASE_DIR/usr/sbin/telnetd "$@"
+	$SU_CMD $BB_BIN_DIR/telnetd "$@"
 }
 
 # Various files and directories
@@ -38,8 +38,8 @@ DHCP=False
 
 # Directories
 STATE_DIR=$RPM_BASE_DIR/state; export STATE_DIR
-BB_BASE_DIR=$RPM_BASE_DIR/bb-13.3; export BB_BASE_DIR
-BB_BIN_DIR=$BB_BASE_DIR/bin; export BB_BIN_DIR
+BB_BASE_DIR=$RPM_BASE_DIR; export BB_BASE_DIR
+BB_BIN_DIR=$BB_BASE_DIR; export BB_BIN_DIR
 
 # Files
 REG_SERVERS_SOURCE=$RPM_ETC_DIR/reg_servers.sh

@@ -5,9 +5,8 @@
 # Directories
 HOME=/root; export HOME			# Somewhow, HOME is not set correctly
 SSH_DIR=$HOME/.ssh; export SSH_DIR
-BB_BASE_DIR=$BASE_DIR/bb-13.3; export BB_BASE_DIR
+BB_BASE_DIR=$BASE_DIR; export BB_BASE_DIR
 BB_BIN_DIR=$BB_BASE_DIR/bin; export BB_BIN_DIR
-BB_SBIN_DIR=$BB_BASE_DIR/sbin; export BB_SBIN_DIR
 RUN_DIR=/tmp/atlas-run
 
 # We need DATA_NEW_DIR in this script
@@ -233,7 +232,7 @@ openwrt_atlas_init()
 	echo '/home/atlas/data/%e.%p.%s.%t.core' > /proc/sys/kernel/core_pattern
 
 	# Set up for user atlas
-	setcap "cap_net_raw=ep cap_sys_time=ep" /home/atlas/bb-13.3/bin/busybox
+	setcap "cap_net_raw=ep cap_sys_time=ep" $BB_BIN_DIR/busybox
 
 	$MOUNT_ROOT_RO
 }
