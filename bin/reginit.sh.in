@@ -325,8 +325,8 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 		rm -f *.bz2
 
 		# Kill cronjobs
-		rm $BASE_DIR/crons/*/*
-		for i in $BASE_DIR/crons/*
+		rm $CRON_DIR/*/*
+		for i in $CRON_DIR/*
 		do
 			echo root > $i/cron.update
 		done

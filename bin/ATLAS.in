@@ -50,7 +50,7 @@ fi
 
 $BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 
-mkdir -p $BASE_DIR/crons/main $BASE_DIR/crons/2
+mkdir -p $CRON_DIR/main $CRON_DIR/2
 rm -f $DATA_NEW_DIR/v6addr.vol
 rm -f $DATA_OUT_DIR/v6addr.txt
 rm -f $SSH_ERR
@@ -103,8 +103,8 @@ then
 	if [ $b -gt 10 ]
 	then
 		echo Removing crontabs
-		rm -f $BASE_DIR/crons/main/root
-		rm -f $BASE_DIR/crons/*/root
+		rm -f $CRON_DIR/main/root
+		rm -f $CRON_DIR/*/root
 	fi
 else
 	echo 0 > $DATA_NEW_DIR/reboot-count.txt
@@ -128,15 +128,15 @@ $CHMOD_FOR_MSM
 
 start_perd()
 {
-	perd -c $BASE_DIR/crons/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
+	perd -c $CRON_DIR/main -A 9801 -P $RUN_DIR/perd-main.pid.vol
 }
 start_eperd()
 {
-	eperd -c $BASE_DIR/crons/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O @localstatedir@/data/new/7 -i 7
+	eperd -c $CRON_DIR/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O @localstatedir@/data/new/7 -i 7
 }
 start_eooqd()
 {
-	eooqd $BASE_DIR/crons/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
+	eooqd $CRON_DIR/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 }
 
 start_perd

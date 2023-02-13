@@ -110,9 +110,7 @@ chown_data_dirs()
 }
 chown_for_msm()
 {
-	chown -R atlas $BASE_DIR/crons
-	chown -R atlas $BASE_DIR/crons/
-	chown -R atlas $BASE_DIR/data
+	chown -R atlas $CRON_DIR
 	chown -R atlas $BASE_DIR/data/
 }
 date()
