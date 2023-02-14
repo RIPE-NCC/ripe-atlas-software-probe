@@ -1,0 +1,57 @@
+export PROBE_TYPE=@probe_type@
+
+get_arch()
+{
+	case $PROBE_TYPE in
+
+		*"v3"*)
+			. /lib/ar71xx.sh
+			ar71xx_board_name
+			;;
+
+#			sh /lib/ramips.sh
+#			sed < /tmp/sysinfo/board_name 's/tplink,//'
+#			;;
+
+		*"v4"*)
+			echo 'nanopi-neo-plus2'
+			;;
+
+		*"v5"*)
+			echo 'atlas-mox'
+			;;
+
+		*"rpm"*|*"deb"*)
+			echo 'fluffy'
+			;;
+
+		*)
+			echo 'unknown board'
+			exit 1
+			;;
+	esac
+
+}
+
+get_sub_arch()
+{
+	arch=`get_arch`
+	if [ "x$arch" == "xfluffy" ]; then
+		echo "$PROBE_TYPE" 
+	else
+		echo ""
+	fi
+}
+
+# DEVICE_NAME is used as a reference for which OS specific scripts should be invoked under 'bin/arch/'. The software probe has already been migrated to used the new 'generic' scripts, therefore for software probes the device name should be 'generic', otherwise it should be the autotools probe_type assigned during build. 
+SUB_ARCH=`get_sub_arch`
+if [ "$SUB_ARCH" != "" ]; then
+	DEVICE_NAME="generic"
+else
+	DEVICE_NAME=$PROBE_TYPE
+fi
+
+ATLAS_BASE=@atlas_datadir@
+ATLAS_STATIC=@atlas_libexecdir@
+
+export DEVICE_NAME SUB_ARCH ATLAS_BASE ATLAS_STATIC

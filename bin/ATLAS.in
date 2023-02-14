@@ -7,16 +7,9 @@
 #exec >@tmpdir@/ATLAS.out 2>@tmpdir@/ATLAS.err
 #set -x
 
-if [ -f @localstatedir@/bin/config.sh ]
-then
-	. @localstatedir@/bin/config.sh
-	export DEVICE_NAME SUB_ARCH ATLAS_STATIC
-else
-	echo "no '@localstatedir@/bin/config.sh'" 1>&2
-	exit 1
-fi
+. @localstatedir@/bin/config.sh
 
-. $ATLAS_STATIC/bin/arch/@probe_type@/@probe_type@-ATLAS.sh
+. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
 
 . $BIN_DIR/common.sh
 

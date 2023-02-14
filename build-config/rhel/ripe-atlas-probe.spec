@@ -61,7 +61,7 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{src_prefix_dir} --localstatedir=%{local_state_dir}
+./configure --prefix=%{src_prefix_dir} --localstatedir=%{local_state_dir} --with-probe-type="centos-rpm-%{name}-%{version}-%{release}"
 make
 
 %install
@@ -135,14 +135,6 @@ if [ ! -f %{local_state_dir}/state/mode ]; then
     %{!?env:%define env prod}
     echo %{env} > %{local_state_dir}/state/mode
 fi
-
-# this file is likely no longer needed since the move to generic
-cat > %{local_state_dir}/bin/config.sh << EOF
-DEVICE_NAME=centos-sw-probe
-ATLAS_BASE="%{local_state_dir}"
-ATLAS_STATIC="%{src_prefix_dir}"
-SUB_ARCH="centos-rpm-%{name}-%{version}-%{release}"
-EOF
 
 # pass runtime dir ownership to measurements user
 chown -R %{msm_user}:%{msm_group} %{local_state_dir}
