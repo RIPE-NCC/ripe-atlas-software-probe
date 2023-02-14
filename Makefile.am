@@ -30,10 +30,10 @@ install-generic-filesystem:
 install-local-filesystem:
 	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
 	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
-	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir) $(DESTDIR)$(working_dir)/state
+	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir) $(DESTDIR)$(atlas_datadir)/state
 
 install-symlinks:
-	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(working_dir)/state/FIRMWARE_APPS_VERSION
+	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(atlas_datadir)/state/FIRMWARE_APPS_VERSION
 
 # this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
 install-ripe-atlas-bin: $(DESTDIR)$(bindir)
