@@ -2,18 +2,18 @@ ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(prefix)/bb-13.3
 SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
 
-DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/arch/linux/linux-functions.sh \
-	bin/arch/$(probe_type)/$(probe_type)-ATLAS.sh bin/arch/$(probe_type)/$(probe_type)-common.sh \
-	bin/arch/$(probe_type)/$(probe_type)-reginit.sh bin/*.lib.sh
+DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/config.sh bin/arch/linux/linux-functions.sh \
+	bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
+	bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh bin/*.lib.sh
 
-A_SCRIPTS_PATH := arch/$(probe_type)/
+A_SCRIPTS_PATH := arch/$(probe_scripts_path)/
 A_LINUX_PATH := arch/linux/
 A_ATLAS_CONFIG := atlas-config/
 A_STATE_PATH := state
 A_ETC_PATH := etc
 
 A_BIN_FILES := bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/*.lib.sh
-A_SCRIPTS_FILES := bin/arch/$(probe_type)/$(probe_type)-ATLAS.sh bin/arch/$(probe_type)/$(probe_type)-common.sh bin/arch/$(probe_type)/$(probe_type)-reginit.sh
+A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
 A_LINUX_FILES := bin/arch/linux/linux-functions.sh
 
 A_CONFIG_FILES_STATE := $(A_ATLAS_CONFIG)$(A_STATE_PATH)/FIRMWARE_APPS_VERSION

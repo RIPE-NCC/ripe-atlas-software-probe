@@ -8,7 +8,7 @@
 
 STATE_FILE=$1
 
-. $ATLAS_STATIC/bin/arch/@probe_type@/@probe_type@-reginit.sh
+. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
 
 . $BIN_DIR/common.sh
 

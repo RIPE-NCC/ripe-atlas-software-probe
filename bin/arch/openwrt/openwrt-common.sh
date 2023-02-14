@@ -139,27 +139,6 @@ handle_storage_current_time()
 		cp $STATUS_DIR/currenttime.txt /storage/currenttime.txt
 	fi
 }
-get_arch()
-{
-	if [ -f /lib/ar71xx.sh ]
-	then
-		. /lib/ar71xx.sh
-		ar71xx_board_name
-	elif [ -f /lib/ramips.sh ]
-	then
-		sh /lib/ramips.sh
-		sed < /tmp/sysinfo/board_name 's/tplink,//'
-	elif [ -f  /etc/board.json ] && grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json
-	then
-		echo 'nanopi-neo-plus2'
-	elif [ -f  /etc/board.json ] && grep -q '"cznic,turris-mox"' /etc/board.json
-	then
-		echo 'atlas-mox'
-	else
-		echo 'unknown board'
-		exit 1
-	fi
-}
 
 kill_dhcpc()
 {

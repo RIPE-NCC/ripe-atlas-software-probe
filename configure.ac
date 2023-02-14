@@ -6,14 +6,21 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([foreign])
 
+# use the following arguments for '--with-probe-type' flag
+# v3: openwrt-atlas-probev3
+# v4: openwrt-atlas-probev4
+# v5: openwrt-atlas-probev5
+# centos: centos-rpm-<PACKAGE_NAME>-<PACKAGE_VERSION>-<PACKAGE_RELEASE>  (ie. centos-rpm-ripe-atlas-probe-5090-1.el7)
+# debian: debian-<PACKAGE_NAME>-<VERSION>  (ie. debian-ripe-atlas-probe-5090)
 AC_ARG_WITH([probe-type], [AS_HELP_STRING([--with-probe-type], [define which probe flavour should be built (v3,v4,v5)])], [], [with_probe_type=no])
 
-AS_IF([test "x${with_probe_type}" == xv3], [probe_type=openwrt-atlas-probev3],
-      [test "x${with_probe_type}" == xv4], [probe_type=openwrt-atlas-probev4],
-      [test "x${with_probe_type}" == xv5], [probe_type=openwrt-atlas-probev5],
-      [probe_type=generic])
-
+probe_type=$with_probe_type
 AC_SUBST(probe_type)
+
+AS_CASE([$probe_type],
+	[*openwrt*], [probe_scripts_path=$probe_type],
+	[probe_scripts_path=generic])
+AC_SUBST(probe_scripts_path)
 
 # system paths
 storage_sysconfdir=/storage/etc
@@ -44,6 +51,7 @@ bin/common-pre.sh
 bin/common.sh
 bin/reginit.sh
 bin/resolvconf
+bin/config.sh
 bin/arch/generic/generic-ATLAS.sh
 bin/arch/generic/generic-common.sh
 bin/arch/generic/generic-reginit.sh
