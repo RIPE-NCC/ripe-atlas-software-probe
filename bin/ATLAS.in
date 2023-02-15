@@ -41,7 +41,7 @@ mkdir -p $DATA_DIR/out/ooq10	# For wifi, can't hurt to just create this
 
 $CHOWN_DATA_DIRS
 
-if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR@localstatedir@/data/new $DATA_DIR@localstatedir@/data/out >> $DATA_NEW_DIR/simpleping
+if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR/new $DATA_DIR/out >> $DATA_NEW_DIR/simpleping
 then
 	D=`epoch`
 	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB"
@@ -132,7 +132,7 @@ start_perd()
 }
 start_eperd()
 {
-	eperd -c $CRON_DIR/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O @localstatedir@/data/new/7 -i 7
+	eperd -c $CRON_DIR/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O $DATA_DIR/new/7 -i 7
 }
 start_eooqd()
 {
