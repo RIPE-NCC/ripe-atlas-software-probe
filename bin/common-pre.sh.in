@@ -2,14 +2,14 @@
 # These variables are set before the platform dependend scripts are run.
 
 # Defaults, override if necessary
-: ${BASE_DIR:=@localstatedir@}	# BASE_DIR if not already set
+: ${BASE_DIR:=${ATLAS_SPOOLDIR}}	# BASE_DIR if not already set
 SSH_DIR=$BASE_DIR/.ssh
-BIN_DIR=$BASE_DIR/bin
-STATUS_DIR=$BASE_DIR/status
-STATE_DIR=$BASE_DIR/state
-RUN_DIR=@atlas_rundir@
+BIN_DIR=${ATLAS_MEASUREMENT}
+STATE_DIR=${ATLAS_DATADIR}
+RUN_DIR=${ATLAS_RUNDIR}
+STATUS_DIR=${ATLAS_STATUS}
 CON_KEEP_PID=con_keep_pid.vol
-RESOLV_CONF_STATIC='@sysconfdir@/resolv.conf.static'
+RESOLV_CONF_STATIC=${ATLAS_SYSCONFDIR}/resolv.conf.static
 REG_INIT_REPLY=$STATUS_DIR/reg_init_reply.txt
-CONFIG_TXT="$BASE_DIR/state/config.txt"
-CRON_DIR="@atlas_spooldir@/crons"
+CONFIG_TXT="${ATLAS_SYSCONFDIR}/config.txt"
+CRON_DIR="${ATLAS_CRONS}"

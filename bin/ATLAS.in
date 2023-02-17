@@ -4,20 +4,22 @@
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
 
+. @atlas_libexecdir@/paths.lib.sh
+
 #exec >@tmpdir@/ATLAS.out 2>@tmpdir@/ATLAS.err
 #set -x
 
 . @localstatedir@/bin/config.sh
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
+. $ATLAS_SCRIPTS/$DEVICE_NAME-ATLAS.sh
 
-. $BIN_DIR/common.sh
+. $ATLAS_SCRIPTS/common.sh
 
-source $ATLAS_STATIC/bin/support.lib.sh
-source $ATLAS_STATIC/bin/class.lib.sh
-source $ATLAS_STATIC/bin/array.lib.sh
-source $ATLAS_STATIC/bin/json.lib.sh
-source $ATLAS_STATIC/bin/atlas_log.lib.sh
+. $ATLAS_SCRIPTS/support.lib.sh
+. $ATLAS_SCRIPTS/class.lib.sh
+. $ATLAS_SCRIPTS/array.lib.sh
+. $ATLAS_SCRIPTS/json.lib.sh
+. $ATLAS_SCRIPTS/atlas_log.lib.sh
 
 # config variables
 if [ $(config_lookup RXTXRPT no) = yes ]

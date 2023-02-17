@@ -3,21 +3,23 @@
 # Handel registering with ATLAS regservers
 # 2010 Oct Antony Antony
 
-#exec >@tmpdir@/reginit.out 2>@tmpdir@/reginit.err
+. @atlas_libexecdir@/paths.lib.sh
+
+#exec >$ATLAS_TMP/reginit.out 2>$ATLAS_TMP/reginit.err
 #set -x
 
 STATE_FILE=$1
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
+. $ATLAS_SCRIPTS/$DEVICE_NAME-reginit.sh
 
-. $BIN_DIR/common.sh
+. $ATLAS_SCRIPTS/common.sh
 
 ## Probe
 
 # Common
-[ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$BASE_DIR/etc/probe_key
+[ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$ATLAS_SYSCONFDIR/probe_key
 # Set REG_SERVERS if it isn't set already
-[ -z "$REG_SERVERS" ] && REG_SERVERS=$BIN_DIR/reg_servers.sh
+[ -z "$REG_SERVERS" ] && REG_SERVERS=$ATLAS_SCRIPTS/reg_servers.sh
 CON_INIT_CONF=$STATUS_DIR/con_init_conf.txt
 CON_INIT_REPLY=con_init_reply.txt
 CON_KEEP_CONF=$STATUS_DIR/con_keep_conf.txt

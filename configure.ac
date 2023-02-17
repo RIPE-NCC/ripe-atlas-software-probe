@@ -24,11 +24,13 @@ AS_CASE([$probe_type],
 AC_SUBST(probe_scripts_path)
 
 # system paths
-atlas_libexecdir=${libexecdir}/ripe-atlas
-atlas_datadir=${datadir}/ripe-atlas
-atlas_sysconfdir=${sysconfdir}/ripe-atlas
-atlas_spooldir=${localstatedir}/spool/ripe-atlas
-atlas_rundir=${localstatedir}/run/ripe-atlas
+atlas_libexecdir="${libexecdir}/ripe-atlas"
+atlas_datadir="${datadir}/ripe-atlas"
+atlas_measurementdir="${atlas_libexecdir}/measurement"
+atlas_rundir="${localstatedir}/run/ripe-atlas"
+atlas_scriptsdir="${atlas_libexecdir}/scripts"
+atlas_spooldir="${localstatedir}/spool/ripe-atlas"
+atlas_sysconfdir="${sysconfdir}/ripe-atlas"
 
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
@@ -50,9 +52,11 @@ AC_SUBST(ripe_atlas_group)
 
 AC_SUBST(atlas_libexecdir)
 AC_SUBST(atlas_datadir)
+AC_SUBST(atlas_measurementdir)
+AC_SUBST(atlas_rundir)
+AC_SUBST(atlas_scriptsdir)
 AC_SUBST(atlas_sysconfdir)
 AC_SUBST(atlas_spooldir)
-AC_SUBST(atlas_rundir)
 
 AC_PROG_LIBTOOL
 AC_PROG_CC
@@ -60,9 +64,6 @@ AC_PROG_CC
 AC_CONFIG_FILES([
 Makefile
 bin/ATLAS
-bin/common-pre.sh
-bin/common.sh
-bin/reginit.sh
 bin/resolvconf
 bin/config.sh
 bin/arch/generic/generic-ATLAS.sh
