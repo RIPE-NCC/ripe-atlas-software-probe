@@ -76,7 +76,7 @@ install-generic-filesystem:
 install-local-filesystem:
 	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
 	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
-	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir) $(DESTDIR)$(atlas_datadir)/state
+	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids $(DESTDIR)$(atlas_datadir)/state
 
 install-symlinks:
 	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(atlas_datadir)/state/FIRMWARE_APPS_VERSION
