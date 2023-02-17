@@ -1,4 +1,5 @@
 #!/bin/sh
+. @atlas_scripts@/paths.lib.sh
 
 # Create @sysconfdir@/resolv.conf from various sources.
 

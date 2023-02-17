@@ -1,10 +1,11 @@
 ACLOCAL_AMFLAGS         = -I m4
-AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_libexecdir)/measurement
+AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir)
 SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
 
-DST_FILES = bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/config.sh bin/arch/linux/linux-functions.sh \
-	bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
-	bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh bin/*.lib.sh
+DST_FILES = bin/arch/linux/linux-functions.sh \
+            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh \
+            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
+            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
 
 A_SCRIPTS_PATH := arch/$(probe_scripts_path)/
 A_LINUX_PATH := arch/linux/
@@ -36,8 +37,24 @@ SH_FINALISE = sed \
              -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
              -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
              -e 's|@tmpdir[@]|$(tmpdir)|g'
+     
+sbin_SCRIPTS = bin/reginit.sh
 
-A_BIN_FILES := bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/*.lib.sh
+atlas_scripts_SCRIPTS = bin/array.lib.sh \
+                        bin/atlas_log.lib.sh \
+                        bin/class.lib.sh \
+                        bin/json.lib.sh \
+                        bin/paths.lib.sh \
+                        bin/support.lib.sh \
+                        bin/common.sh \
+                        bin/common-pre.sh
+
+CLEANFILES = bin/paths.lib.sh \
+             bin/common.sh \
+             bin/common-pre.sh \
+             bin/reginit.sh
+
+A_BIN_FILES := bin/ATLAS
 A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
 A_LINUX_FILES := bin/arch/linux/linux-functions.sh
 

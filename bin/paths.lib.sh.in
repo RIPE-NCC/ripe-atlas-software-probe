@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Path definitions for RIPE Atlas. Convenience constants.
+# Copyright (c) 2022 RIPE NCC
+#
+ATLAS_LIBEXECDIR=@atlas_libexecdir@
+ATLAS_DATADIR=@atlas_datadir@
+ATLAS_SYSCONFDIR=@atlas_sysconfdir@
+ATLAS_SPOOLDIR=@atlas_spooldir@
+ATLAS_RUNDIR=@atlas_rundir@
+ATLAS_MEASUREMENT=@atlas_measurementdir@
+ATLAS_SCRIPTS=@atlas_scriptsdir@
+
+ATLAS_CRONS="${ATLAS_SPOOLDIR}/crons"
+ATLAS_DATA="${ATLAS_SPOOLDIR}/data"
+ATLAS_PIDS="${ATLAS_RUNDIR}/pids"
+ATLAS_STATUS="${ATLAS_RUNDIR}/status"

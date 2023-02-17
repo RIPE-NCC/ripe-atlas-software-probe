@@ -8,6 +8,7 @@ bin/common.sh
 bin/reginit.sh
 bin/resolvconf
 bin/ripe-atlas.service
+bin/paths.lib.sh
 
 # http://www.gnu.org/software/automake
 
