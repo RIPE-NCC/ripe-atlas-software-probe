@@ -10,6 +10,7 @@ ATLAS_SPOOLDIR=@atlas_spooldir@
 ATLAS_RUNDIR=@atlas_rundir@
 ATLAS_MEASUREMENT=@atlas_measurementdir@
 ATLAS_SCRIPTS=@atlas_scriptsdir@
+ATLAS_TMP=@tmpdir@
 
 ATLAS_CRONS="${ATLAS_SPOOLDIR}/crons"
 ATLAS_DATA="${ATLAS_SPOOLDIR}/data"
