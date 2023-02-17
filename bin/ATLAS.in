@@ -249,7 +249,7 @@ do
 		fi
 		$KILL_SSH_CMD
 		echo "start reg"
-		$BIN_DIR/reginit.sh $STATUS_DIR/reginit.vol
+		$ATLAS_SCRIPTS/reginit.sh $STATUS_DIR/reginit.vol
 	fi
 
 	$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
