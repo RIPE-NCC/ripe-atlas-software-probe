@@ -6,7 +6,7 @@
 
 . @atlas_libexecdir@/paths.lib.sh
 
-#exec >@tmpdir@/ATLAS.out 2>@tmpdir@/ATLAS.err
+#exec >$ATLAS_TMP/ATLAS.out 2>@$ATLAS_TMP/ATLAS.err
 #set -x
 
 . @localstatedir@/bin/config.sh
@@ -296,7 +296,7 @@ do
 
 	if [ -n "$RESOLVCONF_CMD" -a -f $DATA_NEW_DIR/resolv.conf.ra6 ]
 	then
-		mv $DATA_NEW_DIR/resolv.conf.ra6 @tmpdir@/resolv.conf.ra6
+		mv $DATA_NEW_DIR/resolv.conf.ra6 $ATLAS_TMP/resolv.conf.ra6
 		$RESOLVCONF_CMD
 	fi
 
