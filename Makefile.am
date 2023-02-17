@@ -38,8 +38,6 @@ SH_FINALISE = sed \
              -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
              -e 's|@tmpdir[@]|$(tmpdir)|g'
      
-sbin_SCRIPTS = bin/reginit.sh
-
 atlas_scripts_SCRIPTS = bin/array.lib.sh \
                         bin/atlas_log.lib.sh \
                         bin/class.lib.sh \
@@ -47,7 +45,8 @@ atlas_scripts_SCRIPTS = bin/array.lib.sh \
                         bin/paths.lib.sh \
                         bin/support.lib.sh \
                         bin/common.sh \
-                        bin/common-pre.sh
+                        bin/common-pre.sh \
+                        bin/reginit.sh
 
 CLEANFILES = bin/paths.lib.sh \
              bin/common.sh \
