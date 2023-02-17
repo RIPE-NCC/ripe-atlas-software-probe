@@ -5,6 +5,7 @@ AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([foreign])
+AM_SILENT_RULES([yes])
 
 # use the following arguments for '--with-probe-type' flag
 # v3: openwrt-atlas-probev3

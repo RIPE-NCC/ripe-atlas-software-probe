@@ -11,6 +11,31 @@ A_LINUX_PATH := arch/linux/
 A_ATLAS_CONFIG := atlas-config/
 A_STATE_PATH := state
 A_ETC_PATH := etc
+SH_FINALISE = sed \
+             -e 's|@atlas_datadir[@]|$(atlas_datadir)|g' \
+             -e 's|@atlas_execprefix[@]|$(atlas_execprefix)|g' \
+             -e 's|@atlas_libexecdir[@]|$(atlas_libexecdir)|g' \
+             -e 's|@atlas_measurementdir[@]|$(atlas_measurementdir)|g' \
+             -e 's|@atlas_scriptsdir[@]|$(atlas_scriptsdir)|g' \
+             -e 's|@atlas_rundir[@]|$(atlas_rundir)|g' \
+             -e 's|@atlas_spooldir[@]|$(atlas_spooldir)|g' \
+             -e 's|@atlas_sysconfdir[@]|$(atlas_sysconfdir)|g' \
+             -e 's|@bindir[@]|$(bindir)|g' \
+             -e 's|@datadir[@]|$(datadir)|g' \
+             -e 's|@datarootdir[@]|$(datarootdir)|g' \
+             -e 's|@docdir[@]|$(docdir)|g' \
+             -e 's|@exec_prefix[@]|$(exec_prefix)|g' \
+             -e 's|@includedir[@]|$(includedir)|g' \
+             -e 's|@libdir[@]|$(libdir)|g' \
+             -e 's|@libexecdir[@]|$(libexecdir)|g' \
+             -e 's|@localedir[@]|$(localedir)|g' \
+             -e 's|@localstatedir[@]|$(localstatedir)|g' \
+             -e 's|@mandir[@]|$(mandir)|g' \
+             -e 's|@prefix[@]|$(prefix)|g' \
+             -e 's|@sbindir[@]|$(sbindir)|g' \
+             -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
+             -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
+             -e 's|@tmpdir[@]|$(tmpdir)|g'
 
 A_BIN_FILES := bin/ATLAS bin/common-pre.sh bin/common.sh bin/reginit.sh bin/*.lib.sh
 A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
@@ -21,6 +46,10 @@ A_CONFIG_FILES_ETC := $(A_ATLAS_CONFIG)$(A_ETC_PATH)/known_hosts.reg $(A_ATLAS_C
 
 install-exec-local:	install-generic-filesystem install-local-filesystem install-ripe-atlas-bin install-ripe-atlas-generic install-ripe-atlas-linux \
 	install-ripe-atlas-config-state install-ripe-atlas-config-etc
+
+%.sh:	%.sh.in
+	@rm -f $@
+	$(AM_V_GEN)$(SH_FINALISE) $< > $@
 
 install-data-hook:	install-symlinks
 
