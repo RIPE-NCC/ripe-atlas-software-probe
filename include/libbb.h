@@ -464,8 +464,8 @@ char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 #define ATLAS_FUZZING_REL          "data"
 
 extern int atlas_unsafe(void);
-extern char *rebased_validated_filename(const char *path, const char *prefix);
-extern char *rebased_validated_dir(const char *path, const char *prefix);
+extern char *rebased_validated_filename(const char *base, const char *path, const char *prefix);
+extern char *rebased_validated_dir(const char *base, const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);

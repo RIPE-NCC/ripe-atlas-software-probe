@@ -1,7 +1,7 @@
 #include "libbb.h"
 
-static char *rebased_validated_common(const char *path, const char *prefix,
-	int require_slash)
+static char *rebased_validated_common(const char* base, const char *path,
+	const char *prefix, int require_slash)
 {
 	size_t path_len, prefix_len, atlas_home_len, new_base_len, new_len;
 	int do_replace, failed;
@@ -20,12 +20,12 @@ static char *rebased_validated_common(const char *path, const char *prefix,
 	 * 3) path does not contain '/../'
 	 * 4) path does not end in '/..'
 	 * return NULL if any of the properties does not hold
-	 * return a new string that replaces '/home/atlas' with atlas_base().
+	 * return a new string that replaces '/home/atlas' with base.
 	 */
 	path_len= strlen(path);
 	prefix_len= strlen(prefix);
 	atlas_home_len= strlen(ATLAS_HOME);
-	new_base= atlas_base();
+	new_base= base;
 	new_base_len= strlen(new_base);
 
 	do_replace= 0;
@@ -123,12 +123,12 @@ static char *rebased_validated_common(const char *path, const char *prefix,
 	return new_path;
 }
 
-char *rebased_validated_filename(const char *path, const char *prefix)
+char *rebased_validated_filename(const char *base, const char *path, const char *prefix)
 {
-	return rebased_validated_common(path, prefix, 1 /*require_slash*/);
+	return rebased_validated_common(base, path, prefix, 1 /*require_slash*/);
 }
 
-char *rebased_validated_dir(const char *path, const char *prefix)
+char *rebased_validated_dir(const char *base, const char *path, const char *prefix)
 {
-	return rebased_validated_common(path, prefix, 0 /*!require_slash*/);
+	return rebased_validated_common(base, path, prefix, 0 /*!require_slash*/);
 }
