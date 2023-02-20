@@ -36,10 +36,10 @@
 #define IPV6_ROUTE_FILE	"/proc/net/ipv6_route"
 #define SUFFIX		".new"
 
-#define IPV4_STATIC_REL	ATLAS_STATUS_REL "/network_v4_static_info.json"
-#define IPV6_STATIC_REL	ATLAS_STATUS_REL "/network_v6_static_info.json"
-#define DNS_STATIC_REL	ATLAS_STATUS_REL "/network_dns_static_info.json"
-#define NETWORK_INFO_REL ATLAS_STATUS_REL "/network_v4_info.txt"
+#define IPV4_STATIC_REL	"network_v4_static_info.json"
+#define IPV6_STATIC_REL	"network_v6_static_info.json"
+#define DNS_STATIC_REL	"network_dns_static_info.json"
+#define NETWORK_INFO_REL "network_v4_info.txt"
 
 #define SAFE_PREFIX_NEW_REL ATLAS_DATA_NEW_REL
 

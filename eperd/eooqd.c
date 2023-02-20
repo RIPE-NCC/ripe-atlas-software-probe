@@ -31,14 +31,15 @@
 #include <event2/dns.h>
 
 #include "eperd.h"
+#include "atlas_path.h"
 
 #define SUFFIX 		".curr"
-#define OOQD_NEW_PREFIX_REL	"data/new/ooq"
-#define OOQD_OUT_PREFIX_REL	"data/out/ooq"
-#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
-#define REPORT_HEADER_REL	"status/p_to_c_report_header"
-#define SESSION_ID_REL		"status/con_session_id.txt"
-#define OOQ_SENT_REL		"data/new/ooq_sent.vol"
+#define OOQD_NEW_PREFIX_REL	"new/ooq"
+#define OOQD_OUT_PREFIX_REL	"out/ooq"
+#define ATLAS_SESSION_FILE_REL	"con_session_id.txt"
+#define REPORT_HEADER_REL	"p_to_c_report_header"
+#define SESSION_ID_REL		"con_session_id.txt"
+#define OOQ_SENT_REL		"new/ooq_sent.vol"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */

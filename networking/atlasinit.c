@@ -73,10 +73,10 @@ const char atlas_force_reg[] = "./force_reg.sh";
 const char atlas_netconfig_v4[] = "./netconfig_v4.vol";
 const char atlas_netconfig_v6[] = "./netconfig_v6.vol";
 const char atlas_resolv_conf[] = "./resolv.conf.vol";
-#define NETWORK_V4_STATIC_INFO_JSON_REL	"status/network_v4_static_info.json"
-#define NETWORK_V6_STATIC_INFO_JSON_REL	"status/network_v6_static_info.json"
-#define NETWORK_DNS_STATIC_INFO_JSON_REL	"status/network_dns_static_info.json"
-#define FIRMWARE_APPS_VERSION_REL "state/FIRMWARE_APPS_VERSION"
+#define NETWORK_V4_STATIC_INFO_JSON_REL	"network_v4_static_info.json"
+#define NETWORK_V6_STATIC_INFO_JSON_REL	"network_v6_static_info.json"
+#define NETWORK_DNS_STATIC_INFO_JSON_REL	"network_dns_static_info.json"
+#define FIRMWARE_APPS_VERSION_REL "FIRMWARE_APPS_VERSION"
 
 const int max_lines = 16; /* maximum lines we'll process */
 const int min_rereg_time = 100; 
