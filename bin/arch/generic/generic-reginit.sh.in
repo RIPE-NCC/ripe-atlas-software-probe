@@ -4,7 +4,7 @@ then
 	export ATLAS_BASE
 fi
 
-. $ATLAS_STATIC/bin/common-pre.sh
+. $ATLAS_STATIC/common-pre.sh
 
 # Directories
 
@@ -20,15 +20,15 @@ SSH_OPT=''
 
 NETCONFIG_V4_DEST=$HOME/etc/netconfig_v4.sh
 NETCONFIG_V6_DEST=$HOME/etc/netconfig_v6.sh
-P_TO_R_INIT_IN=$STATUS_DIR/p_to_r_init.in.vol
+P_TO_R_INIT_IN=$ATLAS_STATUS/p_to_r_init.in.vol
 
 if [ -z "$STATE_FILE" ] ; then
-	STATE_FILE=$STATUS_DIR/reginit.vol
+	STATE_FILE=$ATLAS_STATUS/reginit.vol
 	echo "Warning: STATE_FILE unset. Setting to -> $STATE_FILE"
 fi
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
-. $ATLAS_STATIC/bin/arch/linux/linux-functions.sh
+. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
+. $ATLAS_SCRIPTS/arch/linux/linux-functions.sh
 
 get_arch()
 {
@@ -48,7 +48,7 @@ p_to_r_init()
 {
 	{
 		echo P_TO_R_INIT
-		echo TOKEN_SPECS `get_arch` 1000 `cat $STATE_DIR/FIRMWARE_APPS_VERSION` `get_sub_arch`
+		echo TOKEN_SPECS `get_arch` 1000 `cat $ATLAS_DATADIR/FIRMWARE_APPS_VERSION` `get_sub_arch`
 		echo REASON_FOR_REGISTRATION $1
 	} | tee $P_TO_R_INIT_IN
 }

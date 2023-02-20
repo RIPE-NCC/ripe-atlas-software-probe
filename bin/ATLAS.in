@@ -4,14 +4,14 @@
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
 
-. @atlas_libexecdir@/paths.lib.sh
+. $ATLAS_SCRIPTS/paths.lib.sh
 
 #exec >$ATLAS_TMP/ATLAS.out 2>@$ATLAS_TMP/ATLAS.err
 #set -x
 
 . @localstatedir@/bin/config.sh
 
-. $ATLAS_SCRIPTS/$DEVICE_NAME-ATLAS.sh
+. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
 
 . $ATLAS_SCRIPTS/common.sh
 
@@ -36,14 +36,14 @@ export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
 
 $MOUNT_FS_CMD
 
-mkdir -p $STATUS_DIR $STATE_DIR $RUN_DIR
-mkdir -p $DATA_DIR $DATA_NEW_DIR $DATA_OUT_DIR
-mkdir -p $DATA_DIR/out/ooq
-mkdir -p $DATA_DIR/out/ooq10	# For wifi, can't hurt to just create this
+mkdir -p $ATLAS_STATUS $STATE_DIR $RUN_DIR
+mkdir -p $ATLAS_DATADIR $DATA_NEW_DIR $DATA_OUT_DIR
+mkdir -p $ATLAS_DATADIR/out/ooq
+mkdir -p $ATLAS_DATADIR/out/ooq10	# For wifi, can't hurt to just create this
 
 $CHOWN_DATA_DIRS
 
-if dfrm -A 9018 $DATA_DIR 600 $DATA_NEW_DIR $DATA_OUT_DIR $DATA_DIR/new $DATA_DIR/out >> $DATA_NEW_DIR/simpleping
+if dfrm -A 9018 $ATLAS_DATA 600 $DATA_NEW_DIR $DATA_OUT_DIR $ATLAS_DATA/new $ATLAS_DATA/out >> $DATA_NEW_DIR/simpleping
 then
 	D=`epoch`
 	echo "RESULT 9007 done $D $ETHER_SCANNED data full available space < $LOW_DISK_LIMIT KB"
@@ -52,7 +52,7 @@ fi
 
 $BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
 
-mkdir -p $CRON_DIR/main $CRON_DIR/2
+mkdir -p $ATLAS_CRONS/main $ATLAS_CRONS/2
 rm -f $DATA_NEW_DIR/v6addr.vol
 rm -f $DATA_OUT_DIR/v6addr.txt
 rm -f $SSH_ERR
@@ -74,13 +74,13 @@ fi
 
 $TRY_UPGRADE_CMD
 
-echo "P_TO_C_REPORT" > $STATUS_DIR/p_to_c_report_header
+echo "P_TO_C_REPORT" > $ATLAS_STATUS/p_to_c_report_header
 
 mkdir -p $SSH_DIR
 cp $KNOWN_HOSTS_REG $SSH_DIR/known_hosts
-if [ -f $STATUS_DIR/known_hosts_controllers ]
+if [ -f $ATLAS_STATUS/known_hosts_controllers ]
 then
-	cat $STATUS_DIR/known_hosts_controllers >> $SSH_DIR/known_hosts
+	cat $ATLAS_STATUS/known_hosts_controllers >> $SSH_DIR/known_hosts
 fi
 
 $SETUP_NETWORK_CMD
@@ -91,7 +91,7 @@ $KILL_TELNETD_CMD
 $KILL_PERDS_CMD
 
 # the system part is done. now set env for ATLAS.
-rm -f $STATUS_DIR/*.vol
+rm -f $ATLAS_STATUS/*.vol
 rm -f $RUN_DIR/*.vol
 
 # Crontabs may be bad enough that we can't actually do anything. Delete them
@@ -134,11 +134,11 @@ start_perd()
 }
 start_eperd()
 {
-	eperd -c $CRON_DIR/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O $DATA_DIR/new/7 -i 7
+	eperd -c $CRON_DIR/7 -A 9807 -P $RUN_DIR/perd-7.pid.vol -O $ATLAS_DATA/new/7 -i 7
 }
 start_eooqd()
 {
-	eooqd $CRON_DIR/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
+	eooqd $ATLAS_DATA/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 }
 
 start_perd
@@ -165,7 +165,7 @@ do
 	$CHECK_RO_USB
 
 	if [ $DHCP = "Temp" ] ; then
-		#static config failed started DHCP tempeorly
+		#static config failed started DHCP temporarily
 		evping_no_check -4 -c 2 $IPV4_GW
 		ARP=`arp -n $IPV4_GW`
 		set $ARP
@@ -198,17 +198,17 @@ do
 	fi
 
 	# Check if ssh is still running (when we expect it to be running)
-	if [ -f  $STATUS_DIR/reginit.vol ]; then
+	if [ -f  $ATLAS_STATUS/reginit.vol ]; then
 		$FINDPID_SSH_CMD
 		FOUNDPID=$?
 		if [ $FOUNDPID -eq 1 ] ; then
 			echo "no ssh client matching $KEEP_PID. cleanup state files. for next restart"
 			rm -f $NETCONFIG_V4_VOL
 			rm -f $NETCONFIG_V6_VOL
-			rm -f $STATUS_DIR/reginit.vol
-			rm -f $STATUS_DIR/con_hello_sent.vol
-			rm -f $STATUS_DIR/network_info.vol
-			rm -f $STATUS_DIR/network_info_sent.vol
+			rm -f $ATLAS_STATUS/reginit.vol
+			rm -f $ATLAS_STATUS/con_hello_sent.vol
+			rm -f $ATLAS_STATUS/network_info.vol
+			rm -f $ATLAS_STATUS/network_info_sent.vol
 			D=`epoch`
 			echo "RESULT 9010 done $D $ETHER_SCANNED no ssh client running restart registration"  >> $DATA_NEW_DIR/simpleping
 			echo "RESULT 9011 done $D $ETHER_SCANNED stderr" `cat $SSH_ERR`  >> $DATA_NEW_DIR/simpleping
@@ -219,13 +219,13 @@ do
 		fi
 	fi
 
-	if [ -s $STATUS_DIR/con_keep_reply.vol ] ; then
+	if [ -s $ATLAS_STATUS/con_keep_reply.vol ] ; then
 		echo "Controller kicked us out. KEEP result is nonzero"
 		echo "kill the session and forced reregister"
 		$KILL_SSH_CMD
 		echo "REASON=CON_KEEP_BROKEN" > $FORCE_REG
-		rm -f $STATUS_DIR/con_keep_reply.txt
-		rm -f $STATUS_DIR/reginit.vol
+		rm -f $ATLAS_STATUS/con_keep_reply.txt
+		rm -f $ATLAS_STATUS/reginit.vol
 		D=`epoch`
 		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP" >> $DATA_NEW_DIR/simpleping
 		echo "RESULT 9003 done $D $ETHER_SCANNED REREGISTER Controller kicked us out from KEEP"
@@ -233,10 +233,10 @@ do
 
 	$TRIGGER_MANUAL_UPGRADE_CMD
 
-	if [ ! -f  $STATUS_DIR/reginit.vol ] ; then
+	if [ ! -f  $ATLAS_STATUS/reginit.vol ] ; then
 		D=`epoch`
 		echo "RESULT 9006 done $D $ETHER_SCANNED no reginit.vol start registration"
-		echo "$STATUS_DIR/reginit.vol does not exist try new reg"
+		echo "$ATLAS_STATUS/reginit.vol does not exist try new reg"
 		UPTIME=`onlyuptime`
 		$SET_LEDS_CMD net-try
 		if evping -A "9017" -e -O $DATA_NEW_DIR/simpleping "U$UPTIME.$SOS_ID.sos.atlas.ripe.net"
@@ -249,7 +249,7 @@ do
 		fi
 		$KILL_SSH_CMD
 		echo "start reg"
-		$ATLAS_SCRIPTS/reginit.sh $STATUS_DIR/reginit.vol
+		$ATLAS_SCRIPTS/reginit.sh $ATLAS_STATUS/reginit.vol
 	fi
 
 	$BUDDYINFO $LOW_MEM_T $DATA_NEW_DIR/simpleping
@@ -284,7 +284,7 @@ do
 			condmv -f $DATA_NEW_DIR/reboot-count.txt $DATA_NEW_DIR/reboot-count.old
 		fi
 	else
-		dfrm -A 9018 $DATA_DIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR 2>&1 >> $DATA_NEW_DIR/simpleping
+		dfrm -A 9018 $ATLAS_DATADIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR 2>&1 >> $DATA_NEW_DIR/simpleping
 		if [ $? -eq 0 ]
 		then
 			D=`epoch`

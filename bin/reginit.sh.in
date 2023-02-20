@@ -3,14 +3,14 @@
 # Handel registering with ATLAS regservers
 # 2010 Oct Antony Antony
 
-. @atlas_libexecdir@/paths.lib.sh
+. $ATLAS_SCRIPTS/paths.lib.sh
 
 #exec >$ATLAS_TMP/reginit.out 2>$ATLAS_TMP/reginit.err
 #set -x
 
 STATE_FILE=$1
 
-. $ATLAS_SCRIPTS/$DEVICE_NAME-reginit.sh
+. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
 
 . $ATLAS_SCRIPTS/common.sh
 
@@ -20,9 +20,9 @@ STATE_FILE=$1
 [ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$ATLAS_SYSCONFDIR/probe_key
 # Set REG_SERVERS if it isn't set already
 [ -z "$REG_SERVERS" ] && REG_SERVERS=$ATLAS_SCRIPTS/reg_servers.sh
-CON_INIT_CONF=$STATUS_DIR/con_init_conf.txt
+CON_INIT_CONF=$ATLAS_STATUS/con_init_conf.txt
 CON_INIT_REPLY=con_init_reply.txt
-CON_KEEP_CONF=$STATUS_DIR/con_keep_conf.txt
+CON_KEEP_CONF=$ATLAS_STATUS/con_keep_conf.txt
 CON_KEEP_REPLY=con_keep_reply.vol
 RESOLV_CONF_VOL=resolv.conf.vol
 SSH_OUT=ssh_out.txt
@@ -44,7 +44,7 @@ else
 fi
 
 ## Connect to reg server
-cd $STATUS_DIR
+cd $ATLAS_STATUS
 
 . $REG_SERVERS
 
@@ -306,13 +306,13 @@ fi
 $CHECK_FOR_NEW_KERNEL_CMD
 
 ## download image
-if [ -f $STATUS_DIR/upgrade_firmware ]
+if [ -f $ATLAS_STATUS/upgrade_firmware ]
 then
 	echo Moving failed log
-	mv $STATUS_DIR/upgrade_firmware $DATA_NEW_DIR/upgrade_firmware
+	mv $ATLAS_STATUS/upgrade_firmware $DATA_NEW_DIR/upgrade_firmware
 	condmv $DATA_NEW_DIR/upgrade_firmware $DATA_OUT_DIR/upgrade_firmware
 elif [ -n "$FIRMWARE_APPS" ] ; then
-	FIRMWARE_APPS_VERSION_MY=`cat $STATE_DIR/FIRMWARE_APPS_VERSION`
+	FIRMWARE_APPS_VERSION_MY=`cat $ATLAS_DATA/FIRMWARE_APPS_VERSION`
 	if [ $FIRMWARE_APPS_VERSION -gt  $FIRMWARE_APPS_VERSION_MY ] ; then
 		echo "there is a newer FIRMWARE_APPS_VERSION  $FIRMWARE_APPS_VERSION, current one is $FIRMWARE_APPS_VERSION_MY"
 		echo "fetching it from -p $CONTROLLER_1_PORT atlas@$CONTROLLER_1_HOST FIRMWARE_APPS $FIRMWARE_APPS"
@@ -321,7 +321,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 		echo "RESULT 9013 done $D $ETHER_SCANNED newer firmware $FIRMWARE_APPS_VERSION, currently running $FIRMWARE_APPS_VERSION_MY"  >> $DATA_NEW_DIR/simpleping
 
 		# Make space
-		rm -f $DATA_DIR/*
+		rm -f $ATLAS_DATA/*
 		rm -f $DATA_NEW_DIR/*
 		rm -f $DATA_OUT_DIR/*
 		rm -f *.bz2
@@ -381,7 +381,7 @@ elif [ -n "$FIRMWARE_APPS" ] ; then
 
 		if [ $checksum_okay = true -a $signature_okay = true ]
 		then
-			cp $CON_INIT_CONF $STATUS_DIR/FIRMWARE_APPS
+			cp $CON_INIT_CONF $ATLAS_STATUS/FIRMWARE_APPS
 			mv $FIRMWARE_FETCH_DIR/$FIRMWARE_APPS  $FIRMWARE_TARGET_DIR
 			if [ -n "$DESKTOP" ] ; then
 				echo "ready to reboot, but no this is not a probe";
@@ -492,7 +492,7 @@ if [ "$con_reinit" = "1" ] ; then
 		;;
 		esac
 	done < $CON_KEEP_CONF
-	rm -f $STATUS_DIR/con_hello_sent.vol
+	rm -f $ATLAS_STATUS/con_hello_sent.vol
 fi
 
 if [ -n "$CON_WAIT_TIMER" ] ; then
