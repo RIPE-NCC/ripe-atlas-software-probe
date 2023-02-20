@@ -4,8 +4,10 @@
  */
 
 #include "libbb.h"
+#include <stdio.h>
+#include "atlas_path.h"
 
-#define ATLAS_FW_VERSION_REL	"state/FIRMWARE_APPS_VERSION"
+#define ATLAS_FW_VERSION_REL	"FIRMWARE_APPS_VERSION"
 
 #define DBQ(str) "\"" #str "\""
 
@@ -20,7 +22,7 @@ static int get_atlas_fw_version(void)
 	if (fw_version != -1)
 		return fw_version;
 
-	fn= atlas_path(ATLAS_FW_VERSION_REL);
+	asprintf(&fn, "%s/%s", ATLAS_DATADIR, ATLAS_FW_VERSION_REL);
 	file= fopen(fn, "r");
 	if (file == NULL)
 	{

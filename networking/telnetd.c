@@ -1193,7 +1193,7 @@ do_cmd:
 					add_2sock(ts, BAD_REMOUNT);
 					goto skip3a;
 				}
-				fn= atlas_path(FW_APP_VERS_FILE_REL);
+				asprintf(&fn, "%s/%s", ATLAS_DATADIR, FW_APP_VERS_FILE_REL);
 				file= fopen(fn, "w");
 				free(fn); fn= NULL;
 				if (!file)
@@ -1327,7 +1327,7 @@ static int equal_sessionid(char *passwd)
 	FILE *file;
 	char line[80];
 
-	fn= atlas_path(ATLAS_SESSION_FILE_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, ATLAS_SESSION_FILE_REL);
 	file= fopen(fn, "r");
 	if (file == NULL)
 	{

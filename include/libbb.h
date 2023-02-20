@@ -473,8 +473,6 @@ extern int gettime_mono(struct timespec *tsp);
 extern char *atlas_get_version_json_str(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
-extern const char *atlas_base(void);
-extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
 extern int atlas_tests(void);
 extern time_t atlas_time(void);

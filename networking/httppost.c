@@ -529,8 +529,8 @@ int httppost_main(int argc, char *argv[])
 		else if (rtt <= 1)
 		{
 			/* Time and network are fine. Record this fact */
-			fn_new= atlas_path(ATLAS_TIMESYNC_FILE_REL ".new");
-			fn= atlas_path(ATLAS_TIMESYNC_FILE_REL);
+			asprintf(&fn_new, "%s/%s.new", ATLAS_DATA, ATLAS_TIMESYNC_FILE_REL);
+			asprintf(&fn, "%s/%s", ATLAS_DATA, ATLAS_TIMESYNC_FILE_REL);
 			fh= fopen(fn_new, "wt");
 			if (fh)
 			{

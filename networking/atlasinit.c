@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <stdarg.h>
 #include "atlasinit.h"
+#include "atlas_path.h"
 
 //#ifndef NOTBUSYBOX
 /* compiled to busybox. tested on 1.13  */
@@ -140,7 +141,7 @@ static void print_token_ver (FILE * write_to, int flag_rereg)
 	fscanf (fp, "%s", line);
 	fscanf (fp, "%s", line);
 
-	path= atlas_path(FIRMWARE_APPS_VERSION_REL);
+	asprintf(&path, "%s/%s", ATLAS_DATADIR, FIRMWARE_APPS_VERSION_REL);
 	fpv = fopen(path, "r");
 	free(path); path= NULL;
 	if(fpv)
@@ -1394,8 +1395,7 @@ static int reg_init_main( int argc, char *argv[] )
 				fprintf (f, "IPV4_GW=%s; export IPV4_GW\n", ipv4_gw);
 #endif
 
-				path= atlas_path(
-					NETWORK_V4_STATIC_INFO_JSON_REL);
+				asprintf(&path, "%s/%s", ATLAS_STATUS, NETWORK_V4_STATIC_INFO_JSON_REL);
 				fprintf(f, "echo '"
 					DBQ(static-inet-addresses) " : [ { "
 					DBQ(inet-addr) ": " DBQ(%s) ", "
@@ -1536,8 +1536,7 @@ dhcpv4_end:
 				fprintf (f, "echo \"STATIC_IPV6_GW %s\" >>    %s \n",ipv6_gw );
 #endif
 
-				path= atlas_path(
-					NETWORK_V6_STATIC_INFO_JSON_REL);
+				asprintf(&path, "%s/%s", ATLAS_STATUS, NETWORK_V6_STATIC_INFO_JSON_REL);
 				fprintf(f, "echo '"
 					DBQ(static-inet6-addresses) ": [ { "
 					DBQ(inet6-addr) ": " DBQ(%s) ", "
@@ -1596,8 +1595,7 @@ dhcpv6_end:
                                 }
 #endif
 
-				path= atlas_path(
-					NETWORK_DNS_STATIC_INFO_JSON_REL);
+				asprintf(&path, "%s/%s", ATLAS_STATUS, NETWORK_DNS_STATIC_INFO_JSON_REL);
 				f2 = fopen(path, "wt");
 				if( f2==NULL ) {
                                         atlas_log(ERROR,
@@ -1663,7 +1661,7 @@ dhcpv6_end:
 		{
 			// delete the static configuration 
 			unlink(atlas_netconfig_v4);
-			path= atlas_path(NETWORK_V4_STATIC_INFO_JSON_REL);
+			asprintf( &path, "%s/%s", ATLAS_STATUS, NETWORK_V4_STATIC_INFO_JSON_REL);
 			unlink(path);
 			free(path); path= NULL;
 		}
@@ -1671,7 +1669,7 @@ dhcpv6_end:
 		{
 			// delete the static configuration 
 			unlink(atlas_netconfig_v6);
-			path= atlas_path(NETWORK_V6_STATIC_INFO_JSON_REL);
+			asprintf( &path, "%s/%s", ATLAS_STATUS, NETWORK_V6_STATIC_INFO_JSON_REL);
 			unlink(path);
 			free(path); path= NULL;
 		}
@@ -1679,7 +1677,7 @@ dhcpv6_end:
 		{
 			// unlink(atlas_network_dns_static_info);
 			unlink(atlas_resolv_conf);
-			path= atlas_path(NETWORK_DNS_STATIC_INFO_JSON_REL);
+			asprintf( &path, "%s/%s", ATLAS_STATUS, NETWORK_DNS_STATIC_INFO_JSON_REL);
 			unlink(path);
 			free(path); path= NULL;
 		}

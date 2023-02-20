@@ -318,7 +318,7 @@ static int setup_dhcpv4(FILE *of)
 	const char *value;
 	char line[128];
 
-	fn= atlas_path(NETWORK_INFO_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, NETWORK_INFO_REL);
 	in_file= fopen(fn, "r");
 	if (in_file == NULL)
 	{
@@ -620,17 +620,17 @@ static int setup_static_rpt(FILE *of)
 	int r;
 	char *fn;
 
-	fn= atlas_path(IPV4_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, IPV4_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	fn= atlas_path(IPV6_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, IPV6_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	fn= atlas_path(DNS_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, DNS_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)
