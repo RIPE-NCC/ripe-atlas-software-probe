@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir)
-SUBDIRS = probe-busybox/libevent-2.1.11-stable probe-busybox
+SUBDIRS = . probe-busybox/libevent-2.1.11-stable probe-busybox
 
 DST_FILES = bin/arch/linux/linux-functions.sh \
             bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh \
@@ -12,7 +12,7 @@ A_LINUX_PATH := arch/linux/
 A_ATLAS_CONFIG := atlas-config/
 A_STATE_PATH := state
 A_ETC_PATH := etc
-SH_FINALISE = sed \
+SUBST_PATHS = sed \
              -e 's|@atlas_datadir[@]|$(atlas_datadir)|g' \
              -e 's|@atlas_execprefix[@]|$(atlas_execprefix)|g' \
              -e 's|@atlas_libexecdir[@]|$(atlas_libexecdir)|g' \
@@ -51,7 +51,8 @@ atlas_scripts_SCRIPTS = bin/array.lib.sh \
 CLEANFILES = bin/paths.lib.sh \
              bin/common.sh \
              bin/common-pre.sh \
-             bin/reginit.sh
+             bin/reginit.sh \
+             probe-busybox/include/atlas_path.h
 
 A_BIN_FILES := bin/ATLAS
 A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
@@ -60,12 +61,18 @@ A_LINUX_FILES := bin/arch/linux/linux-functions.sh
 A_CONFIG_FILES_STATE := $(A_ATLAS_CONFIG)$(A_STATE_PATH)/FIRMWARE_APPS_VERSION
 A_CONFIG_FILES_ETC := $(A_ATLAS_CONFIG)$(A_ETC_PATH)/known_hosts.reg $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.dev $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.prod $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.test
 
+all-local:		probe-busybox/include/atlas_path.h
+
 install-exec-local:	install-generic-filesystem install-local-filesystem install-ripe-atlas-bin install-ripe-atlas-generic install-ripe-atlas-linux \
 	install-ripe-atlas-config-state install-ripe-atlas-config-etc
 
+%.h:	%.h.in
+	@rm -f $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+
 %.sh:	%.sh.in
 	@rm -f $@
-	$(AM_V_GEN)$(SH_FINALISE) $< > $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
 #install-data-hook:	install-symlinks
 
