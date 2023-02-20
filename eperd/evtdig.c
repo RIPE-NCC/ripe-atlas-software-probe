@@ -189,6 +189,7 @@
 #include "readresolv.h"
 #include "tcputil.h"
 #include "http2.h"
+#include "atlas_path.h"
 
 #include <event2/event.h>
 #include <event2/event_struct.h>
@@ -2318,8 +2319,8 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 
 	if (qry->out_filename)
 	{
-		validated_fn= rebased_validated_filename(qry->out_filename,
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_DATA,
+			qry->out_filename, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", qry->out_filename);
@@ -2331,8 +2332,8 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 	}
 	if (qry->response_in)
 	{
-		validated_fn= rebased_validated_filename(qry->response_in,
-			ATLAS_FUZZING_REL);
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
+			qry->response_in, ATLAS_FUZZING_REL);
 		if (!validated_fn)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -2345,8 +2346,8 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 	}
 	if (qry->response_out)
 	{
-		validated_fn= rebased_validated_filename(qry->response_out,
-			ATLAS_FUZZING_REL);
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
+			qry->response_out, ATLAS_FUZZING_REL);
 		if (!validated_fn)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",

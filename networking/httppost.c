@@ -29,6 +29,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "libbb.h"
+#include "atlas_path.h"
 
 //#define SAFE_PREFIX_DATA_OUT ATLAS_DATA_OUT
 #define SAFE_PREFIX_DATA_OUT_REL ATLAS_DATA_OUT_REL
@@ -233,12 +234,12 @@ int httppost_main(int argc, char *argv[])
 
 	if(post_header != NULL )
 	{	
-		rebased_fn= rebased_validated_filename(post_header,
-			SAFE_PREFIX_DATA_OUT_REL);
+		rebased_fn= rebased_validated_filename(ATLAS_DATA,
+			post_header, SAFE_PREFIX_DATA_OUT_REL);
 		if (rebased_fn == NULL)
 		{
-			rebased_fn= rebased_validated_filename(post_header,
-				SAFE_PREFIX_STATUS_REL);
+			rebased_fn= rebased_validated_filename(ATLAS_STATUS,
+				post_header, SAFE_PREFIX_STATUS_REL);
 		}
 		if (rebased_fn == NULL)
 		{
@@ -270,12 +271,12 @@ int httppost_main(int argc, char *argv[])
 
 	if (post_footer != NULL )
 	{	
-		rebased_fn= rebased_validated_filename(post_footer,
-			SAFE_PREFIX_DATA_OUT_REL);
+		rebased_fn= rebased_validated_filename(ATLAS_DATA,
+			post_footer, SAFE_PREFIX_DATA_OUT_REL);
 		if (rebased_fn == NULL)
 		{
-			rebased_fn= rebased_validated_filename(post_footer,
-				SAFE_PREFIX_STATUS_REL);
+			rebased_fn= rebased_validated_filename(ATLAS_STATUS,
+				post_footer, SAFE_PREFIX_STATUS_REL);
 		}
 		if (rebased_fn == NULL)
 		{
@@ -309,12 +310,12 @@ int httppost_main(int argc, char *argv[])
 	/* Try to open the file before trying to connect */
 	if (post_file != NULL)
 	{
-		rebased_fn= rebased_validated_filename(post_file,
-			SAFE_PREFIX_DATA_OUT_REL);
+		rebased_fn= rebased_validated_filename(ATLAS_DATA,
+			post_file, SAFE_PREFIX_DATA_OUT_REL);
 		if (rebased_fn == NULL)
 		{
-			rebased_fn= rebased_validated_filename(post_file,
-				SAFE_PREFIX_STATUS_REL);
+			rebased_fn= rebased_validated_filename(ATLAS_STATUS,
+				post_file, SAFE_PREFIX_STATUS_REL);
 		}
 		if (rebased_fn == NULL)
 		{
@@ -343,12 +344,12 @@ int httppost_main(int argc, char *argv[])
 
 	if (post_dir)
 	{
-		rebased_fn= rebased_validated_dir(post_dir,
-			SAFE_PREFIX_DATA_OUT_REL);
+		rebased_fn= rebased_validated_dir(ATLAS_DATA,
+			post_dir, SAFE_PREFIX_DATA_OUT_REL);
 		if (rebased_fn == NULL)
 		{
-			rebased_fn= rebased_validated_dir(post_dir,
-				SAFE_PREFIX_DATA_STORAGE_REL);
+			rebased_fn= rebased_validated_dir(ATLAS_DATA,
+				post_dir, SAFE_PREFIX_DATA_STORAGE_REL);
 		}
 		if (rebased_fn == NULL)
 		{
@@ -433,17 +434,17 @@ int httppost_main(int argc, char *argv[])
 		for (p= filelist; p[0] != 0; p += strlen(p)+1)
 		{
 			fprintf(stderr, "posting file '%s'\n", p);
-			rebased_fn= rebased_validated_filename(p,
-				SAFE_PREFIX_DATA_OUT_REL);
+			rebased_fn= rebased_validated_filename(ATLAS_DATA,
+				p, SAFE_PREFIX_DATA_OUT_REL);
 			if (rebased_fn == NULL)
 			{
-				rebased_fn= rebased_validated_filename(p,
-					SAFE_PREFIX_DATA_OOQ_OUT_REL);
+				rebased_fn= rebased_validated_filename(ATLAS_DATA,
+					p, SAFE_PREFIX_DATA_OOQ_OUT_REL);
 			}
 			if (rebased_fn == NULL)
 			{
-				rebased_fn= rebased_validated_filename(p,
-					SAFE_PREFIX_DATA_STORAGE_REL);
+				rebased_fn= rebased_validated_filename(ATLAS_DATA,
+					p, SAFE_PREFIX_DATA_STORAGE_REL);
 			}
 			if (rebased_fn == NULL)
 			{
@@ -550,8 +551,8 @@ int httppost_main(int argc, char *argv[])
 	fprintf(stderr, "httppost: writing output\n");
 	if (output_file)
 	{
-		rebased_fn= rebased_validated_filename(output_file,
-			SAFE_PREFIX_DATA_NEW_REL);
+		rebased_fn= rebased_validated_filename(ATLAS_DATA,
+			output_file, SAFE_PREFIX_DATA_NEW_REL);
 		if (!rebased_fn)
 		{
 			report("protected file (output) '%s'", output_file);
@@ -593,8 +594,8 @@ int httppost_main(int argc, char *argv[])
 		fprintf(stderr, "httppost: deleting files\n");
 		if (post_file)
 		{
-			rebased_fn= rebased_validated_filename(post_file,
-					SAFE_PREFIX_DATA_OUT_REL);
+			rebased_fn= rebased_validated_filename(ATLAS_DATA,
+					post_file, SAFE_PREFIX_DATA_OUT_REL);
 			if (!rebased_fn)
 			{
 				report("trying to delete protected file '%s'",

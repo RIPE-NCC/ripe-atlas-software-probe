@@ -27,6 +27,7 @@
 #include "../eperd/readresolv.h"
 
 #include "libbb.h"
+#include "atlas_path.h"
 
 #include <inet_common.h>
 
@@ -101,8 +102,8 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 
 	if (out_name)
 	{
-		rebased_out_name= rebased_validated_filename(out_name,
-			SAFE_PREFIX_NEW_REL);
+		rebased_out_name= rebased_validated_filename(ATLAS_DATA,
+			out_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_out_name)
 		{
 			crondlog(LVL8 "insecure file '%s' : allowed '%s'",
@@ -112,8 +113,8 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 	}
 	if (cache_name)
 	{
-		rebased_cache_name= rebased_validated_filename(cache_name,
-			SAFE_PREFIX_NEW_REL);
+		rebased_cache_name= rebased_validated_filename(ATLAS_DATA,
+			cache_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_cache_name)
 		{
 			crondlog(LVL8 "insecure file '%s' allowed %s",

@@ -39,6 +39,7 @@
 //usage:     "\n       -P      pidfile to use"
 
 #include "libbb.h"
+#include "atlas_path.h"
 #include <syslog.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -277,8 +278,8 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 
 	if (out_filename)
 	{
-		validated_fn= rebased_validated_filename(out_filename, 
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_DATA,
+			out_filename, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
 			crondlog(DIE9 "insecure file '%s'. allowed path '%s'", 

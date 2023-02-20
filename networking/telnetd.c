@@ -120,6 +120,7 @@
 #include "common_bufsiz.h"
 #include <syslog.h>
 #include <sys/mount.h>
+#include "atlas_path.h"
 
 #if DEBUG
 # define TELCMDS
@@ -1479,7 +1480,7 @@ static int start_crontab(struct tsession *ts, char *line)
 	}
 
 	cp= line+strlen(CMD_CRONTAB);
-	rebased_fn= rebased_validated_filename(cp, SAFE_PREFIX_REL);
+	rebased_fn= rebased_validated_filename(ATLAS_SPOOLDIR, cp, SAFE_PREFIX_REL);
 	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
@@ -1643,13 +1644,13 @@ static void do_oneoff(struct tsession *ts, char *line)
 	strlcpy(filename_new, filename, sizeof(filename_new));
 	strlcat(filename_new, ONEOFF_SUFFIX, sizeof(filename_new));
 
-	rebased_fn= rebased_validated_filename(filename, SAFE_PREFIX_REL);
+	rebased_fn= rebased_validated_filename(ATLAS_SPOOLDIR, filename, SAFE_PREFIX_REL);
 	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
 		return;
 	}
-	rebased_fn_new= rebased_validated_filename(filename_new,
+	rebased_fn_new= rebased_validated_filename(ATLAS_SPOOLDIR, filename_new,
 		SAFE_PREFIX_REL);
 	if (!rebased_fn_new)
 	{

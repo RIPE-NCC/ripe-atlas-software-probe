@@ -407,8 +407,8 @@ static int add_line(void)
 		p= &cmdline[len];
 		while (*p != '\0' && *p == ' ')
 			p++;
-		validated_fn= rebased_validated_filename(p,
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_DATA,
+			p, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'. allowed path '%s'", 

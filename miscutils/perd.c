@@ -47,6 +47,7 @@
 
 #include "libbb.h"
 #include <syslog.h>
+#include "atlas_path.h"
 
 #define ATLAS 1
 
@@ -1139,8 +1140,8 @@ static int atlas_run(char *cmdline)
 	{
 		/* Redirect I/O */
 		crondlog(LVL7 "sending output to '%s'", outfile);
-		validated_fn= rebased_validated_filename(outfile,
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_DATA,
+			outfile, SAFE_PREFIX_REL);
 		if (!validated_fn)
 		{
 			crondlog(

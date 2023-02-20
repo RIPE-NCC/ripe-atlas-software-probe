@@ -22,6 +22,7 @@
 //usage:     "\n       -f              Force. Move even if FILE2 does exist"
 
 #include "libbb.h"
+#include "atlas_path.h"
 
 #define SAFE_PREFIX_FROM1_REL ATLAS_DATA_NEW_REL
 #define SAFE_PREFIX_FROM2_REL ATLAS_DATA_OUT_REL
@@ -73,29 +74,29 @@ int condmv_main(int argc, char *argv[])
 	from= argv[optind];
 	to= argv[optind+1];
 
-	rebased_from= rebased_validated_filename(from,
-		SAFE_PREFIX_FROM1_REL);
+	rebased_from= rebased_validated_filename(ATLAS_DATA,
+		from, SAFE_PREFIX_FROM1_REL);
 	if (rebased_from == NULL)
 	{
-		rebased_from= rebased_validated_filename(from,
-			SAFE_PREFIX_FROM2_REL);
+		rebased_from= rebased_validated_filename(ATLAS_DATA, 
+			from, SAFE_PREFIX_FROM2_REL);
 	}
 	if (rebased_from == NULL)
 	{
 		fprintf(stderr, "insecure from file '%s'\n", from);
 		goto err;
 	}
-	rebased_to= rebased_validated_filename(to,
-		SAFE_PREFIX_TO1_REL);
+	rebased_to= rebased_validated_filename(ATLAS_DATA,
+		to, SAFE_PREFIX_TO1_REL);
 	if (rebased_to == NULL)
 	{
-		rebased_to= rebased_validated_filename(to,
-			SAFE_PREFIX_TO2_REL);
+		rebased_to= rebased_validated_filename(ATLAS_DATA,
+			to, SAFE_PREFIX_TO2_REL);
 	}
 	if (rebased_to == NULL)
 	{
-		rebased_to= rebased_validated_filename(to,
-			SAFE_PREFIX_FROM1_REL);
+		rebased_to= rebased_validated_filename(ATLAS_DATA,
+			to, SAFE_PREFIX_FROM1_REL);
 	}
 	if (rebased_to == NULL)
 	{
