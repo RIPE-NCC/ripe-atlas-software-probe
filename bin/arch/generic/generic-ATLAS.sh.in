@@ -4,7 +4,7 @@ then
 	export ATLAS_BASE
 fi
 
-. $ATLAS_STATIC/bin/common-pre.sh
+. $ATLAS_STATIC/common-pre.sh
 
 # Commands
 MANUAL_UPGRADE_CMD=:
@@ -23,32 +23,30 @@ SET_HOSTNAME=:
 # For OpenWRT we need telnetd to run as root.
 telnetd()
 {
-	$SU_CMD $BB_BIN_DIR/telnetd "$@"
+	$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
 }
 
 # Various files and directories
 : ${HOME:=@localstatedir@}; export HOME	# Set HOME if it isn't set
 RESOLV_CONF=@sysconfdir@/resolv.conf
-MODE_FILE=$BASE_DIR/state/mode
+MODE_FILE=$ATLAS_SYSCONFDIR/mode
 
 # Other conf
 DHCP=False
 
-. $ATLAS_STATIC/bin/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
+. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
 
 # Directories
-STATE_DIR=$RPM_BASE_DIR/state; export STATE_DIR
-BB_BASE_DIR=$RPM_BASE_DIR; export BB_BASE_DIR
-BB_BIN_DIR=$BB_BASE_DIR; export BB_BIN_DIR
+STATE_DIR=$ATLAS_DATADIR; export STATE_DIR
 
 # Files
-REG_SERVERS_SOURCE=$RPM_ETC_DIR/reg_servers.sh
+REG_SERVERS_SOURCE=$ATLAS_SCRIPTS/reg_servers.sh
 
-. $ATLAS_STATIC/bin/arch/linux/linux-functions.sh
+. $ATLAS_SCRIPTS/arch/linux/linux-functions.sh
 
 chmod_for_msm()
 {
-	chmod -R g+rwX $BASE_DIR/data
+	chmod -R g+rwX $ATLAS_DATA
 	chmod -R g+rw $RUN_DIR
 }
 
@@ -56,14 +54,13 @@ chmod_for_msm()
 get_ether_addr
 
 # Set SOS_ID to the hash of the public key
-export SOS_ID="H$(hash_ssh_pubkey $BASE_DIR/etc/probe_key.pub)"
+export SOS_ID="H$(hash_ssh_pubkey $ATLAS_SYSCONFDIR/probe_key.pub)"
 
 # Create ssh keys if they are not there yet.
-if [ ! -f "$BASE_DIR"/etc/probe_key ]; then
+if [ ! -f $ATLAS_SYSCONFDIR/probe_key ]; then
     name=$(hostname -s)
-    mkdir -p "$BASE_DIR"/etc
-    ssh-keygen -t rsa -P '' -C $name -f "$BASE_DIR"/etc/probe_key
-    chown -R @ripe_atlas_user@:@ripe_atlas_group@ "$BASE_DIR"/etc
+    ssh-keygen -t rsa -P '' -C $name -f $ATLAS_SYSCONFDIR/probe_key
+    chown -R @ripe_atlas_user@:@ripe_atlas_group@ $ATLAS_SYSCONFDIR
 fi
 
 while :
@@ -74,7 +71,7 @@ do
 		# Okay
 		if [ ! -f $REG_SERVERS ]
 		then
-			mkdir -p $BASE_DIR/bin
+			mkdir -p $ATLAS_SCRIPTS
 			cp $REG_SERVERS_SOURCE.$mode $REG_SERVERS
 		fi
 	;;

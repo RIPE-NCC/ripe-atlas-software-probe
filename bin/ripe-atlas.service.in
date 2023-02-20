@@ -7,7 +7,7 @@ User=@ripe_atlas_user@
 Group=@ripe_atlas_group@
 Environment=HOME=@localstatedir@
 WorkingDirectory=@localstatedir@
-ExecStart=@rpm_base_dir@/bin/ATLAS
+ExecStart=@bindir@/ATLAS
 ExecStop=/bin/sudo -u atlasmsm /bin/killall telnetd perd eperd eooqd
 Restart=always
 TimeoutStopSec=60
