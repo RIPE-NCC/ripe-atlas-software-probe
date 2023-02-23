@@ -2,16 +2,6 @@ ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir)
 SUBDIRS = . probe-busybox/libevent-2.1.11-stable probe-busybox
 
-DST_FILES = bin/arch/linux/linux-functions.sh \
-            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh \
-            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
-            bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
-
-A_SCRIPTS_PATH := arch/$(probe_scripts_path)/
-A_LINUX_PATH := arch/linux/
-A_ATLAS_CONFIG := atlas-config/
-A_STATE_PATH := state
-A_ETC_PATH := etc
 SUBST_PATHS = sed \
              -e 's|@atlas_datadir[@]|$(atlas_datadir)|g' \
              -e 's|@atlas_execprefix[@]|$(atlas_execprefix)|g' \
@@ -37,8 +27,19 @@ SUBST_PATHS = sed \
              -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
              -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
              -e 's|@tmpdir[@]|$(tmpdir)|g'
-     
-atlas_scripts_SCRIPTS = bin/array.lib.sh \
+
+sbin_SCRIPTS = \
+               bin/ripe-atlas
+
+atlas_scripts_SCRIPTS = \
+                        atlas-config/etc/reg_servers.sh.dev \
+                        atlas-config/etc/reg_servers.sh.prod \
+                        atlas-config/etc/reg_servers.sh.test \
+                        bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh \
+                        bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
+                        bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh \
+                        bin/arch/linux/linux-functions.sh \
+                        bin/array.lib.sh \
                         bin/atlas_log.lib.sh \
                         bin/class.lib.sh \
                         bin/json.lib.sh \
@@ -46,25 +47,27 @@ atlas_scripts_SCRIPTS = bin/array.lib.sh \
                         bin/support.lib.sh \
                         bin/common.sh \
                         bin/common-pre.sh \
-                        bin/reginit.sh
+                        bin/config.sh \
+                        bin/reginit.sh \
+                        bin/resolvconf
 
-CLEANFILES = bin/paths.lib.sh \
+atlas_data_DATA = \
+                  atlas-config/etc/known_hosts.reg \
+                  atlas-config/state/FIRMWARE_APPS_VERSION
+
+CLEANFILES = \
+             bin/paths.lib.sh \
              bin/common.sh \
              bin/common-pre.sh \
+             bin/config.sh \
              bin/reginit.sh \
+             bin/ripe-atlas \
+             bin/resolvconf \
              probe-busybox/include/atlas_path.h
 
-A_SBIN_FILES := bin/ripe-atlas
-A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
-A_LINUX_FILES := bin/arch/linux/linux-functions.sh
-
-A_CONFIG_FILES_STATE := $(A_ATLAS_CONFIG)$(A_STATE_PATH)/FIRMWARE_APPS_VERSION
-A_CONFIG_FILES_ETC := $(A_ATLAS_CONFIG)$(A_ETC_PATH)/known_hosts.reg $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.dev $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.prod $(A_ATLAS_CONFIG)$(A_ETC_PATH)/reg_servers.sh.test
-
-all-local:		probe-busybox/include/atlas_path.h
-
-install-exec-local:	install-generic-filesystem install-local-filesystem install-ripe-atlas-bin install-ripe-atlas-generic install-ripe-atlas-linux \
-	install-ripe-atlas-config-state install-ripe-atlas-config-etc
+%.service:	%.service.in
+	@rm -f $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
 %.h:	%.h.in
 	@rm -f $@
@@ -74,35 +77,17 @@ install-exec-local:	install-generic-filesystem install-local-filesystem install-
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
-ripe-atlas:	ripe-atlas.in
+bin/ripe-atlas:	bin/ripe-atlas.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
-install-generic-filesystem:
-	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state,sbin}
+bin/resolvconf:	bin/resolvconf.in
+	@rm -f $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
-install-local-filesystem:
+all-local:	probe-busybox/include/atlas_path.h bin/ripe-atlas.service
+
+install-exec-local:
 	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
 	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
-	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids $(DESTDIR)$(atlas_datadir)/state
-
-# this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
-install-ripe-atlas-bin: $(DESTDIR)$(sbindir)
-	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_SBIN_FILES)
-
-install-ripe-atlas-generic: $(DESTDIR)$(bindir)/$(A_SCRIPTS_PATH)
-	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_SCRIPTS_FILES)
-
-install-ripe-atlas-linux: $(DESTDIR)$(bindir)/$(A_LINUX_PATH)
-	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_LINUX_FILES)
-
-install-ripe-atlas-config-state: $(DESTDIR)$(atlas_datadir)/$(A_STATE_PATH)
-	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_CONFIG_FILES_STATE)
-
-install-ripe-atlas-config-etc: $(DESTDIR)$(prefix)/$(A_ETC_PATH)
-	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_CONFIG_FILES_ETC)
+	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids $(DESTDIR)$(atlas_sysconfdir)
