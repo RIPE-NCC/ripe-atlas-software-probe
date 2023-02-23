@@ -3,7 +3,7 @@
 # Handel registering with ATLAS regservers
 # 2010 Oct Antony Antony
 
-. $ATLAS_SCRIPTS/paths.lib.sh
+. @atlas_scriptsdir@/paths.lib.sh
 
 #exec >$ATLAS_TMP/reginit.out 2>$ATLAS_TMP/reginit.err
 #set -x
