@@ -76,11 +76,10 @@ $TRY_UPGRADE_CMD
 
 echo "P_TO_C_REPORT" > $ATLAS_STATUS/p_to_c_report_header
 
-mkdir -p $SSH_DIR
-cp $KNOWN_HOSTS_REG $SSH_DIR/known_hosts
+cp $KNOWN_HOSTS_REG $ATLAS_STATUS/known_hosts
 if [ -f $ATLAS_STATUS/known_hosts_controllers ]
 then
-	cat $ATLAS_STATUS/known_hosts_controllers >> $SSH_DIR/known_hosts
+	cat $ATLAS_STATUS/known_hosts_controllers >> $ATLAS_STATUS/known_hosts
 fi
 
 $SETUP_NETWORK_CMD

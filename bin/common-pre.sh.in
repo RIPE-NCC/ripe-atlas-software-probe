@@ -2,7 +2,6 @@
 # These variables are set before the platform dependend scripts are run.
 
 # Defaults, override if necessary
-SSH_DIR=${ATLAS_SPOOLDIR}/.ssh
 BIN_DIR=${ATLAS_MEASUREMENT}
 STATE_DIR=${ATLAS_DATADIR}
 RUN_DIR=${ATLAS_RUNDIR}

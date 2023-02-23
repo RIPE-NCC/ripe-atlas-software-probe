@@ -136,13 +136,13 @@ ssh()
 {
 	/usr/bin/ssh -i "$SSH_PVT_KEY" -o "ServerAliveInterval 60" \
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 ssh_exec()
 {
 	exec /usr/bin/ssh -i "$SSH_PVT_KEY" -o "ServerAliveInterval 60"\
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 get_ether_addr()
 {

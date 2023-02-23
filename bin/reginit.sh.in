@@ -207,8 +207,8 @@ if [ "$need_rereg" = 1 ]; then
 		exit
 	fi
 	echo "Got good controller info"
-	cp $KNOWN_HOSTS_REG $SSH_DIR/known_hosts
-	cat known_hosts_controllers >> $SSH_DIR/known_hosts
+	cp $KNOWN_HOSTS_REG $ATLAS_STATUS/known_hosts
+	cat known_hosts_controllers >> $ATLAS_STATUS/known_hosts
 	NEED_REBOOT=0
 	if [ -f $RESOLV_CONF_VOL ] ; then
 		# If we have a default IPv6 interface then add that to
