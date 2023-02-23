@@ -54,7 +54,7 @@ CLEANFILES = bin/paths.lib.sh \
              bin/reginit.sh \
              probe-busybox/include/atlas_path.h
 
-A_BIN_FILES := bin/ATLAS
+A_SBIN_FILES := bin/ripe-atlas
 A_SCRIPTS_FILES := bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh
 A_LINUX_FILES := bin/arch/linux/linux-functions.sh
 
@@ -74,6 +74,10 @@ install-exec-local:	install-generic-filesystem install-local-filesystem install-
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
+ripe-atlas:	ripe-atlas.in
+	@rm -f $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+
 install-generic-filesystem:
 	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state,sbin}
 
@@ -85,7 +89,7 @@ install-local-filesystem:
 # this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
 install-ripe-atlas-bin: $(DESTDIR)$(sbindir)
 	$(mkinstalldirs) $<
-	install -m 0755 -t $< $(A_BIN_FILES)
+	install -m 0755 -t $< $(A_SBIN_FILES)
 
 install-ripe-atlas-generic: $(DESTDIR)$(bindir)/$(A_SCRIPTS_PATH)
 	$(mkinstalldirs) $<
