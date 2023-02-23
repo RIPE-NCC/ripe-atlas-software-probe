@@ -1,6 +1,6 @@
 %define     git_repo         ripe-atlas-software-probe
 %define     build_dirname    %{git_repo}
-%define     local_state_dir  /home/ripe-atlas
+%define     base_path        ripe-atlas
 %define     src_prefix_dir   /usr/local/ripe-atlas
 %define     service_name     ripe-atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
@@ -8,7 +8,7 @@
 # define user to perform measurements
 %define     msm_user         ripe-atlas
 %define     msm_group        ripe-atlas
-%define     msm_homedir      %{local_state_dir}
+%define     msm_homedir      %{_localstatedir}
 
 # flag to ignore files installed in builddir but not packaged in the final RPM
 %define	    _unpackaged_files_terminate_build	0
@@ -61,7 +61,7 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{src_prefix_dir} --localstatedir=%{local_state_dir} --with-probe-type="centos-rpm-%{name}-%{version}-%{release}"
+./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir}
 make
 
 %install
@@ -73,20 +73,13 @@ make DESTDIR=%{buildroot} install
 %files
 %ghost %{src_prefix_dir}/bin/event_rpcgen.py
 %ghost %{src_prefix_dir}/lib/pkgconfig
-%{src_prefix_dir}/bb-13.3
-%{src_prefix_dir}/bin/arch
-%{src_prefix_dir}/bin/ATLAS
-%{src_prefix_dir}/bin/reginit.sh
-%{src_prefix_dir}/bin/common-pre.sh
-%{src_prefix_dir}/bin/common.sh
-%{src_prefix_dir}/bin/*.lib.sh
-%caps(cap_net_raw=ep) %{src_prefix_dir}/bb-13.3/bin/busybox
+%{_libexecdir}
+%{_localstatedir}
+%{_sbindir}
 
 %files -n ripe-atlas-probe
 %attr(644, root, root) %{_unitdir}/%{service_name}
-%{src_prefix_dir}/state
-%{src_prefix_dir}/etc
-
+%{_datadir}/%{base_path}/state
 
 %pre -n ripe-atlas-common
 systemctl stop %{service_name} 2>&1 1>/dev/null
@@ -110,13 +103,13 @@ fi
 
 # move in keys from obsolete package - transitional
 if [ -e %{key_dirname}/probe_key ]; then
-	mkdir -p %{local_state_dir}/etc/
-	mv -f %{key_dirname}/probe_key* %{local_state_dir}/etc/
+	mkdir -p %{_sysconfdir}/%{base_path}
+	mv -f %{key_dirname}/probe_key* %{_sysconfdir}/%{base_path}/
 fi
 
 # clean environment
 killall -9 eooqd eperd perd telnetd 2>/dev/null || :
-rm -fr %{local_state_dir}/status %{local_state_dir}/bin/reg_servers.sh
+rm -fr %{_rundir}/%{base_path}/status %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 
 # add measurement system group
 if [ ! $(getent group %{msm_group}) ]; then
@@ -125,22 +118,22 @@ fi
 
 # init measurement user
 GID=$(getent group %{msm_group} | cut -d: -f3)
-useradd -c %{msm_user} -d %{local_state_dir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
+useradd -c %{msm_user} -d %{_localstatedir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
 exit 0
 
 
 %post -n ripe-atlas-probe
 # set to environment
-if [ ! -f %{local_state_dir}/state/mode ]; then
+if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
     %{!?env:%define env prod}
-    echo %{env} > %{local_state_dir}/state/mode
+    echo %{env} > %{_sysconfdir}/%{base_path}/mode
 fi
 
 # pass runtime dir ownership to measurements user
-chown -R %{msm_user}:%{msm_group} %{local_state_dir}
-find %{local_state_dir} -type d -exec chmod -R 755 {} +
-find %{local_state_dir} -type f -exec chmod -R 644 {} +
-chmod 600 %{local_state_dir}/etc/probe_key
+chown -R %{msm_user}:%{msm_group} %{_localstatedir}/%{base_path}
+find %{_localstatedir}/%{base_path} -type d -exec chmod -R 755 {} +
+find %{_localstatedir}/%{base_path} -type f -exec chmod -R 644 {} +
+chmod 600 %{_sysconfdir}/%{base_path}/probe_key
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}
@@ -151,7 +144,7 @@ exit 0
 # save probe keys
 if [ ! -f %{key_dirname}/probe_key ]; then
 	mkdir -p %{key_dirname}
-	cp %{local_state_dir}/etc/probe_key* %{key_dirname}/
+	cp %{_localstatedir}/etc/probe_key* %{key_dirname}/
 fi
 exit 0
 
@@ -160,7 +153,7 @@ exit 0
 # save probe keys
 if [ ! -f %{key_dirname}/probe_key ]; then
 	mkdir -p %{key_dirname}
-	cp %{local_state_dir}/etc/probe_key* %{key_dirname}/
+	cp %{_sysconfdir}/%{base_path}/probe_key* %{key_dirname}/
 fi
 exit 0
 

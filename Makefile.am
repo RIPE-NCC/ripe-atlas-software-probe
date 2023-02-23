@@ -67,21 +67,22 @@ install-exec-local:	install-generic-filesystem install-local-filesystem install-
 	@rm -f $@
 	$(AM_V_GEN)$(SH_FINALISE) $< > $@
 
-install-data-hook:	install-symlinks
+#install-data-hook:	install-symlinks
 
 install-generic-filesystem:
-	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state}
+	$(mkinstalldirs) $(DESTDIR)$(prefix)/{bin,bin/${A_SCRIPTS_PATH},bin/${A_LINUX_PATH},etc,state,sbin}
 
 install-local-filesystem:
 	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
 	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
 	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids $(DESTDIR)$(atlas_datadir)/state
 
-install-symlinks:
-	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(atlas_datadir)/state/FIRMWARE_APPS_VERSION
+# This symlink is not necessary - it existed in the pre-autotools implementation but is no longer found in $(prefix)/state
+#install-symlinks:
+#	$(LN_S) $(DESTDIR)$(prefix)/state/FIRMWARE_APPS_VERSION $(DESTDIR)$(atlas_datadir)/state/FIRMWARE_APPS_VERSION
 
 # this target is used instead of bin_PROGRAMS because by using the automake variable (bin_PROGRAMS) the binaries listed are by default placed under the path defined by `bindir`. Therefore since the current software probe does not abide by the Linux FS hierarchy we manually force these files into a location that aligns with the current implementation (`/usr/local/atlas/bin`)
-install-ripe-atlas-bin: $(DESTDIR)$(bindir)
+install-ripe-atlas-bin: $(DESTDIR)$(sbindir)
 	$(mkinstalldirs) $<
 	install -m 0755 -t $< $(A_BIN_FILES)
 
@@ -93,7 +94,7 @@ install-ripe-atlas-linux: $(DESTDIR)$(bindir)/$(A_LINUX_PATH)
 	$(mkinstalldirs) $<
 	install -m 0755 -t $< $(A_LINUX_FILES)
 
-install-ripe-atlas-config-state: $(DESTDIR)$(prefix)/$(A_STATE_PATH)
+install-ripe-atlas-config-state: $(DESTDIR)$(atlas_datadir)/$(A_STATE_PATH)
 	$(mkinstalldirs) $<
 	install -m 0755 -t $< $(A_CONFIG_FILES_STATE)
 
