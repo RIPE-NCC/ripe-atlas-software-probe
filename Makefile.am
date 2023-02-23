@@ -85,6 +85,10 @@ bin/resolvconf:	bin/resolvconf.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
+atlas-config/state/FIRMWARE_APPS_VERSION:	atlas-config/state/FIRMWARE_APPS_VERSION.in
+	@rm -f $@
+	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+
 all-local:	probe-busybox/include/atlas_path.h bin/ripe-atlas.service
 
 install-exec-local:
