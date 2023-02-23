@@ -40,14 +40,19 @@ start_service()
 
 	mkdir -p /var/run/ripe-atlas/pids
 	mkdir -p /var/run/ripe-atlas/status
-	mkdir -p /var/spool/ripe-atlas/crons
-	mkdir -p /var/spool/ripe-atlas/data
+	for dir in main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+		mkdir -p /var/spool/ripe-atlas/crons/${dir}
+	done
+	for dir in new oneoff out/ooq out/ooq10; do
+		mkdir -p /var/spool/ripe-atlas/data/${dir}
+	done
+
 	chown -R ripe-atlas:ripe-atlas /var/run/ripe-atlas
 	chown -R ripe-atlas:ripe-atlas /var/spool/ripe-atlas
 
 	echo 1>/dev/null 2> "${cfg}"
 	if [ ${rxtx_report} -ne 0 ]; then
-		echo RXTXRPT=yes >> "${cfg}"
+		echo 'RXTXRPT=yes' >> "${cfg}"
 	fi
 
 	procd_open_instance
