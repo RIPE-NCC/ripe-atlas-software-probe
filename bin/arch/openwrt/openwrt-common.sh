@@ -4,7 +4,6 @@
 
 # Directories
 HOME=/root; export HOME			# Somewhow, HOME is not set correctly
-SSH_DIR=$HOME/.ssh; export SSH_DIR
 BB_BASE_DIR=$BASE_DIR; export BB_BASE_DIR
 BB_BIN_DIR=$BB_BASE_DIR/bin; export BB_BIN_DIR
 RUN_DIR=/tmp/atlas-run
