@@ -63,7 +63,7 @@ AC_PROG_CC
 
 AC_CONFIG_FILES([
 Makefile
-bin/ATLAS
+bin/ripe-atlas
 bin/resolvconf
 bin/config.sh
 bin/arch/generic/generic-ATLAS.sh
