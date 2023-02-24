@@ -68,17 +68,20 @@ make
 cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_unitdir}
 install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
+install -m644 %{_builddir}/%{build_dirname}/atlas-probe/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
+install -m644 %{_builddir}/%{build_dirname}/atlas-probe/probe/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 make DESTDIR=%{buildroot} install
 
 %files
 %{_libexecdir}
 %{_localstatedir}
 %{_sbindir}
-%{_datadir}/%{base_path}/known_hosts.reg
+%{_unitdir}/%{service_name}
+%{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 
 %files -n ripe-atlas-probe
-%attr(644, root, root) %{_unitdir}/%{service_name}
-%{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
+%{_datadir}/%{base_path}/known_hosts.reg
+%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %pre -n ripe-atlas-common
 systemctl stop %{service_name} 2>&1 1>/dev/null
@@ -108,7 +111,7 @@ fi
 
 # clean environment
 killall -9 eooqd eperd perd telnetd 2>/dev/null || :
-rm -fr %{_rundir}/%{base_path}/status %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
+rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 
 # add measurement system group
 if [ ! $(getent group %{msm_group}) ]; then
