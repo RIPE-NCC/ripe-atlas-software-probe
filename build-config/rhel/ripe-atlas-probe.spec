@@ -71,15 +71,14 @@ install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_u
 make DESTDIR=%{buildroot} install
 
 %files
-%ghost %{src_prefix_dir}/bin/event_rpcgen.py
-%ghost %{src_prefix_dir}/lib/pkgconfig
 %{_libexecdir}
 %{_localstatedir}
 %{_sbindir}
+%{_datadir}/%{base_path}/known_hosts.reg
 
 %files -n ripe-atlas-probe
 %attr(644, root, root) %{_unitdir}/%{service_name}
-%{_datadir}/%{base_path}/state
+%{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 
 %pre -n ripe-atlas-common
 systemctl stop %{service_name} 2>&1 1>/dev/null
