@@ -1,0 +1,3 @@
+Defaults:atlas !requiretty
+atlas ALL = (atlasmsm) NOPASSWD: /usr/local/atlas/bb-13.3/bin/perd, /usr/local/atlas/bb-13.3/bin/eperd, /usr/local/atlas/bb-13.3/bin/eooqd, /usr/local/atlas/bb-13.3/usr/sbin/telnetd, /bin/killall telnetd perd eperd eooqd
+
