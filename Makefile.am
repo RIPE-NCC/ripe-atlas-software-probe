@@ -32,9 +32,8 @@ sbin_SCRIPTS = \
                bin/ripe-atlas
 
 atlas_scripts_SCRIPTS = \
-                        atlas-config/etc/reg_servers.sh.dev \
-                        atlas-config/etc/reg_servers.sh.prod \
-                        atlas-config/etc/reg_servers.sh.test \
+                        atlas-config/common/reg_servers.sh.dev \
+                        atlas-config/common/reg_servers.sh.test \
                         bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-ATLAS.sh \
                         bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-common.sh \
                         bin/arch/$(probe_scripts_path)/$(probe_scripts_path)-reginit.sh \
@@ -52,8 +51,7 @@ atlas_scripts_SCRIPTS = \
                         bin/resolvconf
 
 atlas_data_DATA = \
-                  atlas-config/etc/known_hosts.reg \
-                  atlas-config/state/FIRMWARE_APPS_VERSION
+                  atlas-config/common/FIRMWARE_APPS_VERSION
 
 CLEANFILES = \
              bin/paths.lib.sh \
@@ -85,7 +83,7 @@ bin/resolvconf:	bin/resolvconf.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
-atlas-config/state/FIRMWARE_APPS_VERSION:	atlas-config/state/FIRMWARE_APPS_VERSION.in
+atlas-config/common/FIRMWARE_APPS_VERSION:	atlas-config/common/FIRMWARE_APPS_VERSION.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
