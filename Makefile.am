@@ -94,4 +94,4 @@ all-local:	probe-busybox/include/atlas_path.h bin/ripe-atlas.service
 install-exec-local:
 	$(mkinstalldirs) $(foreach dir,main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))
 	$(mkinstalldirs) $(foreach dir,new oneoff out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir))
-	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids $(DESTDIR)$(atlas_sysconfdir)
+	$(mkinstalldirs) $(DESTDIR)$(atlas_rundir)/status $(DESTDIR)$(atlas_rundir)/pids 
