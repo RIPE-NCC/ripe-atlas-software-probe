@@ -68,8 +68,10 @@ make
 cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_unitdir}
 install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
-install -m644 %{_builddir}/%{build_dirname}/atlas-probe/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
-install -m644 %{_builddir}/%{build_dirname}/atlas-probe/probe/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+mkdir -p %{buildroot}%{_datadir}/%{base_path}
+install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
+mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
+install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 make DESTDIR=%{buildroot} install
 
 %files
@@ -131,11 +133,9 @@ if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
     echo %{env} > %{_sysconfdir}/%{base_path}/mode
 fi
 
-# pass runtime dir ownership to measurements user
-chown -R %{msm_user}:%{msm_group} %{_localstatedir}/%{base_path}
-find %{_localstatedir}/%{base_path} -type d -exec chmod -R 755 {} +
-find %{_localstatedir}/%{base_path} -type f -exec chmod -R 644 {} +
-chmod 600 %{_sysconfdir}/%{base_path}/probe_key
+# apply permissions
+chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/spool/%{base_path}
+chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/run/%{base_path}/{pids,status}
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}
