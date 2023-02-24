@@ -52,9 +52,9 @@ cd %{_builddir}/%{build_dirname}
 
 %install
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
-install -m644 --group=%{system_group} --owner=%{base_user} %{_builddir}/%{build_dirname}/atlas-config/anchor/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
+install -m644 --group=%{system_group} --owner=%{system_user} %{_builddir}/%{build_dirname}/atlas-config/anchor/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
 mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
-install -m644 --group=%{system_group} --owner=%{base_user} %{_builddir}/%{build_dirname}/atlas-config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+install -m644 --group=%{system_group} --owner=%{system_user} %{_builddir}/%{build_dirname}/atlas-config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %files
 %{_datadir}/%{base_path}/known_hosts.reg
@@ -74,8 +74,8 @@ fi
 # remove cached files
 rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 
-groupadd -g %{system_gid} %{base_user} 2>/dev/null
-useradd -c %{system_user} -g %{base_group} -s /sbin/nologin -u %{base_gid} %{base_user} 2>/dev/null
+groupadd -g %{system_gid} %{system_user} 2>/dev/null
+useradd -c %{system_user} -g %{system_group} -s /sbin/nologin -u %{system_gid} %{system_user} 2>/dev/null
 groupadd -g %{msm_gid} %{msm_user} 2>/dev/null
 useradd -c %{msm_user} -g %{msm_group} -s /sbin/nologin -u %{msm_gid} %{msm_user} 2>/dev/null
 exit 0
