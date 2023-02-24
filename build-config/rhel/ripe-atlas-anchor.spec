@@ -1,4 +1,4 @@
-%define         git_repo	ripe-atlas-anchor
+%define         git_repo	ripe-atlas-software-probe
 %define         build_dirname	%{git_repo}
 %define         base_path       ripe-atlas
 %define		service_name	ripe-atlas.service
