@@ -42,7 +42,7 @@ STATE_DIR=$ATLAS_DATADIR; export STATE_DIR
 # Files
 REG_SERVERS_SOURCE=$ATLAS_SCRIPTS/reg_servers.sh
 
-. $ATLAS_SCRIPTS/linux/linux-functions.sh
+. $ATLAS_SCRIPTS/linux-functions.sh
 
 chmod_for_msm()
 {
