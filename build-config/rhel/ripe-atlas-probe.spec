@@ -75,9 +75,10 @@ install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/reg_servers.sh.pr
 make DESTDIR=%{buildroot} install
 
 %files
+%exclude %dir %{_sbindir}
+%{_sbindir}/ripe-atlas
 %{_libexecdir}
 %{_localstatedir}
-%{_sbindir}/ripe-atlas
 %{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 
