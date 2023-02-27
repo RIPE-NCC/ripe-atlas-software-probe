@@ -4,14 +4,14 @@
 # Written by Daniel Karrenberg, Antony Antony
 # RIPE NCC
 
-. @atlas_spooldir@/paths.lib.sh
+. @atlas_scriptsdir@/paths.lib.sh
 
 #exec >$ATLAS_TMP/ATLAS.out 2>@$ATLAS_TMP/ATLAS.err
 #set -x
 
 . $ATLAS_SCRIPTS/config.sh
 
-. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
+. $ATLAS_SCRIPTS/$DEVICE_NAME/$DEVICE_NAME-ATLAS.sh
 
 . $ATLAS_SCRIPTS/common.sh
 

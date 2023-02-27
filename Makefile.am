@@ -23,6 +23,7 @@ SUBST_PATHS = sed \
              -e 's|@localstatedir[@]|$(localstatedir)|g' \
              -e 's|@mandir[@]|$(mandir)|g' \
              -e 's|@prefix[@]|$(prefix)|g' \
+             -e 's|@probe_type[@]|$(probe_type)|g' \
              -e 's|@ripe_atlas_user[@]|$(ripe_atlas_user)|g' \
              -e 's|@ripe_atlas_group[@]|$(ripe_atlas_group)|g' \
              -e 's|@sbindir[@]|$(sbindir)|g' \
