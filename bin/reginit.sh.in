@@ -10,7 +10,7 @@
 
 STATE_FILE=$1
 
-. $ATLAS_SCRIPTS/$DEVICE_NAME/$DEVICE_NAME-reginit.sh
+. $ATLAS_SCRIPTS/$DEVICE_NAME-reginit.sh
 
 . $ATLAS_SCRIPTS/common.sh
 
