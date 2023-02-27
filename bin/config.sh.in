@@ -1,4 +1,4 @@
-export PROBE_TYPE=@probe_type@
+export PROBE_TYPE=@probe_scripts_path@
 
 get_arch()
 {
