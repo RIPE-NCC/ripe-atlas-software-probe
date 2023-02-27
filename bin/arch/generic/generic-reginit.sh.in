@@ -27,8 +27,8 @@ if [ -z "$STATE_FILE" ] ; then
 	echo "Warning: STATE_FILE unset. Setting to -> $STATE_FILE"
 fi
 
-. $ATLAS_SCRIPTS/arch/$DEVICE_NAME/$DEVICE_NAME-common.sh
-. $ATLAS_SCRIPTS/arch/linux/linux-functions.sh
+. $ATLAS_SCRIPTS/$DEVICE_NAME/$DEVICE_NAME-common.sh
+. $ATLAS_SCRIPTS/linux/linux-functions.sh
 
 get_arch()
 {
