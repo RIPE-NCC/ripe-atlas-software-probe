@@ -10,6 +10,23 @@ PKG_FIXUP=autoreconf
 PKG_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
+PRB_SOURCE:=$(patsubst %/build-config/openwrt,%,$(SOURCE))
+
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),))
+CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev3
+endif
+
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),))
+CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev4
+endif
+
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),))
+CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev5
+endif
+
+define Build/Prepare
+	$(CP) $(PRB_SOURCE) $(PKG_BUILD_DIR)
+endef
 
 define Package/ripe-atlas/Default
 	TITLE:=RIPE Atlas
@@ -72,6 +89,38 @@ define Package/ripe-atlas-common/description
 	$(call Package/ripe-atlas/Default/description)
 endef
 
+define Package/ripe-atlas-common/install
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) $(SOURCE)/ripe-atlas.init $(1)/etc/init.d/ripe-atlas
+	$(CP) $(PKG_INSTALL_DIR)/. $(1)/
+endef
+
+define Package/ripe-atlas-common/postinst
+#!/bin/sh
+source /lib/functions.sh
+
+USER=ripe-atlas
+UID=1001
+GROUP=ripe-atlas
+GID=1001
+group_exists $${UID}
+
+if [ $${?} -ne 0 ]; then
+	group_add $${USER} $${UID}
+fi
+
+user_exists ripe-atlas
+if [ $${?} -ne 0 ]; then
+	user_add $${GROUP} $${GID}
+fi
+
+chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/spool/ripe-atlas
+chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/run/ripe-atlas/pids
+chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/run/ripe-atlas/status
+
+exit 0
+endef
+
 define Package/ripe-atlas-probe
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(Software Probe)
@@ -89,15 +138,19 @@ define Package/ripe-atlas-probe/description
 	$(call Package/ripe-atlas/Default/description)
 endef
 
-define Package/ripe-atlas-probe/install
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./build-config/openwrt/ripe-atlas.init $(1)/etc/init.d/ripe-atlas
-endef
 
 define Package/ripe-atlas-probe/conffiles
 /etc/ripe-atlas/probe_key
 /etc/ripe-atlas/probe_key.pub
 /etc/config/ripe-atlas
+endef
+
+define Package/ripe-atlas-probe/install
+	$(INSTALL_DIR) $(1)/usr/libexec/ripe-atlas
+	$(INSTALL_DATA) $(PRB_SOURCE)/atlas-config/probe/known_hosts.reg \
+	                $(1)/usr/libexec/ripe-atlas/
+	$(INSTALL_DATA) $(PRB_SOURCE)/atlas-config/probe/reg_servers.sh.prod \
+	                $(1)/usr/libexec/ripe-atlas/
 endef
 
 $(eval $(call BuildPackage,ripe-atlas-common))
