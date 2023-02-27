@@ -105,7 +105,7 @@ build_image_prep:
     - /^devel.*/
     - tags
   variables:
-    REPO_RPM_PATH: ${RPMS_DIR}/noarch/ripe-atlas-repo-*.rpm
+    REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
     REPO_GIT_SOURCE: https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@${SUBGROUP_URL}
   script:
