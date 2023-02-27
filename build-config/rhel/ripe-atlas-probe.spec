@@ -80,6 +80,7 @@ make DESTDIR=%{buildroot} install
 %{_sbindir}/ripe-atlas
 %{_libexecdir}
 %{_localstatedir}
+%{_sysconfdir}
 %{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 
