@@ -8,32 +8,22 @@ PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Michel Stam <mstam@ripe.net>
 PKG_FIXUP=autoreconf
 PKG_INSTALL:=1
+PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3, \
+          $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),openwrt-atlas-probev4, \
+          $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),openwrt-atlas-probev5, \
+          generic)))
 
 include $(INCLUDE_DIR)/package.mk
-PRB_SOURCE:=$(patsubst %/build-config/openwrt,%,$(SOURCE))
-
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),))
-CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev3
-endif
-
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),))
-CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev4
-endif
-
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),))
-CONFIGURE_ARGS+=--probe-type=openwrt-atlas-probev5
-endif
-
-define Build/Prepare
-	$(CP) $(PRB_SOURCE) $(PKG_BUILD_DIR)
-endef
 
 define Package/ripe-atlas/Default
 	TITLE:=RIPE Atlas
 	SECTION:=net
-	CATEGORY:=Networking
+	CATEGORY:=Network
 	URL:=https://atlas.ripe.net/
 endef
+
+CONFIGURE_ARGS:= \
+	--with-probe-type=$(PRB_TYPE)
 
 define Package/ripe-atlas/Default/description
 	RIPE Atlas is the RIPE NCC's main Internet data
@@ -46,6 +36,11 @@ define Package/ripe-atlas/Default/description
 	measurements to gain valuable data about their
 	own networks.
 endef
+
+define Build/Prepare
+	$(CP) $(patsubst %/build-config/openwrt,%,$(TOPDIR)/$(SOURCE))/. $(PKG_BUILD_DIR)
+endef
+
 
 define Package/ripe-atlas-common
 	$(call Package/ripe-atlas/Default)
@@ -62,17 +57,17 @@ define Package/ripe-atlas-common
                   +!PACKAGE_ntpd:chrony \
 	          +@!PACKAGE_bzip2:BUSYBOX_CONFIG_BUNZIP2
 
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),))
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),)
 	DEPENDS+= \
 	          +screen
 endif
 
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),))
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),)
 	DEPENDS+= \
 	          +screen
 endif
 
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),))
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),)
 	DEPENDS+= \
 	          +btrfs
 	          +screen
@@ -89,10 +84,66 @@ define Package/ripe-atlas-common/description
 	$(call Package/ripe-atlas/Default/description)
 endef
 
+define LinkApplet
+	$(LN) \
+		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/$(2) \
+		$(1)/usr/lib/ripe-atlas/measurement/$(2)
+endef
+
 define Package/ripe-atlas-common/install
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) $(SOURCE)/ripe-atlas.init $(1)/etc/init.d/ripe-atlas
-	$(CP) $(PKG_INSTALL_DIR)/. $(1)/
+	$(INSTALL_DIR) \
+		$(1)/etc/init.d \
+		$(1)/usr/lib/ripe-atlas/measurement \
+		$(1)/usr/lib/ripe-atlas/scripts \
+		$(1)/usr/share/ripe-atlas \
+		$(1)/usr/sbin
+	$(INSTALL_BIN) -t \
+		$(1)/usr/lib/ripe-atlas/scripts \
+		$(foreach script, \
+			array.lib.sh \
+			atlas_log.lib.sh \
+			class.lib.sh \
+			common-pre.sh \
+			common.sh \
+			config.sh \
+			$(PRB_TYPE)-ATLAS.sh \
+			$(PRB_TYPE)-common.sh \
+			$(PRB_TYPE)-reginit.sh \
+			json.lib.sh \
+			linux-functions.sh \
+			paths.lib.sh \
+			reg_servers.sh.dev \
+			reg_servers.sh.test \
+			reginit.sh \
+			resolvconf \
+			support.lib.sh, \
+			$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/scripts/)
+	$(INSTALL_BIN) \
+		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/busybox \
+		$(1)/usr/lib/ripe-atlas/measurement
+	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
+	$(call LinkApplet,$(1),atlasinit)
+	$(call LinkApplet,$(1),buddyinfo)
+	$(call LinkApplet,$(1),condmv)
+	$(call LinkApplet,$(1),date)
+	$(call LinkApplet,$(1),dfrm)
+	$(call LinkApplet,$(1),eooqd)
+	$(call LinkApplet,$(1),eperd)
+	$(call LinkApplet,$(1),evhttpget)
+	$(call LinkApplet,$(1),evntp)
+	$(call LinkApplet,$(1),evping)
+	$(call LinkApplet,$(1),evsslgetcert)
+	$(call LinkApplet,$(1),evtdig)
+	$(call LinkApplet,$(1),evtraceroute)
+	$(call LinkApplet,$(1),httppost)
+	$(call LinkApplet,$(1),onlyuptime)
+	$(call LinkApplet,$(1),perd)
+	$(call LinkApplet,$(1),rchoose)
+	$(call LinkApplet,$(1),rptaddrs)
+	$(call LinkApplet,$(1),rptra6)
+	$(call LinkApplet,$(1),rptuptime)
+	$(call LinkApplet,$(1),rxtxrpt)
+	$(call LinkApplet,$(1),telnetd)
 endef
 
 define Package/ripe-atlas-common/postinst
@@ -138,19 +189,22 @@ define Package/ripe-atlas-probe/description
 	$(call Package/ripe-atlas/Default/description)
 endef
 
+define Package/ripe-atlas-probe/install
+	$(INSTALL_DIR) \
+		$(1)/usr/lib/ripe-atlas/scripts \
+		$(1)/usr/share/ripe-atlas
+	$(INSTALL_DATA) \
+		$(PKG_BUILD_DIR)/atlas-config/probe/known_hosts.reg \
+		$(1)/usr/share/ripe-atlas
+	$(INSTALL_BIN) \
+		$(PKG_BUILD_DIR)/atlas-config/probe/reg_servers.sh.prod \
+		$(1)/usr/lib/ripe-atlas/scripts
+endef
 
 define Package/ripe-atlas-probe/conffiles
 /etc/ripe-atlas/probe_key
 /etc/ripe-atlas/probe_key.pub
 /etc/config/ripe-atlas
-endef
-
-define Package/ripe-atlas-probe/install
-	$(INSTALL_DIR) $(1)/usr/libexec/ripe-atlas
-	$(INSTALL_DATA) $(PRB_SOURCE)/atlas-config/probe/known_hosts.reg \
-	                $(1)/usr/libexec/ripe-atlas/
-	$(INSTALL_DATA) $(PRB_SOURCE)/atlas-config/probe/reg_servers.sh.prod \
-	                $(1)/usr/libexec/ripe-atlas/
 endef
 
 $(eval $(call BuildPackage,ripe-atlas-common))
