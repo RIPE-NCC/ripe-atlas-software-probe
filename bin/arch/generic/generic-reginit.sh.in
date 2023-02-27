@@ -4,7 +4,7 @@ then
 	export ATLAS_BASE
 fi
 
-. $ATLAS_STATIC/common-pre.sh
+. $ATLAS_SCRIPTS/common-pre.sh
 
 # Directories
 
