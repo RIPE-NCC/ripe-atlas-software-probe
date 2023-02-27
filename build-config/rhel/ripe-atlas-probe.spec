@@ -34,6 +34,7 @@ Essential core assets used in all probe flavours. This package must be installed
 %package -n ripe-atlas-probe
 Summary:	RIPE Atlas Probe Software Essentials
 Group:		Applications/Internet
+BuildArch:      noarch 
 Provides:	atlasswprobe = %{version}-%{release}
 Obsoletes:	atlasswprobe < 5080-3%{?dist}
 Requires:	ripe-atlas-common = %{version}-%{release}
