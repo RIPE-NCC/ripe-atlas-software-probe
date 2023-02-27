@@ -22,7 +22,7 @@ define Package/ripe-atlas/Default
 	URL:=https://atlas.ripe.net/
 endef
 
-CONFIGURE_ARGS:= \
+CONFIGURE_ARGS+= \
 	--with-probe-type=$(PRB_TYPE)
 
 define Package/ripe-atlas/Default/description
@@ -85,9 +85,7 @@ define Package/ripe-atlas-common/description
 endef
 
 define LinkApplet
-	$(LN) \
-		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/$(2) \
-		$(1)/usr/lib/ripe-atlas/measurement/$(2)
+	$(LN) busybox $(1)/usr/lib/ripe-atlas/measurement/$(2)
 endef
 
 define Package/ripe-atlas-common/install
@@ -117,10 +115,16 @@ define Package/ripe-atlas-common/install
 			reginit.sh \
 			resolvconf \
 			support.lib.sh, \
-			$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/scripts/)
+			$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/scripts/$(script))
 	$(INSTALL_BIN) \
 		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/busybox \
-		$(1)/usr/lib/ripe-atlas/measurement
+		$(1)/usr/lib/ripe-atlas/measurement/busybox
+	$(INSTALL_BIN) \
+		$(PKG_INSTALL_DIR)/usr/sbin/ripe-atlas \
+		$(1)/usr/sbin/ripe-atlas
+	$(INSTALL_DATA) \
+		$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/FIRMWARE_APPS_VERSION \
+		$(1)/usr/share/ripe-atlas/FIRMWARE_APPS_VERSION
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
