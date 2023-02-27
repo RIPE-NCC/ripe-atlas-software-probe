@@ -203,7 +203,7 @@ lint-ci-el9:
     - tags
   script:
     - 'eval ${PREPARE}'
-    - 'eval ${FINALIZE_AT}'
+    - 'eval ${FINALIZE}'
     - 'eval ${CLEANUP}'
 
     - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
