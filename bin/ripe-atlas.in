@@ -137,7 +137,7 @@ start_eperd()
 }
 start_eooqd()
 {
-	eooqd $ATLAS_DATA/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
+	eooqd $CRON_DIR/oneoff -A 9809 -P $RUN_DIR/eooqd.pid.vol -i 9 &
 }
 
 start_perd
