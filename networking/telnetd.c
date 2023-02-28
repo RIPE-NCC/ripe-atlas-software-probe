@@ -140,9 +140,9 @@
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
 #define ATLAS_LOGIN	"C_TO_P_TEST_V1"
-#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
+#define ATLAS_SESSION_FILE_REL	"con_session_id.txt"
 #define SESSION_ID_PREFIX	"SESSION_ID "
-#define FW_APP_VERS_FILE_REL	"state/FIRMWARE_APPS_VERSION"
+#define FW_APP_VERS_FILE_REL	"FIRMWARE_APPS_VERSION"
 
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
