@@ -30,7 +30,8 @@ SUBST_PATHS = sed \
 	     -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
              -e 's|@storage_sysconfdir[@]|$(storage_sysconfdir)|g' \
              -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
-             -e 's|@tmpdir[@]|$(tmpdir)|g'
+             -e 's|@tmpdir[@]|$(tmpdir)|g' \
+             -e 's|@VERSION[@]|$(VERSION)|g'
 
 sbin_SCRIPTS = \
                bin/ripe-atlas
