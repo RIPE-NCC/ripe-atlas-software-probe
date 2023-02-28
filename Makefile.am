@@ -27,7 +27,8 @@ SUBST_PATHS = sed \
              -e 's|@ripe_atlas_user[@]|$(ripe_atlas_user)|g' \
              -e 's|@ripe_atlas_group[@]|$(ripe_atlas_group)|g' \
              -e 's|@sbindir[@]|$(sbindir)|g' \
-             -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
+	     -e 's|@sharedstatedir[@]|$(sharedstatedir)|g' \
+             -e 's|@storage_sysconfdir[@]|$(storage_sysconfdir)|g' \
              -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
              -e 's|@tmpdir[@]|$(tmpdir)|g'
 
