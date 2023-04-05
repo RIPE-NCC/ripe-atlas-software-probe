@@ -42,7 +42,8 @@ The intent of this decision is to conform to operational practices and to
 make deployment and maintenance easier on hosts (and the Atlas team) in the
 long run.
 
-If you wish to keep automatically updating your software probe, please install the
-automatic update package of your choice.
+If you wish to automatically keep your software probe package up to date, please
+install an appropriate tool.
 
-Suggested solutions available are yum-cron, dnf-automatic or unattended-upgrades.
+Suggested solutions available are yum-cron (CentOS 7) and dnf-automatic (Redhat
+or Redhat clones version 8 and newer).
