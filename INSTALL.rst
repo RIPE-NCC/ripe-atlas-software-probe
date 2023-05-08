@@ -25,7 +25,7 @@ Currently only the Debian Build system includes support for amd64, arm64, and ar
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory: ``./ripe-atlas-software-probe/build-config/debian/bin/make-deb``
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
- * ``git submodule update`` << this will update the submodule within this branch
+ * ``git submodule update --init`` << this will update the submodule within this branch
  * ``cd ..`` << this take you back to where you started
  * ``./ripe-atlas-software-probe/build-config/debian/bin/make-deb`` << this will retry the build 
 - Install this .deb file: ``sudo dpkg -i atlasswprobe-??????.deb``
