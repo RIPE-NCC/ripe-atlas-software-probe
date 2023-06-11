@@ -16,3 +16,9 @@ log_status()
 	date_now="$(date +'%D %H:%M:%S')"
 	echo "$date_now $state" >>/tmp/log/ripe_sw_probe
 }
+
+# Simulate reboot request as a restart of the atlas service
+reboot_probe()
+{
+	service atlas restart
+}
