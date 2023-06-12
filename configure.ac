@@ -79,6 +79,23 @@ AC_ARG_WITH([install-mode], [AS_HELP_STRING([--with-install-mode], [define the p
 AM_CONDITIONAL([INSTALL_MODE_probe], [test "x${with_install_mode}" = 'xprobe'])
 AM_CONDITIONAL([INSTALL_MODE_anchor], [test "x${with_install_mode}" = 'xanchor'])
 
+AC_PATH_PROG(SETCAP, setcap)
+AC_ARG_ENABLE([setcap-install], [AC_HELP_STRING([--enable-setcap-install], [install measurements with cap_net_raw @<:@default=yes@:>@])], [enable_setcap_install="${enableval}"],[enable_setcap_install=yes])
+
+AC_MSG_CHECKING([whether to install measurements with cap_net_raw capabilities])
+if test "x${enable_setcap_install}" = 'xno'; then
+	AC_MSG_RESULT([no])
+	AC_MSG_WARN([Disabling setcap installation may prevent the probe from running as a non-privileged user])
+else
+	if test "x${SETCAP}" = 'x'; then
+		AC_MSG_RESULT([no. 'setcap' not found])
+	else
+		AC_MSG_RESULT([yes])
+	fi
+fi
+
+AM_CONDITIONAL(SETCAP_INSTALL, [test "x${enable_setcap_install}" = 'xyes'])
+
 # system paths
 atlas_libexecdir="${libexecdir}/ripe-atlas"
 atlas_datadir="${datadir}/ripe-atlas"

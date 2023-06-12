@@ -33,3 +33,12 @@ install-exec-local:
 	$(mkinstalldirs) -m 0755 $(ATLAS_OWN_MEAS_OPTS) $(ATLAS_SPOOL_DIRS)
 	$(mkinstalldirs) -m 0775 $(ATLAS_OWN_MEAS_OPTS) $(ATLAS_RUN_DIRS)
 	$(mkinstalldirs) -m 0770 $(ATLAS_OWN_CONF_OPTS) $(ATLAS_CONF_DIRS)
+
+#
+# Technically this hack belongs in probe-busybox, but it is here
+# because busybox is a different build system.
+install-exec-hook:
+	$(install_sh) $(ATLAS_OWN_SUID_OPTS) $(ATLAS_OWN_MEAS_OPTS) $(top_srcdir)/probe-busybox/busybox_unstripped $(DESTDIR)/$(atlas_measurementdir)/busybox
+if SETCAP_INSTALL
+	setcap cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
+endif

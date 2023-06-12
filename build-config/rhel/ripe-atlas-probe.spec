@@ -83,6 +83,7 @@ make DESTDIR=%{buildroot} install
 %{_sysconfdir}
 %{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
+%caps(cap_net_raw=ep) %attr(0750, ripe-atlas, ripe-atlas) %{_libexecdir}/%{base_path}/measurement/busybox
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
