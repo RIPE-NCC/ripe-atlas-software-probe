@@ -15,13 +15,22 @@ AM_SILENT_RULES([yes])
 # debian: debian-<PACKAGE_NAME>-<VERSION>  (ie. debian-ripe-atlas-probe-5090)
 AC_ARG_WITH([probe-type], [AS_HELP_STRING([--with-probe-type], [define which probe flavour should be built (v3,v4,v5)])], [], [with_probe_type=no])
 
-probe_type=$with_probe_type
+probe_type=${with_probe_type}
 AC_SUBST(probe_type)
 
 AS_CASE([$probe_type],
 	[*openwrt*], [probe_scripts_path=$probe_type],
 	[probe_scripts_path=generic])
 AC_SUBST(probe_scripts_path)
+
+# use the following arguments for the '--with-install-mode' flag
+# common: common, non-probe specific
+# probe: (software) probe
+# anchor
+AC_ARG_WITH([install-mode], [AS_HELP_STRING([--with-install-mode], [define the purpose of the probe (probe,anchor,common)])], [], [with_install_mode=probe])
+
+AM_CONDITIONAL([INSTALL_MODE_probe], [test "x${with_install_mode}" = 'xprobe'])
+AM_CONDITIONAL([INSTALL_MODE_anchor], [test "x${with_install_mode}" = 'xanchor'])
 
 # system paths
 atlas_libexecdir="${libexecdir}/ripe-atlas"
