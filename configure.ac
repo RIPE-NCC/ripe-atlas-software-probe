@@ -23,6 +23,53 @@ AS_CASE([$probe_type],
 	[probe_scripts_path=generic])
 AC_SUBST(probe_scripts_path)
 
+AC_ARG_ENABLE([chown],
+	      [AS_HELP_STRING([--enable-chown], [set permissions during install @<:@default=yes@:>@])],
+	      [case "${enableval}" in
+			yes) do_chown=true ;;
+			no) do_chown=false ;;
+		     *) AC_MSG_ERROR([bad value ${enableval} for --enable-chown]) ;;
+	     esac],[do_chown=true])
+AM_CONDITIONAL([DO_CHOWN], [test "x${do_chown}" = 'xtrue'])
+if test "x${do_chown}" != 'xtrue'; then
+	AC_MSG_WARN([Disabling chown may prevent the probe from running as a non-privileged user])
+fi
+
+ripe_atlas_user=
+ripe_atlas_group=
+ripe_atlas_measurement=
+AC_ARG_WITH([user], [AS_HELP_STRING([--with-user], [run main process as username @<:@default=ripe-atlas@:>@])], [ripe_atlas_user="${withval}"], [])
+AC_ARG_WITH([measurement-user], [AS_HELP_STRING([--with-measurement-user], [run measurement processes as username @<:@default=--with-user@:>@])], [ripe_atlas_measurement="${withval}"], [])
+AC_ARG_WITH([group], [AS_HELP_STRING([--with-group], [run group @<:@default=ripe-atlas@:>@])], [ripe_atlas_group="${withval}"], [])
+
+if test -z "${ripe_atlas_user}"; then
+	ripe_atlas_user='ripe-atlas'
+fi
+
+if ! grep -qE "^${ripe_atlas_user}:" /etc/passwd; then
+	AC_MSG_WARN([User ${ripe_atlas_user} doesn't seem to exist, installation may fail])
+fi
+
+if test -z "${ripe_atlas_group}"; then
+	ripe_atlas_group='ripe-atlas'
+fi
+
+if ! grep -qE "^${ripe_atlas_group}:" /etc/group; then
+	AC_MSG_WARN([Group ${ripe_atlas_group} doesn't seem to exist, installation may fail])
+fi
+
+if test -z "${ripe_atlas_measurement}"; then
+	ripe_atlas_measurement="${ripe_atlas_user}"
+fi
+
+if ! grep -qE "^${ripe_atlas_measurement}:" /etc/passwd; then
+	AC_MSG_WARN([User ${ripe_atlas_measurement} doesn't seem to exist, installation may fail])
+fi
+
+AC_SUBST(ripe_atlas_user)
+AC_SUBST(ripe_atlas_group)
+AC_SUBST(ripe_atlas_measurement)
+
 # use the following arguments for the '--with-install-mode' flag
 # common: common, non-probe specific
 # probe: (software) probe
@@ -44,14 +91,8 @@ atlas_sysconfdir="${sysconfdir}/ripe-atlas"
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
 
-# runtime info
-ripe_atlas_user=ripe-atlas
-ripe_atlas_group=ripe-atlas
-
 AC_SUBST(storage_sysconfdir)
 AC_SUBST(tmpdir)
-AC_SUBST(ripe_atlas_user)
-AC_SUBST(ripe_atlas_group)
 
 AC_SUBST(atlas_libexecdir)
 AC_SUBST(atlas_datadir)
