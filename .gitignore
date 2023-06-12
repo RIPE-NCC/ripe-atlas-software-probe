@@ -14,6 +14,8 @@ bin/ripe-atlas.service
 # http://www.gnu.org/software/automake
 
 Makefile.in
+atlas-config/Makefile.in
+bin/Makefile.in
 /ar-lib
 /mdate-sh
 /py-compile
@@ -64,3 +66,5 @@ m4/lt~obsolete.m4
 # can automatically generate from config.status script
 # (which is called by configure script))
 /Makefile
+/atlas-config/Makefile
+/bin/Makefile

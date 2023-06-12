@@ -57,6 +57,8 @@ AC_PROG_CC
 
 AC_CONFIG_FILES([
 Makefile
+atlas-config/Makefile
+bin/Makefile
 ])
 
 AC_CONFIG_SUBDIRS([probe-busybox/libevent-2.1.11-stable])
