@@ -19,7 +19,7 @@ STATE_FILE=$1
 # Common
 [ -z "$SSH_PVT_KEY" ] && SSH_PVT_KEY=$ATLAS_SYSCONFDIR/probe_key
 # Set REG_SERVERS if it isn't set already
-[ -z "$REG_SERVERS" ] && REG_SERVERS=$ATLAS_SCRIPTS/reg_servers.sh
+[ -z "$REG_SERVERS" ] && REG_SERVERS=$ATLAS_SYSCONFDIR/reg_servers.sh
 CON_INIT_CONF=$ATLAS_STATUS/con_init_conf.txt
 CON_INIT_REPLY=con_init_reply.txt
 CON_KEEP_CONF=$ATLAS_STATUS/con_keep_conf.txt

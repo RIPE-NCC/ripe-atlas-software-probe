@@ -6,7 +6,7 @@
 
 . @atlas_scriptsdir@/paths.lib.sh
 
-#exec >$ATLAS_TMP/ATLAS.out 2>@$ATLAS_TMP/ATLAS.err
+#exec >$ATLAS_TMP/ATLAS.out 2>$ATLAS_TMP/ATLAS.err
 #set -x
 
 . $ATLAS_SCRIPTS/config.sh
@@ -37,9 +37,9 @@ export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
 $MOUNT_FS_CMD
 
 mkdir -p $ATLAS_STATUS $STATE_DIR $RUN_DIR
-mkdir -p $ATLAS_DATADIR $DATA_NEW_DIR $DATA_OUT_DIR
-mkdir -p $ATLAS_DATADIR/out/ooq
-mkdir -p $ATLAS_DATADIR/out/ooq10	# For wifi, can't hurt to just create this
+mkdir -p $ATLAS_DATA $DATA_NEW_DIR $DATA_OUT_DIR
+mkdir -p $ATLAS_DATA/out/ooq
+mkdir -p $ATLAS_DATA/out/ooq10	# For wifi, can't hurt to just create this
 
 $CHOWN_DATA_DIRS
 
@@ -283,7 +283,7 @@ do
 			condmv -f $DATA_NEW_DIR/reboot-count.txt $DATA_NEW_DIR/reboot-count.old
 		fi
 	else
-		dfrm -A 9018 $ATLAS_DATADIR $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR 2>&1 >> $DATA_NEW_DIR/simpleping
+		dfrm -A 9018 $ATLAS_DATA $LOW_DISK_LIMIT $DATA_NEW_DIR $DATA_OUT_DIR 2>&1 >> $DATA_NEW_DIR/simpleping
 		if [ $? -eq 0 ]
 		then
 			D=`epoch`

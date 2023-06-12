@@ -27,7 +27,7 @@ AC_SUBST(probe_scripts_path)
 atlas_libexecdir="${libexecdir}/ripe-atlas"
 atlas_datadir="${datadir}/ripe-atlas"
 atlas_measurementdir="${atlas_libexecdir}/measurement"
-atlas_rundir="${localstatedir}/run/ripe-atlas"
+atlas_rundir="${runstatedir}/ripe-atlas"
 atlas_scriptsdir="${atlas_libexecdir}/scripts"
 atlas_spooldir="${localstatedir}/spool/ripe-atlas"
 atlas_sysconfdir="${sysconfdir}/ripe-atlas"
