@@ -1,0 +1,10 @@
+[SUID]
+eooqd        = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+eperd        = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+perd         = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evhttpget    = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evping       = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evntp        = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evsslgetcert = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evtdig       = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
+evtraceroute = ssx @ripe_atlas_measurement@.@ripe_atlas_group@
