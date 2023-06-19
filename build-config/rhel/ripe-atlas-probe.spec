@@ -1,7 +1,6 @@
 %define     git_repo         ripe-atlas-software-probe
 %define     build_dirname    %{git_repo}
 %define     base_path        ripe-atlas
-%define     src_prefix_dir   /usr/local/ripe-atlas
 %define     service_name     ripe-atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
