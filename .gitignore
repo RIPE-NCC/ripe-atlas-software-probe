@@ -3,6 +3,7 @@
 atlas-config/common/FIRMWARE_APPS_VERSION
 atlas-config/common/measurement.conf
 atlas-config/common/tmpfiles.conf
+atlas-config/common/ripe-atlas.service
 bin/arch/generic/*.sh
 bin/config.sh
 bin/common-pre.sh
@@ -11,7 +12,6 @@ bin/paths.lib.sh
 bin/reginit.sh
 bin/resolvconf
 bin/ripe-atlas
-bin/ripe-atlas.service
 
 # http://www.gnu.org/software/automake
 

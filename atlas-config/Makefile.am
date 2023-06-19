@@ -24,12 +24,14 @@ endif
 
 BUILT_SOURCES = \
 	      common/tmpfiles.conf \
+	      common/ripe-atlas.service \
 	      $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 CLEANFILES = \
              common/FIRMWARE_APPS_VERSION \
              common/measurement.conf \
              common/tmpfiles.conf \
+	     common/ripe-atlas.service \
              $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in

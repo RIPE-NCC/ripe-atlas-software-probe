@@ -36,5 +36,3 @@ ripe-atlas:	ripe-atlas.in
 resolvconf:	resolvconf.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
-
-all-local:	ripe-atlas.service
