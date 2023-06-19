@@ -67,7 +67,9 @@ make
 %install
 cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_unitdir}
-install -m644 %{_builddir}/%{build_dirname}/bin/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
+install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
+mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
+install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/ripe-atlas.conf
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
 install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
 mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
@@ -82,7 +84,7 @@ make DESTDIR=%{buildroot} install
 %{_sysconfdir}
 %{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
-%caps(cap_net_raw=ep) %attr(0750, ripe-atlas, ripe-atlas) %{_libexecdir}/%{base_path}/measurement/busybox
+%caps(cap_net_raw=ep) %attr(0750, %{atlas_measurement}, %{atlas_group} %{_libexecdir}/%{base_path}/measurement/busybox
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
@@ -139,7 +141,6 @@ if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
 fi
 
 # apply permissions
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/ripe-atlas.conf
 chown -R %{atlas_measurement}:%{atlas_group} %{_localstatedir}/spool/%{base_path}
 
 %systemd_post %{service_name}
