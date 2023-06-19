@@ -138,8 +138,7 @@ if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
 fi
 
 # apply permissions
-chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/spool/%{base_path}
-chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/run/%{base_path}/{pids,status}
+install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/ripe-atlas.conf
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}

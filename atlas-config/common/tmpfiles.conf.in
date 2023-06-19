@@ -1,0 +1,4 @@
+#Type	Path					Mode	User				Group			Age	Argument
+d	@atlas_rundir@				0755	@ripe_atlas_measurement@	@ripe_atlas_group@	-	-
+d	@atlas_rundir@/pids			0755	@ripe_atlas_measurement@	@ripe_atlas_group@	-	-
+d	@atlas_rundir@/status			0755	@ripe_atlas_measurement@	@ripe_atlas_group@	-	-

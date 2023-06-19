@@ -23,11 +23,13 @@ atlas_scripts_SCRIPTS += \
 endif
 
 BUILT_SOURCES = \
+	      common/tmpfiles.conf \
 	      $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 CLEANFILES = \
              common/FIRMWARE_APPS_VERSION \
              common/measurement.conf \
+             common/tmpfiles.conf \
              $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in
