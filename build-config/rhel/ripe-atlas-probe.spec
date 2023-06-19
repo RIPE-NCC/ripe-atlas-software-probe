@@ -6,9 +6,9 @@
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
 # define user to perform measurements
-%define     msm_user         ripe-atlas
-%define     msm_group        ripe-atlas
-%define     msm_homedir      %{_localstatedir}
+%define     atlas_measurement  ripe-atlas-measurement
+%define     atlas_user         ripe-atlas
+%define     atlas_group        ripe-atlas
 
 # flag to ignore files installed in builddir but not packaged in the final RPM
 %define	    _unpackaged_files_terminate_build	0
@@ -113,6 +113,7 @@ fi
 if [ -e %{key_dirname}/probe_key ]; then
 	mkdir -p %{_sysconfdir}/%{base_path}
 	mv -f %{key_dirname}/probe_key* %{_sysconfdir}/%{base_path}/
+	chown -R %{atlas_user}:%{atlas_group} %{_sysconfdir}/%{base_path}/probe_key*
 fi
 
 # clean environment
@@ -120,13 +121,14 @@ killall -9 eooqd eperd perd telnetd 2>/dev/null || :
 rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 
 # add measurement system group
-if [ ! $(getent group %{msm_group}) ]; then
-	groupadd %{msm_group}
+if [ ! $(getent group %{atlas_group}) ]; then
+	groupadd %{atlas_group}
 fi
 
 # init measurement user
-GID=$(getent group %{msm_group} | cut -d: -f3)
-useradd -c %{msm_user} -d %{_localstatedir} -g %{msm_group} -s /sbin/nologin -u $GID %{msm_group} 2>/dev/null
+GID=$(getent group %{atlas_group} | cut -d: -f3)
+useradd -c %{atlas_measurement} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_measurement} 2>/dev/null
+useradd -c %{atlas_user} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_user} 2>/dev/null
 exit 0
 
 
@@ -139,6 +141,7 @@ fi
 
 # apply permissions
 install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/ripe-atlas.conf
+chown -R %{atlas_measurement}:%{atlas_group} %{_localstatedir}/spool/%{base_path}
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}
