@@ -13,6 +13,12 @@ PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3, \
           $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),openwrt-atlas-probev5, \
           generic)))
 
+# This will be changed to support low-privilege support in the future;
+# needs xattr support
+ATLAS_USER=root
+ATLAS_GROUP=root
+ATLAS_MEAS=root
+
 include $(INCLUDE_DIR)/package.mk
 
 define Package/ripe-atlas/Default
@@ -23,7 +29,13 @@ define Package/ripe-atlas/Default
 endef
 
 CONFIGURE_ARGS+= \
-	--with-probe-type=$(PRB_TYPE)
+	--with-probe-type=$(PRB_TYPE) \
+	--with-user=$(ATLAS_USER) \
+	--with-group=$(ATLAS_GROUP) \
+	--with-measurement-user=$(ATLAS_MEAS) \
+ifeq ($(ATLAS_USER),root)
+	--disable-setcap
+endif
 
 define Package/ripe-atlas/Default/description
 	RIPE Atlas is the RIPE NCC's main Internet data
@@ -45,7 +57,7 @@ endef
 define Package/ripe-atlas-common
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(common files)
-	USERID:=ripe-atlas:ripe-atlas ripe-atlas-measurement:ripe-atlas
+	USERID:=$(ATLAS_USER):$(ATLAS_GROUP) $(ATLAS_MEAS):$(ATLAS_GROUP)
 	DEPENDS+= \
                   +e2fsprogs \
                   +openssh-client \
@@ -117,7 +129,7 @@ define Package/ripe-atlas-common/install
 			resolvconf \
 			support.lib.sh, \
 			$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/scripts/$(script))
-	$(INSTALL_BIN) \
+	$(INSTALL_SUID) \
 		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/busybox \
 		$(1)/usr/lib/ripe-atlas/measurement/busybox
 	$(INSTALL_BIN) \
