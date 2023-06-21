@@ -891,7 +891,7 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	if (output_file)
 	{
-		validated_output_file= rebased_validated_filename(ATLAS_DATA,
+		validated_output_file= rebased_validated_filename(ATLAS_SPOOLDIR,
 			output_file, SAFE_PREFIX_OUT_REL);
 		if (!validated_output_file)
 		{

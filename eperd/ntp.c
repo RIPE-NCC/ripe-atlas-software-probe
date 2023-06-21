@@ -1037,7 +1037,7 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 
 	if (out_filename)
 	{
-		validated_out_filename= rebased_validated_filename(ATLAS_DATA,
+		validated_out_filename= rebased_validated_filename(ATLAS_SPOOLDIR,
 			out_filename, SAFE_PREFIX_REL);
 		if (!validated_out_filename)
 		{

@@ -1140,7 +1140,7 @@ static int atlas_run(char *cmdline)
 	{
 		/* Redirect I/O */
 		crondlog(LVL7 "sending output to '%s'", outfile);
-		validated_fn= rebased_validated_filename(ATLAS_DATA,
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
 			outfile, SAFE_PREFIX_REL);
 		if (!validated_fn)
 		{

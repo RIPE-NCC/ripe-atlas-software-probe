@@ -603,7 +603,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (output_file)
 	{
-		validated_output_file= rebased_validated_filename(ATLAS_DATA,
+		validated_output_file= rebased_validated_filename(ATLAS_SPOOLDIR,
 			output_file, SAFE_PREFIX_OUT_REL);
 		if (validated_output_file == NULL)
 		{
@@ -639,7 +639,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (post_header)
 	{
-		validated_post_header= rebased_validated_filename(ATLAS_DATA,
+		validated_post_header= rebased_validated_filename(ATLAS_SPOOLDIR,
 			post_header, SAFE_PREFIX_IN_REL);
 		if (validated_post_header == NULL)
 		{
@@ -649,7 +649,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (post_file)
 	{
-		validated_post_file= rebased_validated_filename(ATLAS_DATA,
+		validated_post_file= rebased_validated_filename(ATLAS_SPOOLDIR,
 			post_file, SAFE_PREFIX_IN_REL);
 		if (validated_post_file == NULL)
 		{
@@ -659,7 +659,7 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (post_footer)
 	{
-		validated_post_footer= rebased_validated_filename(ATLAS_DATA,
+		validated_post_footer= rebased_validated_filename(ATLAS_SPOOLDIR,
 			post_footer, SAFE_PREFIX_IN_REL);
 		if (validated_post_footer == NULL)
 		{

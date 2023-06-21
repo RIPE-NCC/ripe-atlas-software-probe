@@ -2319,7 +2319,7 @@ static bool argProcess (int argc, char *argv[], struct query_state *qry )
 
 	if (qry->out_filename)
 	{
-		validated_fn= rebased_validated_filename(ATLAS_DATA,
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
 			qry->out_filename, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{

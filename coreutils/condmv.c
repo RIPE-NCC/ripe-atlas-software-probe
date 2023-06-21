@@ -74,11 +74,11 @@ int condmv_main(int argc, char *argv[])
 	from= argv[optind];
 	to= argv[optind+1];
 
-	rebased_from= rebased_validated_filename(ATLAS_DATA,
+	rebased_from= rebased_validated_filename(ATLAS_SPOOLDIR,
 		from, SAFE_PREFIX_FROM1_REL);
 	if (rebased_from == NULL)
 	{
-		rebased_from= rebased_validated_filename(ATLAS_DATA, 
+		rebased_from= rebased_validated_filename(ATLAS_SPOOLDIR,
 			from, SAFE_PREFIX_FROM2_REL);
 	}
 	if (rebased_from == NULL)
@@ -86,16 +86,16 @@ int condmv_main(int argc, char *argv[])
 		fprintf(stderr, "insecure from file '%s'\n", from);
 		goto err;
 	}
-	rebased_to= rebased_validated_filename(ATLAS_DATA,
+	rebased_to= rebased_validated_filename(ATLAS_SPOOLDIR,
 		to, SAFE_PREFIX_TO1_REL);
 	if (rebased_to == NULL)
 	{
-		rebased_to= rebased_validated_filename(ATLAS_DATA,
+		rebased_to= rebased_validated_filename(ATLAS_SPOOLDIR,
 			to, SAFE_PREFIX_TO2_REL);
 	}
 	if (rebased_to == NULL)
 	{
-		rebased_to= rebased_validated_filename(ATLAS_DATA,
+		rebased_to= rebased_validated_filename(ATLAS_SPOOLDIR,
 			to, SAFE_PREFIX_FROM1_REL);
 	}
 	if (rebased_to == NULL)

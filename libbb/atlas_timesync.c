@@ -16,7 +16,7 @@ int get_timesync(void)
 	if (atlas_tests())
 		return 123;
 
-	asprintf(&fn, "%s/%s", ATLAS_DATA, ATLAS_TIMESYNC_FILE_REL);
+	asprintf(&fn, "%s/%s", ATLAS_SPOOLDIR, ATLAS_TIMESYNC_FILE_REL);
 	fh= fopen(fn, "r");
 	free(fn); fn= NULL;
 	if (!fh)

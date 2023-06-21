@@ -34,12 +34,12 @@
 #include "atlas_path.h"
 
 #define SUFFIX 		".curr"
-#define OOQD_NEW_PREFIX_REL	"new/ooq"
-#define OOQD_OUT_PREFIX_REL	"out/ooq"
-#define ATLAS_SESSION_FILE_REL	"con_session_id.txt"
-#define REPORT_HEADER_REL	"p_to_c_report_header"
-#define SESSION_ID_REL		"con_session_id.txt"
-#define OOQ_SENT_REL		"new/ooq_sent.vol"
+#define OOQD_NEW_PREFIX_REL	"data/new/ooq"
+#define OOQD_OUT_PREFIX_REL	"data/out/ooq"
+#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
+#define REPORT_HEADER_REL	"status/p_to_c_report_header"
+#define SESSION_ID_REL		"status/con_session_id.txt"
+#define OOQ_SENT_REL		"data/new/ooq_sent.vol"
 
 #define ATLAS_NARGS	64	/* Max arguments to a built-in command */
 #define ATLAS_ARGSIZE	512	/* Max size of the command line */
@@ -214,7 +214,7 @@ int eooqd_main(int argc, char *argv[])
 
 	snprintf(output_filename, sizeof(output_filename),
 		"%s/" OOQD_OUT_PREFIX_REL "%s/ooq.out",
-		ATLAS_DATA, queue_id);
+		ATLAS_SPOOLDIR, queue_id);
 
 	signal(SIGQUIT, SIG_DFL);
 	limit.rlim_cur= RLIM_INFINITY;
@@ -408,7 +408,7 @@ static int add_line(void)
 		p= &cmdline[len];
 		while (*p != '\0' && *p == ' ')
 			p++;
-		validated_fn= rebased_validated_filename(ATLAS_DATA,
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
 			p, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
@@ -535,7 +535,7 @@ static int add_line(void)
 	argv[argc++]= "-O";
 	snprintf(filename, sizeof(filename),
 		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-		ATLAS_DATA, queue_id, slot);
+		ATLAS_SPOOLDIR, queue_id, slot);
 	argv[argc++]= filename;
 
 	argv[argc]= NULL;
@@ -561,7 +561,7 @@ error:
 	{
 		snprintf(filename, sizeof(filename),
 			"%s/" OOQD_NEW_PREFIX_REL "%s",
-			ATLAS_DATA, queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		fn= fopen(filename, "a");
 		if (!fn) 
 		{
@@ -591,7 +591,7 @@ error:
 
 		snprintf(filename2, sizeof(filename2),
 			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
-			ATLAS_DATA, queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		if (stat(filename2, &sb) == -1 &&
 			stat(filename, &sb) == 0)
 		{
@@ -638,10 +638,10 @@ static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 
 	snprintf(from_filename, sizeof(from_filename),
 		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-		ATLAS_DATA, queue_id, i);
+		ATLAS_SPOOLDIR, queue_id, i);
 	
 	snprintf(to_filename, sizeof(to_filename),
-	         "%s/%s/%s/%d", ATLAS_DATA,
+	         "%s/%s/%s/%d", ATLAS_SPOOLDIR,
 	         OOQD_OUT_PREFIX_REL, queue_id, i);
 
 	if (stat(to_filename, &sb) == 0)
@@ -737,10 +737,10 @@ static void post_results(int force_post)
 
 		snprintf(from_filename, sizeof(from_filename),
 			"%s/" OOQD_NEW_PREFIX_REL "%s",
-			ATLAS_DATA, queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		snprintf(to_filename, sizeof(to_filename),
 			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
-			ATLAS_DATA, queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		if (stat(to_filename, &sb) == 0)
 		{
 			/* There is more to post */
@@ -759,10 +759,10 @@ static void post_results(int force_post)
 		{
 			snprintf(from_filename, sizeof(from_filename),
 				"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-				ATLAS_DATA, queue_id, i);
+				ATLAS_SPOOLDIR, queue_id, i);
 			snprintf(to_filename, sizeof(to_filename),
 				"%s/" OOQD_OUT_PREFIX_REL "%s/%d",
-				ATLAS_DATA, queue_id, i);
+				ATLAS_SPOOLDIR, queue_id, i);
 			if (stat(to_filename, &sb) == 0)
 			{
 				/* There is more to post */
@@ -797,11 +797,11 @@ static void post_results(int force_post)
 			probe_id, session_id);
 		snprintf(from_filename, sizeof(from_filename),
 			"%s/" OOQD_OUT_PREFIX_REL "%s",
-			ATLAS_DATA, queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 
-		asprintf(&fn_header, "%s/%s", ATLAS_STATUS, REPORT_HEADER_REL);
-		asprintf(&fn_session_id, "%s/%s", ATLAS_STATUS, SESSION_ID_REL);
-		asprintf(&fn_ooq_sent, "%s/%s", ATLAS_DATA, OOQ_SENT_REL);
+		asprintf(&fn_header, "%s/%s", ATLAS_RUNDIR, REPORT_HEADER_REL);
+		asprintf(&fn_session_id, "%s/%s", ATLAS_RUNDIR, SESSION_ID_REL);
+		asprintf(&fn_ooq_sent, "%s/%s", ATLAS_SPOOLDIR, OOQ_SENT_REL);
 		i= 0;
 		argv[i++]= "httppost";
 		argv[i++]= "-A";
@@ -837,7 +837,7 @@ static const char *get_session_id(void)
 	char *cp, *fn;
 	FILE *file;
 
-	asprintf(&fn, "%s/%s", ATLAS_STATUS, ATLAS_SESSION_FILE_REL);
+	asprintf(&fn, "%s/%s", ATLAS_RUNDIR, ATLAS_SESSION_FILE_REL);
 	file= fopen(fn, "r");
 	free(fn); fn= NULL;
 	if (file == NULL)

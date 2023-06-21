@@ -102,7 +102,7 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 
 	if (out_name)
 	{
-		rebased_out_name= rebased_validated_filename(ATLAS_DATA,
+		rebased_out_name= rebased_validated_filename(ATLAS_SPOOLDIR,
 			out_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_out_name)
 		{
@@ -113,7 +113,7 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 	}
 	if (cache_name)
 	{
-		rebased_cache_name= rebased_validated_filename(ATLAS_DATA,
+		rebased_cache_name= rebased_validated_filename(ATLAS_SPOOLDIR,
 			cache_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_cache_name)
 		{

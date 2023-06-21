@@ -278,7 +278,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 
 	if (out_filename)
 	{
-		validated_fn= rebased_validated_filename(ATLAS_DATA,
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
 			out_filename, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
