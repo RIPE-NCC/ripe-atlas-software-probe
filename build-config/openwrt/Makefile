@@ -45,6 +45,7 @@ endef
 define Package/ripe-atlas-common
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(common files)
+	USERID:=ripe-atlas:ripe-atlas ripe-atlas-measurement:ripe-atlas
 	DEPENDS+= \
                   +e2fsprogs \
                   +openssh-client \
@@ -122,9 +123,12 @@ define Package/ripe-atlas-common/install
 	$(INSTALL_BIN) \
 		$(PKG_INSTALL_DIR)/usr/sbin/ripe-atlas \
 		$(1)/usr/sbin/ripe-atlas
-	$(INSTALL_DATA) \
-		$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/FIRMWARE_APPS_VERSION \
-		$(1)/usr/share/ripe-atlas/FIRMWARE_APPS_VERSION
+	$(INSTALL_DATA) -t \
+		$(1)/usr/share/ripe-atlas \
+		$(foreach file, \
+			FIRMWARE_APPS_VERSION \
+			measurement.conf \
+			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
@@ -154,25 +158,18 @@ define Package/ripe-atlas-common/postinst
 #!/bin/sh
 source /lib/functions.sh
 
-USER=ripe-atlas
-UID=1001
-GROUP=ripe-atlas
-GID=1001
-group_exists $${UID}
+add_group_and_user 'ripe-atlas-common'
 
-if [ $${?} -ne 0 ]; then
-	group_add $${USER} $${UID}
-fi
-
-user_exists ripe-atlas
-if [ $${?} -ne 0 ]; then
-	user_add $${GROUP} $${GID}
-fi
-
-chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/spool/ripe-atlas
-chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/run/ripe-atlas/pids
-chown -R $${UID}:$${GID} $${IPKG_INSTROOT}/var/run/ripe-atlas/status
-
+chown -R ripe-atlas-measurement:ripe-atlas \
+	$(foreach cron, \
+		2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 main, \
+		$${IPKG_INSTROOT}/var/spool/ripe-atlas/crons/$(cron)) \
+	$(foreach data, \
+		new oneoff, \
+		$${IPKG_INSTROOT}/var/spool/ripe-atlas/data/$(data)) \
+	$(foreach run, \
+		status pids, \
+		$${IPKG_INSTROOT}/var/run/ripe-atlas/$(run))
 exit 0
 endef
 

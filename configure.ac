@@ -1,5 +1,5 @@
 AC_PREREQ([2.68])
-AC_INIT([ripe-atlas], [m4_esyscmd_s([cat VERSION])], [gmeyer@ripe.net])
+AC_INIT([ripe-atlas], [m4_esyscmd_s([cat VERSION])], [mstam@ripe.net])
 
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])

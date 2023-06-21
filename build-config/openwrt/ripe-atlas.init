@@ -2,12 +2,16 @@
 START=60
 STOP=01
 USE_PROCD=1
+MAINU=ripe-atlas
+MEASU=ripe-atlas-measurement
+GROUP=ripe-atlas
 
 validate_config()
 {
 	uci_validate_section 'ripe-atlas' 'ripe-atlas' "${1}" \
 		'enabled:uinteger:1' \
 		'use_screen:uinteger:0' \
+		'mode:string:prod' \
 		'rxtx_report:uinteger:0'
 
 	return ${?}
@@ -16,6 +20,7 @@ validate_config()
 start_service()
 {
 	local cfg=/etc/ripe-atlas/config.txt
+	local mod=/etc/ripe-atlas/mode
 
 	validate_ripe_atlas 'config'
 	if [ ${?} -ne 0 ]; then
@@ -27,17 +32,15 @@ start_service()
 		return 1
 	fi
 
+	case "${mode}" in
+		test|dev|prod)
+			;;
+		*)
+			return 1
+			;;
+	esac
+
 	echo 'Starting RIPE Atlas'
-	group_exists ripe-atlas
-	if [ ${?} -ne 0 ]; then
-		group_add ripe-atlas 1001
-	fi
-
-	user_exists ripe-atlas
-	if [ ${?} -ne 0 ]; then
-		user_add ripe-atlas 1001
-	fi
-
 	mkdir -p /var/run/ripe-atlas/pids
 	mkdir -p /var/run/ripe-atlas/status
 	for dir in main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
@@ -47,13 +50,14 @@ start_service()
 		mkdir -p /var/spool/ripe-atlas/data/${dir}
 	done
 
-	chown -R ripe-atlas:ripe-atlas /var/run/ripe-atlas
-	chown -R ripe-atlas:ripe-atlas /var/spool/ripe-atlas
+	chown -R ${MEASU}:${GROUP} /var/run/ripe-atlas/*
+	chown -R ${MEASU}:${GROUP} /var/spool/ripe-atlas/*
 
 	echo 1>/dev/null 2> "${cfg}"
 	if [ ${rxtx_report} -ne 0 ]; then
 		echo 'RXTXRPT=yes' >> "${cfg}"
 	fi
+	echo "${mode}" > "${mod}"
 
 	procd_open_instance
 	if [ "${use_screen}" -ne 0 ]; then
@@ -64,6 +68,8 @@ start_service()
 	else
 		procd_set_param command /usr/sbin/ripe-atlas
 	fi
+	procd_set_param user ${MAINU}
+	procd_set_param group ${GROUP}
 	procd_set_param respawn
 	procd_close_instance
 }
