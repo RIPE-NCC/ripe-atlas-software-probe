@@ -22,24 +22,23 @@ atlas_scripts_SCRIPTS += \
 			anchor/reg_servers.sh.prod
 endif
 
+CLEANFILES = \
+             common/FIRMWARE_APPS_VERSION \
+             common/measurement.conf \
+             $(top_srcdir)/probe-busybox/include/atlas_path.h
+
 if SYSTEMD_INSTALL
 systemd_units_DATA = \
 		    common/ripe-atlas.service
 systemd_tmpfiles_DATA = \
-		    common/tmpfiles.conf
+		    common/ripe-atlas.conf
+CLEANFILES += \
+             common/ripe-atlas.conf \
+	     common/ripe-atlas.service
 endif
 
 BUILT_SOURCES = \
-	      common/tmpfiles.conf \
-	      common/ripe-atlas.service \
 	      $(top_srcdir)/probe-busybox/include/atlas_path.h
-
-CLEANFILES = \
-             common/FIRMWARE_APPS_VERSION \
-             common/measurement.conf \
-             common/tmpfiles.conf \
-	     common/ripe-atlas.service \
-             $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in
 	@rm -f $@
