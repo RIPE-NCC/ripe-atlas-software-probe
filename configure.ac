@@ -113,7 +113,7 @@ else
 		AC_MSG_RESULT([no. 'systemd-path' not found])
 	fi
 fi
-AM_CONDITIONAL(SYSTEMD_INSTALL, [test "x${SYSTEMDPATH}" != 'x' && test "${enable_systemd}" != 'x'])
+AM_CONDITIONAL(SYSTEMD_INSTALL, [test "x${SYSTEMDPATH}" != 'x' -a "x${enable_systemd}" = 'xyes'])
 AC_SUBST(systemd_tmpfilesdir)
 AC_SUBST(systemd_unitsdir)
 

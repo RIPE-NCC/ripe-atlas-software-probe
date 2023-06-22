@@ -34,9 +34,8 @@ CONFIGURE_ARGS+= \
 	--with-group=$(ATLAS_GROUP) \
 	--with-measurement-user=$(ATLAS_MEAS) \
 	--disable-systemd \
-ifeq ($(ATLAS_USER),root)
-	--disable-setcap
-endif
+	--disable-setcap-install \
+	--disable-chown
 
 define Package/ripe-atlas/Default/description
 	RIPE Atlas is the RIPE NCC's main Internet data
