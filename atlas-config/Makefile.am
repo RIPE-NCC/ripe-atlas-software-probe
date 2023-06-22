@@ -22,6 +22,13 @@ atlas_scripts_SCRIPTS += \
 			anchor/reg_servers.sh.prod
 endif
 
+if SYSTEMD_INSTALL
+systemd_units_DATA = \
+		    common/ripe-atlas.service
+systemd_tmpfiles_DATA = \
+		    common/tmpfiles.conf
+endif
+
 BUILT_SOURCES = \
 	      common/tmpfiles.conf \
 	      common/ripe-atlas.service \

@@ -31,8 +31,10 @@ endif
 
 install-exec-local:
 	$(mkinstalldirs) -m 0755 $(ATLAS_OWN_MEAS_OPTS) $(ATLAS_SPOOL_DIRS)
-	$(mkinstalldirs) -m 0775 $(ATLAS_OWN_MEAS_OPTS) $(ATLAS_RUN_DIRS)
 	$(mkinstalldirs) -m 0770 $(ATLAS_OWN_CONF_OPTS) $(ATLAS_CONF_DIRS)
+if !SYSTEMD_INSTALL
+	$(mkinstalldirs) -m 0775 $(ATLAS_OWN_MEAS_OPTS) $(ATLAS_RUN_DIRS)
+endif
 
 #
 # Technically this hack belongs in probe-busybox, but it is here

@@ -96,6 +96,27 @@ fi
 
 AM_CONDITIONAL(SETCAP_INSTALL, [test "x${enable_setcap_install}" = 'xyes'])
 
+AC_PATH_PROG(SYSTEMDPATH, systemd-path)
+AC_ARG_ENABLE([systemd], [AC_HELP_STRING([--enable-systemd], [install files for systemd @<:@default=yes@:>@])], [enable_systemd="${enableval}"],[enable_systemd=yes])
+
+AC_MSG_CHECKING([whether to install systemd support files])
+systemd_tmpfilesdir=
+systemd_unitsdir=
+if test "x${enable_systemd}" = 'xno'; then
+	AC_MSG_RESULT([no])
+else
+	if test "x${SYSTEMDPATH}" != 'x'; then
+		AC_MSG_RESULT([yes])
+		systemd_tmpfilesdir=$(${SYSTEMDPATH} tmpfiles)
+		systemd_unitsdir=$(${SYSTEMDPATH} systemd-system-unit)
+	else
+		AC_MSG_RESULT([no. 'systemd-path' not found])
+	fi
+fi
+AM_CONDITIONAL(SYSTEMD_INSTALL, [test "x${SYSTEMDPATH}" != 'x' && test "${enable_systemd}" != 'x'])
+AC_SUBST(systemd_tmpfilesdir)
+AC_SUBST(systemd_unitsdir)
+
 # system paths
 atlas_libexecdir="${libexecdir}/ripe-atlas"
 atlas_datadir="${datadir}/ripe-atlas"

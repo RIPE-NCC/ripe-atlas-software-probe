@@ -66,10 +66,6 @@ make
 
 %install
 cd %{_builddir}/%{build_dirname}
-mkdir -p %{buildroot}%{_unitdir}
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
-mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/common/tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/ripe-atlas.conf
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
 install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
 mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts

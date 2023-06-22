@@ -33,6 +33,7 @@ CONFIGURE_ARGS+= \
 	--with-user=$(ATLAS_USER) \
 	--with-group=$(ATLAS_GROUP) \
 	--with-measurement-user=$(ATLAS_MEAS) \
+	--disable-systemd \
 ifeq ($(ATLAS_USER),root)
 	--disable-setcap
 endif
