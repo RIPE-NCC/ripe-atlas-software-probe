@@ -37,16 +37,12 @@ CLEANFILES += \
 	     common/ripe-atlas.service
 endif
 
+#
+# This is a hack to ensure that atlas_path.h gets created prior
+# to probe-busybox being built.
 BUILT_SOURCES = \
 	      $(top_srcdir)/probe-busybox/include/atlas_path.h
 
 common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
-
-#
-# This is a hack to ensure that atlas_path.h gets created prior
-# to probe-busybox being built.
-# all-local:      $(top_srcdir)/probe-busybox/include/atlas_path.h
-
-
