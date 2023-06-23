@@ -26,6 +26,7 @@ License:    	RIPE NCC
 Group:      	Applications/Internet
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
 BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
+URL:            https://atlas.ripe.net/
 
 %description
 Essential core assets used in all probe flavours. This package must be installed for a probe to operate as expected.
@@ -37,6 +38,7 @@ BuildArch:      noarch
 Provides:	atlasswprobe = %{version}-%{release}
 Obsoletes:	atlasswprobe < 5080-3%{?dist}
 Requires:	ripe-atlas-common = %{version}-%{release}
+URL:            https://atlas.ripe.net/
 
 %description -n ripe-atlas-probe
 Probe specific files and configurations that form a working software probe.
@@ -61,15 +63,10 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir}
+./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd
 make
 
 %install
-cd %{_builddir}/%{build_dirname}
-mkdir -p %{buildroot}%{_datadir}/%{base_path}
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
-mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/probe/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 make DESTDIR=%{buildroot} install
 
 %files
@@ -128,17 +125,6 @@ GID=$(getent group %{atlas_group} | cut -d: -f3)
 useradd -c %{atlas_measurement} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_measurement} 2>/dev/null
 useradd -c %{atlas_user} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_user} 2>/dev/null
 exit 0
-
-
-%post -n ripe-atlas-probe
-# set to environment
-if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
-    %{!?env:%define env prod}
-    echo %{env} > %{_sysconfdir}/%{base_path}/mode
-fi
-
-# apply permissions
-chown -R %{atlas_measurement}:%{atlas_group} %{_localstatedir}/spool/%{base_path}
 
 %systemd_post %{service_name}
 systemctl restart %{service_name}
