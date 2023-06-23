@@ -1,6 +1,23 @@
 Installation Instructions
 =========================
 
+Picking a release
+-----------------
+The repository is structured around 3 main branches:
+- A master branch which contains production-ready code.
+- A testing branch
+- A devel(opment) branch
+- Ticket branches
+
+The master branch contains the latest production-level code code. The firmware for hardware probes is built from this branch.
+The testing branch is a pointer on the master branch that contains code that is being readied for the next production release.
+The development branch contains code which is by its nature feature complete, but may not be fully tested yet. This code is merged into the testing branch upon completion and unit testing.
+Ticket branches that branch off the development branch contain features or fixes that may or may not work
+
+Any tag which is a number divisable by 10 is a production release (5060, 5070, 5080). Any tag with another number is either a development or a testing release.
+
+When uncertain, always select the master branch.
+
 To create a RPM for RHEL
 ------------------------
 
