@@ -34,6 +34,8 @@ fi
 export httppost_port
 export TELNETD_PORT=$(config_lookup TELNETD_PORT 2023)
 
+umask 002
+
 $MOUNT_FS_CMD
 
 mkdir -p $ATLAS_STATUS $STATE_DIR $RUN_DIR
