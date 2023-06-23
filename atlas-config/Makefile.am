@@ -37,6 +37,9 @@ CLEANFILES += \
 	     common/ripe-atlas.service
 endif
 
+atlas_sysconf_DATA = \
+			common/mode
+
 #
 # This is a hack to ensure that atlas_path.h gets created prior
 # to probe-busybox being built.
