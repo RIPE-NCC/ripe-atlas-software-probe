@@ -24,7 +24,7 @@ Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
 Group:      	Applications/Internet
-Requires:   	sudo %{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
+Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
 BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 
 %description
@@ -80,7 +80,8 @@ make DESTDIR=%{buildroot} install
 %{_sysconfdir}
 %{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
-%caps(cap_net_raw=ep) %attr(0750, %{atlas_measurement}, %{atlas_group} %{_libexecdir}/%{base_path}/measurement/busybox
+%caps(cap_net_raw=ep) %attr(0750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
+%attr(2775, %{atlas_measurement}, %{atlas_group}) %{_localstatedir}/spool/%{base_path}
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
