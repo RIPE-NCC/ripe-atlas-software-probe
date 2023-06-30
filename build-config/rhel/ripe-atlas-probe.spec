@@ -18,6 +18,9 @@
 # transition directory key storage
 %define	    key_dirname	/var/tmp/ripe-atlas-keydir
 
+# Keep scripts intact
+%define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
+
 Name:	    	ripe-atlas-common
 Summary:    	RIPE Atlas probe
 Version:    	%{version}
@@ -63,20 +66,35 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd
+./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd --disable-chown --disable-setcap-install
 make
 
 %install
+cd %{_builddir}/%{build_dirname}
 make DESTDIR=%{buildroot} install
 
 %files
 %exclude %dir %{_sbindir}
-%{_sbindir}/ripe-atlas
-%{_libexecdir}
-%{_localstatedir}
-%{_sysconfdir}
+%exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
+%{_sbindir}/*
+%{_libexecdir}/%{base_path}/scripts/*.sh
+%{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_unitdir}/%{service_name}
-%{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
+%{_datadir}/%{base_path}
+%{_tmpfilesdir}/*
+%{_sysconfdir}/%{base_path}/mode
+%attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
+%dir %{_libexecdir}/%{base_path}/measurement/
+%{_libexecdir}/%{base_path}/measurement/a*
+%{_libexecdir}/%{base_path}/measurement/buddyinfo
+%{_libexecdir}/%{base_path}/measurement/c*
+%{_libexecdir}/%{base_path}/measurement/d*
+%{_libexecdir}/%{base_path}/measurement/e*
+%{_libexecdir}/%{base_path}/measurement/h*
+%{_libexecdir}/%{base_path}/measurement/o*
+%{_libexecdir}/%{base_path}/measurement/p*
+%{_libexecdir}/%{base_path}/measurement/r*
+%{_libexecdir}/%{base_path}/measurement/t*
 %caps(cap_net_raw=ep) %attr(0750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
 %attr(2775, %{atlas_measurement}, %{atlas_group}) %{_localstatedir}/spool/%{base_path}
 
