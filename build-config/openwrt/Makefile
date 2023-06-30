@@ -142,6 +142,7 @@ define Package/ripe-atlas-common/install
 			measurement.conf \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
+	$(INSTALL_DATA) capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
 	$(call LinkApplet,$(1),condmv)

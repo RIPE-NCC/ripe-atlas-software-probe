@@ -71,6 +71,9 @@ start_service()
 	procd_set_param user ${MAINU}
 	procd_set_param group ${GROUP}
 	procd_set_param respawn
+	if [ -x /sbin/ujail ]; then
+		procd_append_param capabilities /usr/share/ripe-atlas/capabilities.json
+	fi
 	procd_close_instance
 }
 
