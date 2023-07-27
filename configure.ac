@@ -65,6 +65,7 @@ fi
 if ! grep -qE "^${ripe_atlas_measurement}:" /etc/passwd; then
 	AC_MSG_WARN([User ${ripe_atlas_measurement} doesn't seem to exist, installation may fail])
 fi
+AM_CONDITIONAL(SINGLE_USER, [test "${ripe_atlas_measurement}" = "${ripe_atlas_user}"])
 
 AC_SUBST(ripe_atlas_user)
 AC_SUBST(ripe_atlas_group)
@@ -102,6 +103,7 @@ AC_ARG_ENABLE([systemd], [AC_HELP_STRING([--enable-systemd], [install files for 
 AC_MSG_CHECKING([whether to install systemd support files])
 systemd_tmpfilesdir=
 systemd_unitsdir=
+systemd_sysusersdir=
 if test "x${enable_systemd}" = 'xno'; then
 	AC_MSG_RESULT([no])
 else
@@ -109,6 +111,7 @@ else
 		AC_MSG_RESULT([yes])
 		systemd_tmpfilesdir=$(${SYSTEMDPATH} tmpfiles)
 		systemd_unitsdir=$(${SYSTEMDPATH} systemd-system-unit)
+		systemd_sysusersdir=$(${SYSTEMDPATH} sysusers)
 	else
 		AC_MSG_RESULT([no. 'systemd-path' not found])
 	fi
@@ -116,6 +119,7 @@ fi
 AM_CONDITIONAL(SYSTEMD_INSTALL, [test "x${SYSTEMDPATH}" != 'x' -a "x${enable_systemd}" = 'xyes'])
 AC_SUBST(systemd_tmpfilesdir)
 AC_SUBST(systemd_unitsdir)
+AC_SUBST(systemd_sysusersdir)
 
 # system paths
 atlas_libexecdir="${libexecdir}/ripe-atlas"

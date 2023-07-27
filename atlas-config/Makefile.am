@@ -36,6 +36,21 @@ systemd_tmpfiles_DATA = \
 CLEANFILES += \
              common/ripe-atlas.run.conf \
 	     common/ripe-atlas.service
+
+if SINGLE_USER
+systemd_sysusers_DATA = \
+		    common/ripe-atlas.user.conf
+
+CLEANFILES += \
+	     common/ripe-atlas.user.conf
+else
+systemd_sysusers_DATA = \
+		    common/ripe-atlas.users.conf
+
+CLEANFILES += \
+	     common/ripe-atlas.users.conf
+endif
+
 endif
 
 atlas_sysconf_DATA = \
@@ -50,3 +65,16 @@ BUILT_SOURCES = \
 common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+
+if SYSTEMD_INSTALL
+install-data-hook:
+if SINGLE_USER
+	@mv -f $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.user.conf \
+	       $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.conf
+else
+	@mv -f $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.users.conf \
+	       $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.conf
+endif
+	@mv -f $(DESTDIR)$(systemd_tmpfilesdir)/ripe-atlas.run.conf \
+	       $(DESTDIR)$(systemd_tmpfilesdir)/ripe-atlas.conf
+endif

@@ -80,8 +80,9 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/scripts/*.sh
 %{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_unitdir}/%{service_name}
+%{_sysusersdir}/ripe-atlas.conf
 %{_datadir}/%{base_path}
-%{_tmpfilesdir}/*
+%{_tmpfilesdir}/ripe-atlas.conf
 %{_sysconfdir}/%{base_path}/mode
 %attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}/measurement/
@@ -103,6 +104,7 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %pre -n ripe-atlas-common
+%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.users.conf
 systemctl stop %{service_name} 1>/dev/null 2>&1
 
 # save probe keys
@@ -131,16 +133,6 @@ fi
 # clean environment
 killall -9 eooqd eperd perd telnetd 2>/dev/null || :
 rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
-
-# add measurement system group
-if [ ! $(getent group %{atlas_group}) ]; then
-	groupadd %{atlas_group}
-fi
-
-# init measurement user
-GID=$(getent group %{atlas_group} | cut -d: -f3)
-useradd -c %{atlas_measurement} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_measurement} 2>/dev/null
-useradd -c %{atlas_user} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s /sbin/nologin -u $GID %{atlas_user} 2>/dev/null
 exit 0
 
 %systemd_post %{service_name}
