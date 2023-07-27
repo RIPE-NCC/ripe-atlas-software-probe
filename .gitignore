@@ -2,7 +2,7 @@
 
 atlas-config/common/FIRMWARE_APPS_VERSION
 atlas-config/common/measurement.conf
-atlas-config/common/ripe-atlas.conf
+atlas-config/common/ripe-atlas.run.conf
 atlas-config/common/ripe-atlas.service
 bin/arch/generic/*.sh
 bin/config.sh

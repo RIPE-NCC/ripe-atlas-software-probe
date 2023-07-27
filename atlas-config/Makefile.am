@@ -31,9 +31,10 @@ if SYSTEMD_INSTALL
 systemd_units_DATA = \
 		    common/ripe-atlas.service
 systemd_tmpfiles_DATA = \
-		    common/ripe-atlas.conf
+		    common/ripe-atlas.run.conf
+
 CLEANFILES += \
-             common/ripe-atlas.conf \
+             common/ripe-atlas.run.conf \
 	     common/ripe-atlas.service
 endif
 
