@@ -103,7 +103,7 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %pre -n ripe-atlas-common
-systemctl stop %{service_name} 2>&1 1>/dev/null
+systemctl stop %{service_name} 1>/dev/null 2>&1
 
 # save probe keys
 if [ -d /var/atlas-probe ]; then
@@ -111,7 +111,6 @@ if [ -d /var/atlas-probe ]; then
 	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
 fi
 exit 0
-
 
 %pre -n ripe-atlas-probe
 # TODO: check cgroup and that all processes are stopped when %{service_name} stops
@@ -145,7 +144,7 @@ useradd -c %{atlas_user} -d %{_localstatedir}/%{base_path} -g %{atlas_group} -s 
 exit 0
 
 %systemd_post %{service_name}
-systemctl restart %{service_name}
+systemctl restart %{service_name} 1>/dev/null 2>&1
 exit 0
 
 
