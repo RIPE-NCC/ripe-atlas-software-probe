@@ -28,7 +28,7 @@ Release:    	1%{?dist}
 License:    	RIPE NCC
 Group:      	Applications/Internet
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
-BuildRequires:	rpm %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
+BuildRequires:	rpm systemd systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 URL:            https://atlas.ripe.net/
 
 %description
@@ -78,6 +78,7 @@ make DESTDIR=%{buildroot} install
 %exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %{_sbindir}/*
 %{_libexecdir}/%{base_path}/scripts/*.sh
+%dir %{_libexecdir}/%{base_path}/scripts
 %{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_unitdir}/%{service_name}
 %{_sysusersdir}/ripe-atlas.conf
@@ -96,7 +97,8 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/measurement/p*
 %{_libexecdir}/%{base_path}/measurement/r*
 %{_libexecdir}/%{base_path}/measurement/t*
-%caps(cap_net_raw=ep) %attr(0750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
+%ghost %{_localstatedir}/%{base_path}
+%caps(cap_net_raw=ep) %attr(4750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
 %attr(2775, %{atlas_measurement}, %{atlas_group}) %{_localstatedir}/spool/%{base_path}
 
 %files -n ripe-atlas-probe
@@ -104,8 +106,8 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %pre -n ripe-atlas-common
-%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.users.conf
 systemctl stop %{service_name} 1>/dev/null 2>&1
+%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.users.conf
 
 # save probe keys
 if [ -d /var/atlas-probe ]; then
@@ -139,6 +141,8 @@ exit 0
 systemctl restart %{service_name} 1>/dev/null 2>&1
 exit 0
 
+%post -n ripe-atlas-common
+%tmpfiles_create %{_tmpfilesdir}/ripe-atlas.conf
 
 %preun -n ripe-atlas-common
 # save probe keys
