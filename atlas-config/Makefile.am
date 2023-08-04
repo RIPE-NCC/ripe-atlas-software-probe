@@ -78,3 +78,6 @@ endif
 	@mv -f $(DESTDIR)$(systemd_tmpfilesdir)/ripe-atlas.run.conf \
 	       $(DESTDIR)$(systemd_tmpfilesdir)/ripe-atlas.conf
 endif
+if DO_CHOWN
+	chown $(ripe_atlas_user):$(ripe_atlas_group) $(DESTDIR)/$(atlas_sysconfdir)/mode
+endif

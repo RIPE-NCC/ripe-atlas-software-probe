@@ -1,23 +1,17 @@
-%define         git_repo	ripe-atlas-software-probe
-%define         build_dirname	%{git_repo}
-%define         base_path       ripe-atlas
-%define		service_name	ripe-atlas.service
-%define		version		%(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
+%define     git_repo         ripe-atlas-software-probe
+%define     build_dirname    %{git_repo}
+%define     base_path        ripe-atlas
+%define     service_name     ripe-atlas.service
+%define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
-# define user to perform connectivity operations to infra
-%define     system_user         ripe-atlas
-%define     system_group        ripe-atlas
-%define     system_homedir      /home/ripe-atlas
-%define     system_gid          10042
+# flag to ignore files installed in builddir but not packaged in the final RPM
+%define	    _unpackaged_files_terminate_build	0
 
-# define user to perform measurements
-%define     msm_user         atlasmsm
-%define     msm_group        atlasmsm
-%define     msm_homedir      /home/atlasmsm
-%define     msm_gid          10624
+# prevent creation of the build ids in /usr/lib -> see https://access.redhat.com/discussions/5045161
+%define	    _build_id_links none
 
-# transition directory key storage
-%define     key_dirname /var/tmp/ripe-atlas-keydir
+# Keep scripts intact
+%define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
 Name:           ripe-atlas-anchor
 Summary:        RIPE Atlas Anchor Package
@@ -25,17 +19,22 @@ Version:        %{version}
 Release:        1%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
-BuildArch:	noarch
+BuildArch:      noarch
 Requires:       ripe-atlas-common = %{version}-%{release}
 BuildRequires:  rpm, systemd, openssl-devel
-Provides:	atlasprobe = %{version}-%{release}
-Obsoletes:	atlasprobe < 5080.0-3
-Conflicts:	atlasprobe
+Provides:       atlasprobe = %{version}-%{release}
+Obsoletes:      atlasprobe < 5080.0-3
+Conflicts:      atlasprobe
+URL:            https://atlas.ripe.net/anchors/apply/
+%{systemd_requires}
 
 %description
-Setup the RIPE Atlas Anchor Package
+Probe specific files and configurations that form a working anchor. Please visit https://atlas.ripe.net/anchors/apply/ to register.
+Only install at the direction of RIPE NCC.
 
 %prep
+echo "Building for anchor version: %{version}"
+
 # performing the steps of '%setup' manually since we are pulling from a remote git repo
 echo "Cleaning build dir"
 cd %{_builddir}
@@ -45,7 +44,7 @@ echo "Getting Sources..."
 %{!?git_tag:%define git_tag master}
 %{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-git clone -b %{git_tag} %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
+git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
 cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
@@ -59,64 +58,29 @@ install -m644 %{_builddir}/%{build_dirname}/atlas-config/anchor/reg_servers.sh.p
 %files
 %{_datadir}/%{base_path}/known_hosts.reg
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
-
-%pre
-systemctl stop %{service_name} &>/dev/null
-killall -9 eooqd eperd perd telnetd 2>/dev/null || :
-
-# save files if not there already there and same - transitional
-# intentionally using full path of obsoleting key
-if [ ! -e %{key_dirname}/probe_key ] || ! $(cmp -s /home/atlas/etc/probe_key %{key_dirname}/probe_key); then
-        mkdir -p %{key_dirname}
-        cp /home/atlas/etc/probe_key* %{key_dirname}/
-fi
-
-# remove cached files
-rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
-
-groupadd -g %{system_gid} %{system_user} 2>/dev/null
-useradd -c %{system_user} -g %{system_group} -s /sbin/nologin -u %{system_gid} %{system_user} 2>/dev/null
-groupadd -g %{msm_gid} %{msm_user} 2>/dev/null
-useradd -c %{msm_user} -g %{msm_group} -s /sbin/nologin -u %{msm_gid} %{msm_user} 2>/dev/null
-exit 0
+%ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %post
-# move in keys from obsolete package - transitional
-if [ -e %{key_dirname}/probe_key ]; then
-        mkdir -p %{_sysconfdir}/%{base_path}
-        mv -f %{key_dirname}/probe_key* %{_sysconfdir}/%{base_path}
-        rmdir %{key_dirname}
-fi
-
-# set to environment
-if [ ! -f %{_sysconfdir}/%{base_path}/mode ]; then
-    %{!?env:%define env prod}
-    echo %{env} > %{_sysconfdir}/%{base_path}/mode
-fi
-
-# apply permissions
-chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/spool/%{base_path}
-chown -R %{msm_user}:%{msm_group} %{buildroot}%{_localstatedir}/run/%{base_path}/pids
-chown -R %{system_user}:%{system_user} %{buildroot}%{_localstatedir}/run/%{base_path}/status
-
-# start service
-%systemd_post %{service_name}
-systemctl --now --quiet enable %{service_name}
-
-# lock ssh files to stop obsoleting package from deleting them - transitional
-chattr +i /home/atlas/etc/probe_key*
+# clean environment; systemd should restart after this on upgrade
+rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 exit 0
 
 %preun
-# stop and disable
-%systemd_preun %{service_name}
+# Uninstall
+if [ $1 -eq 0 ]; then
+	systemctl stop %{service_name} 1>/dev/null 2>&1
+	systemctl disable %{service_name} 1>/dev/null 2>&1
+fi
 exit 0
 
 %postun
-%systemd_postun %{service_name}
+%systemd_postun_with_restart %{service_name}
 exit 0
 
 %changelog
+* Wed Aug 9 2023 Michel Stam <mstam@ripe.net>
+- Refactor anchor build spec according to probe spec
+
 * Mon Dec 19 2022 Guy Meyer <gmeyer@ripe.net>
 - generalize system and msm users
 - do not remove probe private key on uninstall

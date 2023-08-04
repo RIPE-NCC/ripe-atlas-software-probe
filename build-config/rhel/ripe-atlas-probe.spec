@@ -16,35 +16,37 @@
 %define	    _build_id_links none
 
 # transition directory key storage
-%define	    key_dirname	/var/tmp/ripe-atlas-keydir
+%define	    atlas_oldkey       /var/atlas-probe/etc/probe_key
+%define	    atlas_newkey       %{_sysconfdir}/%{base_path}/probe_key
 
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
 Name:	    	ripe-atlas-common
-Summary:    	RIPE Atlas probe
+Summary:    	RIPE Atlas Software Probe Essentials
+Group:      	Applications/Internet
 Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
-Group:      	Applications/Internet
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
-BuildRequires:	rpm systemd systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
+BuildRequires:	rpm systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 URL:            https://atlas.ripe.net/
+%{systemd_requires}
 
 %description
 Essential core assets used in all probe flavours. This package must be installed for a probe to operate as expected.
 
 %package -n ripe-atlas-probe
-Summary:	RIPE Atlas Probe Software Essentials
+Summary:	RIPE Atlas Software Probe
 Group:		Applications/Internet
 BuildArch:      noarch 
+Requires:	ripe-atlas-common = %{version}-%{release}
 Provides:	atlasswprobe = %{version}-%{release}
 Obsoletes:	atlasswprobe < 5080-3%{?dist}
-Requires:	ripe-atlas-common = %{version}-%{release}
-URL:            https://atlas.ripe.net/
+URL:            https://atlas.ripe.net/apply/swprobe/
 
 %description -n ripe-atlas-probe
-Probe specific files and configurations that form a working software probe.
+Probe specific files and configurations that form a working software probe. Please visit https://atlas.ripe.net/apply/swprobe/ to register.
 
 %prep
 echo "Building for probe version: %{version}"
@@ -66,7 +68,7 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd --disable-chown --disable-setcap-install
+./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd --disable-chown --disable-setcap-install --with-install-mode=probe
 make
 
 %install
@@ -75,17 +77,18 @@ make DESTDIR=%{buildroot} install
 
 %files
 %exclude %dir %{_sbindir}
-%exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %{_sbindir}/*
-%{_libexecdir}/%{base_path}/scripts/*.sh
-%dir %{_libexecdir}/%{base_path}/scripts
-%{_libexecdir}/%{base_path}/scripts/resolvconf
+%dir %{_datadir}/%{base_path}
 %{_unitdir}/%{service_name}
 %{_sysusersdir}/ripe-atlas.conf
-%{_datadir}/%{base_path}
 %{_tmpfilesdir}/ripe-atlas.conf
-%{_sysconfdir}/%{base_path}/mode
+%{_datadir}/%{base_path}/measurement.conf
+%{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
+%config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{_sysconfdir}/%{base_path}/mode
+%ghost %{_sysconfdir}/%{base_path}/probe_key
+%ghost %{_sysconfdir}/%{base_path}/probe_key.pub
 %attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
+%dir %{_libexecdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}/measurement/
 %{_libexecdir}/%{base_path}/measurement/a*
 %{_libexecdir}/%{base_path}/measurement/buddyinfo
@@ -97,71 +100,79 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/measurement/p*
 %{_libexecdir}/%{base_path}/measurement/r*
 %{_libexecdir}/%{base_path}/measurement/t*
-%ghost %{_localstatedir}/%{base_path}
 %caps(cap_net_raw=ep) %attr(4750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
+%dir %{_libexecdir}/%{base_path}/scripts
+%exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
+%{_libexecdir}/%{base_path}/scripts/resolvconf
+%{_libexecdir}/%{base_path}/scripts/*.sh
 %attr(2775, %{atlas_measurement}, %{atlas_group}) %{_localstatedir}/spool/%{base_path}
+%ghost %{_rundir}/%{base_path}
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+%ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %pre -n ripe-atlas-common
-systemctl stop %{service_name} 1>/dev/null 2>&1
 %sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.users.conf
+%tmpfiles_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.run.conf
 
-# save probe keys
-if [ -d /var/atlas-probe ]; then
-	mkdir -p %{key_dirname}
-	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
-fi
+# check if probe keys need to be backed up
+[ ! -f "%{atlas_oldkey}" ] && exit 0
+[ $(cmp -s "%{atlas_oldkey}" "%{atlas_newkey}") ] && exit 0
+
+# migrate probe keys
+mkdir -p -m 0770 "%{atlas_newdir}"
+cp "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1
+cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1
+chmod 644 "%{atlas_newkey}.pub"
+chmod 400 "%{atlas_newkey}"
+chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}"
 exit 0
 
 %pre -n ripe-atlas-probe
-# TODO: check cgroup and that all processes are stopped when %{service_name} stops
-
-# save files if not there already there and same - transitional
-if [ ! -e %{key_dirname}/probe_key ] || [ -e /var/atlas-probe/etc/probe_key ] || ! $(cmp -s /var/atlas-probe/etc/probe_key %{key_dirname}/probe_key); then
-	mkdir -p %{key_dirname}
-	cp /var/atlas-probe/etc/probe_key* %{key_dirname}/
-fi
-
-# move in keys from obsolete package - transitional
-if [ -e %{key_dirname}/probe_key ]; then
-	mkdir -p %{_sysconfdir}/%{base_path}
-	mv -f %{key_dirname}/probe_key* %{_sysconfdir}/%{base_path}/
-	chown -R %{atlas_user}:%{atlas_group} %{_sysconfdir}/%{base_path}/probe_key*
-fi
-
-# clean environment
-killall -9 eooqd eperd perd telnetd 2>/dev/null || :
-rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
-exit 0
-
-%systemd_post %{service_name}
-systemctl restart %{service_name} 1>/dev/null 2>&1
 exit 0
 
 %post -n ripe-atlas-common
-%tmpfiles_create %{_tmpfilesdir}/ripe-atlas.conf
+%systemd_post %{service_name}
 
-%preun -n ripe-atlas-common
-# save probe keys
-if [ ! -f %{key_dirname}/probe_key ]; then
-	mkdir -p %{key_dirname}
-	cp %{_localstatedir}/etc/probe_key* %{key_dirname}/
-fi
+# clean environment of previous version (if any)
+# on upgrade systemd restarts after this
+rm -f %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
 exit 0
 
+%post -n ripe-atlas-probe
+%systemd_post %{service_name}
+exit 0
 
 %preun -n ripe-atlas-probe
-# save probe keys
-if [ ! -f %{key_dirname}/probe_key ]; then
-	mkdir -p %{key_dirname}
-	cp %{_sysconfdir}/%{base_path}/probe_key* %{key_dirname}/
+# Uninstall
+if [ $1 -eq 0 ]; then
+	systemctl stop %{service_name} 1>/dev/null 2>&1
+	systemctl disable %{service_name} 1>/dev/null 2>&1
 fi
 exit 0
 
+%preun -n ripe-atlas-common
+# Uninstall
+if [ $1 -eq 0 ]; then
+	systemctl stop %{service_name} 1>/dev/null 2>&1
+	systemctl disable %{service_name} 1>/dev/null 2>&1
+
+	# clean environment; %files doesn't support leaving directories but removing files
+	rm -f %{_rundir}/%{base_path}/pids/* \
+	      %{_rundir}/%{base_path}/status/* \
+	      %{_localstatedir}/spool/%{base_path}/crons/* \
+	      %{_localstatedir}/spool/%{base_path}/crons/*/* \
+	      %{_localstatedir}/spool/%{base_path}/data/*/* \
+	      1>/dev/null 2>&1
+fi
+exit 0
+
+%postun -n ripe-atlas-common
+%systemd_postun_with_restart %{service_name}
+exit 0
 
 %postun -n ripe-atlas-probe
-%systemd_postun %{service_name}
+%systemd_postun_with_restart %{service_name}
 exit 0
