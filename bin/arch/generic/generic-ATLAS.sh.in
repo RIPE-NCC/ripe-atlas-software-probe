@@ -47,15 +47,15 @@ REG_SERVERS_SOURCE=$ATLAS_SCRIPTS/reg_servers.sh
 # Get ethernet address
 get_ether_addr
 
-# Set SOS_ID to the hash of the public key
-export SOS_ID="H$(hash_ssh_pubkey $ATLAS_SYSCONFDIR/probe_key.pub)"
-
 # Create ssh keys if they are not there yet.
 if [ ! -f $ATLAS_SYSCONFDIR/probe_key ]; then
     name=$(hostname -s)
     ssh-keygen -t rsa -P '' -C $name -f $ATLAS_SYSCONFDIR/probe_key
     chown -R @ripe_atlas_user@:@ripe_atlas_group@ $ATLAS_SYSCONFDIR
 fi
+
+# Set SOS_ID to the hash of the public key
+export SOS_ID="H$(hash_ssh_pubkey $ATLAS_SYSCONFDIR/probe_key.pub)"
 
 while :
 do
