@@ -1,0 +1,6 @@
+# Compulsory line, this is a version 4 file.
+version=4
+
+# Direct Git.
+opts="mode=git" http://git.example.com/ripe-atlas-software-probe.git \
+    refs/tags/v([\d\.]+)

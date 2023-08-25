@@ -1,0 +1,2 @@
+probe/known_hosts.reg		usr/share/ripe-atlas/known_hosts.reg
+probe/reg_servers.sh.prod	usr/libexec/ripe-atlas/scripts/reg_servers.sh.prod

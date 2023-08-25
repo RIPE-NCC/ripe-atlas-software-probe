@@ -1,0 +1,5 @@
+ripe-atlas-software-probe (5080) bookworm bullseye; urgency=medium
+
+  * Introduction of Debian package for RIPE Atlas probes & anchors
+
+ -- Michel Stam <mstam@ripe.net>  Fri, 25 Aug 2023 16:16:30 +0200

@@ -73,5 +73,12 @@ m4/lt~obsolete.m4
 /atlas-config/Makefile
 /bin/Makefile
 
-# makedeb artifacts
-atlasswprobe-*
+# dpkg-buildpackage
+debian/.debhelper/
+debian/autoreconf.*
+debian/autoreconf.before
+debian/debhelper-build-stamp
+debian/files
+debian/ripe-atlas-anchor*
+debian/ripe-atlas-common*
+debian/ripe-atlas-software-probe*
