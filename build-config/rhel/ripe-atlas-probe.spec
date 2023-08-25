@@ -16,8 +16,10 @@
 %define	    _build_id_links none
 
 # transition directory key storage
-%define	    atlas_oldkey       /var/atlas-probe/etc/probe_key
-%define	    atlas_newkey       %{_sysconfdir}/%{base_path}/probe_key
+%define	    atlas_olddir       /var/atlas-probe/etc
+%define	    atlas_oldkey       %{atlas_olddir}/probe_key
+%define	    atlas_newdir       %{_sysconfdir}/%{base_path}
+%define	    atlas_newkey       %{atlas_newdir}/probe_key
 
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
