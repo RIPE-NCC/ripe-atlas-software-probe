@@ -21,7 +21,7 @@ get_arch()
 			echo 'atlas-mox'
 			;;
 
-		*"rpm"*|*"deb"*)
+		*"rpm"*|*"deb"*|'generic')
 			echo 'fluffy'
 			;;
 
@@ -36,7 +36,7 @@ get_arch()
 get_sub_arch()
 {
 	arch=`get_arch`
-	if [ "x$arch" == "xfluffy" ]; then
+	if [ "x$arch" = 'xfluffy' ]; then
 		echo "$PROBE_TYPE" 
 	else
 		echo ""
