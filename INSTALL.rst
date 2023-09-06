@@ -4,7 +4,7 @@ Installation Instructions
 To create a RPM for CentOS 7 or CentOS 8
 ----------------------------------------
 
-- ``sudo yum update && yum install git tar rpm-build openssl-devel autoconf automake libtool make``
+- ``sudo yum update && sudo yum install git tar rpm-build openssl-devel autoconf automake libtool make``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - ``ripe-atlas-software-probe/build-config/centos/bin/make-tars``
   (this will create a directory called rpmbuild)
