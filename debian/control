@@ -13,7 +13,7 @@ Architecture: any
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
- libssl3,
+ libssl3 | libssl1,
  net-tools,
  openssh-client,
 Section: net

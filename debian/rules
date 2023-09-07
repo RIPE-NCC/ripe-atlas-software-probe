@@ -11,7 +11,7 @@ export DH_VERBOSE = 1
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 %:
-	dh $@ --with installsysusers
+	dh $@
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
@@ -27,6 +27,11 @@ override_dh_auto_configure:
 # and the permissions being fixed. Either users don't exist and permissions
 # are fixed, which won't work. Or, the users are created and systemd is
 # restarted, but the permissions are not fixed.
+sysusers:
+	dh_installsysusers \
+		-pripe-atlas-common \
+		--name=ripe-atlas
+
 override_dh_installsystemd:
 	dh_installsystemd \
 		-pripe-atlas-common \
@@ -34,13 +39,8 @@ override_dh_installsystemd:
 		--no-start \
 		--name=ripe-atlas
 
-override_dh_installtmpfiles:
+override_dh_installtmpfiles: sysusers
 	dh_installtmpfiles \
-		-pripe-atlas-common \
-		--name=ripe-atlas
-
-override_dh_installsysusers:
-	dh_installsysusers \
 		-pripe-atlas-common \
 		--name=ripe-atlas
 
