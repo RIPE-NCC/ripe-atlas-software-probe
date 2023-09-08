@@ -42,6 +42,7 @@ autom4te.cache
 /config.status
 /config.sub
 /configure
+/configure~
 /configure.scan
 /depcomp
 /install-sh
@@ -79,6 +80,12 @@ debian/autoreconf.*
 debian/autoreconf.before
 debian/debhelper-build-stamp
 debian/files
-debian/ripe-atlas-anchor*
-debian/ripe-atlas-common*
-debian/ripe-atlas-software-probe*
+debian/ripe-atlas-anchor/
+debian/ripe-atlas-common/
+debian/ripe-atlas-probe/
+debian/ripe-atlas-anchor*.debhelper*
+debian/ripe-atlas-common*.debhelper*
+debian/ripe-atlas-probe*.debhelper*
+debian/ripe-atlas-anchor*.substvars
+debian/ripe-atlas-common*.substvars
+debian/ripe-atlas-probe*.substvars
