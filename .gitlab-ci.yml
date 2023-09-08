@@ -6,9 +6,8 @@ stages:
   - test
 
 variables:
-  DOCKER_IMAGE_DEBIAN9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian9:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_DEBIAN10: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian10:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_CENTOS7: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos7:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_CENTOS8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
@@ -30,12 +29,6 @@ variables:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker push ${DOCKER_IMAGE}
 
-build_image_debian9:
-  variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian9
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN9}
-  extends: .build_image
-
 build_image_debian10:
   variables:
     DOCKER_DIR: .gitlab-docker/debian10
@@ -46,6 +39,12 @@ build_image_debian11:
   variables:
     DOCKER_DIR: .gitlab-docker/debian11
     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
+  extends: .build_image
+
+build_image_debian12:
+  variables:
+    DOCKER_DIR: .gitlab-docker/debian12
+    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
   extends: .build_image
 
 build_image_centos7:
@@ -78,26 +77,22 @@ build_image_prep:
     - /^devel.*/
     - tags
   script:
-    - cd ..
-    - HOME=${PWD} ripe-atlas-software-probe/build-config/debian/bin/make-deb
-    - cp atlasswprobe-*.deb ripe-atlas-software-probe
+    - cd ripe-atlas-software-probe
+    - dpkg-buildpackage -b -us -uc
+    - cp ../ripe-atlas-*.deb .
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
     paths:
-      - atlasswprobe-*.deb
+      - ripe-atlas-*.deb
     expire_in: never
 
-# build-ci-debian9:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN9}
+build-ci-debian11:
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN11}
 
-# build-ci-debian10:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN10}
-
-# build-ci-debian11:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN11}
+build-ci-debian12:
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN12}
 
 .build-ci-rhel:
   stage: build
