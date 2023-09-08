@@ -51,9 +51,9 @@ cd %{_builddir}/%{build_dirname}
 
 %install
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/anchor/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
+install -m644 %{_builddir}/%{build_dirname}/config/anchor/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
 mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
-install -m644 %{_builddir}/%{build_dirname}/atlas-config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+install -m644 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %files
 %{_datadir}/%{base_path}/known_hosts.reg

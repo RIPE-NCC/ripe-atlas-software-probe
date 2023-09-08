@@ -1,2 +1,2 @@
-atlas-config/anchor/known_hosts.reg	usr/share/ripe-atlas/
-atlas-config/anchor/reg_servers.sh.prod	usr/libexec/ripe-atlas/scripts/
+config/anchor/known_hosts.reg		usr/share/ripe-atlas/
+config/anchor/reg_servers.sh.prod	usr/libexec/ripe-atlas/scripts/

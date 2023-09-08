@@ -50,7 +50,7 @@ define Package/ripe-atlas/Default/description
 endef
 
 define Build/Prepare
-	$(CP) $(patsubst %/build-config/openwrt,%,$(TOPDIR)/$(SOURCE))/. $(PKG_BUILD_DIR)
+	$(CP) $(patsubst %/openwrt,%,$(TOPDIR)/$(SOURCE))/. $(PKG_BUILD_DIR)
 endef
 
 
@@ -208,10 +208,10 @@ define Package/ripe-atlas-probe/install
 		$(1)/usr/lib/ripe-atlas/scripts \
 		$(1)/usr/share/ripe-atlas
 	$(INSTALL_DATA) \
-		$(PKG_BUILD_DIR)/atlas-config/probe/known_hosts.reg \
+		$(PKG_BUILD_DIR)/config/probe/known_hosts.reg \
 		$(1)/usr/share/ripe-atlas
 	$(INSTALL_BIN) \
-		$(PKG_BUILD_DIR)/atlas-config/probe/reg_servers.sh.prod \
+		$(PKG_BUILD_DIR)/config/probe/reg_servers.sh.prod \
 		$(1)/usr/lib/ripe-atlas/scripts
 endef
 

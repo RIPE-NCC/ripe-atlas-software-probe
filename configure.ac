@@ -149,7 +149,7 @@ AC_PROG_CC
 
 AC_CONFIG_FILES([
 Makefile
-atlas-config/Makefile
+config/Makefile
 bin/Makefile
 ])
 

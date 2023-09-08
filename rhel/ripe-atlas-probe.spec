@@ -116,8 +116,8 @@ make DESTDIR=%{buildroot} install
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %pre -n ripe-atlas-common
-%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.users.conf
-%tmpfiles_create_package ripe-atlas %{_builddir}/%{build_dirname}/atlas-config/common/ripe-atlas.run.conf
+%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/config/common/ripe-atlas.users.conf
+%tmpfiles_create_package ripe-atlas %{_builddir}/%{build_dirname}/config/common/ripe-atlas.run.conf
 
 # check if probe keys need to be backed up
 [ ! -f "%{atlas_oldkey}" ] && exit 0

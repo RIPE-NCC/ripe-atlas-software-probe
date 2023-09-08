@@ -2,7 +2,7 @@ include $(top_srcdir)/rules.mk
 
 ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir)
-SUBDIRS = bin atlas-config probe-busybox/libevent-2.1.11-stable probe-busybox .
+SUBDIRS = bin config probe-busybox/libevent-2.1.11-stable probe-busybox .
 
 ATLAS_SPOOL_DIRS = \
 		$(foreach dir,. new oneoff out out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir)) \
