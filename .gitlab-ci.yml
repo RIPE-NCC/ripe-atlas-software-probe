@@ -38,37 +38,37 @@ build_image_debian9:
 
 build_image_debian10:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian10
+    DOCKER_DIR: .gitlab-docker/debian10
     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN10}
   extends: .build_image
 
 build_image_debian11:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian11
+    DOCKER_DIR: .gitlab-docker/debian11
     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
   extends: .build_image
 
 build_image_centos7:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/centos7
+    DOCKER_DIR: .gitlab-docker/centos7
     DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS7}
   extends: .build_image
 
 build_image_centos8:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/centos8
+    DOCKER_DIR: .gitlab-docker/centos8
     DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS8}
   extends: .build_image
 
 build_image_ol9:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/ol9
+    DOCKER_DIR: .gitlab-docker/ol9
     DOCKER_IMAGE: ${DOCKER_IMAGE_OL9}
   extends: .build_image
 
 build_image_prep:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/prep
+    DOCKER_DIR: .gitlab-docker/prep
     DOCKER_IMAGE: ${DOCKER_IMAGE_PREP}
   extends: .build_image
 
@@ -117,16 +117,16 @@ build_image_prep:
     - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
 
     # build repo rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec
+    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-repo.spec
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
 
     # build x86 rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-probe.spec
+    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-probe.spec
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
     - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
 
     # build anchor rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-anchor.spec
+    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-anchor.spec
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
 
     # move artifact to right place
