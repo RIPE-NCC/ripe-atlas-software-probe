@@ -1,9 +1,0 @@
-Package: atlasswprobe
-Version: VERSION
-Section: base
-Priority: optional
-Architecture: ARCH
-Depends: 
-Maintainer: Philip Homburg <phomburg@ripe.net>
-Description: RIPE Atlas Software probe
- Debian version of RIPE Atlas probe software
