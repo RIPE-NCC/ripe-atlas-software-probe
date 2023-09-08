@@ -32,6 +32,8 @@ To build using autoconf tooling and install the software probe to a directory (i
 >> make
 >> make DESTDIR=/tmp/data install
 
+RPM Build
+--------------
 The build process is performed using 'rpmbuild' for RHEL. By default the build is based on the master HEAD. Command-line defines can be set for branch and commits in order to specify specific build points. Currently two are supported
 
 - git_tag
@@ -47,6 +49,29 @@ If a specific version is to be build then:
 
 Note that build outputs will still result in '~/rpmbuild' unless otherwise specified
 
-Two spec files are given each for the following:
+Three spec files are given each for the following:
 - build-config/rhel/ripe-atlas-repo.spec -> used to build the package RPM
+- build-config/rhel/ripe-atlas-anchor.spec -> used to build the Anchor RPM
 - build-config/rhel/ripe-atlas-probe.spec -> used to build the Probe RPM (if you are building locally this is what you should build)
+
+DEB Build
+--------------
+The build process is performed using dpkg-buildpackage on Debian 11 or 12 (compat version 13). The build is based on the currently checked out branch.
+
+If a user wants to build a Debian package, use the following commands:
+cd ripe-atlas-software-probe; dpkg-buildpackage -b -us -uc
+
+Packages built can be find one directory above the ripe-atlas-software-probe directory.
+
+OpenWRT Build
+--------------
+The build process is performed using OpenWRT's build process. The package can be added to
+the build by adding the line:
+`src-git ripe-atlas git@github.com:RIPE-NCC/ripe-atlas-software-probe.git`
+and running:
+`scripts/feeds install -a`
+from the toplevel OpenWRT directory.
+
+The branch checked out is master, other branches can be checked out by appending ;<BRANCH> or ^commit to the line in feeds.conf.
+
+After adding the package can be selected using menuconfig and built as normal.
