@@ -30,7 +30,7 @@ Description: RIPE Atlas essential components
  This package contains essential core assets used in all probe
  flavours. It must be installed for a probe to operate as expected.
 
-Package: ripe-atlas-software-probe
+Package: ripe-atlas-probe
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
 Conflicts: ripe-atlas-anchor
@@ -54,7 +54,7 @@ Description: RIPE Atlas probe specific files and configuration
 Package: ripe-atlas-anchor
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
-Conflicts: ripe-atlas-software-probe
+Conflicts: ripe-atlas-probe
 Replaces: atlasswprobe
 Section: net
 Priority: optional
