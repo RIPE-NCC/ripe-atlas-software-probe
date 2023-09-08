@@ -107,7 +107,6 @@ make DESTDIR=%{buildroot} install
 %exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_libexecdir}/%{base_path}/scripts/*.sh
-%attr(2775, %{atlas_measurement}, %{atlas_group}) %{_localstatedir}/spool/%{base_path}
 %ghost %{_rundir}/%{base_path}
 
 %files -n ripe-atlas-probe
