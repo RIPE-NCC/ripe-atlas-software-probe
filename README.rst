@@ -41,18 +41,18 @@ The build process is performed using 'rpmbuild' for RHEL. By default the build i
 
 The arguments are specified in a define flag in the 'rpmbuild' command. For example if a user wants to build the repo RPM from a specific commit on the master branch then use the following command:
 
-`rpmbuild -bb --define "git_commit 32c5747" ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec`
+`rpmbuild -bb --define "git_commit 32c5747" ripe-atlas-software-probe/rhel/ripe-atlas-repo.spec`
 
 If a specific version is to be build then:
 
-`rpmbuild -bb --define "git_tag 5090"  ripe-atlas-software-probe/build-config/rhel/ripe-atlas-repo.spec`
+`rpmbuild -bb --define "git_tag 5090"  ripe-atlas-software-probe/rhel/ripe-atlas-repo.spec`
 
 Note that build outputs will still result in '~/rpmbuild' unless otherwise specified
 
 Three spec files are given each for the following:
-- build-config/rhel/ripe-atlas-repo.spec -> used to build the package RPM
-- build-config/rhel/ripe-atlas-anchor.spec -> used to build the Anchor RPM
-- build-config/rhel/ripe-atlas-probe.spec -> used to build the Probe RPM (if you are building locally this is what you should build)
+- rhel/ripe-atlas-repo.spec -> used to build the package RPM
+- rhel/ripe-atlas-anchor.spec -> used to build the Anchor RPM
+- rhel/ripe-atlas-probe.spec -> used to build the Probe RPM (if you are building locally this is what you should build)
 
 DEB Build
 --------------

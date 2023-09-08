@@ -2,7 +2,7 @@
 %define		build_dirname		ripe-atlas-repo
 %define		local_state_dir  	/home/ripe-atlas
 %define		src_prefix_dir   	/usr/local/ripe-atlas
-%define		assets_path		build-config/rhel
+%define		assets_path		rhel
 
 %define         repofile_dirname	%{_sysconfdir}/yum.repos.d
 %define		key_dirname		%{_sysconfdir}/pki/rpm-gpg
