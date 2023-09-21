@@ -177,3 +177,5 @@ exit 0
 %postun -n ripe-atlas-probe
 %systemd_postun_with_restart %{service_name}
 exit 0
+
+%include rhel/changelog
