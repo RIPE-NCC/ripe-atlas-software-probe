@@ -1,28 +1,23 @@
-Release History
-===============
-
-5080 (released 2022-09-23)
---------------------------
+%changelog
+* Fri Sep 23 2022 RIPE Atlas Team <atlas@ripe.net> - 5080
 - All platforms
-  * Introduction of CI/CD pipeline for building firmware
-  * Fix for ICMPv6 echo replies on systems with 32-bit pid_t (Graham Edgecombe)
+  - Introduction of CI/CD pipeline for building firmware
+  - Fix for ICMPv6 echo replies on systems with 32-bit pid_t (Graham Edgecombe)
 - Software probes
-  * The auto update functionality has been removed from the CentOS 7/8 RPM.
+  - The auto update functionality has been removed from the CentOS 7/8 RPM.
 - Cleanup on v3 hardware probe to align with v4 and v5 probes.
-  * Streamline build process for flash and USB firmware
-  * Removal of unused software / functionality
-  * Revert to stock OpenWRT insofar as possible
-  * Code refactoring to remove duplicate implementation of LED behaviour
-  * JSON style logging framework introduced, initially for process restarting
-  * Filesystem bug fixed that prevented release of flash firmware
+  - Streamline build process for flash and USB firmware
+  - Removal of unused software / functionality
+  - Revert to stock OpenWRT insofar as possible
+  - Code refactoring to remove duplicate implementation of LED behaviour
+  - JSON style logging framework introduced, initially for process restarting
+  - Filesystem bug fixed that prevented release of flash firmware
 
-5070 (released 2022-05-31)
---------------------------
+* Tue May 31 2022 RIPE Atlas Team <atlas@ripe.net> - 5070
 - Fix bug that caused processes to restart erroneously.
 - Added support for NTP size extension (by Daniel Drown)
 
-5060 (released 2022-03-16)
---------------------------
+* Wed Mar 16 2022 RIPE Atlas Team <atlas@ripe.net> - 5060
 - Removed IPv6 reporting from rxtxrpt
 - Replace syscall(__NR_clock_gettime, ...) with clock_gettime() (by Eneas U de Queiroz)
 - Fix rptaddrs to handle systems without IPv6. Sad but true.
@@ -32,38 +27,33 @@ Release History
 - Updated cipher list in sslgetcert to Firefox 89.0.2
 - Support for DNS-over-HTTPS measurements
 
-5050 (released 2022-02-16)
---------------------------
+* Wed Feb 16 2022 RIPE Atlas Team <atlas@ripe.net> - 5050
 - This is an administrative release, it does not have any changes.
 
-5040 (released 2021-10-21)
---------------------------
+* Thu Oct 21 2021 RIPE Atlas Team <atlas@ripe.net> - 5040
 - Measurement changes (version 2.4.1):
-  * Firmware 5030 introduced a regression where a specific type of TCP connect failure would cause the probe to stop performing measurements.
+  - Firmware 5030 introduced a regression where a specific type of TCP connect failure would cause the probe to stop performing measurements.
 
-5030 (released 2021-09-13)
---------------------------
+* Mon Sep 13 2021 RIPE Atlas Team <atlas@ripe.net> - 5030
 - Config variable to disable the check that atlas data is on tmpfs
 - Support for software probes on OpenWrt (by Jan Pavlinec)
 - Measurement busybox v2.4.0:
-  * Solve issue with duplicate src_addr in DNS measurements
-  * Remove as much as possible source files that are not used by Atlas
-  * Fix bug in sslgetcert if there is a connection failure
-  * Replace stime with clock_settime
-  * Support a lot more network interfaces in reporting traffic statistics
-  * Option to set AD bit in DNS queries
-  * Initial support for testing Atlas measurement code
+  - Solve issue with duplicate src_addr in DNS measurements
+  - Remove as much as possible source files that are not used by Atlas
+  - Fix bug in sslgetcert if there is a connection failure
+  - Replace stime with clock_settime
+  - Support a lot more network interfaces in reporting traffic statistics
+  - Option to set AD bit in DNS queries
+  - Initial support for testing Atlas measurement code
 
-5020 (released 2020-04-06)
---------------------------
+* Mon Apr 6 2020 RIPE Atlas Team <atlas@ripe.net> - 5020
 - Support for a centos 8 binary repo
 - Use the hash of the public key in SOS messages for software probes and anchors, allowing software probes to report SOS messages
 - Fix a bug in DNS measurements where a JSON fields got duplicated (measurement busybox 2.2.1)
 - Suppress some debug output from dfrm (measurement busybox 2.2.1)
 - Make response to a reg. server returning WAIT more robust
 
-5010 (released 2020-01-13)
---------------------------
+* Mon Jan 13 2020 RIPE Atlas Team <atlas@ripe.net> - 5010
 - Support for Turris routers
 - Support Debian
 - Build fixes for CentOS 8
@@ -71,48 +61,42 @@ Release History
 - Support for DNS resolvers with IPv6 link local address
 - Removed some bash-isms
 - Measurement changes (version 2.2.0):
-  * "qt" field for DNS measurements to report query time without setup overhead
-  * Handle IPv6 scope IDs
-  * Switch to libevent 2.1.11
-  * 'httppost' should only set the system if the environment variable HTTPPOST_ALLOW_STIME is set
-  * Add '--ttl' option in DNS measurements to report the TTL on replies (for UDP)
+  - "qt" field for DNS measurements to report query time without setup overhead
+  - Handle IPv6 scope IDs
+  - Switch to libevent 2.1.11
+  - 'httppost' should only set the system if the environment variable HTTPPOST_ALLOW_STIME is set
+  - Add '--ttl' option in DNS measurements to report the TTL on replies (for UDP)
 
-5000 (released 2019-10-07)
---------------------------
+* Mon Oct 7 2019 RIPE Atlas Team <atlas@ripe.net> - 5000
 - Probe firmware 5000.2
-  * Make setting the time and date in the ATLAS script optional
-  * Corrected names of production registration servers
-  * Introduce config.txt to make rxtxrpt optional
-  * Add -y option to yum update
-  * Added README.rst, INSTALL.rst, CHANGES.rst and LICENSE
+  - Make setting the time and date in the ATLAS script optional
+  - Corrected names of production registration servers
+  - Introduce config.txt to make rxtxrpt optional
+  - Add -y option to yum update
+  - Added README.rst, INSTALL.rst, CHANGES.rst and LICENSE
 - Probe firmware 5000
-  * First release of software probes - sync up probe firmware versions between hardware and software
+  - First release of software probes - sync up probe firmware versions between hardware and software
 
-4980 (released 2019-04-10)
---------------------------
+* Wed Apr 10 2019 RIPE Atlas Team <atlas@ripe.net> - 4980
 - Disable TCP SACK
 
-4970 (released 2019-03-25)
---------------------------
+* Mon Mar 25 2019 RIPE Atlas Team <atlas@ripe.net> - 4970
 - Fixed an issue with periodic HTTP measurements and a chunked response from the remote server
 - Generate a new value for the "$r" macro in DNS measurements for each resolver when "use probe's resolvers" is in effect
 - Fixed a bug in TCP traceroute when some measurements did not run if there were more than 256 measurements defined
 
-4960 (released 2019-02-26)
---------------------------
+* Tue Feb 26 2019 RIPE Atlas Team <atlas@ripe.net> - 4960
 - Fix local time management to deal with cases where the probe did not adjust its local time correctly
 - Add support for reinstalling the current firmware if (filesystem) corruption is suspected
 
-4950 (released 2019-02-20)
---------------------------
+* Wed Feb 20 2019 RIPE Atlas Team <atlas@ripe.net> - 4950
 - Fixed a bug in traceroute where a trace was supposed to stop after 5 non-responding hops, but it stopped earlier if the starting hop was not set to 1
 - Added support for DNS cookies (API/UI support is in the works)
 - Added support to set EDNS version, flags and options (API/UI support TBD)
 - Added support to send DNS queries with IPv6 destination option (API/UI support is in the works)
 - Code shuffles to record timestamps for response time as close as possible to sending and receiving calls
 
-4940 (released 2018-07-17)
---------------------------
+* Tue Jul 17 2018 RIPE Atlas Team <atlas@ripe.net> - 4940
 - Add support for DNS client subnet option
 - Add support for HTTP host header
 - Add support for ping synchronous DNS resolution (only used internally)
@@ -123,24 +107,20 @@ Release History
 - Internal code changes to align the behaviour/scripts used on v3 and v4 probes
 - Fix a bug where probes no longer sent DNS "sos" queries
 
-4930 (released 2018-05-21)
---------------------------
+* Mon May 21 2018 RIPE Atlas Team <atlas@ripe.net> - 4930
 - This firmware is a clone of 4910, aimed exclusively for the upcoming v4 probes
 
-4910 (released 2018-01-08)
---------------------------
+* Mon Jan 8 2018 RIPE Atlas Team <atlas@ripe.net> - 4910
 - Upgrade busybox (used inside the probe firmware)
 - When name resolution results in a 'local' address and the probe denies executing the measurement, report the offending address
 - Report how long name resolution takes (except for DNS measurements)
 - SSL/TLS certificate measurements now report the cipher that is chosen by the server
 - Fix bug where a TCP socket was not set to non-blocking when explicit binding to an interface was required
 
-4790 (released 2017-05-29)
---------------------------
+* Mon May 29 2017 RIPE Atlas Team <atlas@ripe.net> - 4790
 - This is a v1/v2 only release meant to fix stability issues that resulted in stretching the hardware capabilities too far.
 
-4780 (released 2017-05-22)
---------------------------
+* Mon May 22 2017 RIPE Atlas Team <atlas@ripe.net> - 4780
 - Various fixes for stability and security
 - Allow DNS "macros" like $p, $t, $r, which are replaced by the probe each time with probe ID, timestamp and a random value, respectively
 - Add SNI support to TLS/SSL checks
@@ -148,24 +128,20 @@ Release History
 - Report time-to-complete in TLS/SSL results even if fetching the actual certificate fails
 - Fixed a bug where there were no results delivered for DNS measurements with the "include the abuf" option turned off
 
-4770 (released 2017-03-22)
---------------------------
+* Wed Mar 22 2017 RIPE Atlas Team <atlas@ripe.net> - 4770
 - Fixed a regression where DNS measurements using TCP transport always failed
 - Fixed a bug where WiFi measurements could sometimes report using the wrong outgoing network interface
 
-4760 (released 2017-02-23)
---------------------------
+* Thu Feb 23 2017 RIPE Atlas Team <atlas@ripe.net> - 4760
 - Changes to use USB sticks (in v3 probes) as little as possible by buffering results in memory. As a tradeoff for more expected stability, the probes lose recent, unreported measurement results (ie. the ones collected in the last 60-90 seconds).
 - Unexpectedly terminated TCP connections caused SIGPIPE signals crashing the measurement the process
 - Various stability and security fixes to the measurement code
 
-4750 (released 2017-01-24)
---------------------------
+* Tue Jan 24 2017 RIPE Atlas Team <atlas@ripe.net> - 4750
 - First release of wifi firmware (4755)
 - Various security/stability fixes in the measurement code
 
-4740 (released 2016-08-08)
---------------------------
+* Mon Aug 8 2016 RIPE Atlas Team <atlas@ripe.net> - 4740
 - Disallow measurements towards 0.0.0.0/8
 - Internal changes to support wifi measurements
 - Report local network configuration every hour
@@ -173,15 +149,13 @@ Release History
 - Check for read-only USB and send SOS message if that's the case
 - Fixed kernel to not download new firmware if the usb stick is read-only
 
-4730 (released 2016-01-18)
---------------------------
+* Mon Jan 18 2016 RIPE Atlas Team <atlas@ripe.net> - 4730
 - Better error handling for unexpected measurement results
 - Probes will soon start reporting their uptime in a new "virtual measurement", ID 7001
 - Fixed an error case where  results of one-off traceroutes could have interfered with ongoing traceroutes
 - Added preliminary support for specifying a timeout parameter for DNS measurements
 
-4720 (released 2015-10-05)
---------------------------
+* Mon Oct 5 2015 RIPE Atlas Team <atlas@ripe.net> - 4720
 - The method for measuring times (e.g. RTTs) for each measurement has been switched to use a strictly monotonic, relative clock, thereby avoiding the artefacts caused by absolute clock changes due to time synchronisation.
 - The RDATA field of a DNS measurement result (in response to a TXT query) is now a list of strings. It was a single string before.
 - The cipher list supported by SSL/TLS certificate checks have been refreshed.
@@ -192,12 +166,10 @@ Release History
 - The probes, in addition to the infrastructure, now also enforce the restriction that local (RFC1918 and link-local) addresses should not be measured.
 - When removing static configuration from a probe, the statically added previous DNS server was still used
 
-4700 (released 2015-07-06)
---------------------------
+* Mon Jul 6 2015 RIPE Atlas Team <atlas@ripe.net> - 4700
 - This is mostly a maintenance release, with internal behavioural changes only.
 
-4680 (released 2015-03-28)
---------------------------
+* Sat Mar 28 2015 RIPE Atlas Team <atlas@ripe.net> - 4680
 - This firmware incorporates a few bug fixes:
 - If probe has statically configured nameserver and also DHCPv4, the DHCP one wins, thereby fixing stale DNS entries
 - Enhance the NTP client on v3 probes
@@ -205,22 +177,19 @@ Release History
 - Stability issues on v1/v2 probes when HTTP measurements immediately fail with connection errors
 - "SSLCert" measurements now also support TLS
 
-4670 (released 2015-01-14)
---------------------------
+* Wed Jan 14 2015 RIPE Atlas Team <atlas@ripe.net> - 4670
 - Fixed two bugs in ping measurements where the probe had issues pinging its own IPv6 address
 - Fixed wrong host header for IPv6 literals in http measurements
 - Probes are now trying to avoid starting too many measurements at exactly the same second
 
-4660 (released 2014-08-25)
---------------------------
+* Mon Aug 25 2014 RIPE Atlas Team <atlas@ripe.net> - 4660
 - Bugfix: fixed a bug in paris traceroute where the ICMP version would have the wrong paris id in outgoing packets
 - Bugfix: fixed a memory leak in the DNS measurements code
 - Enhancement: include a cookie in outgoing ping packets and check the reply
 - Enhancement: in ping, report IP version and target address even if socket connect fails
 - Experimental suport for NTP measurements (not publicly available yet)
 
-4650 (released 2014-07-08)
---------------------------
+* Tue Jul 8 2014 RIPE Atlas Team <atlas@ripe.net> - 4650
 - Ping interval option (-i option, needs support from API and UI)
 - The "lts" field is now also available in the output of traceroute, dns, sslgetcert, httpget
 - Traceroute IPv6 extra error code 'h': destination unreachable/beyond scope
@@ -228,25 +197,21 @@ Release History
 - Fixed bug in parsing multiple IPv6 extension headers in traceroute
 - Fixed bug in DNS where RA flag was set in requests
 
-4610 (released 2014-03-17)
---------------------------
+* Mon Mar 17 2014 RIPE Atlas Team <atlas@ripe.net> - 4610
 - The new firmware fixes a few DNS related bugs:
 - In some cases the probe sent DNS results too often
 - Querying the local DNS resolver could result in multiple results (one per resolver), but these could not be accessed in the data store. The new version collects results from all resolvers into one data structure. See the /apis/result-format/#version-4610-dns-lookup for details.
 - In addition, this firmware adds preliminary support for using IPv6 extension headers. This will be available in the UI and in the API at a later date.
 
-4600 (released 2014-02-17)
---------------------------
+* Mon Feb 17 2014 RIPE Atlas Team <atlas@ripe.net> - 4600
 - The new firmware release (4600) contains bug fixes for missing fields in ping results (TTL and source address). It also incorporates a more secure way for the probes to authenticate new firmwares before upgrading.
 
-4580 (released 2013-12-16)
---------------------------
+* Mon Dec 16 2013 RIPE Atlas Team <atlas@ripe.net> - 4580
 - Due to an issue with the latest firmware release, a subset of the v3 probes were listening to incoming connections on an open port that should not have been left open. As a secondary measure, however, access to this port required credentials only available to the RIPE Atlas probe developers. It therefore never presented open access to the probes. This port (SSH) is used for development purposes in our internal development environment.
 - We upgraded the v3 probes to a new, corrected firmware version (4580), and improved the checks in our firmware release process. The new firmware is otherwise functionally equivalent to the previous one.
 - This issue did not affect version 1/2 probes and anchors.
 
-4570 (released 2013-11-21)
---------------------------
+* Thu Nov 21 2013 RIPE Atlas Team <atlas@ripe.net> - 4570
 - Upgrade kernel on v3 probes without losing static network config
 - Uniform interpretation of the size parameter of ping and traceroute: the size excludes the IPv4/IPv6 header and the transport (ICMP, TCP, UDP) header
 - Add TCP mode to traceroute measurements
@@ -255,23 +220,19 @@ Release History
 - Support "number of retries" option in DNS measurements
 - Note that the use of the new measurement flag will be enabled in the UI and API at a later stage.
 
-4520 (released 2013-04-23)
---------------------------
+* Tue Apr 23 2013 RIPE Atlas Team <atlas@ripe.net> - 4520
 - This is a bug fix release for all probe architectures. There is a small bug in the probe measurement code that can be trigger only if a controller sends the wrong commands to a probe.
 
-4510 (released 2013-04-23)
---------------------------
+* Tue Apr 23 2013 RIPE Atlas Team <atlas@ripe.net> - 4510
 - This release is only for the new v3 probes. It contains fixes for static network configuration.
 
-4500 (released 2013-02-28)
---------------------------
+* Thu Feb 28 2013 RIPE Atlas Team <atlas@ripe.net> - 4500
 - RIPE Atlas probe software now supports two more architectures: TP-Link (for the next generation probes) and CentOS (for RIPE Atlas anchors).
 - There is now support for one-off measurements for ping, traceroute, DNS, and HTTPget.
 - We fixed a bug in DNS measurements in which, when querying local resolvers, more queries went to the last resolver.
 - Fixed "error" : { "TUCONNECT" : "Success"}. Before this version DNS TCP and HTTPget reported an error message "Success".
 
-4480 (released 2012-10-03)
---------------------------
+* Wed Oct 3 2012 RIPE Atlas Team <atlas@ripe.net> - 4480
 - Fixed bug in traceroute when it has to deal with rfc4884 objects (mpls) that have a wrong size.
 - Delayed DNS name resolution in ping and traceroute. This feature will soon be enabled through the UI.
 - Fixed bug in HTTP GET where some characters where not properly escaped in generating the result JSON.
@@ -279,32 +240,25 @@ Release History
 - Limit the amount of measurement data that is sent as one unit. This prevents probes that have not connected to a controller for some time from overloading the controller.
 - The probe uptime is now in the DNS SOS messages that are sent by probes before they try to connect. This will allow making a distinction between various reasons for disconnects: e.g. probe reboot vs. network problems.
 
-4470 (released 2012-09-20)
---------------------------
+* Thu Sep 20 2012 RIPE Atlas Team <atlas@ripe.net> - 4470
 - This firmware fixes two bugs.
-  * The first one is that DNS results may get mixed up when a probe runs two DNS measurements at the same time.
-  * The second one is where traceroute sometimes reports a timestamp of 0.
+  - The first one is that DNS results may get mixed up when a probe runs two DNS measurements at the same time.
+  - The second one is where traceroute sometimes reports a timestamp of 0.
 - In addition, the firmware now has IPv6 literals for the registrations servers, so an IPv6-only probe can connect to a registration server even if it doesn't have a DNS resolver.
 
-4460 (released 2012-06-21)
---------------------------
+* Thu Jun 21 2012 RIPE Atlas Team <atlas@ripe.net> - 4460
 - The main new feature in this firmware is the use of libevent and rewriting the measurement code to use it. This provides a much higher capacity for doing measurements. In addition, the probe now reports results in JSON. Expect the traceroute output to be completely different. The are a number of small changes. For example, the DHCP client now sets the client-id and vendor class. Please note that if you have given the probe a static IPv4 address through DHCP and the probes stops working then this may be caused by the change in DHCP client-id.
 
-4310 (released 2012-02-22)
---------------------------
+* Wed Feb 22 2012 RIPE Atlas Team <atlas@ripe.net> - 4310
 - This firmware contains a number of small fixes that deal with exceptional conditions. Probes should also reconnected slightly quicker after a disconnect.
 
-4270 (released 2011-10-10)
---------------------------
+* Mon Oct 10 2011 RIPE Atlas Team <atlas@ripe.net> - 4270
 - More pings to fixed destinations
 - Traceroutes to fixed destinations
 - DNS root server anycast instance checks
 
-4030 (released 2011-07-04)
---------------------------
+* Mon Jul 4 2011 RIPE Atlas Team <atlas@ripe.net> - 4030
 - We're in the process of rolling out a new firmware version. It enables a new feature that has been asked by members of the community: /howtos/probe-static-network-config.md. Using the UI, one can ask the probe to try to use static IPv4/IPv6 addresses (and DNS resolvers). If these settings don't work, the probes will fall back to using DHCP. As a byproduct, this feature also allows IPv6-only deployments.
 
-4020 (released 2011-02-07)
---------------------------
+* Mon Feb 7 2011 RIPE Atlas Team <atlas@ripe.net> - 4020
 - The new firmware version enables the use of a second registration server (woolsey.atlas.ripe.net). All probes are expected to upgrade automatically in the coming days.
-
