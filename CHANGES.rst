@@ -1,6 +1,20 @@
 Release History
 ===============
 
+5081 (released 2023-09-23)
+--------------------------
+- All platforms
+  * All platforms now have a ripe-atlas-common package, a ripe-atlas-anchor and ripe-atlas-probe package to define the purpose of the probe. This deprecates atlasswprobe
+  * Package is now built using autotools
+  * Package restructured according to Linux FHS
+  * Probe private key is not removed upon uninstall
+  * libevent is now linked to the measurement code statically. It diverged from the original package and cannot be sent upstream
+- Software probes
+  * Added support for Oracle EL9
+  * Added support for Debian 10/11
+  * OpenWRT package is now public
+(parsed changelog up to Fri Sep 22 12:00 CET)
+
 5080 (released 2022-09-23)
 --------------------------
 - All platforms

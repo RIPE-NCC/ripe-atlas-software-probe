@@ -1,3 +1,19 @@
+ripe-atlas-software-probe (5081) bookworm bullseye; urgency=medium
+
+  * All platforms
+    - All platforms now have a ripe-atlas-common package, a ripe-atlas-anchor and ripe-atlas-probe package to define the purpose of the probe. This deprecates atlasswprobe
+    - Package is now built using autotools
+    - Package restructured according to Linux FHS
+    - Probe private key is not removed upon uninstall
+    - libevent is now linked to the measurement code statically. It diverged from the original package and cannot be sent upstream
+  * Software probes
+    - Added support for Oracle EL9
+    - Added support for Debian 10/11
+    - OpenWRT package is now public
+(parsed changelog up to Fri Sep 22 12:00 CET)
+
+ -- RIPE Atlas Team <atlas@ripe.net>  Sat, 23 Sep 2023 00:00:00 -0000
+
 ripe-atlas-software-probe (5080) bookworm bullseye; urgency=medium
 
   * All platforms
