@@ -129,11 +129,14 @@ Release History
 
 4910 (released 2018-01-08)
 --------------------------
-- Upgrade busybox (used inside the probe firmware)
-- When name resolution results in a 'local' address and the probe denies executing the measurement, report the offending address
-- Report how long name resolution takes (except for DNS measurements)
-- SSL/TLS certificate measurements now report the cipher that is chosen by the server
-- Fix bug where a TCP socket was not set to non-blocking when explicit binding to an interface was required
+- General
+  * Upgrade busybox (used inside the probe firmware)
+  * When name resolution results in a 'local' address and the probe denies executing the measurement, report the offending address
+  * Report how long name resolution takes (except for DNS measurements)
+  * SSL/TLS certificate measurements now report the cipher that is chosen by the server
+  * Fix bug where a TCP socket was not set to non-blocking when explicit binding to an interface was required
+- Anchor
+  * Support added for CentOS 6 and 7
 
 4790 (released 2017-05-29)
 --------------------------
@@ -261,7 +264,15 @@ Release History
 
 4510 (released 2013-04-23)
 --------------------------
-- This release is only for the new v3 probes. It contains fixes for static network configuration.
+- Version 3 probes
+  * Fixes for static network configuration
+- Anchor
+  * Cleanup in anchor package
+  * Various fixes to the startup/shutdown scripts
+  * Aligned build script with upstart for killing processes
+  * Clean up pid files on Atlas shutdown
+  * Kill Atlas processes on install/uninstall
+  * Anchor now requires daemontools to be installed
 
 4500 (released 2013-02-28)
 --------------------------
@@ -269,6 +280,7 @@ Release History
 - There is now support for one-off measurements for ping, traceroute, DNS, and HTTPget.
 - We fixed a bug in DNS measurements in which, when querying local resolvers, more queries went to the last resolver.
 - Fixed "error" : { "TUCONNECT" : "Success"}. Before this version DNS TCP and HTTPget reported an error message "Success".
+- First release of anchor package
 
 4480 (released 2012-10-03)
 --------------------------
@@ -278,6 +290,7 @@ Release History
 - Fixed bugs in the libevent stub resolver to better handle DNS errors and timeouts (affects mostly httpget)
 - Limit the amount of measurement data that is sent as one unit. This prevents probes that have not connected to a controller for some time from overloading the controller.
 - The probe uptime is now in the DNS SOS messages that are sent by probes before they try to connect. This will allow making a distinction between various reasons for disconnects: e.g. probe reboot vs. network problems.
+- Initial version for anchor package added (Anand Buddhev)
 
 4470 (released 2012-09-20)
 --------------------------

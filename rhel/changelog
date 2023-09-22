@@ -111,11 +111,14 @@
 - This firmware is a clone of 4910, aimed exclusively for the upcoming v4 probes
 
 * Mon Jan 8 2018 RIPE Atlas Team <atlas@ripe.net> - 4910
-- Upgrade busybox (used inside the probe firmware)
-- When name resolution results in a 'local' address and the probe denies executing the measurement, report the offending address
-- Report how long name resolution takes (except for DNS measurements)
-- SSL/TLS certificate measurements now report the cipher that is chosen by the server
-- Fix bug where a TCP socket was not set to non-blocking when explicit binding to an interface was required
+- General
+  - Upgrade busybox (used inside the probe firmware)
+  - When name resolution results in a 'local' address and the probe denies executing the measurement, report the offending address
+  - Report how long name resolution takes (except for DNS measurements)
+  - SSL/TLS certificate measurements now report the cipher that is chosen by the server
+  - Fix bug where a TCP socket was not set to non-blocking when explicit binding to an interface was required
+- Anchor
+  - Support added for CentOS 6 and 7
 
 * Mon May 29 2017 RIPE Atlas Team <atlas@ripe.net> - 4790
 - This is a v1/v2 only release meant to fix stability issues that resulted in stretching the hardware capabilities too far.
@@ -224,13 +227,22 @@
 - This is a bug fix release for all probe architectures. There is a small bug in the probe measurement code that can be trigger only if a controller sends the wrong commands to a probe.
 
 * Tue Apr 23 2013 RIPE Atlas Team <atlas@ripe.net> - 4510
-- This release is only for the new v3 probes. It contains fixes for static network configuration.
+- Version 3 probes
+  - Fixes for static network configuration
+- Anchor
+  - Cleanup in anchor package
+  - Various fixes to the startup/shutdown scripts
+  - Aligned build script with upstart for killing processes
+  - Clean up pid files on Atlas shutdown
+  - Kill Atlas processes on install/uninstall
+  - Anchor now requires daemontools to be installed
 
 * Thu Feb 28 2013 RIPE Atlas Team <atlas@ripe.net> - 4500
 - RIPE Atlas probe software now supports two more architectures: TP-Link (for the next generation probes) and CentOS (for RIPE Atlas anchors).
 - There is now support for one-off measurements for ping, traceroute, DNS, and HTTPget.
 - We fixed a bug in DNS measurements in which, when querying local resolvers, more queries went to the last resolver.
 - Fixed "error" : { "TUCONNECT" : "Success"}. Before this version DNS TCP and HTTPget reported an error message "Success".
+- First release of anchor package
 
 * Wed Oct 3 2012 RIPE Atlas Team <atlas@ripe.net> - 4480
 - Fixed bug in traceroute when it has to deal with rfc4884 objects (mpls) that have a wrong size.
@@ -239,6 +251,7 @@
 - Fixed bugs in the libevent stub resolver to better handle DNS errors and timeouts (affects mostly httpget)
 - Limit the amount of measurement data that is sent as one unit. This prevents probes that have not connected to a controller for some time from overloading the controller.
 - The probe uptime is now in the DNS SOS messages that are sent by probes before they try to connect. This will allow making a distinction between various reasons for disconnects: e.g. probe reboot vs. network problems.
+- Initial version for anchor package added (Anand Buddhev)
 
 * Thu Sep 20 2012 RIPE Atlas Team <atlas@ripe.net> - 4470
 - This firmware fixes two bugs.

@@ -77,46 +77,4 @@ exit 0
 %systemd_postun_with_restart %{service_name}
 exit 0
 
-%changelog
-* Wed Aug 9 2023 Michel Stam <mstam@ripe.net>
-- Refactor anchor build spec according to probe spec
-
-* Mon Dec 19 2022 Guy Meyer <gmeyer@ripe.net>
-- generalize system and msm users
-- do not remove probe private key on uninstall
-- convert to noarch
-- add key preservation
-- add deploy env variability
-
-* Tue Nov 29 2022 Guy Meyer <gmeyer@ripe.net>
-- rename package to atlas-anchor (obseletes for version 5080-1 , or older)
-- rename this spec file: atlasprobe.spec.in -> atlas-anchor.spec
-- add command line "--define" options for specific builds with "git_tag", "git_source" and "git_commit"
-- add anchor-specific configurations to config.sh file during post-installation
-- cleanup spec file, comments, add defines for generalizations
-
-* Wed Oct 19 2022 Guy Meyer <gmeyer@ripe.net>
-- add atlasswprobe as runtime dependency
-- simplify script to include only anchor related functionality
-
-* Wed Oct 5 2022 Guy Meyer <gmeyer@ripe.net>
-- added support for el9
-
-* Thu Jul 6 2017 Anand Buddhdev <anandb@ripe.net>
-- Updated the SPEC file to build for both CentOS 6 and 7
-
-* Thu Mar 28 2013 Anand Buddhdev <anandb@ripe.net>
-- Removed some redundant kill commands, because the upstart script takes care of that
-- Added code to the post-stop hook in the upstart script to delete all PID files
-* Wed Mar 27 2013 Anand Buddhdev <anandb@ripe.net>
-- Embedded the upstart script into the spec file; switched from "su" to "setuidgid"
-- Added a post-stop hook to the upstart script to kill all atlas child processes
-- Fixed a typo in the "stop on" stanza in the upstart script
-- Added shell code to the the pre-install and pre-uninstall hooks to kill atlas child processes
-- Added dependency on daemontools for setuidgid
-- Some misc clean-ups in the spec file itself
-- Removed the "setcap" call in the post-install hook; the capability is set by RPM itself
-* Thu Jan 31 2013 Philip Homburg <phomburg@ripe.net>
-- First real release
-* Wed Oct 17 2012 Anand Buddhdev <anandb@ripe.net>
-- First version of spec file
+%include rhel/changelog
