@@ -223,5 +223,41 @@ define Package/ripe-atlas-probe/conffiles
 /etc/config/ripe-atlas
 endef
 
+define Package/ripe-atlas-anchor
+	$(call Package/ripe-atlas/Default)
+	TITLE+=(Anchor)
+	DEPENDS+=+ripe-atlas-common
+	MENU:=1
+endef
+
+define Package/ripe-atlas-anchor/config
+	source "$(SOURCE)/Config.in"
+endef
+
+define Package/ripe-atlas-anchor/description
+	RIPE Atlas (Anchor)
+
+	$(call Package/ripe-atlas/Default/description)
+endef
+
+define Package/ripe-atlas-anchor/install
+	$(INSTALL_DIR) \
+		$(1)/usr/lib/ripe-atlas/scripts \
+		$(1)/usr/share/ripe-atlas
+	$(INSTALL_DATA) \
+		$(PKG_BUILD_DIR)/config/anchor/known_hosts.reg \
+		$(1)/usr/share/ripe-atlas
+	$(INSTALL_BIN) \
+		$(PKG_BUILD_DIR)/config/anchor/reg_servers.sh.prod \
+		$(1)/usr/lib/ripe-atlas/scripts
+endef
+
+define Package/ripe-atlas-anchor/conffiles
+/etc/ripe-atlas/probe_key
+/etc/ripe-atlas/probe_key.pub
+/etc/config/ripe-atlas
+endef
+
 $(eval $(call BuildPackage,ripe-atlas-common))
+$(eval $(call BuildPackage,ripe-atlas-anchor))
 $(eval $(call BuildPackage,ripe-atlas-probe))
