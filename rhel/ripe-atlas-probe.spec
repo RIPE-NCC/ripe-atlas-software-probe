@@ -31,6 +31,8 @@ Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
+Requires(pre):  %{_sbindir}/semanage
+Requires(post): %{_sbindir}/semanage
 BuildRequires:	rpm systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 URL:            https://atlas.ripe.net/
 %{systemd_requires}
@@ -129,6 +131,7 @@ cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1
 chmod 644 "%{atlas_newkey}.pub"
 chmod 400 "%{atlas_newkey}"
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}"
+semanage fcontext -a -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
 exit 0
 
 %pre -n ripe-atlas-probe
@@ -140,6 +143,10 @@ exit 0
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
 rm -f %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
+
+if [ $1 -eq 0 ]; then
+	semanage fcontext -d -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
+fi
 exit 0
 
 %post -n ripe-atlas-probe
