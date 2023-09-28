@@ -139,7 +139,7 @@ define Package/ripe-atlas-common/install
 		$(1)/usr/share/ripe-atlas \
 		$(foreach file, \
 			FIRMWARE_APPS_VERSION \
-			measurement.conf \
+			measurement.conf, \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
 	$(INSTALL_DATA) capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
