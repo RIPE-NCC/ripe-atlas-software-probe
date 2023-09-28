@@ -13,11 +13,9 @@ PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3, \
           $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),openwrt-atlas-probev5, \
           generic)))
 
-# This will be changed to support low-privilege support in the future;
-# needs xattr support
-ATLAS_USER=root
-ATLAS_GROUP=root
-ATLAS_MEAS=root
+ATLAS_USER=ripe-atlas
+ATLAS_GROUP=ripe-atlas
+ATLAS_MEAS=ripe-atlas-measurement
 
 include $(INCLUDE_DIR)/package.mk
 
