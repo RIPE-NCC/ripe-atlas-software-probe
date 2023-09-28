@@ -61,6 +61,8 @@ define Package/ripe-atlas-common
 	DEPENDS+= \
                   +e2fsprogs \
                   +openssh-client \
+                  +libopenssl \
+		  +@OPENSSL_WITH_DEPRECATED \
 	          +@BUSYBOX_CONFIG_HOSTNAME \
 	          +@BUSYBOX_CONFIG_KILL \
 	          +@BUSYBOX_CONFIG_KILLALL \
