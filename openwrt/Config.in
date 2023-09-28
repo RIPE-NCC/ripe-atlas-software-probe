@@ -1,6 +1,8 @@
-choice
+choice RIPE_ATLAS_PROBE_TYPE
 	prompt "Probe Type"
 	default RIPE_ATLAS_PROBE_TYPE_GENERIC
+	help
+	  Select probe type to build. Set to "Generic" if unsure.
 
 config RIPE_ATLAS_PROBE_TYPE_GENERIC
 	bool "Generic"

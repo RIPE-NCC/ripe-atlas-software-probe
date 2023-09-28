@@ -70,7 +70,7 @@ define Package/ripe-atlas-common
 	          +@BUSYBOX_CONFIG_SED \
 	          +@BUSYBOX_CONFIG_TAR \
                   +!PACKAGE_ntpd:chrony \
-	          +@!PACKAGE_bzip2:BUSYBOX_CONFIG_BUNZIP2
+		  +!BUSYBOX_CONFIG_BUNZIP2:bzip2
 
 ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),)
 	DEPENDS+= \
@@ -167,25 +167,6 @@ define Package/ripe-atlas-common/install
 	$(call LinkApplet,$(1),rptuptime)
 	$(call LinkApplet,$(1),rxtxrpt)
 	$(call LinkApplet,$(1),telnetd)
-endef
-
-define Package/ripe-atlas-common/postinst
-#!/bin/sh
-source /lib/functions.sh
-
-add_group_and_user 'ripe-atlas-common'
-
-chown -R ripe-atlas-measurement:ripe-atlas \
-	$(foreach cron, \
-		2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 main, \
-		$${IPKG_INSTROOT}/var/spool/ripe-atlas/crons/$(cron)) \
-	$(foreach data, \
-		new oneoff, \
-		$${IPKG_INSTROOT}/var/spool/ripe-atlas/data/$(data)) \
-	$(foreach run, \
-		status pids, \
-		$${IPKG_INSTROOT}/var/run/ripe-atlas/$(run))
-exit 0
 endef
 
 define Package/ripe-atlas-probe
