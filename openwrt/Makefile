@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ripe-atlas-probe
-PKG_VERSION:=5080
+PKG_VERSION:=$(shell cat $(CURDIR)/$(SOURCE)/../VERSION)
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL
 PKG_LICENSE_FILES:=LICENSE
