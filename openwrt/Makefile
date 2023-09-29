@@ -175,6 +175,12 @@ define Package/ripe-atlas-common/install
 	$(call LinkApplet,$(1),telnetd)
 endef
 
+define Package/ripe-atlas-common/postinst
+#!/bin/sh
+chown ${ATLAS_MEAS}:${ATLAS_GROUP} $${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox
+chmod 4755 $${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox
+endef
+
 define Package/ripe-atlas-probe
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(Software Probe)
