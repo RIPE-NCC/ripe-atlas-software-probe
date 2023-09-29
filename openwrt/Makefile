@@ -69,6 +69,13 @@ define Package/ripe-atlas-common
 	          +@BUSYBOX_CONFIG_TAR \
                   +!PACKAGE_ntpd:chrony \
 		  +!BUSYBOX_CONFIG_BUNZIP2:bzip2
+	CONFLICTS:=atlasmsm \
+	           atlasprobe \
+	           atlas_extra_v3 \
+	           atlas_extra_v4 \
+	           atlas_extra_v5 \
+	           atlas-sw-probe \
+	           atlas-sw-probe-rpc
 
 ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),)
 	DEPENDS+= \
@@ -171,6 +178,8 @@ define Package/ripe-atlas-probe
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(Software Probe)
 	DEPENDS+=+ripe-atlas-common
+	VARIANT:=probe
+	CONFLICTS+=ripe-atlas-anchor
 	MENU:=1
 endef
 
@@ -206,6 +215,8 @@ define Package/ripe-atlas-anchor
 	$(call Package/ripe-atlas/Default)
 	TITLE+=(Anchor)
 	DEPENDS+=+ripe-atlas-common
+	VARIANT:=anchor
+	PROVIDES+=ripe-atlas-probe
 	MENU:=1
 endef
 
