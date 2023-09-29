@@ -55,12 +55,14 @@ define Package/ripe-atlas-common
 	USERID:=$(ATLAS_USER):$(ATLAS_GROUP) $(ATLAS_MEAS):$(ATLAS_GROUP)
 	DEPENDS+= \
                   +e2fsprogs \
+                  +jsonfilter \
                   +openssh-client \
                   +libopenssl \
 		  +@OPENSSL_WITH_DEPRECATED \
 	          +@BUSYBOX_CONFIG_HOSTNAME \
 	          +@BUSYBOX_CONFIG_KILL \
 	          +@BUSYBOX_CONFIG_KILLALL \
+	          +@BUSYBOX_CONFIG_PGREP \
 	          +@BUSYBOX_CONFIG_PS \
 	          +@BUSYBOX_CONFIG_SED \
 	          +@BUSYBOX_CONFIG_TAR \
