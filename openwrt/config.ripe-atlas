@@ -1,5 +1,0 @@
-config ripe-atlas
-	option enabled '1'
-	option mode 'prod'
-	option screen '1'
-	option txrx_report '0'

@@ -1,0 +1,16 @@
+#!/bin/sh
+chown ripe-atlas-measurement:ripe-atlas ${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox 1>/dev/null 2>&1
+chmod 4750 ${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox 1>/dev/null 2>&1
+uci get ripe-atlas 1>/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	touch ${IPKG_INSTROOT}/etc/config/ripe-atlas
+	uci -q batch 1>/dev/null 2>&1 <<EOF
+add ripe-atlas ripe-atlas
+set ripe-atlas.@ripe-atlas[0].enabled='1'
+set ripe-atlas.@ripe-atlas[0].mode='prod'
+set ripe-atlas.@ripe-atlas[0].use_screen='0'
+set ripe-atlas.@ripe-atlas[0].rxtx_report='0'
+commit ripe-atlas
+EOF
+fi
+exit 0

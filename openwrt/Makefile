@@ -57,6 +57,7 @@ define Package/ripe-atlas-common
                   +e2fsprogs \
                   +jsonfilter \
                   +openssh-client \
+                  +openssh-keygen \
                   +libopenssl \
 		  +@OPENSSL_WITH_DEPRECATED \
 	          +@BUSYBOX_CONFIG_HOSTNAME \
@@ -109,8 +110,8 @@ endef
 
 define Package/ripe-atlas-common/install
 	$(INSTALL_DIR) \
-		$(1)/etc/config \
 		$(1)/etc/init.d \
+		$(1)/etc/uci-defaults \
 		$(1)/usr/lib/ripe-atlas/measurement \
 		$(1)/usr/lib/ripe-atlas/scripts \
 		$(1)/usr/share/ripe-atlas \
@@ -136,7 +137,7 @@ define Package/ripe-atlas-common/install
 			resolvconf \
 			support.lib.sh, \
 			$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/scripts/$(script))
-	$(INSTALL_SUID) \
+	$(INSTALL_BIN) \
 		$(PKG_INSTALL_DIR)/usr/lib/ripe-atlas/measurement/busybox \
 		$(1)/usr/lib/ripe-atlas/measurement/busybox
 	$(INSTALL_BIN) \
@@ -149,7 +150,7 @@ define Package/ripe-atlas-common/install
 			measurement.conf, \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
-	$(INSTALL_CONF) config.ripe-atlas $(1)/etc/config/ripe-atlas
+	$(INSTALL_BIN) ripe-atlas.uci-defaults $(1)/etc/uci-defaults/60_ripe-atlas
 	$(INSTALL_DATA) capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
@@ -173,12 +174,6 @@ define Package/ripe-atlas-common/install
 	$(call LinkApplet,$(1),rptuptime)
 	$(call LinkApplet,$(1),rxtxrpt)
 	$(call LinkApplet,$(1),telnetd)
-endef
-
-define Package/ripe-atlas-common/postinst
-#!/bin/sh
-chown ${ATLAS_MEAS}:${ATLAS_GROUP} $${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox
-chmod 4755 $${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox
 endef
 
 define Package/ripe-atlas-probe
