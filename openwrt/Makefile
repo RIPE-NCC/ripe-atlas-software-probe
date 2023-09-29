@@ -8,10 +8,7 @@ PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Michel Stam <mstam@ripe.net>
 PKG_FIXUP=autoreconf
 PKG_INSTALL:=1
-PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3, \
-          $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),openwrt-atlas-probev4, \
-          $(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),openwrt-atlas-probev5, \
-          generic)))
+PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3,$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),openwrt-atlas-probev4,$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),openwrt-atlas-probev5,generic)))
 
 ATLAS_USER=ripe-atlas
 ATLAS_GROUP=ripe-atlas
