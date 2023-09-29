@@ -109,6 +109,7 @@ endef
 
 define Package/ripe-atlas-common/install
 	$(INSTALL_DIR) \
+		$(1)/etc/config \
 		$(1)/etc/init.d \
 		$(1)/usr/lib/ripe-atlas/measurement \
 		$(1)/usr/lib/ripe-atlas/scripts \
@@ -148,6 +149,7 @@ define Package/ripe-atlas-common/install
 			measurement.conf, \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
+	$(INSTALL_CONF) config.ripe-atlas $(1)/etc/config/ripe-atlas
 	$(INSTALL_DATA) capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
