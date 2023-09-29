@@ -1,4 +1,4 @@
-#!/bin/sh ${IPKG_INSTROOT}/etc/rc.common
+#!/bin/sh /etc/rc.common
 START=60
 STOP=01
 USE_PROCD=1
@@ -17,12 +17,72 @@ validate_config()
 	return ${?}
 }
 
+create_dir()
+{
+	local user
+	local group
+	local mode
+	local dir
+
+	user="${1}"
+	shift
+	group="${1}"
+	shift
+	mode="${1}"
+	shift
+
+	while [ -n "${1}" ]; do
+		ent="${1}"
+		mkdir -p ${IPKG_INSTROOT}/${ent}
+		chown ${user}:${group} ${IPKG_INSTROOT}/${ent}
+		chmod ${mode} ${IPKG_INSTROOT}/${ent}
+		shift
+	done
+}
+
+setup_environment()
+{
+	create_dir ${MAINU} ${GROUP} 0770 \
+		/etc/ripe-atlas
+	create_dir ${MEASU} ${GROUP} 0775 \
+		/var/run/ripe-atlas/pids \
+		/var/run/ripe-atlas/status
+	create_dir ${MEASU} ${GROUP} 2775 \
+		/var/spool/ripe-atlas/crons \
+		/var/spool/ripe-atlas/crons/main \
+		/var/spool/ripe-atlas/crons/2 \
+		/var/spool/ripe-atlas/crons/3 \
+		/var/spool/ripe-atlas/crons/4 \
+		/var/spool/ripe-atlas/crons/5 \
+		/var/spool/ripe-atlas/crons/6 \
+		/var/spool/ripe-atlas/crons/7 \
+		/var/spool/ripe-atlas/crons/8 \
+		/var/spool/ripe-atlas/crons/9 \
+		/var/spool/ripe-atlas/crons/10 \
+		/var/spool/ripe-atlas/crons/11 \
+		/var/spool/ripe-atlas/crons/12 \
+		/var/spool/ripe-atlas/crons/13 \
+		/var/spool/ripe-atlas/crons/14 \
+		/var/spool/ripe-atlas/crons/15 \
+		/var/spool/ripe-atlas/crons/16 \
+		/var/spool/ripe-atlas/crons/17 \
+		/var/spool/ripe-atlas/crons/18 \
+		/var/spool/ripe-atlas/crons/19 \
+		/var/spool/ripe-atlas/crons/20 \
+		/var/spool/ripe-atlas/data \
+		/var/spool/ripe-atlas/data/new \
+		/var/spool/ripe-atlas/data/oneoff \
+		/var/spool/ripe-atlas/data/out \
+		/var/spool/ripe-atlas/data/out/ooq \
+		/var/spool/ripe-atlas/data/out/ooq10
+}
+
 start_service()
 {
 	local cfg=${IPKG_INSTROOT}/etc/ripe-atlas/config.txt
 	local mod=${IPKG_INSTROOT}/etc/ripe-atlas/mode
 
-	validate_ripe_atlas 'config'
+	validate_config 'config'
 	if [ ${?} -ne 0 ]; then
 		echo 'validation failed'
 		return 1
@@ -41,17 +101,7 @@ start_service()
 	esac
 
 	echo 'Starting RIPE Atlas'
-	mkdir -p ${IPKG_INSTROOT}/var/run/ripe-atlas/pids
-	mkdir -p ${IPKG_INSTROOT}/var/run/ripe-atlas/status
-	for dir in main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-		mkdir -p ${IPKG_INSTROOT}/var/spool/ripe-atlas/crons/${dir}
-	done
-	for dir in new oneoff out/ooq out/ooq10; do
-		mkdir -p ${IPKG_INSTROOT}/var/spool/ripe-atlas/data/${dir}
-	done
-
-	chown -R ${MEASU}:${GROUP} ${IPKG_INSTROOT}/var/run/ripe-atlas/*
-	chown -R ${MEASU}:${GROUP} ${IPKG_INSTROOT}/var/spool/ripe-atlas/*
+	setup_environment
 
 	echo 1>/dev/null 2> "${cfg}"
 	if [ ${rxtx_report} -ne 0 ]; then
@@ -71,7 +121,7 @@ start_service()
 	procd_set_param user ${MAINU}
 	procd_set_param group ${GROUP}
 	procd_set_param respawn
-	if [ -x ${IPKG_INSTROOT}/sbin/ujail ]; then
+	if [ -x /sbin/ujail ]; then
 		procd_append_param capabilities ${IPKG_INSTROOT}/usr/share/ripe-atlas/capabilities.json
 	fi
 	procd_close_instance
