@@ -36,15 +36,15 @@ CONFIGURE_ARGS+= \
 	--disable-chown
 
 define Package/ripe-atlas/Default/description
-	RIPE Atlas is the RIPE NCC's main Internet data
-	collection system. It is a global network of
-	devices, called probes and anchors, that
-	actively measure Internet connectivity. Anyone
-	can access this data via Internet traffic maps,
-	streaming data visualisations, and an API.
-	RIPE Atlas users can also perform customised
-	measurements to gain valuable data about their
-	own networks.
+RIPE Atlas is the RIPE NCC's main Internet data
+collection system. It is a global network of
+devices, called probes and anchors, that
+actively measure Internet connectivity. Anyone
+can access this data via Internet traffic maps,
+streaming data visualisations, and an API.
+RIPE Atlas users can also perform customised
+measurements to gain valuable data about their
+own networks.
 endef
 
 define Build/Prepare
@@ -99,9 +99,9 @@ define Package/ripe-atlas-common/conffiles
 endef
 
 define Package/ripe-atlas-common/description
-	RIPE Atlas (common files)
+RIPE Atlas (common files)
 
-	$(call Package/ripe-atlas/Default/description)
+$(call Package/ripe-atlas/Default/description)
 endef
 
 define LinkApplet
@@ -188,9 +188,9 @@ define Package/ripe-atlas-probe/config
 endef
 
 define Package/ripe-atlas-probe/description
-	RIPE Atlas (Software Probe)
+RIPE Atlas (Software Probe)
 
-	$(call Package/ripe-atlas/Default/description)
+$(call Package/ripe-atlas/Default/description)
 endef
 
 define Package/ripe-atlas-probe/install
@@ -225,9 +225,9 @@ define Package/ripe-atlas-anchor/config
 endef
 
 define Package/ripe-atlas-anchor/description
-	RIPE Atlas (Anchor)
+RIPE Atlas (Anchor)
 
-	$(call Package/ripe-atlas/Default/description)
+$(call Package/ripe-atlas/Default/description)
 endef
 
 define Package/ripe-atlas-anchor/install
