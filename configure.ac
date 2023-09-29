@@ -125,7 +125,11 @@ AC_SUBST(systemd_sysusersdir)
 atlas_libexecdir="${libexecdir}/ripe-atlas"
 atlas_datadir="${datadir}/ripe-atlas"
 atlas_measurementdir="${atlas_libexecdir}/measurement"
-atlas_rundir="${runstatedir}/ripe-atlas"
+if [ -n "${runstatedir}" ]; then
+	atlas_rundir="${runstatedir}/ripe-atlas"
+else
+	atlas_rundir="${localstatedir}/run/ripe-atlas"
+fi
 atlas_scriptsdir="${atlas_libexecdir}/scripts"
 atlas_spooldir="${localstatedir}/spool/ripe-atlas"
 atlas_sysconfdir="${sysconfdir}/ripe-atlas"
