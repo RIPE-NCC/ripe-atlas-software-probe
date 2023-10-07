@@ -21,18 +21,27 @@ Note
 ----
 
 The software probe uses TCP ports 2023 and 8080 internally. If another
-service is using these ports then the probe will not function correctly.
+service is using these ports, then the probe will not function
+correctly. To avoid conflicts, the runtime configuration options
+described below are available to make the probe use different port
+numbers.
 
-Runtime Configuration Options
+Runtime configuration options
 -----------------------------
 
-Currently there is one runtime configuration option that enables sending
-interface traffic statistics as Atlas measurement results. 
-This option can be enabled by creating the file
-/etc/ripe-atlas/config.txt and adding the line 'RXTXRPT=yes'.
+Currently there are three runtime configuration options available. To
+use them, create the file ``/etc/ripe-atlas/config.txt`` and add a
+line per desired configuration setting as per the following:
+
+- Set ``RXTXRPT=yes`` to enable sending of interface traffic statistics as
+  Atlas measurement results.
+- Set TELNETD_PORT to an integer value to make the probe use that TCP
+  port number instead of 2023, e.g., ``TELNETD_PORT=52023``.
+- Set HTTP_POST_PORT to an integer value to make the probe use that TCP
+  port number instead of 8080, e.g., ``HTTP_POST_PORT=58080``.
 
 Common installation instructions
 --------------------------------
 
 The public key is stored in ``/etc/ripe-atlas/probe_key.pub``. Use
-This to register your probe at <https://atlas.ripe.net/apply/swprobe/>.
+this to register your probe at <https://atlas.ripe.net/apply/swprobe/>.
