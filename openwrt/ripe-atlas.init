@@ -8,13 +8,11 @@ GROUP=ripe-atlas
 
 validate_config()
 {
-	uci_validate_section 'ripe-atlas' 'ripe-atlas' "${1}" \
+	uci_load_validate 'ripe-atlas' 'ripe-atlas' "${1}" "${2}" \
 		'enabled:uinteger:1' \
 		'use_screen:uinteger:0' \
 		'mode:string:prod' \
 		'rxtx_report:uinteger:0'
-
-	return ${?}
 }
 
 create_dir()
@@ -77,13 +75,12 @@ setup_environment()
 		/var/spool/ripe-atlas/data/out/ooq10
 }
 
-start_service()
+start_instance()
 {
 	local cfg=${IPKG_INSTROOT}/etc/ripe-atlas/config.txt
 	local mod=${IPKG_INSTROOT}/etc/ripe-atlas/mode
 
-	validate_config 'config'
-	if [ ${?} -ne 0 ]; then
+	if [ ${2} -ne 0 ]; then
 		echo 'validation failed'
 		return 1
 	fi
@@ -102,8 +99,9 @@ start_service()
 
 	echo 'Starting RIPE Atlas'
 	setup_environment
-
+	echo 1>/dev/null 2> "${mod}"
 	echo 1>/dev/null 2> "${cfg}"
+
 	if [ ${rxtx_report} -ne 0 ]; then
 		echo 'RXTXRPT=yes' >> "${cfg}"
 	fi
@@ -125,6 +123,14 @@ start_service()
 		procd_append_param capabilities ${IPKG_INSTROOT}/usr/share/ripe-atlas/capabilities.json
 	fi
 	procd_close_instance
+
+	return 0
+}
+
+start_service()
+{
+	config_load 'ripe-atlas'
+	config_foreach validate_config 'ripe-atlas' start_instance
 }
 
 stop_service()
