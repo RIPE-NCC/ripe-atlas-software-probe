@@ -149,9 +149,9 @@ define Package/ripe-atlas-common/install
 			FIRMWARE_APPS_VERSION \
 			measurement.conf, \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
-	$(INSTALL_BIN) ripe-atlas.init $(1)/etc/init.d/ripe-atlas
-	$(INSTALL_BIN) ripe-atlas.uci-defaults $(1)/etc/uci-defaults/60_ripe-atlas
-	$(INSTALL_DATA) capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
+	$(INSTALL_BIN) files/ripe-atlas.init $(1)/etc/init.d/ripe-atlas
+	$(INSTALL_BIN) files/ripe-atlas.uci-defaults $(1)/etc/uci-defaults/60_ripe-atlas
+	$(INSTALL_DATA) files/capabilities.json $(1)/usr/share/ripe-atlas/capabilities.json
 	$(call LinkApplet,$(1),atlasinit)
 	$(call LinkApplet,$(1),buddyinfo)
 	$(call LinkApplet,$(1),condmv)
