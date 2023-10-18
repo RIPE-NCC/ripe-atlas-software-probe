@@ -120,6 +120,7 @@ start_instance()
 	procd_set_param group ${GROUP}
 	procd_set_param respawn
 	if [ -x /sbin/ujail ]; then
+		procd_add_jail ripe-atlas
 		procd_append_param capabilities ${IPKG_INSTROOT}/usr/share/ripe-atlas/capabilities.json
 	fi
 	procd_close_instance
