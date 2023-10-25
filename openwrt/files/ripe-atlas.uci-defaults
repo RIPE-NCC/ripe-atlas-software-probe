@@ -1,6 +1,8 @@
 #!/bin/sh
 chown ripe-atlas-measurement:ripe-atlas ${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox 1>/dev/null 2>&1
 chmod 4750 ${IPKG_INSTROOT}/usr/lib/ripe-atlas/measurement/busybox 1>/dev/null 2>&1
+chown 0:0 ${IPKG_INSTROOT}/usr/share/ripe-atlas/measurement.conf 1>/dev/null 2>&1
+chmod 0644 ${IPKG_INSTROOT}/usr/share/ripe-atlas/measurement.conf 1>/dev/null 2>&1
 uci get ripe-atlas 1>/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	touch ${IPKG_INSTROOT}/etc/config/ripe-atlas
