@@ -89,6 +89,7 @@ start_instance()
 		return 1
 	fi
 
+	rm -f ${IPKG_INSTROOT}/etc/ripe-atlas/reg_servers.sh
 	case "${mode}" in
 		test|dev|prod)
 			;;
