@@ -63,7 +63,6 @@ define Package/ripe-atlas-common
 	          +@BUSYBOX_CONFIG_HOSTNAME \
 	          +@BUSYBOX_CONFIG_KILL \
 	          +@BUSYBOX_CONFIG_KILLALL \
-	          +@BUSYBOX_CONFIG_PGREP \
 	          +@BUSYBOX_CONFIG_PS \
 	          +@BUSYBOX_CONFIG_SED \
 	          +@BUSYBOX_CONFIG_TAR \

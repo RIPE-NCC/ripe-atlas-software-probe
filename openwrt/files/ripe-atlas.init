@@ -137,34 +137,15 @@ start_service()
 
 stop_service()
 {
-	local parent
-	local file
 	local pids
 	local pid
 
-	# first kill the parent pids. This prevents a restart of processes
-	parent=$(info|jsonfilter -e '@["ripe-atlas"]["instances"]["instance1"]["pid"]')
-	if [ -z "${parent}" ]; then
-		return
-	fi
-	pids=$(pgrep -P ${parent} 2>/dev/null)
-
-	if [ -n "${pids}" ]; then
-		kill ${pids} 1>/dev/null 2>&1
-	fi
-	pids=''
-
-	# now kill the remaining processes
-	for file in /var/run/ripe-atlas/pids/*; do
-		if [ -f "${file}" ]; then
-			pid=$(cat ${file})
-			pids="${pids} ${pid}"
-			rm -f "${file}"
-		fi
+	for pid in $(find /proc -type d -maxdepth 1 -group ${GROUP} -print); do
+		pids="${pid##*/} ${pids}"
 	done
 
 	if [ -n "${pids}" ]; then
-		kill -9 ${pids} 1>/dev/null 2>&1
+		kill ${pids} 1>/dev/null 2>&1
 	fi
 }
 
