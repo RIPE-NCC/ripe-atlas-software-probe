@@ -10,7 +10,7 @@ validate_config()
 {
 	uci_load_validate 'ripe-atlas' 'ripe-atlas' "${1}" "${2}" \
 		'enabled:uinteger:1' \
-		'use_screen:uinteger:0' \
+		'log_console:uinteger:0' \
 		'mode:string:prod' \
 		'rxtx_report:uinteger:0'
 }
@@ -109,16 +109,11 @@ start_instance()
 	echo "${mode}" > "${mod}"
 
 	procd_open_instance
-	if [ "${use_screen}" -ne 0 ]; then
-		proc_set_param command ${IPKG_INSTROOT}/usr/bin/screen
-		procd_append_param command '-Admt'
-		procd_append_param command 'atlas'
-		procd_append_param command ${IPKG_INSTROOT}/usr/sbin/ripe-atlas
-	else
-		procd_set_param command ${IPKG_INSTROOT}/usr/sbin/ripe-atlas
-	fi
+	procd_set_param command ${IPKG_INSTROOT}/usr/sbin/ripe-atlas
 	procd_set_param user ${MAINU}
 	procd_set_param group ${GROUP}
+	procd_set_param stdout ${log_console}
+	procd_set_param stderr ${log_console}
 	procd_set_param respawn
 	if [ -x /sbin/ujail ]; then
 		procd_add_jail ripe-atlas

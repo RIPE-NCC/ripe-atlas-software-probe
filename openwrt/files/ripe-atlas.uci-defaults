@@ -10,7 +10,7 @@ if [ $? -ne 0 ]; then
 add ripe-atlas ripe-atlas
 set ripe-atlas.@ripe-atlas[0].enabled='1'
 set ripe-atlas.@ripe-atlas[0].mode='prod'
-set ripe-atlas.@ripe-atlas[0].use_screen='0'
+set ripe-atlas.@ripe-atlas[0].log_console='0'
 set ripe-atlas.@ripe-atlas[0].rxtx_report='0'
 commit ripe-atlas
 EOF

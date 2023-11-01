@@ -76,20 +76,9 @@ define Package/ripe-atlas-common
 	           atlas-sw-probe \
 	           atlas-sw-probe-rpc
 
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),)
-	DEPENDS+= \
-	          +screen
-endif
-
-ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),)
-	DEPENDS+= \
-	          +screen
-endif
-
 ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),)
 	DEPENDS+= \
 	          +btrfs
-	          +screen
 endif
 endef
 
