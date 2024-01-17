@@ -13,6 +13,7 @@ PRB_TYPE:=$(if $(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),openwrt-atlas-probev3,$(if $(C
 ATLAS_USER=ripe-atlas
 ATLAS_GROUP=ripe-atlas
 ATLAS_MEAS=ripe-atlas-measurement
+PROBE_FW_KEYS=
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -96,6 +97,25 @@ define LinkApplet
 	$(LN) busybox $(1)/usr/lib/ripe-atlas/measurement/$(2)
 endef
 
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V3),)
+	PROBE_FW_KEYS += \
+		2017-11-07-dev.pem \
+		2017-11-07-prod.pem \
+		2017-11-07-test.pem
+endif
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V4),)
+	PROBE_FW_KEYS += \
+		2018-04-23-dev.pem \
+		2018-04-23-prod.pem \
+		2018-04-23-test.pem
+endif
+ifneq ($(CONFIG_RIPE_ATLAS_PROBE_TYPE_V5),)
+	PROBE_FW_KEYS += \
+		2021-02-02-dev.pem \
+		2021-02-02-prod.pem \
+		2021-02-02-test.pem
+endif
+
 define Package/ripe-atlas-common/install
 	$(INSTALL_DIR) \
 		$(1)/etc/init.d \
@@ -135,7 +155,8 @@ define Package/ripe-atlas-common/install
 		$(1)/usr/share/ripe-atlas \
 		$(foreach file, \
 			FIRMWARE_APPS_VERSION \
-			measurement.conf, \
+			measurement.conf \
+			$(PROBE_FW_KEYS), \
 			$(PKG_INSTALL_DIR)/usr/share/ripe-atlas/$(file))
 	$(INSTALL_BIN) files/ripe-atlas.init $(1)/etc/init.d/ripe-atlas
 	$(INSTALL_BIN) files/ripe-atlas.uci-defaults $(1)/etc/uci-defaults/60_ripe-atlas

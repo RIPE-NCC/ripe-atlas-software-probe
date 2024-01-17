@@ -56,6 +56,29 @@ endif
 atlas_sysconf_DATA = \
 			common/mode
 
+if PROBE_TYPE_V3
+atlas_data_DATA += \
+			probe/2017-11-07-dev.pem \
+			probe/2017-11-07-prod.pem \
+			probe/2017-11-07-test.pem
+else
+if PROBE_TYPE_V4
+atlas_data_DATA += \
+			probe/2018-04-23-dev.pem \
+			probe/2018-04-23-prod.pem \
+			probe/2018-04-23-test.pem
+else
+if PROBE_TYPE_V5
+atlas_data_DATA += \
+			probe/2021-02-02-dev.pem \
+			probe/2021-02-02-prod.pem \
+			probe/2021-02-02-test.pem
+endif # PROBE_TYPE_V5
+
+endif # PROBE_TYPE_V4
+
+endif # PROBE_TYPE_V3
+
 #
 # This is a hack to ensure that atlas_path.h gets created prior
 # to probe-busybox being built.

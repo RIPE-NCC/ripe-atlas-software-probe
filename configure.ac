@@ -22,6 +22,9 @@ AS_CASE([$probe_type],
 	[*openwrt*], [probe_scripts_path=$probe_type],
 	[probe_scripts_path=generic])
 AC_SUBST(probe_scripts_path)
+AM_CONDITIONAL([PROBE_TYPE_V3], [test "x${probe_type}" = 'xopenwrt-atlas-probev3'])
+AM_CONDITIONAL([PROBE_TYPE_V4], [test "x${probe_type}" = 'xopenwrt-atlas-probev4'])
+AM_CONDITIONAL([PROBE_TYPE_V5], [test "x${probe_type}" = 'xopenwrt-atlas-probev5'])
 
 AC_ARG_ENABLE([chown],
 	      [AS_HELP_STRING([--enable-chown], [set permissions during install @<:@default=yes@:>@])],
