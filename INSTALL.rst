@@ -33,13 +33,13 @@ To create a deb for Debian or Debian-based distros
 
 Currently only tested on Debian 11 and 12 on the x86_64 platform.
 
-- Get the needed tools: ``sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autoconf-dev``
+- Get the needed tools: ``sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autoconf-dev``. Note that ``autoconf-dev`` may be ``autotools-dev`` on very recent Debian systems
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
  * ``git checkout BRANCH`` << if needed (optional)
  * ``git submodule update`` << this will update the submodule within this branch
- * ``dpkg-buildpackage -b -us -uc``deb`` << this will create the package
+ * ``dpkg-buildpackage -b -us -uc`` << this will create the package
  * ``cp ../ripe-atlas-*.deb .``
 - Install these .deb files: ``sudo dpkg -i ripe-atlas-common-????.deb ripe-atlas-software-probe-????.deb``
 
