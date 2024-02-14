@@ -6,3 +6,10 @@ REG_SERVERS=$ATLAS_SYSCONFDIR/reg_servers.sh
 
 # Commands
 SET_LEDS_CMD=:
+STATIC_V4_CMD=:
+STATIC_V6_CMD=:
+
+reboot_probe()
+{
+	:
+}
