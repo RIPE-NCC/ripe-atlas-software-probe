@@ -223,7 +223,7 @@ if [ "$need_rereg" = 1 ]; then
 
 		fi
 
-		if cmp $RESOLV_CONF_VOL $RESOLV_CONF_STATIC
+		if cmp -s $RESOLV_CONF_VOL $RESOLV_CONF_STATIC
 		then
 			:
 		else
