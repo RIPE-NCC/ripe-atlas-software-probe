@@ -37,11 +37,14 @@ get_arch()
 
 get_sub_arch()
 {
-	if [ ! -z $SUB_ARCH ] ; then
-		echo "$SUB_ARCH"
-	else
-		echo ""
+	local ID='generic'
+	local VERSION_ID='unknown'
+	local ARCH=$(uname -m)
+
+	if [ -r '/etc/os-release' ]; then
+		. /etc/os-release
 	fi
+	echo "${ID}/${VERSION_ID}/${ARCH}"
 }
 
 p_to_r_init()
