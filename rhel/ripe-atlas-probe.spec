@@ -86,7 +86,7 @@ make DESTDIR=%{buildroot} install
 %{_unitdir}/%{service_name}
 %{_sysusersdir}/ripe-atlas.conf
 %{_tmpfilesdir}/ripe-atlas.conf
-%attr(0644, 0, 0,) %{_datadir}/%{base_path}/measurement.conf
+%attr(0644, root, root) %{_datadir}/%{base_path}/measurement.conf
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 %config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{_sysconfdir}/%{base_path}/mode
 %ghost %{_sysconfdir}/%{base_path}/probe_key
