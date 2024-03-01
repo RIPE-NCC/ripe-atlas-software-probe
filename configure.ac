@@ -125,17 +125,13 @@ AC_SUBST(systemd_unitsdir)
 AC_SUBST(systemd_sysusersdir)
 
 # system paths
-atlas_libexecdir="${libexecdir}/ripe-atlas"
-atlas_datadir="${datadir}/ripe-atlas"
+atlas_libexecdir="\${libexecdir}/ripe-atlas"
+atlas_datadir="\${datadir}/ripe-atlas"
 atlas_measurementdir="${atlas_libexecdir}/measurement"
-if [ -n "${runstatedir}" ]; then
-	atlas_rundir="${runstatedir}/ripe-atlas"
-else
-	atlas_rundir="${localstatedir}/run/ripe-atlas"
-fi
+atlas_rundir="\${runstatedir}/ripe-atlas"
 atlas_scriptsdir="${atlas_libexecdir}/scripts"
-atlas_spooldir="${localstatedir}/spool/ripe-atlas"
-atlas_sysconfdir="${sysconfdir}/ripe-atlas"
+atlas_spooldir="\${localstatedir}/spool/ripe-atlas"
+atlas_sysconfdir="\${sysconfdir}/ripe-atlas"
 
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
