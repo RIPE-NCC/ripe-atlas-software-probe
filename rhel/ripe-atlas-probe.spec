@@ -128,9 +128,6 @@ make DESTDIR=%{buildroot} install
 mkdir -p -m 0770 "%{atlas_newdir}"
 cp "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1
 cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1
-chmod 644 "%{atlas_newkey}.pub"
-chmod 400 "%{atlas_newkey}"
-chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}"
 semanage fcontext -a -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
 exit 0
 
@@ -138,12 +135,14 @@ exit 0
 exit 0
 
 %post -n ripe-atlas-common
+chmod 644 "%{atlas_newkey}.pub" 1>/dev/null 2>&1
+chmod 400 "%{atlas_newkey}" 1>/dev/null 2>&1
+chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1
 %systemd_post %{service_name}
 
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
-rm -f %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
-
+rm -f %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 if [ $1 -eq 0 ]; then
 	semanage fcontext -d -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
 fi
