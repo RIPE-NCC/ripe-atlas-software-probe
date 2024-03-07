@@ -40,7 +40,7 @@ To build DEB files for Debian or Debian-based distros
 The build process is performed using dpkg-buildpackage (compat version 13).
 Currently only tested on Debian 11 and 12 on the x86_64 platform.
 
-- Get the needed tools: ``sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autoconf-dev``. Note that ``autoconf-dev`` may be ``autotools-dev`` on very recent Debian systems
+- Get the needed tools: ``sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
