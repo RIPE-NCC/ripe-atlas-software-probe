@@ -40,7 +40,7 @@ endif
 # Technically this hack belongs in probe-busybox, but it is here
 # because busybox is a different build system.
 install-exec-hook:
-	$(install_sh) $(ATLAS_OWN_SUID_OPTS) $(ATLAS_OWN_MEAS_OPTS) $(top_srcdir)/probe-busybox/busybox_unstripped $(DESTDIR)/$(atlas_measurementdir)/busybox
+	$(install_sh) $(ATLAS_OWN_SUID_OPTS) $(ATLAS_OWN_MEAS_OPTS) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
 if SETCAP_INSTALL
 	setcap cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
 endif
