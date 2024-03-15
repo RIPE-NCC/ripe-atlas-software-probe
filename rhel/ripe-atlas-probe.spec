@@ -121,14 +121,15 @@ make DESTDIR=%{buildroot} install
 %tmpfiles_create_package ripe-atlas %{_builddir}/%{build_dirname}/config/common/ripe-atlas.run.conf
 
 # check if probe keys need to be backed up
-[ ! -f "%{atlas_oldkey}" ] && exit 0
-[ $(cmp -s "%{atlas_oldkey}" "%{atlas_newkey}") ] && exit 0
-
-# migrate probe keys
-mkdir -p -m 0770 "%{atlas_newdir}"
-cp "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1
-cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1
-semanage fcontext -a -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
+if [ -f "%{atlas_oldkey}" ]; then
+	if ! cmp -s "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1; then
+		# migrate probe keys
+		mkdir -p -m 0770 "%{atlas_newdir}"
+		cp "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1 || :
+		cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1 || :
+	fi
+fi
+semanage fcontext -a -f a -t bin_t -r s0 /usr/sbin/ripe-atlas 1>/dev/null 2>&1 || :
 exit 0
 
 %pre -n ripe-atlas-probe
