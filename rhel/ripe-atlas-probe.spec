@@ -31,7 +31,7 @@ Version:    	%{version}
 Release:    	1%{?dist}
 License:    	RIPE NCC
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
-Requires(pre):  %{_sbindir}/semanage
+Requires(pre):  %{_sbindir}/semanage %{_bindir}/systemd-sysusers %{_bindir}/systemd-tmpfiles
 Requires(post): %{_sbindir}/semanage
 BuildRequires:	rpm systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
 URL:            https://atlas.ripe.net/
@@ -117,8 +117,11 @@ make DESTDIR=%{buildroot} install
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %pre -n ripe-atlas-common
-%sysusers_create_package ripe-atlas %{_builddir}/%{build_dirname}/config/common/ripe-atlas.users.conf
-%tmpfiles_create_package ripe-atlas %{_builddir}/%{build_dirname}/config/common/ripe-atlas.run.conf
+%{_bindir}/systemd-sysusers --replace=%{_sysusersdir}/ripe-atlas.conf - <<EOF
+g %{atlas_group} -
+u %{atlas_user} -:%{atlas_group} "RIPE Atlas" %{_rundir}/%{base_path} -
+u %{atlas_measurement} -:%{atlas_group} "RIPE Atlas Measurements" %{_localstatedir}/spool/%{base_path} -
+EOF
 
 # check if probe keys need to be backed up
 if [ -f "%{atlas_oldkey}" ]; then
@@ -136,6 +139,8 @@ exit 0
 exit 0
 
 %post -n ripe-atlas-common
+%{_bindir}/systemd-tmpfiles --create %{_tmpfilesdir}/ripe-atlas.conf
+
 chmod 644 "%{atlas_newkey}.pub" 1>/dev/null 2>&1
 chmod 400 "%{atlas_newkey}" 1>/dev/null 2>&1
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1
