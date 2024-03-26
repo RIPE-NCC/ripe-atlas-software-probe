@@ -113,7 +113,7 @@ make DESTDIR=%{buildroot} install
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
-%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %pre -n ripe-atlas-common

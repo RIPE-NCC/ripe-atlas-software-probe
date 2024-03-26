@@ -53,11 +53,13 @@ cd %{_builddir}/%{build_dirname}
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
 install -m644 %{_builddir}/%{build_dirname}/config/anchor/known_hosts.reg %{buildroot}%{_datadir}/%{base_path}/known_hosts.reg
 mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
+install -m644 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.dev %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.dev
+install -m644 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.test %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.test
 install -m644 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 
 %files
 %{_datadir}/%{base_path}/known_hosts.reg
-%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %post
