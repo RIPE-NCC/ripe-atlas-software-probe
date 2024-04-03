@@ -89,39 +89,39 @@ kill_ssh()
 {
 	if [ -f $STATUS_DIR/con_keep_pid.vol ]
 	then
-		kill -9 `cat $STATUS_DIR/con_keep_pid.vol`
+		kill -9 `cat $STATUS_DIR/con_keep_pid.vol` 2>/dev/null
 	rm -f $STATUS_DIR/con_keep_pid.vol
 	fi
 }
 findpid_ssh()
 {
 	[ -f $STATUS_DIR/con_keep_pid.vol ] &&
-		kill -0 `cat $STATUS_DIR/con_keep_pid.vol`
+		kill -0 `cat $STATUS_DIR/con_keep_pid.vol` 2>/dev/null
 }
 kill_perds()
 {
 	PERD_PIDS=`pidof perd`
 	for s in $PERD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 
 	EPERD_PIDS=`pidof eperd`
 	for s in $EPERD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 
 	EOOQD_PIDS=`pidof eooqd`
 	for s in $EOOQD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 }
 kill_telnetd()
 {
 	if [ -f $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol ] ; then
-		kill -9 `tail -1 $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol`
+		kill -9 `tail -1 $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol` 2>/dev/null
 	fi
 }
 sos()
