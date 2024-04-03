@@ -38,7 +38,7 @@ fw_version()
 			;;
 
 		'application'|'app')
-			file="${ATLAS_DATA}/FIRMWARE_APPS_VERSION"
+			file="${ATLAS_DATADIR}/FIRMWARE_APPS_VERSION"
 			;;
 
 		*)
