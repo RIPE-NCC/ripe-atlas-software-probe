@@ -22,7 +22,10 @@ When uncertain, always select the master branch.
 To build RPMs for RHEL-based distros
 ------------------------------------
 
-- ``sudo dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatability with Centos7 systems replace ``dnf`` with ``yum``
+The build process is performed using rpmbuild.
+Currently only tested on Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
+
+- (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatibility with CentOS7 systems replace ``dnf`` with ``yum``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - cd ripe-atlas-software-probe
 - ``rpmbuild --bb rhel/ripe-atlas-probe.spec``, see note.
@@ -31,8 +34,16 @@ To build RPMs for RHEL-based distros
   * git_source; to specify a GIT repository (--define "git_source https://github.com/RIPE-NCC")
   * git_tag; to specify a particular version (--define "git_tag 5080")
   * git_commit; to specify a particular commit (--define "git_commit abcdef")
-- This will leave the RPMs in rpmbuild/RPMS/x86_64
-- To install, ``sudo dnf -y install rpmbuild/RPMS/x86_64/ripe-atlas-common-????.rpm ripe-atlas-probe-????.rpm``
+- This will leave the RPMs in rpmbuild/RPMS/x86_64 and rpmbuild/RPMS/noarch
+
+To install RPMs for RHEL-based distros
+--------------------------------------
+
+To install, execute:
+- ``cd ~/rpmbuild/RPMS``
+- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.*.noarch.rpm x86_64/ripe-atlas-probe-????-1.x86_64.rpm``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
 
 To build DEB files for Debian or Debian-based distros
 -----------------------------------------------------
@@ -40,7 +51,7 @@ To build DEB files for Debian or Debian-based distros
 The build process is performed using dpkg-buildpackage (compat version 13).
 Currently only tested on Debian 11 and 12 on the x86_64 platform.
 
-- Get the needed tools: ``sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
+- Get the needed tools (using root privileges): ``apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
@@ -48,7 +59,14 @@ Currently only tested on Debian 11 and 12 on the x86_64 platform.
  * ``git submodule update`` << this will update the submodule within this branch
  * ``dpkg-buildpackage -b -us -uc`` << this will create the package
  * ``cp ../ripe-atlas-*.deb .``
-- To install, ``sudo dpkg -i ripe-atlas-common-????.deb ripe-atlas-software-probe-????.deb``
+
+To install DEB files for Debian or Debian-based distros
+-------------------------------------------------------
+
+To install, execute:
+- (using root privileges): ``dpkg -i ripe-atlas-common_????_amd64.deb ripe-atlas-probe_????_all.deb``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
 
 To build IPKG files for OpenWRT
 -------------------------------
@@ -64,14 +82,27 @@ The branch checked out is master, other branches can be checked out by appending
 
 After adding the package can be selected using menuconfig and built as normal.
 
-To install, use ``opkg install ripe-atlas-common-????.ipkg ripe-atlas-software-probe-????.ipkg``
+To install IPKG files for OpenWRT
+---------------------------------
 
-Manual installation
--------------------
+To install, execute:
+- ``opkg install ripe-atlas-common-????.ipkg ripe-atlas-software-probe-????.ipkg``
+- ``service ripe-atlas start``
+
+Manual build (using systemd)
+----------------------------
 
 To build using autoconf tooling and install the software probe, execute the following commands at the top level of the git repo:
 
 - ``autoreconf -iv``
 - ``./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib64 --runstatedir=/run --with-user=ripe-atlas --with-group=ripe-atlas --with-measurement-user=ripe-atlas-measurement --enable-systemd --enable-chown --enable-setcap-install``
 - ``make``
-- ``make install``
+
+Manual installation
+-------------------
+
+To install, execute:
+- (using root privileges) ``make install``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
+
