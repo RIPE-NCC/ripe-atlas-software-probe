@@ -89,8 +89,6 @@ make DESTDIR=%{buildroot} install
 %attr(0644, root, root) %{_datadir}/%{base_path}/measurement.conf
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 %config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{_sysconfdir}/%{base_path}/mode
-%ghost %{_sysconfdir}/%{base_path}/probe_key
-%ghost %{_sysconfdir}/%{base_path}/probe_key.pub
 %attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}/measurement/
@@ -132,7 +130,7 @@ if [ -f "%{atlas_oldkey}" ]; then
 		cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1 || :
 	fi
 fi
-semanage fcontext -a -f a -t bin_t -r s0 /usr/sbin/ripe-atlas 1>/dev/null 2>&1 || :
+%{_sbindir}/semanage fcontext -a -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas 1>/dev/null 2>&1 || :
 exit 0
 
 %pre -n ripe-atlas-probe
@@ -150,7 +148,7 @@ chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1
 # on upgrade systemd restarts after this
 rm -f %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 if [ $1 -eq 0 ]; then
-	semanage fcontext -d -f a -t bin_t -r s0 /usr/sbin/ripe-atlas > /dev/null 2>&1 || :
+	%{_sbindir}/semanage fcontext -d -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas > /dev/null 2>&1 || :
 fi
 exit 0
 
