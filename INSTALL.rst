@@ -45,6 +45,19 @@ To install, execute:
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
+To upgrade RPMs from atlasswprobe
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To upgrade from the existing atlasswprobe:
+- ``cd ~/rpmbuild/RPMS``
+- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.*.noarch.rpm``
+- (using root privileges) ``rpm -Uvh x86_64/ripe-atlas-probe-????-1.x86_64.rpm``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
+
+Note that this will attempt to migrate existing probe keys and configuration.
+Existing probe state will be removed (/var/atlas-probe).
+
 To build DEB files for Debian or Debian-based distros
 -----------------------------------------------------
 
