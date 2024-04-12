@@ -10,10 +10,12 @@ set -e
 
 #DEBHELPER#
 
-atlas_olddir='var/atlas-probe/etc'
-atlas_oldkey="${atlas_olddir}/probe_key"
+atlas_olddir='var/atlas-probe'
+atlas_oldkey="${atlas_olddir}/etc/probe_key"
+atlas_oldmode="${atlas_olddir}/state/mode"
 atlas_newdir='etc/ripe-atlas'
 atlas_newkey="${atlas_newdir}/probe_key"
+atlas_newmode="${atlas_newdir}/mode"
 # Summary of how this script can be called:
 #        * <new-preinst> 'install'
 #        * <new-preinst> 'install' <old-version>
@@ -28,6 +30,7 @@ case "$1" in
 		mkdir -p -m 0770 "${atlas_newdir}"
 		cp "${atlas_oldkey}" "${atlas_newkey}" 1>/dev/null 2>&1 || true
 		cp "${atlas_oldkey}.pub" "${atlas_newkey}.pub" 1>/dev/null 2>&1 || true
+		cp "${atlas_oldmode}" "${atlas_newmode}" 1>/dev/null 2>&1 || true
 		chmod 664 "${atlas_newkey}.pub" 1>/dev/null 2>&1 || true
 		chmod 400 "${atlas_newkey}" 1>/dev/null 2>&1 || true
 		chown -R ripe-atlas:ripe-atlas "${atlas_newdir}" 1>/dev/null 2>&1

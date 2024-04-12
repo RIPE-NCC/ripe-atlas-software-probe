@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for ripe-atlas-common.
+# postrm script for ripe-atlas-probe.
 #
 # See: dh_installdeb(1).
 
@@ -24,31 +24,17 @@ set -e
 # the debian-policy package.
 
 case "${1}" in
-	purge)
+	purge|remove|upgrade)
 		rm -f \
-			run/ripe-atlas/pids/* \
-			run/ripe-atlas/status/* \
-			var/spool/ripe-atlas/crons/* \
-			var/spool/ripe-atlas/crons/*/* \
-			var/spool/ripe-atlas/data/* \
-			var/spool/ripe-atlas/data/*/* \
-			etc/ripe-atlas/probe_key \
-			etc/ripe-atlas/probe_key.pub \
-			etc/ripe-atlas/mode \
-			1>/dev/null 2>&1 || true
-		;;
-
-	remove|upgrade)
-		rm -f \
-			run/ripe-atlas/status/* \
-			1>/dev/null 2>&1 || true
+			etc/ripe-atlas/reg_servers.sh \
+			1>/dev/null 2>&1
 		;;
 
 	failed-upgrade|abort-install|abort-upgrade|disappear)
 		;;
 
 	*)
-		echo "prerm called with unknown argument '$1'" >&2
+		echo "postrm called with unknown argument '$1'" >&2
 		exit 1
 		;;
 esac

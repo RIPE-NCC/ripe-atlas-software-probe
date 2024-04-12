@@ -63,8 +63,16 @@ install -m644 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %post
+# clean up old atlas installation, it is now obsolete
+if ( [ -f "%{atlas_newkey}" ] &&
+     [ -f "%{atlas_newkey}.pub" ] &&
+     [ -f "%{atlas_newmode}" ] &&
+     [ -d "%{atlas_olddir}" ] ); then
+	rm -rf "%{atlas_olddir}"
+fi
+
 # clean environment; systemd should restart after this on upgrade
-rm -fr %{_rundir}/%{base_path}/status/* %{_libexecdir}/%{base_path}/scripts/reg_servers.sh
+rm -fr %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 exit 0
 
 %preun

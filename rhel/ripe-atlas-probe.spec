@@ -16,10 +16,12 @@
 %define	    _build_id_links none
 
 # transition directory key storage
-%define	    atlas_olddir       /var/atlas-probe/etc
-%define	    atlas_oldkey       %{atlas_olddir}/probe_key
+%define	    atlas_olddir       /var/atlas-probe
+%define	    atlas_oldkey       %{atlas_olddir}/etc/probe_key
+%define	    atlas_oldmode      %{atlas_olddir}/state/mode
 %define	    atlas_newdir       %{_sysconfdir}/%{base_path}
 %define	    atlas_newkey       %{atlas_newdir}/probe_key
+%define	    atlas_newmode      %{atlas_newdir}/mode
 
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
@@ -88,7 +90,7 @@ make DESTDIR=%{buildroot} install
 %{_tmpfilesdir}/ripe-atlas.conf
 %attr(0644, root, root) %{_datadir}/%{base_path}/measurement.conf
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
-%config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{_sysconfdir}/%{base_path}/mode
+%config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{atlas_newmode}
 %attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}/measurement/
@@ -125,11 +127,12 @@ EOF
 if [ -f "%{atlas_oldkey}" ]; then
 	if ! cmp -s "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1; then
 		# migrate probe keys
-		mkdir -p -m 0770 "%{atlas_newdir}"
+		mkdir -p -m 0770 "%{atlas_newdir}" || :
 		cp "%{atlas_oldkey}" "%{atlas_newkey}" 1>/dev/null 2>&1 || :
 		cp "%{atlas_oldkey}.pub" "%{atlas_newkey}.pub" 1>/dev/null 2>&1 || :
 	fi
 fi
+
 %{_sbindir}/semanage fcontext -a -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas 1>/dev/null 2>&1 || :
 exit 0
 
@@ -139,20 +142,38 @@ exit 0
 %post -n ripe-atlas-common
 %{_bindir}/systemd-tmpfiles --create %{_tmpfilesdir}/ripe-atlas.conf
 
-chmod 644 "%{atlas_newkey}.pub" 1>/dev/null 2>&1
-chmod 400 "%{atlas_newkey}" 1>/dev/null 2>&1
-chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1
+if [ -f "%{atlas_oldmode}" ]; then
+	if ! cmp -s "%{atlas_oldmode}" "%{atlas_newmode}" 1>/dev/null 2>&1; then
+		# migrate mode file
+		mkdir -p -m 0770 "%{atlas_newdir}" || :
+		cp "%{atlas_oldmode}" "%{atlas_newmode}" 1>/dev/null 2>&1 || :
+	fi
+fi
+
+chmod 644 "%{atlas_newkey}.pub" "%{atlas_newmode}" 1>/dev/null 2>&1 || :
+chmod 400 "%{atlas_newkey}" 1>/dev/null 2>&1 || :
+chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1 || :
+
 %systemd_post %{service_name}
 
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
 rm -f %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+
 if [ $1 -eq 0 ]; then
 	%{_sbindir}/semanage fcontext -d -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas > /dev/null 2>&1 || :
 fi
 exit 0
 
 %post -n ripe-atlas-probe
+# clean up old atlas installation, it is now obsolete
+if ( [ -f "%{atlas_newkey}" ] &&
+     [ -f "%{atlas_newkey}.pub" ] &&
+     [ -f "%{atlas_newmode}" ] &&
+     [ -d "%{atlas_olddir}" ] ); then
+	rm -rf "%{atlas_olddir}"
+fi
+
 %systemd_post %{service_name}
 exit 0
 
