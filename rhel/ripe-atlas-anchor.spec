@@ -71,8 +71,11 @@ if ( [ -f "%{atlas_newkey}" ] &&
 	rm -rf "%{atlas_olddir}"
 fi
 
-# clean environment; systemd should restart after this on upgrade
+# clean environment of previous version (if any)
+# on upgrade systemd restarts after this
 rm -fr %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+
+%systemd_post %{service_name}
 exit 0
 
 %preun

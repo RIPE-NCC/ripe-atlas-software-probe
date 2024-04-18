@@ -154,12 +154,6 @@ chmod 644 "%{atlas_newkey}.pub" "%{atlas_newmode}" 1>/dev/null 2>&1 || :
 chmod 400 "%{atlas_newkey}" 1>/dev/null 2>&1 || :
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1 || :
 
-%systemd_post %{service_name}
-
-# clean environment of previous version (if any)
-# on upgrade systemd restarts after this
-rm -f %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
-
 if [ $1 -eq 0 ]; then
 	%{_sbindir}/semanage fcontext -d -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas > /dev/null 2>&1 || :
 fi
@@ -174,7 +168,12 @@ if ( [ -f "%{atlas_newkey}" ] &&
 	rm -rf "%{atlas_olddir}"
 fi
 
+# clean environment of previous version (if any)
+# on upgrade systemd restarts after this
+rm -fr %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+
 %systemd_post %{service_name}
+
 exit 0
 
 %preun -n ripe-atlas-probe
