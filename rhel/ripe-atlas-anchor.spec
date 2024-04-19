@@ -4,11 +4,26 @@
 %define     service_name     ripe-atlas.service
 %define     version          %(find . -name VERSION | head -1 | xargs -I {} sh -c "cat {}")
 
+# define user to perform measurements
+%define     atlas_measurement  ripe-atlas-measurement
+%define     atlas_user         ripe-atlas
+%define     atlas_group        ripe-atlas
+
 # flag to ignore files installed in builddir but not packaged in the final RPM
 %define	    _unpackaged_files_terminate_build	0
 
 # prevent creation of the build ids in /usr/lib -> see https://access.redhat.com/discussions/5045161
 %define	    _build_id_links none
+
+# Files to migrate
+%define     atlas_olddir       /home/atlas
+%define     atlas_oldkey       %{atlas_olddir}/etc/probe_key
+%define     atlas_oldmode      %{atlas_olddir}/state/mode
+%define     atlas_oldconfig    %{atlas_olddir}/state/config.txt
+%define     atlas_newdir       %{_sysconfdir}/%{base_path}
+%define     atlas_newkey       %{atlas_newdir}/probe_key
+%define     atlas_newmode      %{atlas_newdir}/mode
+%define     atlas_newconfig    %{atlas_newdir}/config.txt
 
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
@@ -62,12 +77,26 @@ install -m644 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
+%define migrate_file() \
+if ( [ -f "%1" ] && ! cmp -s "%1" "%2" 1>/dev/null 2>&1 ); then \
+	install -D -p -m "%3" -o "%4" -g "%5" "%1" "%2" 1>/dev/null 2>&1; \
+fi \
+%{nil}
+
 %post
+# Migrate configuration files
+%migrate_file %{atlas_oldkey}     %{atlas_newkey}     0400 %{atlas_user} %{atlas_group}
+%migrate_file %{atlas_oldkey}.pub %{atlas_newkey}.pub 0644 %{atlas_user} %{atlas_group}
+%migrate_file %{atlas_oldmode}    %{atlas_newmode}    0644 %{atlas_user} %{atlas_group}
+%migrate_file %{atlas_oldconfig}  %{atlas_newconfig}  0644 %{atlas_user} %{atlas_group}
+
 # clean up old atlas installation, it is now obsolete
 if ( [ -f "%{atlas_newkey}" ] &&
      [ -f "%{atlas_newkey}.pub" ] &&
      [ -f "%{atlas_newmode}" ] &&
      [ -d "%{atlas_olddir}" ] ); then
+	# NOTE: %{atlas_newconfig} may not exist
+	# if %{atlas_oldconfig} did not either
 	rm -rf "%{atlas_olddir}"
 fi
 
