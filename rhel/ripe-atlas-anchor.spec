@@ -25,6 +25,13 @@
 %define     atlas_newmode      %{atlas_newdir}/mode
 %define     atlas_newconfig    %{atlas_newdir}/config.txt
 
+# Workaround for systems using autoconf 2.69 and older
+%if 0%{?rhel} >= 9
+%define     fix_rundir         %{_rundir}
+%else
+%define     fix_rundir         %{_localstatedir}/run
+%endif
+
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
@@ -102,7 +109,7 @@ fi
 
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
-rm -fr %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %systemd_post %{service_name}
 exit 0

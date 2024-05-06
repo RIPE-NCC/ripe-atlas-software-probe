@@ -25,6 +25,13 @@
 %define	    atlas_newmode      %{atlas_newdir}/mode
 %define	    atlas_newconfig    %{atlas_newdir}/config.txt
 
+# Workaround for systems using autoconf 2.69 and older
+%if 0%{?rhel} >= 9
+%define	    fix_rundir         %{_rundir}
+%else
+%define	    fix_rundir         %{_localstatedir}/run
+%endif
+
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
@@ -76,7 +83,21 @@ cd %{_builddir}/%{build_dirname}
 %build
 cd %{_builddir}/%{build_dirname}
 autoreconf -iv
-./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} --libdir=%{_libdir} --runstatedir=%{_rundir} --with-user=%{atlas_user} --with-group=%{atlas_group} --with-measurement-user=%{atlas_measurement} --enable-systemd --disable-chown --disable-setcap-install --with-install-mode=probe
+./configure \
+	--prefix=%{_prefix} \
+	--sysconfdir=%{_sysconfdir} \
+	--localstatedir=%{_localstatedir} \
+	--libdir=%{_libdir} \
+%if 0%{?rhel} >= 9
+	--runstatedir=%{fix_rundir} \
+%endif
+	--with-user=%{atlas_user} \
+	--with-group=%{atlas_group} \
+	--with-measurement-user=%{atlas_measurement} \
+	--enable-systemd \
+	--disable-chown \
+	--disable-setcap-install \
+	--with-install-mode=probe
 make
 
 %install
@@ -111,7 +132,7 @@ make DESTDIR=%{buildroot} install
 %exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_libexecdir}/%{base_path}/scripts/*.sh
-%ghost %{_rundir}/%{base_path}
+%ghost %{fix_rundir}/%{base_path}
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
@@ -121,7 +142,7 @@ make DESTDIR=%{buildroot} install
 %pre -n ripe-atlas-common
 %{_bindir}/systemd-sysusers --replace=%{_sysusersdir}/ripe-atlas.conf - <<EOF
 g %{atlas_group} -
-u %{atlas_user} -:%{atlas_group} "RIPE Atlas" %{_rundir}/%{base_path} -
+u %{atlas_user} -:%{atlas_group} "RIPE Atlas" %{fix_rundir}/%{base_path} -
 u %{atlas_measurement} -:%{atlas_group} "RIPE Atlas Measurements" %{_localstatedir}/spool/%{base_path} -
 EOF
 
@@ -164,7 +185,7 @@ fi
 
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
-rm -fr %{_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %systemd_post %{service_name}
 
@@ -185,8 +206,8 @@ if [ $1 -eq 0 ]; then
 	systemctl disable %{service_name} 1>/dev/null 2>&1
 
 	# clean environment; %files doesn't support leaving directories but removing files
-	rm -f %{_rundir}/%{base_path}/pids/* \
-	      %{_rundir}/%{base_path}/status/* \
+	rm -f %{fix_rundir}/%{base_path}/pids/* \
+	      %{fix_rundir}/%{base_path}/status/* \
 	      %{_localstatedir}/spool/%{base_path}/crons/* \
 	      %{_localstatedir}/spool/%{base_path}/crons/*/* \
 	      %{_localstatedir}/spool/%{base_path}/data/*/* \

@@ -133,6 +133,11 @@ atlas_scriptsdir="${atlas_libexecdir}/scripts"
 atlas_spooldir="\${localstatedir}/spool/ripe-atlas"
 atlas_sysconfdir="\${sysconfdir}/ripe-atlas"
 
+# Compatibility fix for EL8
+if test "x${runstatedir}" = "x"; then
+	atlas_rundir="\${localstatedir}/run/ripe-atlas"
+fi
+
 storage_sysconfdir=/storage/etc
 tmpdir=/tmp
 
