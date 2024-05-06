@@ -113,8 +113,17 @@ else
 	if test "x${SYSTEMDPATH}" != 'x'; then
 		AC_MSG_RESULT([yes])
 		systemd_tmpfilesdir=$(${SYSTEMDPATH} tmpfiles)
+		if test "x${systemd_tmpfilesdir}" = "x"; then
+			systemd_tmpfilesdir=$(${SYSTEMDPATH} --suffix=tmpfiles.d system-library-private)
+		fi
 		systemd_unitsdir=$(${SYSTEMDPATH} systemd-system-unit)
+		if test "x${systemd_unitsdir}" = "x"; then
+			systemd_unitsdir=$(${SYSTEMDPATH} --suffix=systemd/system system-library-private)
+		fi
 		systemd_sysusersdir=$(${SYSTEMDPATH} sysusers)
+		if test "x${systemd_sysusersdir}" = "x"; then
+			systemd_sysusersdir=$(${SYSTEMDPATH} --suffix=sysusers.d system-library-private)
+		fi
 	else
 		AC_MSG_RESULT([no. 'systemd-path' not found])
 	fi
