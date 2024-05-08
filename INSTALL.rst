@@ -19,11 +19,11 @@ Any tag which is a number divisable by 10 is a production release (5060, 5070, 5
 
 When uncertain, always select the master branch.
 
-To build RPMs for RHEL-based distros
-------------------------------------
+To build RPMs for RHEL-based distributions
+------------------------------------------
 
 The build process is performed using rpmbuild.
-Currently only tested on Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
+Currently tested on Centos 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
 
 - (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatibility with CentOS7 systems replace ``dnf`` with ``yum``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
@@ -36,12 +36,12 @@ Currently only tested on Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_
   * git_commit; to specify a particular commit (--define "git_commit abcdef")
 - This will leave the RPMs in rpmbuild/RPMS/x86_64 and rpmbuild/RPMS/noarch
 
-To install RPMs for RHEL-based distros
---------------------------------------
+To install RPMs for RHEL-based distributions
+--------------------------------------------
 
 To install, execute:
 - ``cd ~/rpmbuild/RPMS``
-- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.*.noarch.rpm x86_64/ripe-atlas-probe-????-1.x86_64.rpm``
+- (using root privileges) ``dnf -y install x86_64/ripe-atlas-common-????-1.el?.x86_64.rpm noarch/ripe-atlas-probe-????-1.el?.noarch.rpm``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
@@ -50,16 +50,16 @@ To upgrade RPMs from atlasswprobe
 
 To upgrade from the existing atlasswprobe:
 - ``cd ~/rpmbuild/RPMS``
-- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.*.noarch.rpm``
-- (using root privileges) ``rpm -Uvh x86_64/ripe-atlas-probe-????-1.x86_64.rpm``
+- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.el?.noarch.rpm``
+- (using root privileges) ``rpm -Uvh x86_64/ripe-atlas-probe-????-1.el?.x86_64.rpm``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
 Note that this will attempt to migrate existing probe keys and configuration.
 Existing probe state will be removed (/var/atlas-probe).
 
-To build DEB files for Debian or Debian-based distros
------------------------------------------------------
+To build DEB files for Debian or Debian-based distributions
+-----------------------------------------------------------
 
 The build process is performed using dpkg-buildpackage (compat version 13).
 Currently only tested on Debian 11 and 12 on the x86_64 platform.
@@ -73,8 +73,8 @@ Currently only tested on Debian 11 and 12 on the x86_64 platform.
  * ``dpkg-buildpackage -b -us -uc`` << this will create the package
  * ``cp ../ripe-atlas-*.deb .``
 
-To install DEB files for Debian or Debian-based distros
--------------------------------------------------------
+To install DEB files for Debian or Debian-based distributions
+-------------------------------------------------------------
 
 To install, execute:
 - (using root privileges): ``dpkg -i ripe-atlas-common_????_amd64.deb ripe-atlas-probe_????_all.deb``
@@ -84,8 +84,10 @@ To install, execute:
 To build IPKG files for OpenWRT
 -------------------------------
 
-The build process is performed using OpenWRT's build process. The package can be added to
-the build by adding the line:
+The build process is performed using OpenWRT's build process.
+Currently only tested on OpenWRT 22.03.
+
+The package can be added to the build by adding the line:
 `src-git ripe-atlas git@github.com:RIPE-NCC/ripe-atlas-software-probe.git`
 and running:
 `scripts/feeds install -a`
