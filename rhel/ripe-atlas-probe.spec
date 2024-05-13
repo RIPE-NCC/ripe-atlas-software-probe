@@ -168,7 +168,7 @@ fi \
 
 %post -n ripe-atlas-probe
 # Migrate configuration files
-%migrate_file %{atlas_oldkey}     %{atlas_newkey}     0400 %{atlas_user} %{atlas_group}
+%migrate_file %{atlas_oldkey}     %{atlas_newkey}     0600 %{atlas_user} %{atlas_group}
 %migrate_file %{atlas_oldkey}.pub %{atlas_newkey}.pub 0644 %{atlas_user} %{atlas_group}
 %migrate_file %{atlas_oldmode}    %{atlas_newmode}    0644 %{atlas_user} %{atlas_group}
 %migrate_file %{atlas_oldconfig}  %{atlas_newconfig}  0644 %{atlas_user} %{atlas_group}
