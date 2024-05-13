@@ -104,7 +104,7 @@ if ( [ -f "%{atlas_newkey}" ] &&
      [ -d "%{atlas_olddir}" ] ); then
 	# NOTE: %{atlas_newconfig} may not exist
 	# if %{atlas_oldconfig} did not either
-	rm -rf "%{atlas_olddir}"
+	rm -rf "%{atlas_olddir}/*"
 fi
 
 # clean environment of previous version (if any)
