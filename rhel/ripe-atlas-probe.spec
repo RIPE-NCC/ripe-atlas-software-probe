@@ -142,8 +142,10 @@ make DESTDIR=%{buildroot} install
 %pre -n ripe-atlas-common
 %{_bindir}/systemd-sysusers --replace=%{_sysusersdir}/ripe-atlas.conf - <<EOF
 g %{atlas_group} -
-u %{atlas_user} -:%{atlas_group} "RIPE Atlas" %{fix_rundir}/%{base_path} -
-u %{atlas_measurement} -:%{atlas_group} "RIPE Atlas Measurements" %{_localstatedir}/spool/%{base_path} -
+u %{atlas_user} - "RIPE Atlas" %{fix_rundir}/%{base_path} -
+m %{atlas_user} %{atlas_group}
+u %{atlas_measurement} - "RIPE Atlas Measurements" %{_localstatedir}/spool/%{base_path} -
+m %{atlas_measurement} %{atlas_group}
 EOF
 
 %{_sbindir}/semanage fcontext -a -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas 1>/dev/null 2>&1 || :
