@@ -112,17 +112,17 @@ if test "x${enable_systemd}" = 'xno'; then
 else
 	if test "x${SYSTEMDPATH}" != 'x'; then
 		AC_MSG_RESULT([yes])
-		systemd_tmpfilesdir=$(${SYSTEMDPATH} tmpfiles)
+		systemd_tmpfilesdir=$(${SYSTEMDPATH} tmpfiles 2>/dev/null)
 		if test "x${systemd_tmpfilesdir}" = "x"; then
-			systemd_tmpfilesdir=$(${SYSTEMDPATH} --suffix=tmpfiles.d system-library-private)
+			systemd_tmpfilesdir=$(${SYSTEMDPATH} --suffix=tmpfiles.d system-library-private 2>/dev/null)
 		fi
-		systemd_unitsdir=$(${SYSTEMDPATH} systemd-system-unit)
+		systemd_unitsdir=$(${SYSTEMDPATH} systemd-system-unit 2>/dev/null)
 		if test "x${systemd_unitsdir}" = "x"; then
-			systemd_unitsdir=$(${SYSTEMDPATH} --suffix=systemd/system system-library-private)
+			systemd_unitsdir=$(${SYSTEMDPATH} --suffix=systemd/system system-library-private 2>/dev/null)
 		fi
-		systemd_sysusersdir=$(${SYSTEMDPATH} sysusers)
+		systemd_sysusersdir=$(${SYSTEMDPATH} sysusers 2>/dev/null)
 		if test "x${systemd_sysusersdir}" = "x"; then
-			systemd_sysusersdir=$(${SYSTEMDPATH} --suffix=sysusers.d system-library-private)
+			systemd_sysusersdir=$(${SYSTEMDPATH} --suffix=sysusers.d system-library-private 2>/dev/null)
 		fi
 	else
 		AC_MSG_RESULT([no. 'systemd-path' not found])
