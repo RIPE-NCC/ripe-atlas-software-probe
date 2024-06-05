@@ -105,7 +105,6 @@ cd %{_builddir}/%{build_dirname}
 make DESTDIR=%{buildroot} install
 
 %files
-%exclude %dir %{_sbindir}
 %{_sbindir}/*
 %dir %{_datadir}/%{base_path}
 %{_unitdir}/%{service_name}
