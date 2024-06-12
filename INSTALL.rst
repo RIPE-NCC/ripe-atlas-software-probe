@@ -23,7 +23,7 @@ To build RPMs for RHEL-based distributions
 ------------------------------------------
 
 The build process is performed using rpmbuild.
-Currently tested on Centos 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
+Currently tested on CentOS 8, Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
 
 - (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatibility with CentOS7 systems replace ``dnf`` with ``yum``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
