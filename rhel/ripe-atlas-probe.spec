@@ -56,8 +56,9 @@ Summary:	RIPE Atlas Software Probe
 Group:		Applications/Internet
 BuildArch:      noarch 
 Requires:	ripe-atlas-common = %{version}-%{release}
-Provides:	atlasswprobe = %{version}-%{release}
+Provides:	ripe-atlas-software-probe
 Obsoletes:	atlasswprobe < 5080-3%{?dist}
+Conflicts:      atlasprobe, atlasswprobe, ripe-atlas-anchor
 URL:            https://atlas.ripe.net/apply/swprobe/
 
 %description -n ripe-atlas-probe

@@ -44,9 +44,9 @@ Group:          Applications/Internet
 BuildArch:      noarch
 Requires:       ripe-atlas-common = %{version}-%{release}
 BuildRequires:  rpm, systemd, openssl-devel
-Provides:       atlasprobe = %{version}-%{release}
+Provides:       ripe-atlas-software-probe
 Obsoletes:      atlasprobe < 5080.0-3
-Conflicts:      atlasprobe
+Conflicts:      atlasprobe, atlasswprobe, ripe-atlas-probe
 URL:            https://atlas.ripe.net/anchors/apply/
 %{systemd_requires}
 
