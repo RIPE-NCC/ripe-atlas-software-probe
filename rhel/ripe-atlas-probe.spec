@@ -32,6 +32,8 @@
 %define	    fix_rundir         %{_localstatedir}/run
 %endif
 
+%define     rpm_statedir       %{_localstatedir}/lib/rpm-state/%{base_path}
+
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
@@ -40,7 +42,7 @@ Summary:    	RIPE Atlas Software Probe Essentials
 Group:      	Applications/Internet
 Version:    	%{version}
 Release:    	1%{?dist}
-License:    	RIPE NCC
+License:    	GPLv3.0
 Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} net-tools hostname
 Requires(pre):  %{_sbindir}/semanage %{_bindir}/systemd-sysusers %{_bindir}/systemd-tmpfiles
 Requires(post): %{_sbindir}/semanage
@@ -139,7 +141,29 @@ make DESTDIR=%{buildroot} install
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
+
+%define get_state() \
+[ -f "%{rpm_statedir}/%1" ] \
+%{nil}
+
+%define init_state() \
+mkdir -p %{rpm_statedir}; \
+if %{_sbindir}/systemctl "%1" --quiet %{service_name} 2>/dev/null; then \
+	touch "%{rpm_statedir}/%1" 2>/dev/null; \
+else \
+	rm -f "%{rpm_statedir}/%1" 2>/dev/null; \
+fi \
+%{nil}
+
+%define clear_state() \
+rm -rf %{rpm_statedir} 1>/dev/null 2>&1 \
+%{nil}
+
 %pre -n ripe-atlas-common
+%init_state is-active
+%init_state is-enabled
+systemctl stop %{service_name} 1>/dev/null 2>&1
+systemctl disable %{service_name} 1>/dev/null 2>&1
 %{_bindir}/systemd-sysusers --replace=%{_sysusersdir}/ripe-atlas.conf - <<EOF
 g %{atlas_group} -
 u %{atlas_user} - "RIPE Atlas" %{fix_rundir}/%{base_path} -
@@ -191,14 +215,18 @@ rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_serve
 
 %systemd_post %{service_name}
 
+if %{get_state is-started}; then
+	systemctl start %{service_name}
+fi
+
+if %{get_state is-enabled}; then
+	systemctl enable %{service_name}
+fi
+
+%clear_state
 exit 0
 
 %preun -n ripe-atlas-probe
-# Uninstall
-if [ $1 -eq 0 ]; then
-	systemctl stop %{service_name} 1>/dev/null 2>&1
-	systemctl disable %{service_name} 1>/dev/null 2>&1
-fi
 exit 0
 
 %preun -n ripe-atlas-common
@@ -206,7 +234,6 @@ exit 0
 if [ $1 -eq 0 ]; then
 	systemctl stop %{service_name} 1>/dev/null 2>&1
 	systemctl disable %{service_name} 1>/dev/null 2>&1
-
 	# clean environment; %files doesn't support leaving directories but removing files
 	rm -f %{fix_rundir}/%{base_path}/pids/* \
 	      %{fix_rundir}/%{base_path}/status/* \
@@ -218,11 +245,9 @@ fi
 exit 0
 
 %postun -n ripe-atlas-common
-%systemd_postun_with_restart %{service_name}
 exit 0
 
 %postun -n ripe-atlas-probe
-%systemd_postun_with_restart %{service_name}
 exit 0
 
 %include rhel/changelog
