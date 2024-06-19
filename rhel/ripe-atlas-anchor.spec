@@ -32,6 +32,8 @@
 %define     fix_rundir         %{_localstatedir}/run
 %endif
 
+%define     rpm_statedir       %{_localstatedir}/lib/rpm-state/ripe-atlas
+
 # Keep scripts intact
 %define     __brp_mangle_shebangs_exclude_from ^%{_libexecdir}/%{base_path}/scripts/.*$
 
@@ -84,6 +86,20 @@ install -m 0755 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod 
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
+%define get_state() [ -f "%{rpm_statedir}/%1" ]
+
+%define init_state() \
+mkdir -p %{rpm_statedir} \
+systemctl "%1" --quiet %{service_name} 1>/dev/null 2>&1 \
+if [ $? -eq 0 ]; then \
+	touch "%{rpm_statedir}/%1" 2>/dev/null \
+else \
+	rm -f "%{rpm_statedir}/%1" 2>/dev/null \
+fi \
+%{nil}
+
+%define clear_state() rm -rf %{rpm_statedir} 1>/dev/null 2>&1
+
 %define migrate_file() \
 if ( [ -f "%1" ] && ! cmp -s "%1" "%2" 1>/dev/null 2>&1 ); then \
 	install -D -p -m "%3" -o "%4" -g "%5" "%1" "%2" 1>/dev/null 2>&1; \
@@ -112,18 +128,20 @@ fi
 rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 %systemd_post %{service_name}
-exit 0
 
-%preun
-# Uninstall
-if [ $1 -eq 0 ]; then
-	systemctl stop %{service_name} 1>/dev/null 2>&1
-	systemctl disable %{service_name} 1>/dev/null 2>&1
+if %{get_state is-active}; then
+	systemctl start %{service_name} 1>/dev/null 2>&1
+fi
+
+if %{get_state is-enabled}; then
+	systemctl enable %{service_name} 1>/dev/null 2>&1
 fi
 exit 0
 
+%preun
+exit 0
+
 %postun
-%systemd_postun_with_restart %{service_name}
 exit 0
 
 %include rhel/changelog

@@ -142,22 +142,19 @@ make DESTDIR=%{buildroot} install
 %ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
 
 
-%define get_state() \
-[ -f "%{rpm_statedir}/%1" ] \
-%{nil}
+%define get_state() [ -f "%{rpm_statedir}/%1" ]
 
 %define init_state() \
-mkdir -p %{rpm_statedir}; \
-if %{_sbindir}/systemctl "%1" --quiet %{service_name} 2>/dev/null; then \
-	touch "%{rpm_statedir}/%1" 2>/dev/null; \
+mkdir -p %{rpm_statedir} \
+systemctl "%1" --quiet %{service_name} 1>/dev/null 2>&1 \
+if [ $? -eq 0 ]; then \
+	touch "%{rpm_statedir}/%1" 2>/dev/null \
 else \
-	rm -f "%{rpm_statedir}/%1" 2>/dev/null; \
+	rm -f "%{rpm_statedir}/%1" 2>/dev/null \
 fi \
 %{nil}
 
-%define clear_state() \
-rm -rf %{rpm_statedir} 1>/dev/null 2>&1 \
-%{nil}
+%define clear_state() rm -rf %{rpm_statedir} 1>/dev/null 2>&1
 
 %pre -n ripe-atlas-common
 %init_state is-active
@@ -215,12 +212,12 @@ rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_serve
 
 %systemd_post %{service_name}
 
-if %{get_state is-started}; then
-	systemctl start %{service_name}
+if %{get_state is-active}; then
+	systemctl start %{service_name} 1>/dev/null 2>&1
 fi
 
 if %{get_state is-enabled}; then
-	systemctl enable %{service_name}
+	systemctl enable %{service_name} 1>/dev/null 2>&1
 fi
 
 %clear_state
