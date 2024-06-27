@@ -106,6 +106,7 @@ make
 %install
 cd %{_builddir}/%{build_dirname}
 make DESTDIR=%{buildroot} install
+touch %{buildroot}%{atlas_newdir}/reg_servers.sh
 
 %files
 %{_sbindir}/*
@@ -116,7 +117,7 @@ make DESTDIR=%{buildroot} install
 %attr(0644, root, root) %{_datadir}/%{base_path}/measurement.conf
 %{_datadir}/%{base_path}/FIRMWARE_APPS_VERSION
 %config(noreplace) %attr(0644, %{atlas_user}, %{atlas_group}) %{atlas_newmode}
-%attr(0770, %{atlas_user}, %{atlas_group}) %dir %{_sysconfdir}/%{base_path}
+%attr(0770, %{atlas_user}, %{atlas_group}) %dir %{atlas_newdir}
 %dir %{_libexecdir}/%{base_path}
 %dir %{_libexecdir}/%{base_path}/measurement/
 %{_libexecdir}/%{base_path}/measurement/a*
@@ -132,15 +133,14 @@ make DESTDIR=%{buildroot} install
 %caps(cap_net_raw=ep) %attr(4750, %{atlas_measurement}, %{atlas_group}) %{_libexecdir}/%{base_path}/measurement/busybox
 %dir %{_libexecdir}/%{base_path}/scripts
 %exclude %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
+%exclude %{atlas_newdir}/reg_servers.sh
 %{_libexecdir}/%{base_path}/scripts/resolvconf
 %{_libexecdir}/%{base_path}/scripts/*.sh
-%ghost %{fix_rundir}/%{base_path}
 
 %files -n ripe-atlas-probe
 %{_datadir}/%{base_path}/known_hosts.reg
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
-%ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
-
+%ghost %attr(0755, %{atlas_user}, %{atlas_group}) %{atlas_newdir}/reg_servers.sh
 
 %define get_state() [ -f "%{rpm_statedir}/%1" ]
 
@@ -174,9 +174,6 @@ exit 0
 
 %post -n ripe-atlas-common
 %{_bindir}/systemd-tmpfiles --create %{_tmpfilesdir}/ripe-atlas.conf
-
-chmod 0770 "%{atlas_newdir}" 1>/dev/null 2>&1 || :
-chown "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" 1>/dev/null 2>&1 || :
 
 if [ $1 -eq 0 ]; then
 	%{_sbindir}/semanage fcontext -d -f a -t bin_t -r s0 %{_sbindir}/ripe-atlas > /dev/null 2>&1 || :

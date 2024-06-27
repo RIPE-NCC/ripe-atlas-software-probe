@@ -80,11 +80,13 @@ mkdir -p %{buildroot}%{_libexecdir}/%{base_path}/scripts
 install -m 0755 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.dev %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.dev
 install -m 0755 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.test %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.test
 install -m 0755 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
+mkdir -p %{buildroot}%{atlas_newdir}
+touch %{buildroot}%{atlas_newdir}/reg_servers.sh
 
 %files
 %{_datadir}/%{base_path}/known_hosts.reg
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
-%ghost %{_sysconfdir}/%{base_path}/reg_servers.sh
+%ghost %attr(0755, %{atlas_user}, %{atlas_group}) %{atlas_newdir}/reg_servers.sh
 
 %define get_state() [ -f "%{rpm_statedir}/%1" ]
 
