@@ -4,18 +4,18 @@ Installation Instructions
 Picking a release
 -----------------
 
-The repository is structured around 3 main branches:
+The repository is structured around 3 main branches, and a topic branch:
 - A master branch which contains production-ready code.
 - A testing branch
 - A devel(opment) branch
 - Ticket branches
 
-The master branch contains the latest production-level code code. The firmware for hardware probes is built from this branch.
+The master branch contains the latest production-level code. The firmware for hardware probes is built from this branch.
 The testing branch is a pointer on the master branch that contains code that is being readied for the next production release.
 The development branch contains code which is by its nature feature complete, but may not be fully tested yet. This code is merged into the testing branch upon completion and unit testing.
 Ticket branches that branch off the development branch contain features or fixes that may or may not work
 
-Any tag which is a number divisable by 10 is a production release (5060, 5070, 5080). Any tag with another number is either a development or a testing release.
+Any tag which is a number divisible by 10 is a production release (5060, 5070, 5080). Any tag with another number is either a development or a testing release.
 
 When uncertain, always select the master branch.
 
@@ -23,9 +23,9 @@ To build RPMs for RHEL-based distributions
 ------------------------------------------
 
 The build process is performed using rpmbuild.
-Currently tested on CentOS 8, Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
+Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
 
-- (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make`` << for reverse compatibility with CentOS7 systems replace ``dnf`` with ``yum``
+- (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make``
 - ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - cd ripe-atlas-software-probe
 - ``rpmbuild --bb rhel/ripe-atlas-probe.spec``, see note.
@@ -62,7 +62,9 @@ To build DEB files for Debian or Debian-based distributions
 -----------------------------------------------------------
 
 The build process is performed using dpkg-buildpackage (compat version 13).
-Currently only tested on Debian 11 and 12 on the x86_64 platform.
+Currently compile tested on Debian 11 and 12 on the x86_64 platform. Code
+should be considered Beta quality and will be fully supported in an
+upcoming release.
 
 - Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
 - Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
@@ -85,7 +87,8 @@ To build IPKG files for OpenWRT
 -------------------------------
 
 The build process is performed using OpenWRT's build process.
-Currently only tested on OpenWRT 22.03.
+Currently compile tested on OpenWRT 22.03. OpenWRT 22.03 will be
+fully supported in an upcoming release.
 
 The package can be added to the build by adding the line:
 `src-git ripe-atlas git@github.com:RIPE-NCC/ripe-atlas-software-probe.git`
