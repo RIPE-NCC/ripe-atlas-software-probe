@@ -8,8 +8,7 @@ stages:
 variables:
   DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_CENTOS7: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos7:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_CENTOS8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos8:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_OL8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
   GIT_SUBMODULE_STRATEGY: recursive
@@ -29,12 +28,6 @@ variables:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker push ${DOCKER_IMAGE}
 
-build_image_debian10:
-  variables:
-    DOCKER_DIR: .gitlab-docker/debian10
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN10}
-  extends: .build_image
-
 build_image_debian11:
   variables:
     DOCKER_DIR: .gitlab-docker/debian11
@@ -47,16 +40,10 @@ build_image_debian12:
     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
   extends: .build_image
 
-build_image_centos7:
+build_image_ol8:
   variables:
-    DOCKER_DIR: .gitlab-docker/centos7
-    DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS7}
-  extends: .build_image
-
-build_image_centos8:
-  variables:
-    DOCKER_DIR: .gitlab-docker/centos8
-    DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS8}
+    DOCKER_DIR: .gitlab-docker/ol8
+    DOCKER_IMAGE: ${DOCKER_IMAGE_OL8}
   extends: .build_image
 
 build_image_ol9:
@@ -133,16 +120,11 @@ build-ci-debian12:
       - ./${OS_VERSION}
     expire_in: never
 
-build-ci-el7:
-  variables:
-    OS_VERSION: el7
-  image: ${DOCKER_IMAGE_CENTOS7}
-  extends: .build-ci-rhel
 
 build-ci-el8:
   variables:
     OS_VERSION: el8
-  image: ${DOCKER_IMAGE_CENTOS8}
+  image: ${DOCKER_IMAGE_OL8}
   extends: .build-ci-rhel
 
 build-ci-el9:
@@ -165,14 +147,6 @@ build-ci-el9:
       - ./lint_report
     expire_in: never  
 
-lint-ci-el7:
-  needs:                                                                                                                                                          
-    - job: build-ci-el7                                                                                                                                           
-      artifacts: true 
-  variables:
-    OS_VERSION: el7
-  image: ${DOCKER_IMAGE_CENTOS7}
-  extends: .lint-ci-rhel
 
 lint-ci-el8:
   needs:                                                                                                                                                          
@@ -180,7 +154,7 @@ lint-ci-el8:
       artifacts: true 
   variables:
     OS_VERSION: el8
-  image: ${DOCKER_IMAGE_CENTOS8}
+  image: ${DOCKER_IMAGE_OL8}
   extends: .lint-ci-rhel
 
 lint-ci-el9:
@@ -210,15 +184,6 @@ lint-ci-el9:
       - ./${OS_VERSION}-deployable
     expire_in: never
 
-deployable-el7:
-  needs:
-    - job: build-ci-el7
-      artifacts: true
-  variables:
-    OS_VERSION: el7
-  image: ${DOCKER_IMAGE_PREP}
-  extends: .prepare-ci-rhel
-
 deployable-el8:
   needs:
     - job: build-ci-el8
@@ -247,15 +212,6 @@ deployable-el9:
     - 'eval ${DEPLOY_AT}'
     - 'eval ${CLEANUP}'
   when: manual
-
-add-el7-to-test:
-  needs:
-    - job: deployable-el7
-      artifacts: true
-  variables:
-    OS_VERSION: el7
-  image: ${DOCKER_IMAGE_PREP}
-  extends: .add-to-test
 
 add-el8-to-test:
   needs:
