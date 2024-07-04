@@ -27,7 +27,7 @@
 //config:       help
 //config:         -d sets loglevel to 0 (most verbose) and directs all output to stderr.
 
-//applet:IF_PERD(APPLET(perd, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_PERD(APPLET(perd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_PERD) += perd.o
 
@@ -47,6 +47,7 @@
 
 #include "libbb.h"
 #include <syslog.h>
+#include "atlas_path.h"
 
 #define ATLAS 1
 
@@ -1139,8 +1140,8 @@ static int atlas_run(char *cmdline)
 	{
 		/* Redirect I/O */
 		crondlog(LVL7 "sending output to '%s'", outfile);
-		validated_fn= rebased_validated_filename(outfile,
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
+			outfile, SAFE_PREFIX_REL);
 		if (!validated_fn)
 		{
 			crondlog(

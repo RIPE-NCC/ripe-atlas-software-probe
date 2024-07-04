@@ -21,7 +21,7 @@
 ////config:		}
 ////config:		config_close(p);
 
-////applet:IF_PARSE(APPLET(parse, BB_DIR_USR_BIN, BB_SUID_DROP))
+////applet:IF_PARSE(APPLET(parse, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-y += parse_config.o
 

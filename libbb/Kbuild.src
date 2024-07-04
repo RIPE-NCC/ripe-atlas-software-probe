@@ -17,7 +17,6 @@ lib-y += atlas_check_addr.o
 lib-y += atlas_gettime_mono.o
 lib-y += atlas_ipv6_option.o
 lib-y += atlas_name_macro.o
-lib-y += atlas_path.o
 lib-y += atlas_probe.o
 lib-y += atlas_read_response.o
 lib-y += atlas_tests.o

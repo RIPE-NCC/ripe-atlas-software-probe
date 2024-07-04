@@ -15,6 +15,7 @@ Created:	April 2013 by Philip Homburg for RIPE NCC
 
 #include "eperd.h"
 #include "tcputil.h"
+#include "atlas_path.h"
 
 #define SAFE_PREFIX_IN ATLAS_DATA_OUT
 #define SAFE_PREFIX_OUT_REL ATLAS_DATA_NEW_REL
@@ -867,8 +868,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		validated_response_in= rebased_validated_filename(response_in,
-			ATLAS_FUZZING_REL);
+		validated_response_in= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_in, ATLAS_FUZZING_REL);
 		if (!validated_response_in)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -878,8 +879,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (response_out)
 	{
-		validated_response_out= rebased_validated_filename(response_out,
-			ATLAS_FUZZING_REL);
+		validated_response_out= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_out, ATLAS_FUZZING_REL);
 		if (!validated_response_out)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -890,8 +891,8 @@ static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 
 	if (output_file)
 	{
-		validated_output_file= rebased_validated_filename(output_file,
-			SAFE_PREFIX_OUT_REL);
+		validated_output_file= rebased_validated_filename(ATLAS_SPOOLDIR,
+			output_file, SAFE_PREFIX_OUT_REL);
 		if (!validated_output_file)
 		{
 			crondlog(LVL8 "insecure file '%s'", output_file);

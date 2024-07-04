@@ -69,3 +69,5 @@ libevent-2.0.20-stable/sample
 libevent-2.0.20-stable/sample/.libs/*
 libevent-2.0.20-stable/stamp-h1
 libevent-2.0.20-stable/test
+
+include/atlas_path.h

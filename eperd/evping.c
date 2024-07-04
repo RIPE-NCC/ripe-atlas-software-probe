@@ -9,7 +9,7 @@
 //config:       help
 //config:               standalone version of event-driven ping
 
-//applet:IF_EVPING(APPLET(evping, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVPING(APPLET(evping, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVPING) += evping.o
 

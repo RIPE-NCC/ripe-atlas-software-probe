@@ -34,6 +34,7 @@
 # include <malloc.h> /* for mallopt */
 #endif
 
+#include "atlas_path.h"
 
 /* Declare <applet>_main() */
 #define PROTOTYPES
@@ -353,7 +354,7 @@ static char *get_trimmed_slice(char *s, char *e)
 static void parse_config_file(void)
 {
 	/* Don't depend on the tools to combine strings. */
-	static const char config_file[] ALIGN1 = "/etc/busybox.conf";
+	static const char config_file[] ALIGN1 = ATLAS_DATADIR "/measurement.conf";
 
 	struct suid_config_t *sct_head;
 	int applet_no;

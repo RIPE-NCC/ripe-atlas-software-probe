@@ -17,6 +17,7 @@
 #include <netinet/udp.h>
 
 #include "eperd.h"
+#include "atlas_path.h"
 
 #define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
@@ -4286,8 +4287,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		validated_response_in= rebased_validated_filename(response_in,
-			ATLAS_FUZZING_REL);
+		validated_response_in= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_in, ATLAS_FUZZING_REL);
 		if (!validated_response_in)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -4297,8 +4298,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (response_out)
 	{
-		validated_response_out= rebased_validated_filename(response_out,
-			ATLAS_FUZZING_REL);
+		validated_response_out= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_out, ATLAS_FUZZING_REL);
 		if (!validated_response_out)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -4309,8 +4310,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 
 	if (out_filename)
 	{
-		validated_out_filename= rebased_validated_filename(out_filename,
-			SAFE_PREFIX_REL);
+		validated_out_filename= rebased_validated_filename(ATLAS_SPOOLDIR,
+			out_filename, SAFE_PREFIX_REL);
 		if (!validated_out_filename)
 		{
 			crondlog(LVL8 "insecure file '%s'", out_filename);

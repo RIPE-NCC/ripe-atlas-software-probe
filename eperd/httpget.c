@@ -15,6 +15,7 @@
 
 #include "eperd.h"
 #include "tcputil.h"
+#include "atlas_path.h"
 
 #define SAFE_PREFIX_IN_REL ATLAS_DATA_OUT_REL
 #define SAFE_PREFIX_OUT_REL ATLAS_DATA_NEW_REL
@@ -579,8 +580,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (response_in)
 	{
-		validated_response_in= rebased_validated_filename(response_in,
-			ATLAS_FUZZING_REL);
+		validated_response_in= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_in, ATLAS_FUZZING_REL);
 		if (validated_response_in == NULL)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -590,8 +591,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (response_out)
 	{
-		validated_response_out= rebased_validated_filename(response_out,
-			ATLAS_FUZZING_REL);
+		validated_response_out= rebased_validated_filename(ATLAS_SPOOLDIR,
+			response_out, ATLAS_FUZZING_REL);
 		if (validated_response_out == NULL)
 		{
 			crondlog(LVL8 "insecure fuzzing file '%s'",
@@ -602,8 +603,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (output_file)
 	{
-		validated_output_file= rebased_validated_filename(output_file,
-			SAFE_PREFIX_OUT_REL);
+		validated_output_file= rebased_validated_filename(ATLAS_SPOOLDIR,
+			output_file, SAFE_PREFIX_OUT_REL);
 		if (validated_output_file == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", output_file);
@@ -638,8 +639,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 
 	if (post_header)
 	{
-		validated_post_header= rebased_validated_filename(post_header,
-			SAFE_PREFIX_IN_REL);
+		validated_post_header= rebased_validated_filename(ATLAS_SPOOLDIR,
+			post_header, SAFE_PREFIX_IN_REL);
 		if (validated_post_header == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", post_header);
@@ -648,8 +649,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (post_file)
 	{
-		validated_post_file= rebased_validated_filename(post_file,
-			SAFE_PREFIX_IN_REL);
+		validated_post_file= rebased_validated_filename(ATLAS_SPOOLDIR,
+			post_file, SAFE_PREFIX_IN_REL);
 		if (validated_post_file == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", post_file);
@@ -658,8 +659,8 @@ static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	}
 	if (post_footer)
 	{
-		validated_post_footer= rebased_validated_filename(post_footer,
-			SAFE_PREFIX_IN_REL);
+		validated_post_footer= rebased_validated_filename(ATLAS_SPOOLDIR,
+			post_footer, SAFE_PREFIX_IN_REL);
 		if (validated_post_footer == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'", post_footer);
@@ -906,7 +907,7 @@ static void report(struct hgstate *state)
 		add_str(state, line);
 
 		if (state->read_truncated)
-			add_str(state, ", " DBQ(read-truncated) ": True");
+			add_str(state, ", " DBQ(read-truncated) ": true");
 
 		if (state->socklen != 0)
 		{

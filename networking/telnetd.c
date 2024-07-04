@@ -90,7 +90,7 @@
 //config:	  way of running tcp services, including telnetd.
 //config:	  You most probably want to say N here.
 
-//applet:IF_TELNETD(APPLET(telnetd, BB_DIR_USR_SBIN, BB_SUID_DROP))
+//applet:IF_TELNETD(APPLET(telnetd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_TELNETD) += telnetd.o
 
@@ -120,6 +120,7 @@
 #include "common_bufsiz.h"
 #include <syslog.h>
 #include <sys/mount.h>
+#include "atlas_path.h"
 
 #if DEBUG
 # define TELCMDS
@@ -139,9 +140,9 @@
 #define PASSWORD_PROMPT	"\r\nPassword: "
 
 #define ATLAS_LOGIN	"C_TO_P_TEST_V1"
-#define ATLAS_SESSION_FILE_REL	"status/con_session_id.txt"
+#define ATLAS_SESSION_FILE_REL	"con_session_id.txt"
 #define SESSION_ID_PREFIX	"SESSION_ID "
-#define FW_APP_VERS_FILE_REL	"state/FIRMWARE_APPS_VERSION"
+#define FW_APP_VERS_FILE_REL	"FIRMWARE_APPS_VERSION"
 
 #define CMD_CRONTAB	"CRONTAB "
 #define CMD_CRONLINE	"CRONLINE "
@@ -1192,7 +1193,7 @@ do_cmd:
 					add_2sock(ts, BAD_REMOUNT);
 					goto skip3a;
 				}
-				fn= atlas_path(FW_APP_VERS_FILE_REL);
+				asprintf(&fn, "%s/%s", ATLAS_DATADIR, FW_APP_VERS_FILE_REL);
 				file= fopen(fn, "w");
 				free(fn); fn= NULL;
 				if (!file)
@@ -1326,7 +1327,7 @@ static int equal_sessionid(char *passwd)
 	FILE *file;
 	char line[80];
 
-	fn= atlas_path(ATLAS_SESSION_FILE_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, ATLAS_SESSION_FILE_REL);
 	file= fopen(fn, "r");
 	if (file == NULL)
 	{
@@ -1479,7 +1480,7 @@ static int start_crontab(struct tsession *ts, char *line)
 	}
 
 	cp= line+strlen(CMD_CRONTAB);
-	rebased_fn= rebased_validated_filename(cp, SAFE_PREFIX_REL);
+	rebased_fn= rebased_validated_filename(ATLAS_SPOOLDIR, cp, SAFE_PREFIX_REL);
 	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
@@ -1643,13 +1644,13 @@ static void do_oneoff(struct tsession *ts, char *line)
 	strlcpy(filename_new, filename, sizeof(filename_new));
 	strlcat(filename_new, ONEOFF_SUFFIX, sizeof(filename_new));
 
-	rebased_fn= rebased_validated_filename(filename, SAFE_PREFIX_REL);
+	rebased_fn= rebased_validated_filename(ATLAS_SPOOLDIR, filename, SAFE_PREFIX_REL);
 	if (!rebased_fn)
 	{
 		add_2sock(ts, BAD_PATH);
 		return;
 	}
-	rebased_fn_new= rebased_validated_filename(filename_new,
+	rebased_fn_new= rebased_validated_filename(ATLAS_SPOOLDIR, filename_new,
 		SAFE_PREFIX_REL);
 	if (!rebased_fn_new)
 	{

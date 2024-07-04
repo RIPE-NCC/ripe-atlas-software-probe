@@ -20,7 +20,7 @@
 //config:       help
 //config:           Eperd periodically runs Atlas measurements. It is based on crond.
 
-//applet:IF_EPERD(APPLET(eperd, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EPERD(APPLET(eperd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EPERD) += eooqd.o eperd.o condmv.o http2.o httpget.o ping.o sslgetcert.o traceroute.o evhttpget.o evping.o evsslgetcert.o evtdig.o evtraceroute.o tcputil.o readresolv.o evntp.o ntp.o
 
@@ -39,6 +39,7 @@
 //usage:     "\n       -P      pidfile to use"
 
 #include "libbb.h"
+#include "atlas_path.h"
 #include <syslog.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -277,8 +278,8 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 
 	if (out_filename)
 	{
-		validated_fn= rebased_validated_filename(out_filename, 
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
+			out_filename, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
 			crondlog(DIE9 "insecure file '%s'. allowed path '%s'", 

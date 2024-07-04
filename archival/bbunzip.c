@@ -234,7 +234,7 @@ char* FAST_FUNC make_new_name_generic(char *filename, const char *expected_ext)
 //config:	  uncompress is used to decompress archives created by compress.
 //config:	  Not much used anymore, replaced by gzip/gunzip.
 
-//applet:IF_UNCOMPRESS(APPLET(uncompress, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_UNCOMPRESS(APPLET(uncompress, BB_DIR_ROOT, BB_SUID_DROP))
 //kbuild:lib-$(CONFIG_UNCOMPRESS) += bbunzip.o
 #if ENABLE_UNCOMPRESS
 int uncompress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -313,8 +313,8 @@ int uncompress_main(int argc UNUSED_PARAM, char **argv)
 //config:	help
 //config:	  Enable use of long options.
 
-//applet:IF_GUNZIP(APPLET(gunzip, BB_DIR_BIN, BB_SUID_DROP))
-//applet:IF_ZCAT(APPLET_ODDNAME(zcat, gunzip, BB_DIR_BIN, BB_SUID_DROP, zcat))
+//applet:IF_GUNZIP(APPLET(gunzip, BB_DIR_ROOT, BB_SUID_DROP))
+//applet:IF_ZCAT(APPLET_ODDNAME(zcat, gunzip, BB_DIR_ROOT, BB_SUID_DROP, zcat))
 //kbuild:lib-$(CONFIG_GUNZIP) += bbunzip.o
 //kbuild:lib-$(CONFIG_ZCAT) += bbunzip.o
 #if ENABLE_GUNZIP || ENABLE_ZCAT
@@ -424,8 +424,8 @@ int gunzip_main(int argc UNUSED_PARAM, char **argv)
 //config:	help
 //config:	  Alias to "bunzip2 -c".
 
-//applet:IF_BUNZIP2(APPLET(bunzip2, BB_DIR_USR_BIN, BB_SUID_DROP))
-//applet:IF_BZCAT(APPLET_ODDNAME(bzcat, bunzip2, BB_DIR_USR_BIN, BB_SUID_DROP, bzcat))
+//applet:IF_BUNZIP2(APPLET(bunzip2, BB_DIR_ROOT, BB_SUID_DROP))
+//applet:IF_BZCAT(APPLET_ODDNAME(bzcat, bunzip2, BB_DIR_ROOT, BB_SUID_DROP, bzcat))
 //kbuild:lib-$(CONFIG_BUNZIP2) += bbunzip.o
 //kbuild:lib-$(CONFIG_BZCAT) += bbunzip.o
 #if ENABLE_BUNZIP2 || ENABLE_BZCAT
@@ -529,9 +529,9 @@ int bunzip2_main(int argc UNUSED_PARAM, char **argv)
 //config:	  This option reduces decompression time by about 25% at the cost of
 //config:	  a 1K bigger binary.
 
-//applet:IF_UNLZMA(APPLET(unlzma, BB_DIR_USR_BIN, BB_SUID_DROP))
-//applet:IF_LZCAT(APPLET_ODDNAME(lzcat, unlzma, BB_DIR_USR_BIN, BB_SUID_DROP, lzcat))
-//applet:IF_LZMA(APPLET_ODDNAME(lzma, unlzma, BB_DIR_USR_BIN, BB_SUID_DROP, lzma))
+//applet:IF_UNLZMA(APPLET(unlzma, BB_DIR_ROOT, BB_SUID_DROP))
+//applet:IF_LZCAT(APPLET_ODDNAME(lzcat, unlzma, BB_DIR_ROOT, BB_SUID_DROP, lzcat))
+//applet:IF_LZMA(APPLET_ODDNAME(lzma, unlzma, BB_DIR_ROOT, BB_SUID_DROP, lzma))
 //kbuild:lib-$(CONFIG_UNLZMA) += bbunzip.o
 //kbuild:lib-$(CONFIG_LZCAT) += bbunzip.o
 //kbuild:lib-$(CONFIG_LZMA) += bbunzip.o
@@ -574,9 +574,9 @@ int unlzma_main(int argc UNUSED_PARAM, char **argv)
 //config:	  Enable this option if you want commands like "xz -d" to work.
 //config:	  IOW: you'll get xz applet, but it will always require -d option.
 
-//applet:IF_UNXZ(APPLET(unxz, BB_DIR_USR_BIN, BB_SUID_DROP))
-//applet:IF_XZCAT(APPLET_ODDNAME(xzcat, unxz, BB_DIR_USR_BIN, BB_SUID_DROP, xzcat))
-//applet:IF_XZ(APPLET_ODDNAME(xz, unxz, BB_DIR_USR_BIN, BB_SUID_DROP, xz))
+//applet:IF_UNXZ(APPLET(unxz, BB_DIR_ROOT, BB_SUID_DROP))
+//applet:IF_XZCAT(APPLET_ODDNAME(xzcat, unxz, BB_DIR_ROOT, BB_SUID_DROP, xzcat))
+//applet:IF_XZ(APPLET_ODDNAME(xz, unxz, BB_DIR_ROOT, BB_SUID_DROP, xz))
 //kbuild:lib-$(CONFIG_UNXZ) += bbunzip.o
 //kbuild:lib-$(CONFIG_XZCAT) += bbunzip.o
 //kbuild:lib-$(CONFIG_XZ) += bbunzip.o

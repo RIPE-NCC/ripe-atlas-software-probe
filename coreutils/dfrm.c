@@ -11,7 +11,7 @@
 //config:         dfrm deletes files from directories when the amount of free space is
 //config:         too low
 
-//applet:IF_DFRM(APPLET(dfrm, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_DFRM(APPLET(dfrm, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_DFRM) += dfrm.o
 

@@ -12,7 +12,7 @@
 //config:       help
 //config:         buddyinfo reports on the amount of free memory
 
-//applet:IF_CONDMV(APPLET(buddyinfo, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_CONDMV(APPLET(buddyinfo, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_BUDDYINFO) += buddyinfo.o
 

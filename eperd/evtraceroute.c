@@ -9,7 +9,7 @@
 //config:       help
 //config:               standalone version of event-driven traceroute
 
-//applet:IF_EVTRACEROUTE(APPLET(evtraceroute, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVTRACEROUTE(APPLET(evtraceroute, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVTRACEROUTE) += evtraceroute.o
 

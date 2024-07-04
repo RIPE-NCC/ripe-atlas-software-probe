@@ -15,7 +15,7 @@
 //config:       help
 //config:               Scan TLS server with various TLS paramenters and summarize them.
 
-//applet:IF_EVTLSSCAN(APPLET(evtlsscan, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EVTLSSCAN(APPLET(evtlsscan, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EVTLSSCAN) += evtlsscan.o
 

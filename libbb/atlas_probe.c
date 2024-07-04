@@ -3,9 +3,12 @@
  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
  */
 
-#define REG_INIT_REPLY_REL "status/reg_init_reply.txt"
+#define REG_INIT_REPLY_REL "reg_init_reply.txt"
 
 #include "libbb.h"
+#include "atlas_path.h"
+#include <stdio.h>
+
 int get_probe_id(void)
 {
         static int probe_id= -1;
@@ -19,7 +22,7 @@ int get_probe_id(void)
 	if (probe_id > 0)
 		return probe_id;	/* Assume probe ID never changes */
 
-	fn= atlas_path(REG_INIT_REPLY_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, REG_INIT_REPLY_REL);
         fp= fopen(fn, "r");
 	free(fn); fn= NULL;
         if (!fp)

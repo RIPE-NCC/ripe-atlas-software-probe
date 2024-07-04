@@ -58,7 +58,7 @@
 //config:	  the same format. With it on, 'date DATE' additionally supports
 //config:	  MMDDhhmm[[YY]YY][.ss] format.
 
-//applet:IF_DATE(APPLET(date, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_DATE(APPLET(date, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_DATE) += date.o
 

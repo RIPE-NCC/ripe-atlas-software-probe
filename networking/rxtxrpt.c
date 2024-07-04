@@ -11,7 +11,7 @@ table if it has changed.
 //config:         rxtxrpt report RX and TX statistics as well as IPv6 addresses and
 //config:         routes
 
-//applet:IF_RXTXRPT(APPLET(rxtxrpt, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_RXTXRPT(APPLET(rxtxrpt, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RXTXRPT) += rxtxrpt.o
 

@@ -9,7 +9,7 @@
 //config:       help
 //config:         Report addresses, routes, dns both static and dynamic
 
-//applet:IF_RPTADDRS(APPLET(rptaddrs, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_RPTADDRS(APPLET(rptaddrs, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RPTADDRS) += rptaddrs.o
 
@@ -27,6 +27,7 @@
 #include "../eperd/readresolv.h"
 
 #include "libbb.h"
+#include "atlas_path.h"
 
 #include <inet_common.h>
 
@@ -35,10 +36,10 @@
 #define IPV6_ROUTE_FILE	"/proc/net/ipv6_route"
 #define SUFFIX		".new"
 
-#define IPV4_STATIC_REL	ATLAS_STATUS_REL "/network_v4_static_info.json"
-#define IPV6_STATIC_REL	ATLAS_STATUS_REL "/network_v6_static_info.json"
-#define DNS_STATIC_REL	ATLAS_STATUS_REL "/network_dns_static_info.json"
-#define NETWORK_INFO_REL ATLAS_STATUS_REL "/network_v4_info.txt"
+#define IPV4_STATIC_REL	"network_v4_static_info.json"
+#define IPV6_STATIC_REL	"network_v6_static_info.json"
+#define DNS_STATIC_REL	"network_dns_static_info.json"
+#define NETWORK_INFO_REL "network_v4_info.txt"
 
 #define SAFE_PREFIX_NEW_REL ATLAS_DATA_NEW_REL
 
@@ -101,8 +102,8 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 
 	if (out_name)
 	{
-		rebased_out_name= rebased_validated_filename(out_name,
-			SAFE_PREFIX_NEW_REL);
+		rebased_out_name= rebased_validated_filename(ATLAS_SPOOLDIR,
+			out_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_out_name)
 		{
 			crondlog(LVL8 "insecure file '%s' : allowed '%s'",
@@ -112,8 +113,8 @@ int rptaddrs_main(int argc UNUSED_PARAM, char *argv[])
 	}
 	if (cache_name)
 	{
-		rebased_cache_name= rebased_validated_filename(cache_name,
-			SAFE_PREFIX_NEW_REL);
+		rebased_cache_name= rebased_validated_filename(ATLAS_SPOOLDIR,
+			cache_name, SAFE_PREFIX_NEW_REL);
 		if (!rebased_cache_name)
 		{
 			crondlog(LVL8 "insecure file '%s' allowed %s",
@@ -317,7 +318,7 @@ static int setup_dhcpv4(FILE *of)
 	const char *value;
 	char line[128];
 
-	fn= atlas_path(NETWORK_INFO_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, NETWORK_INFO_REL);
 	in_file= fopen(fn, "r");
 	if (in_file == NULL)
 	{
@@ -619,17 +620,17 @@ static int setup_static_rpt(FILE *of)
 	int r;
 	char *fn;
 
-	fn= atlas_path(IPV4_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, IPV4_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	fn= atlas_path(IPV6_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, IPV6_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)
 		return -1;
-	fn= atlas_path(DNS_STATIC_REL);
+	asprintf(&fn, "%s/%s", ATLAS_STATUS, DNS_STATIC_REL);
 	r= report_line(of, fn);
 	free(fn); fn= NULL;
 	if (r == -1)

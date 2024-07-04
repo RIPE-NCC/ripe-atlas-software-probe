@@ -9,7 +9,7 @@
 //config:       help
 //config:         return a random choice from command line arguments
 
-//applet:IF_CONDMV(APPLET(rchoose, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_CONDMV(APPLET(rchoose, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_RCHOOSE) += rchoose.o
 

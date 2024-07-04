@@ -450,7 +450,7 @@ const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 
-#define ATLAS_MSM_VERSION	"2.6.3"
+#define ATLAS_MSM_VERSION	"2.6.4"
 
 /* What's the best place for this? AA may be atlas_probe.h */
 #define ATLAS_HOME     "/home/atlas"
@@ -464,8 +464,8 @@ char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
 #define ATLAS_FUZZING_REL          "data"
 
 extern int atlas_unsafe(void);
-extern char *rebased_validated_filename(const char *path, const char *prefix);
-extern char *rebased_validated_dir(const char *path, const char *prefix);
+extern char *rebased_validated_filename(const char *base, const char *path, const char *prefix);
+extern char *rebased_validated_dir(const char *base, const char *path, const char *prefix);
 extern int validate_atlas_id(const char *atlas_id);
 extern int get_probe_id(void);
 extern int get_timesync(void);
@@ -473,8 +473,6 @@ extern int gettime_mono(struct timespec *tsp);
 extern char *atlas_get_version_json_str(void);
 extern int bind_interface(int socket, int af, char *name);
 extern int atlas_check_addr(const struct sockaddr *sa, socklen_t len);
-extern const char *atlas_base(void);
-extern char *atlas_path(const char *rel_path);
 extern char *atlas_name_macro(char *str);
 extern int atlas_tests(void);
 extern time_t atlas_time(void);

@@ -11,7 +11,7 @@
 //config:       help
 //config:           Eooqd runs Atlas measurements just once.
 
-//applet:IF_EOOQD(APPLET(eooqd, BB_DIR_BIN, BB_SUID_DROP))
+//applet:IF_EOOQD(APPLET(eooqd, BB_DIR_ROOT, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_EOOQD) += eooqd.o
 
@@ -31,6 +31,7 @@
 #include <event2/dns.h>
 
 #include "eperd.h"
+#include "atlas_path.h"
 
 #define SUFFIX 		".curr"
 #define OOQD_NEW_PREFIX_REL	"data/new/ooq"
@@ -213,7 +214,7 @@ int eooqd_main(int argc, char *argv[])
 
 	snprintf(output_filename, sizeof(output_filename),
 		"%s/" OOQD_OUT_PREFIX_REL "%s/ooq.out",
-		atlas_base(), queue_id);
+		ATLAS_SPOOLDIR, queue_id);
 
 	signal(SIGQUIT, SIG_DFL);
 	limit.rlim_cur= RLIM_INFINITY;
@@ -407,8 +408,8 @@ static int add_line(void)
 		p= &cmdline[len];
 		while (*p != '\0' && *p == ' ')
 			p++;
-		validated_fn= rebased_validated_filename(p,
-			SAFE_PREFIX_REL);
+		validated_fn= rebased_validated_filename(ATLAS_SPOOLDIR,
+			p, SAFE_PREFIX_REL);
 		if (validated_fn == NULL)
 		{
 			crondlog(LVL8 "insecure file '%s'. allowed path '%s'", 
@@ -534,7 +535,7 @@ static int add_line(void)
 	argv[argc++]= "-O";
 	snprintf(filename, sizeof(filename),
 		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-		atlas_base(), queue_id, slot);
+		ATLAS_SPOOLDIR, queue_id, slot);
 	argv[argc++]= filename;
 
 	argv[argc]= NULL;
@@ -560,7 +561,7 @@ error:
 	{
 		snprintf(filename, sizeof(filename),
 			"%s/" OOQD_NEW_PREFIX_REL "%s",
-			atlas_base(), queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		fn= fopen(filename, "a");
 		if (!fn) 
 		{
@@ -590,7 +591,7 @@ error:
 
 		snprintf(filename2, sizeof(filename2),
 			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
-			atlas_base(), queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		if (stat(filename2, &sb) == -1 &&
 			stat(filename, &sb) == 0)
 		{
@@ -609,7 +610,6 @@ error:
 static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 {
 	int i, r;
-	char *fn_fmt;
 	char from_filename[80];
 	char to_filename[80];
 	struct stat sb;
@@ -638,11 +638,11 @@ static void cmddone(void *cmdstate, int error UNUSED_PARAM)
 
 	snprintf(from_filename, sizeof(from_filename),
 		"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-		atlas_base(), queue_id, i);
+		ATLAS_SPOOLDIR, queue_id, i);
 	
-	fn_fmt= atlas_path(OOQD_OUT_PREFIX_REL "%s/%d");
-	snprintf(to_filename, sizeof(to_filename), fn_fmt, queue_id, i);
-	free(fn_fmt); fn_fmt= NULL;
+	snprintf(to_filename, sizeof(to_filename),
+	         "%s/%s/%s/%d", ATLAS_SPOOLDIR,
+	         OOQD_OUT_PREFIX_REL, queue_id, i);
 
 	if (stat(to_filename, &sb) == 0)
 	{
@@ -721,7 +721,8 @@ static void re_post(evutil_socket_t fd UNUSED_PARAM, short what UNUSED_PARAM,
 static void post_results(int force_post)
 {
 	int i, j, r, need_post, probe_id;
-	const char *fn_header, *fn_session_id, *fn_ooq_sent, *session_id;
+	char *fn_header, *fn_session_id, *fn_ooq_sent;
+	const char *session_id;
 	const char *argv[20];
 	char from_filename[80];
 	char to_filename[80];
@@ -736,10 +737,10 @@ static void post_results(int force_post)
 
 		snprintf(from_filename, sizeof(from_filename),
 			"%s/" OOQD_NEW_PREFIX_REL "%s",
-			atlas_base(), queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		snprintf(to_filename, sizeof(to_filename),
 			"%s/" OOQD_OUT_PREFIX_REL "%s/ooq",
-			atlas_base(), queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 		if (stat(to_filename, &sb) == 0)
 		{
 			/* There is more to post */
@@ -758,10 +759,10 @@ static void post_results(int force_post)
 		{
 			snprintf(from_filename, sizeof(from_filename),
 				"%s/" OOQD_NEW_PREFIX_REL "%s.%d",
-				atlas_base(), queue_id, i);
+				ATLAS_SPOOLDIR, queue_id, i);
 			snprintf(to_filename, sizeof(to_filename),
 				"%s/" OOQD_OUT_PREFIX_REL "%s/%d",
-				atlas_base(), queue_id, i);
+				ATLAS_SPOOLDIR, queue_id, i);
 			if (stat(to_filename, &sb) == 0)
 			{
 				/* There is more to post */
@@ -796,11 +797,11 @@ static void post_results(int force_post)
 			probe_id, session_id);
 		snprintf(from_filename, sizeof(from_filename),
 			"%s/" OOQD_OUT_PREFIX_REL "%s",
-			atlas_base(), queue_id);
+			ATLAS_SPOOLDIR, queue_id);
 
-		fn_header= atlas_path(REPORT_HEADER_REL);
-		fn_session_id= atlas_path(SESSION_ID_REL);
-		fn_ooq_sent= atlas_path(OOQ_SENT_REL);
+		asprintf(&fn_header, "%s/%s", ATLAS_RUNDIR, REPORT_HEADER_REL);
+		asprintf(&fn_session_id, "%s/%s", ATLAS_RUNDIR, SESSION_ID_REL);
+		asprintf(&fn_ooq_sent, "%s/%s", ATLAS_SPOOLDIR, OOQ_SENT_REL);
 		i= 0;
 		argv[i++]= "httppost";
 		argv[i++]= "-A";
@@ -836,7 +837,7 @@ static const char *get_session_id(void)
 	char *cp, *fn;
 	FILE *file;
 
-	fn= atlas_path(ATLAS_SESSION_FILE_REL);
+	asprintf(&fn, "%s/%s", ATLAS_RUNDIR, ATLAS_SESSION_FILE_REL);
 	file= fopen(fn, "r");
 	free(fn); fn= NULL;
 	if (file == NULL)
