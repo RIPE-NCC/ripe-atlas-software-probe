@@ -3,11 +3,12 @@ stages:
   - build
   - lint
   - prepare
-  - test
+  - deploy:el8
+  - deploy:el9
 
 variables:
-  DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
+  # DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
+  # DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
@@ -19,6 +20,8 @@ variables:
   only:
     refs:
       - /^devel.*/
+      - /^testing$/
+      - /^master$/
       - tags
     changes:
       - ${DOCKER_DIR}/Dockerfile
@@ -28,17 +31,17 @@ variables:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker push ${DOCKER_IMAGE}
 
-build_image_debian11:
-  variables:
-    DOCKER_DIR: .gitlab-docker/debian11
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
-  extends: .build_image
+# build_image_debian11:
+#   variables:
+#     DOCKER_DIR: .gitlab-docker/debian11
+#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
+#   extends: .build_image
 
-build_image_debian12:
-  variables:
-    DOCKER_DIR: .gitlab-docker/debian12
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
-  extends: .build_image
+# build_image_debian12:
+#   variables:
+#     DOCKER_DIR: .gitlab-docker/debian12
+#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
+#   extends: .build_image
 
 build_image_ol8:
   variables:
@@ -58,68 +61,66 @@ build_image_prep:
     DOCKER_IMAGE: ${DOCKER_IMAGE_PREP}
   extends: .build_image
 
-.build-ci-debian:
-  stage: build
-  only:
-    - /^devel.*/
-    - tags
-  script:
-    - cd ripe-atlas-software-probe
-    - dpkg-buildpackage -b -us -uc
-    - cp ../ripe-atlas-*.deb .
-  artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
-    paths:
-      - ripe-atlas-*.deb
-    expire_in: never
+# .build-ci-debian:
+#   stage: build
+#   only:
+#     - /^devel.*/
+#     - tags
+#   script:
+#     - cd ripe-atlas-software-probe
+#     - dpkg-buildpackage -b -us -uc
+#     - cp ../ripe-atlas-*.deb .
+#   artifacts:
+#     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
+#     paths:
+#       - ripe-atlas-*.deb
+#     expire_in: never
 
-build-ci-debian11:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN11}
+# build-ci-debian11:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN11}
 
-build-ci-debian12:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN12}
+# build-ci-debian12:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN12}
 
 .build-ci-rhel:
   stage: build
   only:
     - /^devel.*/
+    - /^testing$/
+    - /^master$/
     - tags
   variables:
     REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
-    REPO_GIT_SOURCE: https://${PROBE_SUBGROUP_USER}:${PROBE_SUBGROUP_TOKEN}@${SUBGROUP_URL}
+    REPO_GIT_SOURCE: https://${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD}@${URL}
   script:
-    - cd ..
-    - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
-
     # build define list
     - REPO_GIT_TAG=""
     - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
+    - export HOME="${PWD}"
+    - mkdir -p ${HOME}/${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build repo rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-repo.spec
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
-    # build x86 rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-probe.spec
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
-    - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
+    # build x86_64 rpm
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-probe.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
+    - cp -a ${HOME}/${X86_RPM_PATH} ${HOME}/${OS_VERSION}/x86_64
+    - cp ${HOME}/rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${HOME}/${OS_VERSION}
 
     # build anchor rpm
-    - HOME=${PWD} rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" ripe-atlas-software-probe/rhel/ripe-atlas-anchor.spec
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
-
-    # move artifact to right place
-    - cd ripe-atlas-software-probe && mv ../${OS_VERSION} .
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-anchor.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths:
       - ./${OS_VERSION}
     expire_in: never
-
 
 build-ci-el8:
   variables:
@@ -137,20 +138,21 @@ build-ci-el9:
   stage: lint
   only:
     - /^devel.*/
+    - /^testing$/
+    - /^master$/
     - tags
   script:
     - mkdir lint_report
     - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}-lint-report"
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}-lint-report"
     paths:
       - ./lint_report
     expire_in: never  
 
-
 lint-ci-el8:
-  needs:                                                                                                                                                          
-    - job: build-ci-el8                                                                                                                                           
+  needs:
+    - job: build-ci-el8
       artifacts: true 
   variables:
     OS_VERSION: el8
@@ -158,8 +160,8 @@ lint-ci-el8:
   extends: .lint-ci-rhel
 
 lint-ci-el9:
-  needs:                                                                                                                                                          
-    - job: build-ci-el9                                                                                                                                           
+  needs:
+    - job: build-ci-el9
       artifacts: true 
   variables:
     OS_VERSION: el9
@@ -168,65 +170,155 @@ lint-ci-el9:
 
 .prepare-ci-rhel:
   stage: prepare
-  only:
-    - /^devel.*/
-    - tags
   script:
     - 'eval ${PREPARE}'
-    - 'eval ${FINALIZE}'
-    - 'eval ${CLEANUP}'
-
     - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
-
+  image: ${DOCKER_IMAGE_PREP}
   artifacts:
     name: "${OS_VERSION}-deployable"
     paths:
       - ./${OS_VERSION}-deployable
     expire_in: never
 
-deployable-el8:
+.prepare-ci-el8:
   needs:
     - job: build-ci-el8
       artifacts: true
   variables:
     OS_VERSION: el8
-  image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-rhel
 
-deployable-el9:
+.prepare-ci-el9:
   needs:
     - job: build-ci-el9
       artifacts: true
   variables:
     OS_VERSION: el9
-  image: ${DOCKER_IMAGE_PREP}
   extends: .prepare-ci-rhel
 
-.add-to-test:
-  stage: test
-  only:
-    - /^devel.*/
-    - tags
+prepare-ci-el8-devel:
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-el8
+    environment:
+      name: devel
+
+prepare-ci-el9-devel:
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-el9
+    environment:
+      name: devel
+
+prepare-ci-el8-testing:
+    only:
+      - /^testing$/
+    extends: .prepare-ci-el8
+    environment:
+      name: testing
+
+prepare-ci-el9-testing:
+    only:
+      - /^testing$/
+    extends: .prepare-ci-el9
+    environment:
+      name: testing
+
+prepare-ci-el8-master:
+    only:
+      - /^master$/
+      - tags
+    extends: .prepare-ci-el8
+    environment:
+      name: master
+
+prepare-ci-el9-master:
+    only:
+      - /^master$/
+      - tags
+    extends: .prepare-ci-el9
+    environment:
+      name: master
+
+.deploy-ci:
+  variables:
+    REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
   script:
-    - 'eval ${PREPARE}'
-    - 'eval ${DEPLOY_AT}'
-    - 'eval ${CLEANUP}'
+    - 'eval ${DEPLOY}'
   when: manual
 
-add-el8-to-test:
-  needs:
-    - job: deployable-el8
-      artifacts: true
+.deploy-ci-el8:
+  stage: deploy:el8
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
-  extends: .add-to-test
+  extends: .deploy-ci
 
-add-el9-to-test:
-  needs:
-    - job: deployable-el9
-      artifacts: true
+.deploy-ci-el9:
+  stage: deploy:el9
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
-  extends: .add-to-test
+  extends: .deploy-ci
+
+deploy-ci-el8-devel:
+    only:
+      - /^devel.*/
+    needs:
+      - job: prepare-ci-el8-devel
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: devel
+
+deploy-ci-el9-devel:
+    only:
+      - /^devel.*/
+    needs:
+    - job: prepare-ci-el9-devel
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: devel      
+
+deploy-ci-el8-testing:
+    only:
+      - /^testing$/
+    needs:
+      - job: prepare-ci-el8-testing
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: testing
+
+deploy-ci-el9-testing:
+    only:
+      - /^testing$/
+    needs:
+    - job: prepare-ci-el9-testing
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: testing
+
+deploy-ci-el8-master:
+    only:
+      - /^master$/
+      - tags
+    needs:
+      - job: prepare-ci-el8-master
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: master
+
+deploy-ci-el9-master:
+    only:
+      - /^master$/
+      - tags
+    needs:
+    - job: prepare-ci-el9-master
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: master         
