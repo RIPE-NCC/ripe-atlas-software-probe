@@ -141,6 +141,10 @@ fi
 exit 0
 
 %preun
+if [ $1 -eq 0 ]; then
+	systemctl disable %{service_name} 1>/dev/null 2>&1
+	systemctl stop %{service_name} 1>/dev/null 2>&1
+fi
 exit 0
 
 %postun
