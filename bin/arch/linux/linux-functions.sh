@@ -1,7 +1,7 @@
 # Shell functions that are common between Linux versions.
 buddyinfo()
 {
-	$BB_BIN_DIR/buddyinfo "$@"
+	$ATLAS_MEASUREMENT/buddyinfo "$@"
 	set $(free | grep 'Mem:')
 	[ $(expr $3 + $5) -gt 2048 ]
 }
@@ -11,7 +11,7 @@ epoch()
 }
 rchoose()
 {
-	$BB_BIN_DIR/rchoose "$@"
+	$ATLAS_MEASUREMENT/rchoose "$@"
 }
 check_pid()
 {
@@ -19,67 +19,67 @@ check_pid()
 }
 condmv()
 {
-	$BB_BIN_DIR/condmv "$@"
+	$ATLAS_MEASUREMENT/condmv "$@"
 }
 dfrm()
 {
-	$BB_BIN_DIR/dfrm "$@"
+	$ATLAS_MEASUREMENT/dfrm "$@"
 }
 evping()
 {
-	$BB_BIN_DIR/evping "$@"
+	$ATLAS_MEASUREMENT/evping "$@"
 }
 evping_no_check()
 {
-	ATLAS_DISABLE_CHECK_ADDR=yes $BB_BIN_DIR/evping "$@"
+	ATLAS_DISABLE_CHECK_ADDR=yes $ATLAS_MEASUREMENT/evping "$@"
 }
 httppost()
 {
-	$BB_BIN_DIR/httppost "$@"
+	$ATLAS_MEASUREMENT/httppost "$@"
 }
 ping()
 {
-	$BB_BIN_DIR/ping "$@"
+	$ATLAS_LIBEXECDIR/ping "$@"
 }
 rxtxrpt()
 {
-	$BB_BIN_DIR/rxtxrpt "$@"
+	$ATLAS_MEASUREMENT/rxtxrpt "$@"
 }
 rptaddrs()
 {
-	$BB_BIN_DIR/rptaddrs "$@"
+	$ATLAS_MEASUREMENT/rptaddrs "$@"
 }
 rptuptime()
 {
-	$BB_BIN_DIR/rptuptime "$@"
+	$ATLAS_MEASUREMENT/rptuptime "$@"
 }
 onlyuptime()
 {
-	$BB_BIN_DIR/onlyuptime "$@"
+	$ATLAS_MEASUREMENT/onlyuptime "$@"
 }
 #telnetd()
 #{
-#	$SU_CMD $BB_BASE_DIR/usr/sbin/telnetd "$@"
+#	$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
 #}
 perd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/perd "$@"
+	$SU_CMD $ATLAS_MEASUREMENT/perd "$@"
 }
 root_perd()
 {
-	$BB_BASE_DIR/bin/perd "$@"
+	$ATLAS_MEASUREMENT/perd "$@"
 }
 ooqd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/ooqd "$@"
+	$SU_CMD $ATLAS_LIBEXECDIR/ooqd "$@"
 }
 eperd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/eperd "$@"
+	$SU_CMD $ATLAS_MEASUREMENT/eperd "$@"
 }
 eooqd()
 {
-	$SU_CMD $BB_BASE_DIR/bin/eooqd "$@"
+	$SU_CMD $ATLAS_MEASUREMENT/eooqd "$@"
 }
 sleepkick()
 {
@@ -89,39 +89,39 @@ kill_ssh()
 {
 	if [ -f $STATUS_DIR/con_keep_pid.vol ]
 	then
-		kill -9 `cat $STATUS_DIR/con_keep_pid.vol`
+		kill -9 `cat $STATUS_DIR/con_keep_pid.vol` 2>/dev/null
 	rm -f $STATUS_DIR/con_keep_pid.vol
 	fi
 }
 findpid_ssh()
 {
 	[ -f $STATUS_DIR/con_keep_pid.vol ] &&
-		kill -0 `cat $STATUS_DIR/con_keep_pid.vol`
+		kill -0 `cat $STATUS_DIR/con_keep_pid.vol` 2>/dev/null
 }
 kill_perds()
 {
 	PERD_PIDS=`pidof perd`
 	for s in $PERD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 
 	EPERD_PIDS=`pidof eperd`
 	for s in $EPERD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 
 	EOOQD_PIDS=`pidof eooqd`
 	for s in $EOOQD_PIDS
 	do
-		kill -9 $s
+		kill -9 $s 2>/dev/null
 	done
 }
 kill_telnetd()
 {
 	if [ -f $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol ] ; then
-		kill -9 `tail -1 $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol`
+		kill -9 `tail -1 $STATUS_DIR/telnetd-port$TELNETD_PORT-pid.vol` 2>/dev/null
 	fi
 }
 sos()
@@ -136,13 +136,13 @@ ssh()
 {
 	/usr/bin/ssh -i "$SSH_PVT_KEY" -o "ServerAliveInterval 60" \
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 ssh_exec()
 {
 	exec /usr/bin/ssh -i "$SSH_PVT_KEY" -o "ServerAliveInterval 60"\
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 get_ether_addr()
 {

@@ -1,0 +1,13 @@
+# Shell variables that are needed in both ATLAS and reginit.sh
+# These variables are set before the platform dependend scripts are run.
+
+# Defaults, override if necessary
+BIN_DIR=${ATLAS_MEASUREMENT}
+STATE_DIR=${ATLAS_DATA}
+RUN_DIR=${ATLAS_PIDS}
+STATUS_DIR=${ATLAS_STATUS}
+CON_KEEP_PID=con_keep_pid.vol
+RESOLV_CONF_STATIC=${ATLAS_SYSCONFDIR}/resolv.conf.static
+REG_INIT_REPLY=${ATLAS_STATUS}/reg_init_reply.txt
+CONFIG_TXT="${ATLAS_SYSCONFDIR}/config.txt"
+CRON_DIR="${ATLAS_CRONS}"

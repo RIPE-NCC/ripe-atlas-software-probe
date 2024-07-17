@@ -4,10 +4,8 @@
 
 # Directories
 HOME=/root; export HOME			# Somewhow, HOME is not set correctly
-SSH_DIR=$HOME/.ssh; export SSH_DIR
-BB_BASE_DIR=$BASE_DIR/bb-13.3; export BB_BASE_DIR
+BB_BASE_DIR=$BASE_DIR; export BB_BASE_DIR
 BB_BIN_DIR=$BB_BASE_DIR/bin; export BB_BIN_DIR
-BB_SBIN_DIR=$BB_BASE_DIR/sbin; export BB_SBIN_DIR
 RUN_DIR=/tmp/atlas-run
 
 # We need DATA_NEW_DIR in this script
@@ -111,9 +109,7 @@ chown_data_dirs()
 }
 chown_for_msm()
 {
-	chown -R atlas $BASE_DIR/crons
-	chown -R atlas $BASE_DIR/crons/
-	chown -R atlas $BASE_DIR/data
+	chown -R atlas $CRON_DIR
 	chown -R atlas $BASE_DIR/data/
 }
 date()
@@ -137,27 +133,6 @@ handle_storage_current_time()
 		fi
 	else
 		cp $STATUS_DIR/currenttime.txt /storage/currenttime.txt
-	fi
-}
-get_arch()
-{
-	if [ -f /lib/ar71xx.sh ]
-	then
-		. /lib/ar71xx.sh
-		ar71xx_board_name
-	elif [ -f /lib/ramips.sh ]
-	then
-		sh /lib/ramips.sh
-		sed < /tmp/sysinfo/board_name 's/tplink,//'
-	elif [ -f  /etc/board.json ] && grep -q '"friendlyarm,nanopi-neo-plus2"' /etc/board.json
-	then
-		echo 'nanopi-neo-plus2'
-	elif [ -f  /etc/board.json ] && grep -q '"cznic,turris-mox"' /etc/board.json
-	then
-		echo 'atlas-mox'
-	else
-		echo 'unknown board'
-		exit 1
 	fi
 }
 
@@ -254,7 +229,7 @@ openwrt_atlas_init()
 	echo '/home/atlas/data/%e.%p.%s.%t.core' > /proc/sys/kernel/core_pattern
 
 	# Set up for user atlas
-	setcap "cap_net_raw=ep cap_sys_time=ep" /home/atlas/bb-13.3/bin/busybox
+	setcap "cap_net_raw=ep cap_sys_time=ep" $BB_BIN_DIR/busybox
 
 	$MOUNT_ROOT_RO
 }

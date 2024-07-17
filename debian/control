@@ -1,0 +1,74 @@
+Source: ripe-atlas-software-probe
+Section: net
+Priority: optional
+Build-Depends:
+ debhelper-compat (= 13),
+ autotools-dev,
+ libssl-dev,
+Rules-Requires-Root: binary-targets
+Maintainer: Michel Stam <mstam@ripe.net>
+
+Package: ripe-atlas-common
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ libssl3 | libssl1,
+ net-tools,
+ openssh-client,
+Section: net
+Priority: optional
+Homepage: https://atlas.ripe.net/
+Description: RIPE Atlas essential components
+ RIPE Atlas is the RIPE NCC's main Internet data collection system.
+ It is a global network of devices, called probes and anchors, that
+ actively measure Internet connectivity. Anyone can access this
+ data via Internet traffic maps, streaming data visualisations, and
+ an API. RIPE Atlas users can also perform customised measurements
+ to gain valuable data about their own networks.
+ .
+ This package contains essential core assets used in all probe
+ flavours. It must be installed for a probe to operate as expected.
+
+Package: ripe-atlas-probe
+Architecture: all
+Depends: ripe-atlas-common (= ${binary:Version})
+Conflicts: ripe-atlas-anchor
+Replaces: atlasswprobe
+Section: net
+Priority: optional
+Homepage: https://atlas.ripe.net/apply/swprobe/
+Description: RIPE Atlas probe specific files and configuration
+ RIPE Atlas is the RIPE NCC's main Internet data collection system.
+ It is a global network of devices, called probes and anchors, that
+ actively measure Internet connectivity. Anyone can access this
+ data via Internet traffic maps, streaming data visualisations, and
+ an API. RIPE Atlas users can also perform customised measurements
+ to gain valuable data about their own networks.
+ .
+ This package contains probe specific files and configuration.
+ It must be installed for a probe to operate as expected.
+ .
+ Please visit https://atlas.ripe.net/apply/swprobe/ to register.
+
+Package: ripe-atlas-anchor
+Architecture: all
+Depends: ripe-atlas-common (= ${binary:Version})
+Conflicts: ripe-atlas-probe
+Replaces: atlasswprobe
+Section: net
+Priority: optional
+Homepage: https://atlas.ripe.net/anchors/apply/
+Description: RIPE Atlas anchor specific files and configuration
+ RIPE Atlas is the RIPE NCC's main Internet data collection system.
+ It is a global network of devices, called probes and anchors, that
+ actively measure Internet connectivity. Anyone can access this
+ data via Internet traffic maps, streaming data visualisations, and
+ an API. RIPE Atlas users can also perform customised measurements
+ to gain valuable data about their own networks.
+ .
+ This package contains anchor specific files and configuration.
+ It must be installed for an anchor to operate as expected.
+ .
+ Please visit https://atlas.ripe.net/anchors/apply/ to register.
+ Only install at the direction of RIPE NCC.

@@ -1,14 +1,16 @@
 stages:
   - docker_image
   - build
+  - lint
   - prepare
+  - deploy:el8
+  - deploy:el9
 
 variables:
-  DOCKER_IMAGE_DEBIAN9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian9:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_DEBIAN10: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian10:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_CENTOS7: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos7:${CI_COMMIT_REF_SLUG}
-  DOCKER_IMAGE_CENTOS8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/centos8:${CI_COMMIT_REF_SLUG}
+  # DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
+  # DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_OL8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol8:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
   GIT_SUBMODULE_STRATEGY: recursive
   RPMS_DIR: rpmbuild/RPMS
@@ -18,6 +20,8 @@ variables:
   only:
     refs:
       - /^devel.*/
+      - /^testing$/
+      - /^master$/
       - tags
     changes:
       - ${DOCKER_DIR}/Dockerfile
@@ -27,146 +31,294 @@ variables:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker push ${DOCKER_IMAGE}
 
-build_image_debian9:
+# build_image_debian11:
+#   variables:
+#     DOCKER_DIR: .gitlab-docker/debian11
+#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
+#   extends: .build_image
+
+# build_image_debian12:
+#   variables:
+#     DOCKER_DIR: .gitlab-docker/debian12
+#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
+#   extends: .build_image
+
+build_image_ol8:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian9
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN9}
+    DOCKER_DIR: .gitlab-docker/ol8
+    DOCKER_IMAGE: ${DOCKER_IMAGE_OL8}
   extends: .build_image
 
-build_image_debian10:
+build_image_ol9:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian10
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN10}
-  extends: .build_image
-
-build_image_debian11:
-  variables:
-    DOCKER_DIR: build-config/gitlab-docker/debian11
-    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
-  extends: .build_image
-
-build_image_centos7:
-  variables:
-    DOCKER_DIR: build-config/gitlab-docker/centos7
-    DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS7}
-  extends: .build_image
-
-build_image_centos8:
-  variables:
-    DOCKER_DIR: build-config/gitlab-docker/centos8
-    DOCKER_IMAGE: ${DOCKER_IMAGE_CENTOS8}
+    DOCKER_DIR: .gitlab-docker/ol9
+    DOCKER_IMAGE: ${DOCKER_IMAGE_OL9}
   extends: .build_image
 
 build_image_prep:
   variables:
-    DOCKER_DIR: build-config/gitlab-docker/prep
+    DOCKER_DIR: .gitlab-docker/prep
     DOCKER_IMAGE: ${DOCKER_IMAGE_PREP}
   extends: .build_image
 
-.build-ci-debian:
+# .build-ci-debian:
+#   stage: build
+#   only:
+#     - /^devel.*/
+#     - tags
+#   script:
+#     - cd ripe-atlas-software-probe
+#     - dpkg-buildpackage -b -us -uc
+#     - cp ../ripe-atlas-*.deb .
+#   artifacts:
+#     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
+#     paths:
+#       - ripe-atlas-*.deb
+#     expire_in: never
+
+# build-ci-debian11:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN11}
+
+# build-ci-debian12:
+#   extends: .build-ci-debian
+#   image: ${DOCKER_IMAGE_DEBIAN12}
+
+.build-ci-rhel:
   stage: build
   only:
     - /^devel.*/
-    - tags
-  script:
-    - cd ..
-    - HOME=${PWD} ripe-atlas-software-probe/build-config/debian/bin/make-deb
-    - cp atlasswprobe-*.deb ripe-atlas-software-probe
-  artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
-    paths:
-      - atlasswprobe-*.deb
-    expire_in: never
-
-build-ci-debian9:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN9}
-
-build-ci-debian10:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN10}
-
-build-ci-debian11:
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN11}
-
-.build-ci-centos:
-  stage: build
-  only:
-    - /^devel.*/
+    - /^testing$/
+    - /^master$/
     - tags
   variables:
-    REPO_RPM_PATH: ${RPMS_DIR}/noarch/ripe-atlas-repo-*.rpm
-    X86_RPM_PATH: ${RPMS_DIR}/x86_64/atlasswprobe-*.rpm
+    REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
+    X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
+    REPO_GIT_SOURCE: https://${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD}@${URL}
   script:
-    - cd ..
-    - mkdir -p ${CENTOS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
-
-    # setup build env
-    - ripe-atlas-software-probe/build-config/centos/bin/cp-repo-files ${CENTOS_VERSION}
-    - HOME=${PWD} ripe-atlas-software-probe/build-config/centos/bin/make-tars
+    # build define list
+    - REPO_GIT_TAG=""
+    - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
+    - export HOME="${PWD}"
+    - mkdir -p ${HOME}/${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build repo rpm
-    - HOME=${PWD} rpmbuild --bb rpmbuild/SPECS/ripe-atlas-repo.spec
-    - cp -a ${REPO_RPM_PATH} ${CENTOS_VERSION}/noarch
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
-    # build x86 rpm
-    - HOME=${PWD} rpmbuild --bb rpmbuild/SPECS/atlasswprobe.spec
-    - cp -a ${X86_RPM_PATH} ${CENTOS_VERSION}/x86_64
+    # build x86_64 rpm
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-probe.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
+    - cp -a ${HOME}/${X86_RPM_PATH} ${HOME}/${OS_VERSION}/x86_64
+    - cp ${HOME}/rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${HOME}/${OS_VERSION}
 
-    # move artifact to right place
-    - cd ripe-atlas-software-probe && mv ../${CENTOS_VERSION} .
+    # build anchor rpm
+    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-anchor.spec
+    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths:
-      - ./${CENTOS_VERSION}
+      - ./${OS_VERSION}
     expire_in: never
 
-build-ci-centos7:
+build-ci-el8:
   variables:
-    CENTOS_VERSION: centos7
-  image: ${DOCKER_IMAGE_CENTOS7}
-  extends: .build-ci-centos
+    OS_VERSION: el8
+  image: ${DOCKER_IMAGE_OL8}
+  extends: .build-ci-rhel
 
-build-ci-centos8:
+build-ci-el9:
   variables:
-    CENTOS_VERSION: centos8
-  image: ${DOCKER_IMAGE_CENTOS8}
-  extends: .build-ci-centos
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_OL9}
+  extends: .build-ci-rhel
 
-.prepare-ci-centos:
-  stage: prepare
+.lint-ci-rhel:
+  stage: lint
   only:
     - /^devel.*/
+    - /^testing$/
+    - /^master$/
     - tags
   script:
-    - 'eval ${PREPARE}'
-    - 'eval ${FINALIZE}'
-    - 'eval ${CLEANUP}'
-
-    - cp -a ${CENTOS_VERSION} ${CENTOS_VERSION}-deployable
-
+    - mkdir lint_report
+    - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
   artifacts:
-    name: "${CENTOS_VERSION}-deployable"
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}-lint-report"
     paths:
-      - ./${CENTOS_VERSION}-deployable
+      - ./lint_report
+    expire_in: never  
+
+lint-ci-el8:
+  needs:
+    - job: build-ci-el8
+      artifacts: true 
+  variables:
+    OS_VERSION: el8
+  image: ${DOCKER_IMAGE_OL8}
+  extends: .lint-ci-rhel
+
+lint-ci-el9:
+  needs:
+    - job: build-ci-el9
+      artifacts: true 
+  variables:
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_OL9}
+  extends: .lint-ci-rhel
+
+.prepare-ci-rhel:
+  stage: prepare
+  script:
+    - 'eval ${PREPARE}'
+    - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
+  image: ${DOCKER_IMAGE_PREP}
+  artifacts:
+    name: "${OS_VERSION}-deployable"
+    paths:
+      - ./${OS_VERSION}-deployable
     expire_in: never
 
-deployable-centos7:
+.prepare-ci-el8:
   needs:
-    - job: build-ci-centos7
+    - job: build-ci-el8
       artifacts: true
   variables:
-    CENTOS_VERSION: centos7
-  image: ${DOCKER_IMAGE_PREP}
-  extends: .prepare-ci-centos
+    OS_VERSION: el8
+  extends: .prepare-ci-rhel
 
-deployable-centos8:
+.prepare-ci-el9:
   needs:
-    - job: build-ci-centos8
+    - job: build-ci-el9
       artifacts: true
   variables:
-    CENTOS_VERSION: centos8
+    OS_VERSION: el9
+  extends: .prepare-ci-rhel
+
+prepare-ci-el8-devel:
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-el8
+    environment:
+      name: devel
+
+prepare-ci-el9-devel:
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-el9
+    environment:
+      name: devel
+
+prepare-ci-el8-testing:
+    only:
+      - /^testing$/
+    extends: .prepare-ci-el8
+    environment:
+      name: testing
+
+prepare-ci-el9-testing:
+    only:
+      - /^testing$/
+    extends: .prepare-ci-el9
+    environment:
+      name: testing
+
+prepare-ci-el8-master:
+    only:
+      - /^master$/
+      - tags
+    extends: .prepare-ci-el8
+    environment:
+      name: master
+
+prepare-ci-el9-master:
+    only:
+      - /^master$/
+      - tags
+    extends: .prepare-ci-el9
+    environment:
+      name: master
+
+.deploy-ci:
+  variables:
+    REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
+  script:
+    - 'eval ${DEPLOY}'
+  when: manual
+
+.deploy-ci-el8:
+  stage: deploy:el8
+  variables:
+    OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
-  extends: .prepare-ci-centos
+  extends: .deploy-ci
+
+.deploy-ci-el9:
+  stage: deploy:el9
+  variables:
+    OS_VERSION: el9
+  image: ${DOCKER_IMAGE_PREP}
+  extends: .deploy-ci
+
+deploy-ci-el8-devel:
+    only:
+      - /^devel.*/
+    needs:
+      - job: prepare-ci-el8-devel
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: devel
+
+deploy-ci-el9-devel:
+    only:
+      - /^devel.*/
+    needs:
+    - job: prepare-ci-el9-devel
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: devel      
+
+deploy-ci-el8-testing:
+    only:
+      - /^testing$/
+    needs:
+      - job: prepare-ci-el8-testing
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: testing
+
+deploy-ci-el9-testing:
+    only:
+      - /^testing$/
+    needs:
+    - job: prepare-ci-el9-testing
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: testing
+
+deploy-ci-el8-master:
+    only:
+      - /^master$/
+      - tags
+    needs:
+      - job: prepare-ci-el8-master
+        artifacts: true
+    extends: .deploy-ci-el8
+    environment:
+      name: master
+
+deploy-ci-el9-master:
+    only:
+      - /^master$/
+      - tags
+    needs:
+    - job: prepare-ci-el9-master
+      artifacts: true
+    extends: .deploy-ci-el9
+    environment:
+      name: master         

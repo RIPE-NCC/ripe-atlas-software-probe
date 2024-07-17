@@ -1,0 +1,16 @@
+[Unit]
+Description=Atlas Probe
+After=network-online.target syslog.target
+
+[Service]
+User=@ripe_atlas_user@
+Group=@ripe_atlas_group@
+Environment=HOME=@atlas_spooldir@
+WorkingDirectory=@atlas_spooldir@
+ExecStart=@sbindir@/ripe-atlas
+ExecStop=/usr/bin/killall -n 0 telnetd perd eperd eooqd
+Restart=always
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

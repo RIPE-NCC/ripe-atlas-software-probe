@@ -112,14 +112,14 @@ probev5_ssh()
 	/usr/bin/ssh -o 'PKCS11Provider /usr/lib/libmox-pkcs11.so' \
 		-o "ServerAliveInterval 60" \
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 probev5_ssh_exec()
 {
 	exec /usr/bin/ssh -o 'PKCS11Provider /usr/lib/libmox-pkcs11.so' \
 		-o "ServerAliveInterval 60"\
 		-o "StrictHostKeyChecking yes" \
-		-o "UserKnownHostsFile $SSH_DIR/known_hosts" "$@"
+		-o "UserKnownHostsFile $ATLAS_STATUS/known_hosts" "$@"
 }
 
 manual_firmware_upgrade

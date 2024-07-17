@@ -1,0 +1,4 @@
+#Type Name                     ID                   GECOS                      Home directory   Shell
+g     @ripe_atlas_group@       -
+u     @ripe_atlas_user@        -                    "RIPE Atlas"               @atlas_rundir@   -
+m     @ripe_atlas_user@        @ripe_atlas_group@

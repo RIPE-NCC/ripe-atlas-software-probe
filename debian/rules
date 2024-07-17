@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+RIPE_ATLAS_USER:=ripe-atlas
+RIPE_ATLAS_MEASUREMENT_USER:=ripe-atlas-measurement
+RIPE_ATLAS_GROUP:=ripe-atlas
+
+# See debhelper(7) (uncomment to enable).
+# Output every command that modifies files on the build system.
+export DH_VERBOSE = 1
+
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--with-user=$(RIPE_ATLAS_USER) \
+		--with-measurement-user=$(RIPE_ATLAS_MEASUREMENT_USER) \
+		--with-group=$(RIPE_ATLAS_GROUP) \
+		--enable-systemd \
+		--disable-chown \
+		--disable-setcap-install \
+		--with-install-mode=probe
+
+# Installing/restarting systemd will conflict with the tmpusers being created
+# and the permissions being fixed. Either users don't exist and permissions
+# are fixed, which won't work. Or, the users are created and systemd is
+# restarted, but the permissions are not fixed.
+sysusers:
+	dh_installsysusers \
+		-pripe-atlas-common \
+		--name=ripe-atlas
+
+override_dh_installsystemd:
+	dh_installsystemd \
+		-pripe-atlas-common \
+		--no-enable \
+		--no-start \
+		--name=ripe-atlas
+
+override_dh_installtmpfiles: sysusers
+	dh_installtmpfiles \
+		-pripe-atlas-common \
+		--name=ripe-atlas
+
+override_dh_auto_install:
+	dh_auto_install \
+		--destdir=debian/ripe-atlas-common --
+
+	# Probe specific files added in other package
+	rm -f debian/ripe-atlas-common/usr/libexec/ripe-atlas/scripts/reg_servers.sh.prod
+	rm -f debian/ripe-atlas-common/usr/share/ripe-atlas/known_hosts.reg
+
+# The only tests that exist are in libevent and these
+# do not work
+override_dh_auto_test:
