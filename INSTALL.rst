@@ -1,8 +1,9 @@
+=========================
 Installation Instructions
 =========================
 
 Picking a release
------------------
+=================
 
 The repository is structured around 3 main branches, and a topic branch:
 - A master branch which contains production-ready code.
@@ -20,7 +21,7 @@ Any tag which is a number divisible by 10 is a production release (5060, 5070, 5
 When uncertain, always select the master branch.
 
 To build RPMs for RHEL-based distributions
-------------------------------------------
+==========================================
 
 The build process is performed using rpmbuild.
 Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
@@ -28,6 +29,7 @@ Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Roc
 - (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make``
 - ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - cd ripe-atlas-software-probe
+- ``rpmbuild --bb rhel/ripe-atlas-repo.spec``, see note.
 - ``rpmbuild --bb rhel/ripe-atlas-probe.spec``, see note.
 - ``rpmbuild --bb rhel/ripe-atlas-anchor.spec``, see note.
 - NOTE: if you wish to build specific (development) branches or repositories:
@@ -37,7 +39,21 @@ Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Roc
 - This will leave the RPMs in rpmbuild/RPMS/x86_64 and rpmbuild/RPMS/noarch
 
 To install RPMs for RHEL-based distributions
---------------------------------------------
+============================================
+
+Automatic Updates
+-----------------
+As of release 5080, the RPM will no longer automatically update.
+
+The intent of this decision is to conform to operational practices and to
+make deployment and maintenance easier on hosts (and the Atlas team) in the
+If you wish to keep automatically updating your software probe, please
+install the automatic update package of your choice.
+
+Suggested solutions available are yum-cron, dnf-automatic or unattended-upgrades.
+
+Offline (locally built)
+-----------------------
 
 To install, execute:
 - ``cd ~/rpmbuild/RPMS``
@@ -45,21 +61,45 @@ To install, execute:
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
-To upgrade RPMs from atlasswprobe
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Online (built by RIPE NCC)
+--------------------------
 
-To upgrade from the existing atlasswprobe:
-- ``cd ~/rpmbuild/RPMS``
-- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.el?.noarch.rpm``
-- (using root privileges) ``rpm -Uvh x86_64/ripe-atlas-probe-????-1.el?.x86_64.rpm``
+To install, execute:
+- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-4.el8.noarch.rpm``
+- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1-4.el9.noarch.rpm``
+- (using root privileges) ``dnf -y install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
-Note that this will attempt to migrate existing probe keys and configuration.
+To upgrade RPMs from atlasswprobe
+---------------------------------
+
+Upgrading from atlasswprobe will attempt to migrate existing
+probe keys and configuration.
+
 Existing probe state will be removed (/var/atlas-probe).
 
+Offline (locally built)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+To upgrade on EL8, execute:
+- ``cd ~/rpmbuild/RPMS``
+- (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.el8.noarch.rpm``
+- (using root privileges) ``dnf -y upgrade x86_64/ripe-atlas-probe-????-1.el8.x86_64.rpm``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
+
+Online (built by RIPE NCC)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To upgrade on EL8, execute:
+- (using root privileges) ``dnf -y upgrade https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-4.el8.noarch.rpm``
+- (using root privileges) ``dnf -y install ripe-atlas-probe``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
+
 To build DEB files for Debian or Debian-based distributions
------------------------------------------------------------
+===========================================================
 
 The build process is performed using dpkg-buildpackage (compat version 13).
 Currently compile tested on Debian 11 and 12 on the x86_64 platform. Code
@@ -76,7 +116,7 @@ upcoming release.
  * ``cp ../ripe-atlas-*.deb .``
 
 To install DEB files for Debian or Debian-based distributions
--------------------------------------------------------------
+=============================================================
 
 To install, execute:
 - (using root privileges): ``dpkg -i ripe-atlas-common_????_amd64.deb ripe-atlas-probe_????_all.deb``
@@ -84,7 +124,7 @@ To install, execute:
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
 To build IPKG files for OpenWRT
--------------------------------
+===============================
 
 The build process is performed using OpenWRT's build process.
 Currently compile tested on OpenWRT 22.03. OpenWRT 22.03 will be
@@ -101,14 +141,14 @@ The branch checked out is master, other branches can be checked out by appending
 After adding the package can be selected using menuconfig and built as normal.
 
 To install IPKG files for OpenWRT
----------------------------------
+=================================
 
 To install, execute:
 - ``opkg install ripe-atlas-common-????.ipkg ripe-atlas-software-probe-????.ipkg``
 - ``service ripe-atlas start``
 
 Manual build (using systemd)
-----------------------------
+============================
 
 To build using autoconf tooling and install the software probe, execute the following commands at the top level of the git repo:
 
@@ -117,7 +157,7 @@ To build using autoconf tooling and install the software probe, execute the foll
 - ``make``
 
 Manual installation
--------------------
+===================
 
 To install, execute:
 - (using root privileges) ``make install``
