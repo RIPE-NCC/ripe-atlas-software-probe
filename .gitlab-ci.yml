@@ -3,6 +3,7 @@ stages:
   - build
   - lint
   - prepare
+  - deploy
   - deploy:el8
   - deploy:el9
 
@@ -181,6 +182,7 @@ lint-ci-el9:
     expire_in: never
 
 .prepare-ci-el8:
+  stage: prepare
   needs:
     - job: build-ci-el8
       artifacts: true
@@ -189,6 +191,7 @@ lint-ci-el9:
   extends: .prepare-ci-rhel
 
 .prepare-ci-el9:
+  stage: prepare
   needs:
     - job: build-ci-el9
       artifacts: true
@@ -197,6 +200,7 @@ lint-ci-el9:
   extends: .prepare-ci-rhel
 
 prepare-ci-el8-devel:
+    stage: prepare
     only:
       - /^devel.*/
     extends: .prepare-ci-el8
@@ -204,6 +208,7 @@ prepare-ci-el8-devel:
       name: devel
 
 prepare-ci-el9-devel:
+    stage: prepare
     only:
       - /^devel.*/
     extends: .prepare-ci-el9
@@ -211,6 +216,7 @@ prepare-ci-el9-devel:
       name: devel
 
 prepare-ci-el8-testing:
+    stage: prepare
     only:
       - /^testing$/
     extends: .prepare-ci-el8
@@ -218,6 +224,7 @@ prepare-ci-el8-testing:
       name: testing
 
 prepare-ci-el9-testing:
+    stage: prepare
     only:
       - /^testing$/
     extends: .prepare-ci-el9
@@ -225,6 +232,7 @@ prepare-ci-el9-testing:
       name: testing
 
 prepare-ci-el8-master:
+    stage: prepare
     only:
       - /^master$/
       - tags
@@ -233,6 +241,7 @@ prepare-ci-el8-master:
       name: master
 
 prepare-ci-el9-master:
+    stage: prepare
     only:
       - /^master$/
       - tags
@@ -240,85 +249,112 @@ prepare-ci-el9-master:
     environment:
       name: master
 
+.approve-ci:
+  stage: deploy
+  allow_failure: false
+  script: ':'
+  when: manual
+
+.approve-ci-rhel:
+  stage: deploy
+  allow_failure: false
+  extends: .approve-ci
+
+approve-ci-rhel-devel:
+  only:
+    - /^devel.*/
+  extends: .approve-ci-rhel
+
+approve-ci-rhel-testing:
+  only:
+    - /^testing$/
+  extends: .approve-ci-rhel
+
+approve-ci-rhel-master:
+  only:
+    - /^master$/
+    - tags
+  extends: .approve-ci-rhel
+
 .deploy-ci:
   variables:
     REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
   script:
     - 'eval ${DEPLOY}'
-  when: manual
+  when: on_success
 
 .deploy-ci-el8:
   stage: deploy:el8
+  allow_failure: false
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
   extends: .deploy-ci
+  dependencies:
+    - .prepare-ci-el8
 
 .deploy-ci-el9:
   stage: deploy:el9
+  allow_failure: false
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
   extends: .deploy-ci
+  dependencies:
+    - .prepare-ci-el9
 
 deploy-ci-el8-devel:
     only:
       - /^devel.*/
-    needs:
-      - job: prepare-ci-el8-devel
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: devel
+    dependencies:
+      - prepare-ci-el8-devel
 
 deploy-ci-el9-devel:
     only:
       - /^devel.*/
-    needs:
-    - job: prepare-ci-el9-devel
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
-      name: devel      
+      name: devel
+    dependencies:
+      - prepare-ci-el9-devel
 
 deploy-ci-el8-testing:
     only:
       - /^testing$/
-    needs:
-      - job: prepare-ci-el8-testing
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: testing
+    dependencies:
+      - prepare-ci-el8-testing
 
 deploy-ci-el9-testing:
     only:
       - /^testing$/
-    needs:
-    - job: prepare-ci-el9-testing
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
       name: testing
+    dependencies:
+      - prepare-ci-el9-testing
 
 deploy-ci-el8-master:
     only:
       - /^master$/
       - tags
-    needs:
-      - job: prepare-ci-el8-master
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: master
+    dependencies:
+      - prepare-ci-el8-master
 
 deploy-ci-el9-master:
     only:
       - /^master$/
       - tags
-    needs:
-    - job: prepare-ci-el9-master
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
-      name: master         
+      name: master
+    dependencies:
+      - prepare-ci-el9-master
