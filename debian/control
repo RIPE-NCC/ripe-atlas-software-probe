@@ -33,7 +33,8 @@ Description: RIPE Atlas essential components
 Package: ripe-atlas-probe
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
-Conflicts: ripe-atlas-anchor
+Conflicts: ripe-atlas-anchor, atlasswprobe
+Provides: atlasswprobe
 Replaces: atlasswprobe
 Section: net
 Priority: optional
@@ -54,7 +55,8 @@ Description: RIPE Atlas probe specific files and configuration
 Package: ripe-atlas-anchor
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
-Conflicts: ripe-atlas-probe
+Conflicts: ripe-atlas-probe, atlasswprobe
+Provides: atlasswprobe
 Replaces: atlasswprobe
 Section: net
 Priority: optional
