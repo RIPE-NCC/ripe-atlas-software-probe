@@ -76,8 +76,10 @@ install -m 0644 %{repofile_path} %{buildroot}%{repofile_dirname}
 install -m 0644 %{gpg_key_path}."${RELEASE}" %{buildroot}%{key_dirname}/%{gpg_key_filename}
 
 %files
-%{repofile_dirname}
-%{key_dirname}
+%{repofile_dirname}/*
+%{gpg_key_dirname}/*
+%exclude %dir %{repofile_dirname}
+%exclude %dir %{gpg_key_dirname}
 
 %include rhel/changelog
 
