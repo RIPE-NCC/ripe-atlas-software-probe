@@ -1,13 +1,14 @@
 %define		git_repo         	ripe-atlas-software-probe
-%define		build_dirname		ripe-atlas-repo
-%define		assets_path		rhel
+%define		base_name		ripe-atlas-repo
+%define		assets_dir		rhel
 
-%define         repofile_dirname	%{_sysconfdir}/yum.repos.d
-%define         key_dirname             %{_sysconfdir}/pki/rpm-gpg
-%define         gpg_key_filename        RPM-GPG-KEY-ripe-atlas
+%define         repo_dir		%{_sysconfdir}/yum.repos.d
+%define         repo_file		ripe-atlas-probe.repo
+%define         key_dir			%{_sysconfdir}/pki/rpm-gpg
+%define         key_file		RPM-GPG-KEY-ripe-atlas
 
-%define         repofile_path           %{_builddir}/%{build_dirname}/%{assets_path}/ripe-atlas-probe.repo
-%define         gpg_key_path            %{_builddir}/%{build_dirname}/%{assets_path}/%{gpg_key_filename}
+%define         repo_path		%{_builddir}/%{base_name}/%{assets_dir}/%{repo_file}
+%define         key_path		%{_builddir}/%{base_name}/%{assets_dir}/%{key_file}
 
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
@@ -24,15 +25,15 @@ Setup the RIPE Atlas Software Probe Repo
 # performing the steps of '%setup' manually since we are pulling from a remote git repo
 echo "Cleaning build dir"
 cd %{_builddir}
-rm -rf %{_builddir}/%{build_dirname}
+rm -rf %{_builddir}/%{base_name}
 echo "Getting Sources..."
 
 %{!?git_tag:%define git_tag master}
 %{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-git clone -b %{git_tag} %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
+git clone -b %{git_tag} %{git_source}/%{git_repo}.git %{_builddir}/%{base_name}
 
-cd %{_builddir}/%{build_dirname}
+cd %{_builddir}/%{base_name}
 %{?git_commit:git checkout %{git_commit}}
 
 %build
@@ -47,7 +48,7 @@ case "${RELEASE}" in
 		;;
 
 	*)
-		sed -i -e "s/baseurl.*\$/&.${RELEASE}\//" %{repofile_path}
+		sed -i -e "s/baseurl.*\$/&.${RELEASE}\//" %{repo_path}
 		;;
 esac
 
@@ -58,7 +59,7 @@ if [ -z ${STRIPPED_DIST} ] ; then
 fi
 
 echo "OS Distro detected as: ${STRIPPED_DIST}"
-sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{repofile_path}
+sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{repo_path}
 
 %install
 RELEASE=%{git_tag}
@@ -71,15 +72,15 @@ case "${RELEASE}" in
 	*)
 		;;
 esac
-mkdir -p %{buildroot}/{%{repofile_dirname},%{key_dirname}}
-install -m 0644 %{repofile_path} %{buildroot}%{repofile_dirname}
-install -m 0644 %{gpg_key_path}."${RELEASE}" %{buildroot}%{key_dirname}/%{gpg_key_filename}
+mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
+install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
+install -m 0644 %{key_path}."${RELEASE}" %{buildroot}%{key_dir}/%{key_file}
 
 %files
-%{repofile_dirname}/*
-%{gpg_key_dirname}/*
-%exclude %dir %{repofile_dirname}
-%exclude %dir %{gpg_key_dirname}
+%{repo_dir}/*
+%{key_dir}/*
+%exclude %dir %{repo_dir}
+%exclude %dir %{key_dir}
 
 %include rhel/changelog
 
