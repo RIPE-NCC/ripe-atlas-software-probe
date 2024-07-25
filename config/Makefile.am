@@ -89,8 +89,8 @@ common/FIRMWARE_APPS_VERSION:	common/FIRMWARE_APPS_VERSION.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
 
-if SYSTEMD_INSTALL
 install-data-hook:
+if SYSTEMD_INSTALL
 if SINGLE_USER
 	@mv -f $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.user.conf \
 	       $(DESTDIR)$(systemd_sysusersdir)/ripe-atlas.conf
