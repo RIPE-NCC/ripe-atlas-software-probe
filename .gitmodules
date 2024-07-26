@@ -1,3 +1,0 @@
-[submodule "probe-measurements"]
-	path = probe-busybox
-	url = ../ripe-atlas-probe-measurements.git
