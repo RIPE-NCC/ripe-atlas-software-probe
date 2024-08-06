@@ -26,7 +26,7 @@ The build process is performed using rpmbuild.
 Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Rocky Linux 9 on the x86_64 platform.
 
 - (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make``
-- ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
+- ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - cd ripe-atlas-software-probe
 - ``rpmbuild --bb rhel/ripe-atlas-probe.spec``, see note.
 - ``rpmbuild --bb rhel/ripe-atlas-anchor.spec``, see note.
@@ -67,7 +67,7 @@ should be considered Beta quality and will be fully supported in an
 upcoming release.
 
 - Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
-- Clone the repo: ``git clone --recursive https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
+- Clone the repo: ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
  * ``git checkout BRANCH`` << if needed (optional)
