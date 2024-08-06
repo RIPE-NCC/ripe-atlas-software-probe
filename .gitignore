@@ -89,3 +89,76 @@ debian/ripe-atlas-probe*.debhelper*
 debian/ripe-atlas-anchor*.substvars
 debian/ripe-atlas-common*.substvars
 debian/ripe-atlas-probe*.substvars
+
+#
+# Kbuild ignores
+#
+probe-busybox/**/.*
+probe-busybox/**/*.o
+probe-busybox/**/*.o.*
+probe-busybox/**/*.a
+probe-busybox/**/*.s
+probe-busybox/**/Kbuild
+probe-busybox/**/Config.in
+.config
+
+#
+# Normal output
+#
+probe-busybox/busybox
+probe-busybox/busybox_old
+probe-busybox/busybox_unstripped*
+
+#
+# Backups / patches
+#
+*~
+*.orig
+*.rej
+/*.patch
+
+#
+# debugging stuff
+#
+core
+.gdb_history
+.gdbinit
+
+#
+# testing output
+#
+probe-busybox/busybox.links
+probe-busybox/runtest-tempdir-links
+probe-busybox/testsuite/echo-ne
+
+#
+# cscope output
+#
+cscope.files
+cscope.in.out
+cscope.out
+cscope.po.out
+
+probe-busybox/libevent-2.0.20-stable/autom4te.cache
+probe-busybox/libevent-2.0.20-stable/config.h
+probe-busybox/libevent-2.0.20-stable/config.log
+probe-busybox/libevent-2.0.20-stable/config.status
+probe-busybox/libevent-2.0.20-stable/.deps
+probe-busybox/libevent-2.0.20-stable/include/event2/event-config.h
+probe-busybox/libevent-2.0.20-stable/include/Makefile
+probe-busybox/libevent-2.0.20-stable/*.la
+probe-busybox/libevent-2.0.20-stable/.libs
+probe-busybox/libevent-2.0.20-stable/libtool
+probe-busybox/libevent-2.0.20-stable/*.lo
+probe-busybox/libevent-2.0.20-stable/Makefile
+probe-busybox/libevent-2.0.20-stable/*.pc
+probe-busybox/libevent-2.0.20-stable/sample
+probe-busybox/libevent-2.0.20-stable/sample/.libs/*
+probe-busybox/libevent-2.0.20-stable/stamp-h1
+probe-busybox/libevent-2.0.20-stable/test
+probe-busybox/include/atlas_path.h
+
+#
+# Never ignore these
+#
+!.gitignore
