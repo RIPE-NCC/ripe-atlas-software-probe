@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # Array manipulation in scripts for shells that do not support arrays (ash)
 # Copyright (c) 2022 RIPE NCC, portions Michel Stam (c) 2013

@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # JSON string generation in shell scripts
 # Copyright (c) 2022 RIPE NCC

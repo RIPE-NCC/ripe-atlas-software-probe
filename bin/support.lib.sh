@@ -1,4 +1,3 @@
-#!/bin/sh
 # Support routines
 # Copyright (c) 2022 RIPE NCC
 #
