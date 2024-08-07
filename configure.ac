@@ -83,6 +83,12 @@ AC_ARG_WITH([install-mode], [AS_HELP_STRING([--with-install-mode], [define the p
 AM_CONDITIONAL([INSTALL_MODE_probe], [test "x${with_install_mode}" = 'xprobe'])
 AM_CONDITIONAL([INSTALL_MODE_anchor], [test "x${with_install_mode}" = 'xanchor'])
 
+AC_ARG_WITH([shell-fixup], [AS_HELP_STRING([--with-shell-fixup], [force the shell to use in scripts])], [], [with_shell_fixup=''])
+AM_CONDITIONAL([SHELL_FIXUP], [test "x${with_shell_fixup}" != 'x'])
+if test "x${with_shell_fixup}" != 'x'; then
+	shebang="\#!${with_shell_fixup}"
+fi
+
 AC_PATH_PROG(SETCAP, setcap)
 AC_ARG_ENABLE([setcap-install], [AC_HELP_STRING([--enable-setcap-install], [install measurements with cap_net_raw @<:@default=yes@:>@])], [enable_setcap_install="${enableval}"],[enable_setcap_install=yes])
 
@@ -132,6 +138,7 @@ AM_CONDITIONAL(SYSTEMD_INSTALL, [test "x${SYSTEMDPATH}" != 'x' -a "x${enable_sys
 AC_SUBST(systemd_tmpfilesdir)
 AC_SUBST(systemd_unitsdir)
 AC_SUBST(systemd_sysusersdir)
+AC_SUBST(shebang)
 
 # system paths
 atlas_libexecdir="\${libexecdir}/ripe-atlas"
