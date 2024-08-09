@@ -1,0 +1,23 @@
+/* vi: set sw=4 ts=4: */
+/*
+ * Atlas directory paths.
+ * Licensed under GPLv2, see file LICENSE in this source tree.
+ */
+#ifndef _ATLAS_PATH_H_
+#define _ATLAS_PATH_H_
+
+#define	ATLAS_LIBEXECDIR	"@atlas_libexecdir@"
+#define	ATLAS_DATADIR		"@atlas_datadir@"
+#define	ATLAS_SYSCONFDIR	"@atlas_sysconfdir@"
+#define	ATLAS_SPOOLDIR		"@atlas_spooldir@"
+#define	ATLAS_RUNDIR		"@atlas_rundir@"
+#define	ATLAS_MEASUREMENT	"@atlas_measurementdir@"
+#define	ATLAS_SCRIPTS		"@atlas_scriptsdir@"
+#define	ATLAS_TMP		"@tmpdir@"
+
+#define	ATLAS_CRONS		"@atlas_spooldir@/crons"
+#define	ATLAS_DATA		"@atlas_spooldir@/data"
+#define	ATLAS_PIDS		"@atlas_rundir@/pids"
+#define	ATLAS_STATUS		"@atlas_rundir@/status"
+
+#endif /* _ATLAS_PATH_H_ */

@@ -1,0 +1,1 @@
+RESULT { "result":[ { "method":"GET", "af": 6, "dst_addr":"2606:4700::6812:152c", "src_addr":"2001:67c:2e8:1::c100:10a", "rt":3000.003000, "res":301, "ver":"1.1", "hsize":387, "bsize":0 } ] }
