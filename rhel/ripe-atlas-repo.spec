@@ -37,8 +37,8 @@ cd %{_builddir}/%{base_name}
 %{?git_commit:git checkout %{git_commit}}
 
 %build
-RELEASE=%{git_tag}
-RELEASE=${RELEASE%%%.*}
+RELEASE='%{git_tag}'
+RELEASE="${RELEASE%%%.*}"
 case "${RELEASE}" in
 	([0-9]*)
 		RELEASE='master'
@@ -52,8 +52,8 @@ case "${RELEASE}" in
 		;;
 esac
 
-STRIPPED_DIST=$(echo %{?dist} | sed -r 's/^\.//')
-if [ -z ${STRIPPED_DIST} ] ; then 
+STRIPPED_DIST="$(echo %{?dist} | sed -r 's/^\.//')"
+if [ -z "${STRIPPED_DIST}" ] ; then
 	echo "OS Error: No Distribution Detected! rpm macro ?dist is empty"
 	exit 1
 fi
@@ -62,8 +62,8 @@ echo "OS Distro detected as: ${STRIPPED_DIST}"
 sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{repo_path}
 
 %install
-RELEASE=%{git_tag}
-RELEASE=${RELEASE%%%.*}
+RELEASE='%{git_tag}'
+RELEASE="${RELEASE%%%.*}"
 case "${RELEASE}" in
 	([0-9]*)
 		RELEASE='master'
@@ -74,7 +74,7 @@ case "${RELEASE}" in
 esac
 mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
 install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
-install -m 0644 %{key_path}."${RELEASE}" %{buildroot}%{key_dir}/%{key_file}
+install -m 0644 "%{key_path}.${RELEASE}" %{buildroot}%{key_dir}/%{key_file}
 
 %files
 %{repo_dir}/*
