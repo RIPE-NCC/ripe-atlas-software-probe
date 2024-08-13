@@ -257,35 +257,38 @@ prepare-ci-el9-master:
 
 .approve-ci-rhel:
   stage: deploy
-  allow_failure: false
   extends: .approve-ci
 
 approve-ci-rhel-devel:
   only:
     - /^devel.*/
   extends: .approve-ci-rhel
+  environment:
+    name: devel
 
 approve-ci-rhel-testing:
   only:
     - /^testing$/
   extends: .approve-ci-rhel
+  environment:
+    name: testing
 
 approve-ci-rhel-master:
   only:
     - /^master$/
     - tags
   extends: .approve-ci-rhel
+  environment:
+    name: master
 
 .deploy-ci:
   variables:
     REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
   script:
     - 'eval ${DEPLOY}'
-  when: on_success
 
 .deploy-ci-el8:
   stage: deploy:el8
-  allow_failure: false
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
@@ -295,7 +298,6 @@ approve-ci-rhel-master:
 
 .deploy-ci-el9:
   stage: deploy:el9
-  allow_failure: false
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
