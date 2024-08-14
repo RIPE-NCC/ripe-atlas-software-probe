@@ -4,8 +4,6 @@ stages:
   - lint
   - prepare
   - deploy
-  - deploy:el8
-  - deploy:el9
 
 variables:
   # DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
@@ -249,37 +247,10 @@ prepare-ci-el9-master:
     environment:
       name: master
 
-.approve-ci:
+approve-ci:
   stage: deploy
-  allow_failure: false
   script: ':'
   when: manual
-
-.approve-ci-rhel:
-  stage: deploy
-  extends: .approve-ci
-
-approve-ci-rhel-devel:
-  only:
-    - /^devel.*/
-  extends: .approve-ci-rhel
-  environment:
-    name: devel
-
-approve-ci-rhel-testing:
-  only:
-    - /^testing$/
-  extends: .approve-ci-rhel
-  environment:
-    name: testing
-
-approve-ci-rhel-master:
-  only:
-    - /^master$/
-    - tags
-  extends: .approve-ci-rhel
-  environment:
-    name: master
 
 .deploy-ci:
   variables:
@@ -288,75 +259,85 @@ approve-ci-rhel-master:
     - 'eval ${DEPLOY}'
 
 .deploy-ci-el8:
-  stage: deploy:el8
+  stage: deploy
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
   extends: .deploy-ci
-  dependencies:
-    - .prepare-ci-el8
+  resource_group: deploy
 
 .deploy-ci-el9:
-  stage: deploy:el9
+  stage: deploy
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
   extends: .deploy-ci
-  dependencies:
-    - .prepare-ci-el9
+  resource_group: deploy
 
 deploy-ci-el8-devel:
+    needs:
+        - job: prepare-ci-el8-devel
+          artifacts: true
+        - job: approve-ci
     only:
       - /^devel.*/
     extends: .deploy-ci-el8
     environment:
       name: devel
-    dependencies:
-      - prepare-ci-el8-devel
 
 deploy-ci-el9-devel:
+    needs:
+        - job: prepare-ci-el9-devel
+          artifacts: true
+        - job: approve-ci
     only:
       - /^devel.*/
     extends: .deploy-ci-el9
     environment:
       name: devel
-    dependencies:
-      - prepare-ci-el9-devel
 
 deploy-ci-el8-testing:
+    needs:
+        - job: prepare-ci-el8-testing
+          artifacts: true
+        - job: approve-ci
     only:
       - /^testing$/
     extends: .deploy-ci-el8
     environment:
       name: testing
-    dependencies:
-      - prepare-ci-el8-testing
 
 deploy-ci-el9-testing:
+    needs:
+        - job: prepare-ci-el9-testing
+          artifacts: true
+        - job: approve-ci
     only:
       - /^testing$/
     extends: .deploy-ci-el9
     environment:
       name: testing
-    dependencies:
-      - prepare-ci-el9-testing
 
 deploy-ci-el8-master:
+    needs:
+        - job: prepare-ci-el8-master
+          artifacts: true
+        - job: approve-ci
     only:
       - /^master$/
       - tags
     extends: .deploy-ci-el8
     environment:
       name: master
-    dependencies:
-      - prepare-ci-el8-master
 
 deploy-ci-el9-master:
+    needs:
+        - job: prepare-ci-el9-master
+          artifacts: true
+        - job: approve-ci
     only:
       - /^master$/
       - tags
     extends: .deploy-ci-el9
     environment:
       name: master
-    dependencies:
-      - prepare-ci-el9-master
