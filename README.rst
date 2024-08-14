@@ -3,6 +3,7 @@ RIPE Atlas Software Probe
 
 This is the source code for RIPE Atlas software probes. Currently this
 source code supports building:
+
 - RPM package for Oracle EL8 (RHEL8), Oracle EL9 / Rocky Linux 9 (RHEL9)
 - DEB package for Debian 11/12
 - OpenWRT package for OpenWRT 22.03
@@ -34,4 +35,4 @@ Common installation instructions
 --------------------------------
 
 The public key is stored in ``/etc/ripe-atlas/probe_key.pub``. Use
-this to register your probe at <https://atlas.ripe.net/apply/swprobe/>.
+This to register your probe at <https://atlas.ripe.net/apply/swprobe/>.

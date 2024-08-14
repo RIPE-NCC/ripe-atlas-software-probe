@@ -6,6 +6,7 @@ Picking a release
 =================
 
 The repository is structured around 3 main branches, and a topic branch:
+
 - A master branch which contains production-ready code.
 - A testing branch
 - A devel(opment) branch
@@ -14,7 +15,7 @@ The repository is structured around 3 main branches, and a topic branch:
 The master branch contains the latest production-level code. The firmware for hardware probes is built from this branch.
 The testing branch is a pointer on the master branch that contains code that is being readied for the next production release.
 The development branch contains code which is by its nature feature complete, but may not be fully tested yet. This code is merged into the testing branch upon completion and unit testing.
-Ticket branches that branch off the development branch contain features or fixes that may or may not work
+Ticket branches that branch off the development branch contain features or fixes that may or may not work.
 
 Any tag which is a number divisible by 10 is a production release (5060, 5070, 5080). Any tag with another number is either a development or a testing release.
 
@@ -46,7 +47,7 @@ Automatic Updates
 As of release 5080, the RPM will no longer automatically update.
 
 The intent of this decision is to conform to operational practices and to
-make deployment and maintenance easier on hosts (and the Atlas team) in the
+make deployment and maintenance easier on hosts (and the Atlas team).
 If you wish to keep automatically updating your software probe, please
 install the automatic update package of your choice.
 
@@ -56,6 +57,7 @@ Offline (locally built)
 -----------------------
 
 To install, execute:
+
 - ``cd ~/rpmbuild/RPMS``
 - (using root privileges) ``dnf -y install x86_64/ripe-atlas-common-????-1.el?.x86_64.rpm noarch/ripe-atlas-probe-????-1.el?.noarch.rpm``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
@@ -65,8 +67,9 @@ Online (built by RIPE NCC)
 --------------------------
 
 To install, execute:
-- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-4.el8.noarch.rpm``
-- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1-4.el9.noarch.rpm``
+
+- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-5.el8.noarch.rpm``
+- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1-5.el9.noarch.rpm``
 - (using root privileges) ``dnf -y install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
@@ -83,6 +86,7 @@ Offline (locally built)
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 To upgrade on EL8, execute:
+
 - ``cd ~/rpmbuild/RPMS``
 - (using root privileges) ``dnf -y install noarch/ripe-atlas-common-????-1.el8.noarch.rpm``
 - (using root privileges) ``dnf -y upgrade x86_64/ripe-atlas-probe-????-1.el8.x86_64.rpm``
@@ -93,7 +97,8 @@ Online (built by RIPE NCC)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To upgrade on EL8, execute:
-- (using root privileges) ``dnf -y upgrade https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-4.el8.noarch.rpm``
+
+- (using root privileges) ``dnf -y upgrade https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-5.el8.noarch.rpm``
 - (using root privileges) ``dnf -y install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
@@ -119,6 +124,7 @@ To install DEB files for Debian or Debian-based distributions
 =============================================================
 
 To install, execute:
+
 - (using root privileges): ``dpkg -i ripe-atlas-common_????_amd64.deb ripe-atlas-probe_????_all.deb``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
@@ -144,6 +150,7 @@ To install IPKG files for OpenWRT
 =================================
 
 To install, execute:
+
 - ``opkg install ripe-atlas-common-????.ipkg ripe-atlas-software-probe-????.ipkg``
 - ``service ripe-atlas start``
 
@@ -160,7 +167,7 @@ Manual installation
 ===================
 
 To install, execute:
+
 - (using root privileges) ``make install``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
-
