@@ -21,7 +21,6 @@ variables:
       - /^devel.*/
       - /^testing$/
       - /^master$/
-      - tags
     changes:
       - ${DOCKER_DIR}/Dockerfile
   image: docker:latest
@@ -64,7 +63,6 @@ build_image_prep:
 #   stage: build
 #   only:
 #     - /^devel.*/
-#     - tags
 #   script:
 #     - cd ripe-atlas-software-probe
 #     - dpkg-buildpackage -b -us -uc
@@ -89,7 +87,6 @@ build_image_prep:
     - /^devel.*/
     - /^testing$/
     - /^master$/
-    - tags
   variables:
     REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
@@ -139,7 +136,6 @@ build-ci-el9:
     - /^devel.*/
     - /^testing$/
     - /^master$/
-    - tags
   script:
     - mkdir lint_report
     - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
@@ -233,7 +229,6 @@ prepare-ci-el8-master:
     stage: prepare
     only:
       - /^master$/
-      - tags
     extends: .prepare-ci-el8
     environment:
       name: master
@@ -242,7 +237,6 @@ prepare-ci-el9-master:
     stage: prepare
     only:
       - /^master$/
-      - tags
     extends: .prepare-ci-el9
     environment:
       name: master
@@ -325,7 +319,6 @@ deploy-ci-el8-master:
         - job: approve-ci
     only:
       - /^master$/
-      - tags
     extends: .deploy-ci-el8
     environment:
       name: master
@@ -337,7 +330,6 @@ deploy-ci-el9-master:
         - job: approve-ci
     only:
       - /^master$/
-      - tags
     extends: .deploy-ci-el9
     environment:
       name: master
