@@ -11,6 +11,7 @@ Maintainer: Michel Stam <mstam@ripe.net>
 Package: ripe-atlas-common
 Architecture: any
 Depends:
+ bash,
  ${shlibs:Depends},
  ${misc:Depends},
  libssl3 | libssl1,
