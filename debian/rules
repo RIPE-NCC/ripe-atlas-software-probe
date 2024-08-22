@@ -34,11 +34,6 @@ sysusers:
 		--name=ripe-atlas
 
 override_dh_installsystemd:
-	dh_installsystemd \
-		-pripe-atlas-common \
-		--no-enable \
-		--no-start \
-		--name=ripe-atlas
 
 override_dh_installtmpfiles: sysusers
 	dh_installtmpfiles \

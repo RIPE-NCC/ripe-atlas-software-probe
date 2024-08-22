@@ -23,20 +23,19 @@ set -e
 
 #DEBHELPER#
 
-ATLAS_MEAS_OWN='ripe-atlas-measurement:ripe-atlas'
-ATLAS_MAIN_OWN='ripe-atlas:ripe-atlas'
-ATLAS_CONF_DIR='etc/ripe-atlas'
-ATLAS_MEAS_DIR='usr/libexec/ripe-atlas/measurement'
-ATLAS_CONF_DIRS="${ATLAS_CONF_DIR}"
+atlas_measurement='ripe-atlas-measurement'
+atlas_user='ripe-atlas'
+atlas_group='ripe-atlas'
+atlas_newdir='/etc/ripe-atlas'
+atlas_measdir='/usr/libexec/ripe-atlas/measurement'
 
 case "${1}" in
 	configure)
-		chown -R ${ATLAS_MAIN_OWN} ${ATLAS_CONF_DIRS}
-		chmod 0770 ${ATLAS_CONF_DIRS}
-
-		chown ${ATLAS_MEAS_OWN} ${ATLAS_MEAS_DIR}/busybox
-		chmod 4750 ${ATLAS_MEAS_DIR}/busybox
-		setcap cap_net_raw=ep ${ATLAS_MEAS_DIR}/busybox
+		chown -R ${atlas_user}:${atlas_group} ${atlas_newdir}
+		chmod 0770 ${atlas_newdir}
+		chown -R ${atlas_measurement}:${atlas_group} ${atlas_measdir}/busybox
+		chmod 4750 ${atlas_measdir}/busybox
+		setcap cap_net_raw=ep ${atlas_measdir}/busybox
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

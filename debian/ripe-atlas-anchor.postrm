@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for ripe-atlas-probe.
+# postrm script for ripe-atlas-anchor.
 #
 # See: dh_installdeb(1).
 

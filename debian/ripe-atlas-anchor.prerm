@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for ripe-atlas-common.
+# prerm script for ripe-atlas-anchor.
 #
 # See: dh_installdeb(1).
 
@@ -23,7 +23,6 @@ set -e
 
 #DEBHELPER#
 
-atlas_newdir='/etc/ripe-atlas'
 atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 service_name='ripe-atlas.service'
 
@@ -51,7 +50,6 @@ clear_state()
         rm -rf "${atlas_upgradedir}" 2>/dev/null
 }
 
-
 case "${1}" in
 	purge)
 		clear_state
@@ -67,13 +65,11 @@ case "${1}" in
 		fi
 
 		if get_state "is-active"; then
-			systemctl stop "${service_name}" 1>/dev/null 2>&1
+			systemctl stop ${service_name} 1>/dev/null 2>&1
 		fi
-
 		if get_state "is-enabled"; then
-			systemctl disable "${service_name}" 1>/dev/null 2>&1
+			systemctl disable ${service_name} 1>/dev/null 2>&1
 		fi
-
 		if [ "${1}" = "remove" ]; then
 			clear_state
 		fi
