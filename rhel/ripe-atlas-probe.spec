@@ -76,7 +76,7 @@ rm -rf %{_builddir}/%{build_dirname}
 echo "Getting Sources..."
 
 %{!?git_tag:%define git_tag master}
-%{!?git_source:%define git_source https://github.com/RIPE_NCC}
+%{!?git_source:%define git_source https://github.com/RIPE-NCC}
 
 git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
