@@ -1,14 +1,13 @@
 %define		git_repo         	ripe-atlas-software-probe
 %define		base_name		ripe-atlas-repo
-%define		assets_dir		rhel
 
-%define         repo_dir		%{_sysconfdir}/yum.repos.d
-%define         repo_file		ripe-atlas-probe.repo
-%define         key_dir			%{_sysconfdir}/pki/rpm-gpg
-%define         key_file		RPM-GPG-KEY-ripe-atlas
+%define		repo_dir		%{_sysconfdir}/yum.repos.d
+%define		repo_file		ripe-atlas.repo
+%define		key_dir			%{_sysconfdir}/pki/rpm-gpg
+%define		key_file		RPM-GPG-KEY-ripe-atlas
 
-%define         repo_path		%{_builddir}/%{base_name}/%{assets_dir}/%{repo_file}
-%define         key_path		%{_builddir}/%{base_name}/%{assets_dir}/%{key_file}
+%define		repo_path		%{_builddir}/%{base_name}/%{repo_file}
+%define		key_path		%{_builddir}/%{base_name}/%{key_file}
 
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
