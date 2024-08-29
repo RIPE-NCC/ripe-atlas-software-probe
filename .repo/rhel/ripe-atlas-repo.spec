@@ -6,13 +6,13 @@
 %define		key_dir			%{_sysconfdir}/pki/rpm-gpg
 %define		key_file		RPM-GPG-KEY-ripe-atlas
 
-%define		repo_path		%{_builddir}/%{base_name}/%{repo_file}
-%define		key_path		%{_builddir}/%{base_name}/%{key_file}
+%define		repo_path		%{_builddir}/%{base_name}/.repo/%{repo_file}
+%define		key_path		%{_builddir}/%{base_name}/.repo/%{key_file}
 
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
-Version:        1
-Release:        5%{?dist}
+Version:        1.5
+Release:        1%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 BuildArch:	noarch

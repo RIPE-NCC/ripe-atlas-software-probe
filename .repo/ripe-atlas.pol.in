@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!DOCTYPE Policy SYSTEM "https://www.debian.org/debsig/1.0/policy.dtd">
+<Policy xmlns="https://www.debian.org/debsig/1.0/">
+  <!-- This is mainly a sanity check, since our filename is that of the ID
+       anyway. -->
+  <Origin Name="Debsig" id="@fingerprint@" Description="RIPE Atlas Signing"/>
+
+  <!-- This is required to match in order for this policy to be used. We
+       reject the release Type, since we want a different rule set for
+       that. -->
+  <Selection>
+    <Required Type="origin" File="ripe-atlas.pub.gpg" id="@fingerprint@"/>
+  </Selection>
+
+  <!-- Once we decide to use this policy, this must pass in order to verify
+       the package. -->
+  <Verification MinOptional="0">
+    <Required Type="origin" File="ripe-atlas.pub.gpg" id="@fingerprint@"/>
+  </Verification>
+</Policy>

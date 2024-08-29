@@ -1,0 +1,6 @@
+ripe-atlas-repo (1.5-1) bookworm bullseye; urgency=medium
+
+  * Initial version after restructuring
+
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 29 Aug 2024 00:00:00 -0000
+

@@ -90,6 +90,20 @@ debian/ripe-atlas-anchor*.substvars
 debian/ripe-atlas-common*.substvars
 debian/ripe-atlas-probe*.substvars
 
+# dpkg-buildpackage (repository)
+.repo/debian/.debhelper/
+.repo/debian/autoreconf.*
+.repo/debian/autoreconf.before
+.repo/debian/debhelper-build-stamp
+.repo/debian/files
+.repo/debian/ripe-atlas-repo/
+.repo/debian/ripe-atlas-repo*.debhelper*
+.repo/debian/ripe-atlas-repo*.substvars
+.repo/ripe-atlas.list
+.repo/ripe-atlas.pol
+.repo/ripe-atlas.pub.gpg
+.repo/ripe-atlas.pub.gpg.asc
+
 #
 # Kbuild ignores
 #
