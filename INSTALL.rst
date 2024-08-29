@@ -30,9 +30,10 @@ Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Roc
 - (using root privileges) ``dnf update && dnf install git tar rpm-build openssl-devel autoconf automake libtool make``
 - ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - cd ripe-atlas-software-probe
-- ``rpmbuild --bb rhel/ripe-atlas-repo.spec``, see note.
 - ``rpmbuild --bb rhel/ripe-atlas-probe.spec``, see note.
 - ``rpmbuild --bb rhel/ripe-atlas-anchor.spec``, see note.
+- cd .repo
+- ``rpmbuild --bb rhel/ripe-atlas-repo.spec``, see note.
 - NOTE: if you wish to build specific (development) branches or repositories:
   * git_source; to specify a GIT repository (--define "git_source https://github.com/RIPE-NCC")
   * git_tag; to specify a particular version (--define "git_tag 5080")
@@ -68,8 +69,8 @@ Online (built by RIPE NCC)
 
 To install, execute:
 
-- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1-5.el8.noarch.rpm``
-- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1-5.el9.noarch.rpm``
+- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1.5-1.el8.noarch.rpm``
+- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1.5-1.el9.noarch.rpm``
 - (using root privileges) ``dnf -y install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
@@ -107,11 +108,9 @@ To build DEB files for Debian or Debian-based distributions
 ===========================================================
 
 The build process is performed using dpkg-buildpackage (compat version 13).
-Currently compile tested on Debian 11 and 12 on the x86_64 platform. Code
-should be considered Beta quality and will be fully supported in an
-upcoming release.
+Currently tested on Debian 11 and 12 on the x86_64 platform.
 
-- Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev``.
+- Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev gpg``.
 - Clone the repo: ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
@@ -119,6 +118,8 @@ upcoming release.
  * ``git submodule update`` << this will update the submodule within this branch
  * ``dpkg-buildpackage -b -us -uc`` << this will create the package
  * ``cp ../ripe-atlas-*.deb .``
+ * ``cd .repo``
+ * ``dpkg-buildpackage -b -us -uc`` << this will create the repository package
 
 To install DEB files for Debian or Debian-based distributions
 =============================================================

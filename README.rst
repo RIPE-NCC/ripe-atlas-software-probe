@@ -8,9 +8,9 @@ source code supports building:
 - DEB package for Debian 11/12
 - OpenWRT package for OpenWRT 22.03
 
-Of the supported builds, only the RPM has received sufficient testing.
-DEB and OpenWRT should be considered Beta quality and will be fully
-supported in an upcoming release.
+Of the supported builds, the RPM and DEB packages have received
+sufficient testing. OpenWRT should be considered Beta quality and will be
+fully supported in an upcoming release.
 
 See INSTALL.rst for installation instructions.
 
