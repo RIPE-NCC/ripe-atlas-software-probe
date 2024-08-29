@@ -99,7 +99,9 @@ build_image_prep:
     - mkdir -p ${HOME}/${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build repo rpm
+    - pushd .repo
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
+    - popd
     - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
     # build x86_64 rpm
