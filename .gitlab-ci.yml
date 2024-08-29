@@ -6,8 +6,8 @@ stages:
   - deploy
 
 variables:
-  # DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
-  # DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
@@ -29,17 +29,17 @@ variables:
     - docker build -t ${DOCKER_IMAGE} ${DOCKER_DIR}
     - docker push ${DOCKER_IMAGE}
 
-# build_image_debian11:
-#   variables:
-#     DOCKER_DIR: .gitlab-docker/debian11
-#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
-#   extends: .build_image
+build_image_debian11:
+  variables:
+    DOCKER_DIR: .gitlab-docker/debian11
+    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
+  extends: .build_image
 
-# build_image_debian12:
-#   variables:
-#     DOCKER_DIR: .gitlab-docker/debian12
-#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
-#   extends: .build_image
+build_image_debian12:
+  variables:
+    DOCKER_DIR: .gitlab-docker/debian12
+    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
+  extends: .build_image
 
 build_image_ol8:
   variables:
@@ -59,27 +59,38 @@ build_image_prep:
     DOCKER_IMAGE: ${DOCKER_IMAGE_PREP}
   extends: .build_image
 
-# .build-ci-debian:
-#   stage: build
-#   only:
-#     - /^devel.*/
-#   script:
-#     - cd ripe-atlas-software-probe
-#     - dpkg-buildpackage -b -us -uc
-#     - cp ../ripe-atlas-*.deb .
-#   artifacts:
-#     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
-#     paths:
-#       - ripe-atlas-*.deb
-#     expire_in: never
+.build-ci-debian:
+  stage: build
+  only:
+    - /^devel.*/
+    - /^testing$/
+    - /^master$/
+  script:
+    - export HOME="${PWD}"
+    - mkdir -p ${HOME}/${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
+    - dpkg-buildpackage -b -us -uc
+    - pushd .repo
+    - dpkg-buildpackage -b -us -uc
+    - popd
+    - cp {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
+    - cp VERSION ${HOME}/${OS_VERSION}
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
+    paths:
+      - ./${OS_VERSION}
+    expire_in: never
 
-# build-ci-debian11:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN11}
+build-ci-debian11:
+  variables:
+    OS_VERSION: bullseye
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN11}
 
-# build-ci-debian12:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN12}
+build-ci-debian12:
+  variables:
+    OS_VERSION: bookworm
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN12}
 
 .build-ci-rhel:
   stage: build
