@@ -176,7 +176,7 @@ lint-ci-el9:
   image: ${DOCKER_IMAGE_OL9}
   extends: .lint-ci-rhel
 
-.prepare-ci-rhel:
+.prepare-ci:
   stage: prepare
   script:
     - 'eval ${PREPARE}'
@@ -187,6 +187,16 @@ lint-ci-el9:
     paths:
       - ./${OS_VERSION}-deployable
     expire_in: never
+
+.prepare-ci-rhel:
+  variables:
+    OS_DISTRIBUTION: rhel
+  extends: .prepare-ci
+
+.prepare-ci-debian:
+  variables:
+    OS_DISTRIBUTION: debian
+  extends: .prepare-ci
 
 .prepare-ci-el8:
   stage: prepare
@@ -206,6 +216,24 @@ lint-ci-el9:
     OS_VERSION: el9
   extends: .prepare-ci-rhel
 
+.prepare-ci-debian11:
+  stage: prepare
+  needs:
+    - job: build-ci-debian11
+      artifacts: true
+  variables:
+    OS_VERSION: bullseye
+  extends: .prepare-ci-debian
+
+.prepare-ci-debian12:
+  stage: prepare
+  needs:
+    - job: build-ci-debian12
+      artifacts: true
+  variables:
+    OS_VERSION: bookworm
+  extends: .prepare-ci-debian
+
 prepare-ci-el8-devel:
     stage: prepare
     only:
@@ -219,6 +247,22 @@ prepare-ci-el9-devel:
     only:
       - /^devel.*/
     extends: .prepare-ci-el9
+    environment:
+      name: devel
+
+prepare-ci-debian11-devel:
+    stage: prepare
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-debian11
+    environment:
+      name: devel
+
+prepare-ci-debian12-devel:
+    stage: prepare
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-debian12
     environment:
       name: devel
 
@@ -238,6 +282,22 @@ prepare-ci-el9-testing:
     environment:
       name: testing
 
+prepare-ci-debian11-testing:
+    stage: prepare
+    only:
+      - /^testing$/
+    extends: .prepare-ci-debian11
+    environment:
+      name: testing
+
+prepare-ci-debian12-testing:
+    stage: prepare
+    only:
+      - /^testing$/
+    extends: .prepare-ci-debian12
+    environment:
+      name: testing
+
 prepare-ci-el8-master:
     stage: prepare
     only:
@@ -251,6 +311,22 @@ prepare-ci-el9-master:
     only:
       - /^master$/
     extends: .prepare-ci-el9
+    environment:
+      name: master
+
+prepare-ci-debian11-master:
+    stage: prepare
+    only:
+      - /^master$/
+    extends: .prepare-ci-debian11
+    environment:
+      name: master
+
+prepare-ci-debian12-master:
+    stage: prepare
+    only:
+      - /^master$/
+    extends: .prepare-ci-debian12
     environment:
       name: master
 
