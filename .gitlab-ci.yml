@@ -338,15 +338,26 @@ approve-ci:
 .deploy-ci:
   variables:
     REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
+  image: ${DOCKER_IMAGE_PREP}
   script:
     - 'eval ${DEPLOY}'
+
+.deploy-ci-rhel:
+  variables:
+    OS_DISTRIBUTION: rhel
+  extends: .deploy-ci
+
+.deploy-ci-debian:
+  variables:
+    OS_DISTRIBUTION: debian
+  extends: .deploy-ci
 
 .deploy-ci-el8:
   stage: deploy
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
-  extends: .deploy-ci
+  extends: .deploy-ci-rhel
   resource_group: deploy
 
 .deploy-ci-el9:
@@ -354,7 +365,21 @@ approve-ci:
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
-  extends: .deploy-ci
+  extends: .deploy-ci-rhel
+  resource_group: deploy
+
+.deploy-ci-debian11:
+  stage: deploy
+  variables:
+    OS_VERSION: bullseye
+  extends: .deploy-ci-debian
+  resource_group: deploy
+
+.deploy-ci-debian12:
+  stage: deploy
+  variables:
+    OS_VERSION: bookworm
+  extends: .deploy-ci-debian
   resource_group: deploy
 
 deploy-ci-el8-devel:
@@ -376,6 +401,28 @@ deploy-ci-el9-devel:
     only:
       - /^devel.*/
     extends: .deploy-ci-el9
+    environment:
+      name: devel
+
+deploy-ci-debian11-devel:
+    needs:
+        - job: prepare-ci-debian11-devel
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^devel.*/
+    extends: .deploy-ci-debian11
+    environment:
+      name: devel
+
+deploy-ci-debian12-devel:
+    needs:
+        - job: prepare-ci-debian12-devel
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^devel.*/
+    extends: .deploy-ci-debian12
     environment:
       name: devel
 
@@ -401,6 +448,28 @@ deploy-ci-el9-testing:
     environment:
       name: testing
 
+deploy-ci-debian11-testing:
+    needs:
+        - job: prepare-ci-debian11-testing
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^testing$/
+    extends: .deploy-ci-debian11
+    environment:
+      name: testing
+
+deploy-ci-debian12-testing:
+    needs:
+        - job: prepare-ci-debian12-testing
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^testing$/
+    extends: .deploy-ci-debian12
+    environment:
+      name: testing
+
 deploy-ci-el8-master:
     needs:
         - job: prepare-ci-el8-master
@@ -420,5 +489,27 @@ deploy-ci-el9-master:
     only:
       - /^master$/
     extends: .deploy-ci-el9
+    environment:
+      name: master
+
+deploy-ci-debian11-master:
+    needs:
+        - job: prepare-ci-debian11-master
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^master$/
+    extends: .deploy-ci-debian11
+    environment:
+      name: master
+
+deploy-ci-debian12-testing:
+    needs:
+        - job: prepare-ci-debian12-master
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^master$/
+    extends: .deploy-ci-debian12
     environment:
       name: master
