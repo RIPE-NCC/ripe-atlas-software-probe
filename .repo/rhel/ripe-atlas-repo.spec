@@ -12,7 +12,7 @@
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
 Version:        1.5
-Release:        1%{?dist}
+Release:        2%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 BuildArch:	noarch
@@ -50,6 +50,8 @@ case "${RELEASE}" in
 		sed -i -e "s/baseurl.*\$/&.${RELEASE}\//" %{repo_path}
 		;;
 esac
+
+sed -i -e "s/baseurl.*\$/&rhel\//" %{repo_path}
 
 STRIPPED_DIST="$(echo %{?dist} | sed -r 's/^\.//')"
 if [ -z "${STRIPPED_DIST}" ] ; then
