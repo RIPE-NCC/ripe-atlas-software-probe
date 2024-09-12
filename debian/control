@@ -17,6 +17,7 @@ Depends:
  libssl3 | libssl1.1,
  net-tools,
  openssh-client,
+ psmisc,
 Section: net
 Priority: optional
 Homepage: https://atlas.ripe.net/
