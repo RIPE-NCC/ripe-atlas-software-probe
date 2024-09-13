@@ -4,10 +4,11 @@
 %define		repo_dir		%{_sysconfdir}/yum.repos.d
 %define		repo_file		ripe-atlas.repo
 %define		key_dir			%{_sysconfdir}/pki/rpm-gpg
-%define		key_file		RPM-GPG-KEY-ripe-atlas
+%define		oldkey_file		RPM-GPG-KEY-ripe-atlas-20220721
+%define		newkey_file		RPM-GPG-KEY-ripe-atlas-20240924
 
-%define		repo_path		%{_builddir}/%{base_name}/.repo/%{repo_file}
-%define		key_path		%{_builddir}/%{base_name}/.repo/%{key_file}
+%define		source_path		%{_builddir}/%{base_name}/.repo
+%define		repo_path		%{source_path}/%{repo_file}
 
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
@@ -75,7 +76,8 @@ case "${RELEASE}" in
 esac
 mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
 install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
-install -m 0644 "%{key_path}.${RELEASE}" %{buildroot}%{key_dir}/%{key_file}
+install -m 0644 "%{source_path}/%{oldkey_file}.${RELEASE}" %{buildroot}%{key_dir}/
+install -m 0644 "%{source_path}/%{newkey_file}.${RELEASE}" %{buildroot}%{key_dir}/
 
 %files
 %{repo_dir}/*

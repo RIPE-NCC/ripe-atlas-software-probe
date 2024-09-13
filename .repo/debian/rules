@@ -2,7 +2,7 @@
 
 include rules.mk
 
-KEY:=RPM-GPG-KEY-ripe-atlas.$(RELEASE)
+KEY:=RPM-GPG-KEY-ripe-atlas-20240924.$(RELEASE)
 FINGERPRINT:=$(call fingerprint,$(KEY))
 KEYID:=$(call keyid,$(KEY))
 DISTRIBUTION:=$(call distribution)
