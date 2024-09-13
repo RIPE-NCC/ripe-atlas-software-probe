@@ -67,12 +67,12 @@ build_image_prep:
     - /^master$/
   script:
     - export HOME="${PWD}"
-    - mkdir -p ${HOME}/${OS_VERSION}/dists/${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
+    - mkdir -p ${HOME}/${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
     - dpkg-buildpackage -b -us -uc
     - pushd .repo
     - dpkg-buildpackage -b -us -uc
     - popd
-    - cp {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/dists/${OS_VERSION}/main/binary-amd64
+    - cp {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
     - cp VERSION ${HOME}/${OS_VERSION}
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
@@ -345,11 +345,13 @@ approve-ci:
 .deploy-ci-rhel:
   variables:
     OS_DISTRIBUTION: rhel
+    TARGET: ${OS_DISTRIBUTION}/${OS_VERSION}
   extends: .deploy-ci
 
 .deploy-ci-debian:
   variables:
     OS_DISTRIBUTION: debian
+    TARGET: ${OS_DISTRIBUTION}/dists/${OS_VERSION}
   extends: .deploy-ci
 
 .deploy-ci-el8:
