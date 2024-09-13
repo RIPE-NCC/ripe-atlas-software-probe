@@ -1,1 +1,1 @@
-deb https://ftp.ripe.net/ripe/atlas/software-probe/debian/@repo@ @distribution@ main
+deb https://ftp.ripe.net/ripe/atlas/software-probe/@repo@debian/ @distribution@ main
