@@ -43,6 +43,10 @@ Currently tested on Oracle Enterprise Linux 8, Oracle Enterprise Linux 9 and Roc
 To install RPMs for RHEL-based distributions
 ============================================
 
+NOTE: The ripe-atlas-anchor package is intended for deploying Atlas
+      anchors. Please only install when instructed to do so by RIPE
+      NCC staff.
+
 Automatic Updates
 -----------------
 As of release 5080, the RPM will no longer automatically update.
@@ -69,8 +73,8 @@ Online (built by RIPE NCC)
 
 To install, execute:
 
-- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1.5-1.el8.noarch.rpm``
-- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1.5-1.el9.noarch.rpm``
+- (using root privileges on el8) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el8/noarch/ripe-atlas-repo-1.5-2.el8.noarch.rpm``
+- (using root privileges on el9) ``dnf -y install https://ftp.ripe.net/ripe/atlas/software-probe/el9/noarch/ripe-atlas-repo-1.5-2.el9.noarch.rpm``
 - (using root privileges) ``dnf -y install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
@@ -115,7 +119,6 @@ Currently tested on Debian 11 and 12 on the x86_64 platform.
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
  * ``git checkout BRANCH`` << if needed (optional)
- * ``git submodule update`` << this will update the submodule within this branch
  * ``dpkg-buildpackage -b -us -uc`` << this will create the package
  * ``cp ../ripe-atlas-*.deb .``
  * ``cd .repo``
@@ -124,9 +127,29 @@ Currently tested on Debian 11 and 12 on the x86_64 platform.
 To install DEB files for Debian or Debian-based distributions
 =============================================================
 
+NOTE: The ripe-atlas-anchor package is intended for deploying Atlas
+      anchors. Please only install when instructed to do so by RIPE
+      NCC staff.
+
+Offline (locally built)
+-----------------------
+
 To install, execute:
 
 - (using root privileges): ``dpkg -i ripe-atlas-common_????_amd64.deb ripe-atlas-probe_????_all.deb``
+- (using root privileges) ``systemctl enable ripe-atlas.service``
+- (using root privileges) ``systemctl start ripe-atlas.service``
+
+Online (built by RIPE NCC)
+--------------------------
+
+To install, execute:
+
+- (on debian11) ``wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/bullseye/main/binary-amd64/ripe-atlas-repo_1.5-2_all.deb
+- (on debian12) ``wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/bookworm/main/binary-amd64/ripe-atlas-repo_1.5-2_all.deb
+- (using root privileges) ``dpkg -i ./ripe-atlas-repo_1.5-2_all.deb``
+- (using root privileges) ``apt-get update``
+- (using root privileges) ``apt-get install ripe-atlas-probe``
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
