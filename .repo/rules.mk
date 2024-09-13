@@ -1,4 +1,15 @@
+# Try and default to GitLab CI/CD variables
+BRANCH:=$(CI_COMMIT_TAG)
+ifeq ($(BRANCH),)
+BRANCH:=$(CI_COMMIT_BRANCH)
+endif
+
+# Derive from GIT if none available (local build?)
+ifeq ($(BRANCH),)
 BRANCH:=$(shell git rev-parse --abbrev-ref HEAD 2>/dev/null)
+endif
+
+# Default to the master branch
 RELEASE:=$(firstword $(subst ., ,$(BRANCH)))
 ifeq ($(RELEASE),)
 RELEASE:=master
