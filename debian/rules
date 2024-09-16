@@ -47,6 +47,7 @@ override_dh_auto_install:
 	# Probe specific files added in other package
 	rm -f debian/ripe-atlas-common/usr/libexec/ripe-atlas/scripts/reg_servers.sh.prod
 	rm -f debian/ripe-atlas-common/usr/share/ripe-atlas/known_hosts.reg
+	rm -f debian/ripe-atlas-common/usr/lib/systemd/system/ripe-atlas.service
 
 # The only tests that exist are in libevent and these
 # do not work
