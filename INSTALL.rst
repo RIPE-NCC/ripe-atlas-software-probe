@@ -114,7 +114,7 @@ To build DEB files for Debian or Debian-based distributions
 The build process is performed using dpkg-buildpackage (compat version 13).
 Currently tested on Debian 11 and 12 on the x86_64 platform.
 
-- Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev gpg``.
+- Get the needed tools (using root privileges): ``apt-get update && apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools``.
 - Clone the repo: ``git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git``
 - Build the needed .deb file in the current working directory:
  * ``cd ripe-atlas-software-probe`` << this will change into the root directory of the git repo that you have clone
@@ -153,6 +153,12 @@ To install, execute:
 - (using root privileges) ``systemctl enable ripe-atlas.service``
 - (using root privileges) ``systemctl start ripe-atlas.service``
 
+Note that packages have been signed and can be verified using ``debsigs``,
+for example:
+``debsig-verify ./ripe-atlas-probe_????_amd64.deb``
+
+This can only be done after the ripe-atlas-repo package has been installed.
+
 To build IPKG files for OpenWRT
 ===============================
 
@@ -178,13 +184,13 @@ To install, execute:
 - ``opkg install ripe-atlas-common-????.ipkg ripe-atlas-software-probe-????.ipkg``
 - ``service ripe-atlas start``
 
-Manual build (using systemd)
+Manual build
 ============================
 
 To build using autoconf tooling and install the software probe, execute the following commands at the top level of the git repo:
 
 - ``autoreconf -iv``
-- ``./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib64 --runstatedir=/run --with-user=ripe-atlas --with-group=ripe-atlas --with-measurement-user=ripe-atlas-measurement --enable-systemd --enable-chown --enable-setcap-install``
+- ``./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib64 --runstatedir=/run --with-user=ripe-atlas --with-group=ripe-atlas --with-measurement-user=ripe-atlas-measurement --disable-systemd --enable-chown --enable-setcap-install``
 - ``make``
 
 Manual installation
@@ -193,5 +199,4 @@ Manual installation
 To install, execute:
 
 - (using root privileges) ``make install``
-- (using root privileges) ``systemctl enable ripe-atlas.service``
-- (using root privileges) ``systemctl start ripe-atlas.service``
+- (using root privileges) ``/usr/sbin/ripe-atlas``
