@@ -18,6 +18,7 @@ Depends:
  net-tools,
  openssh-client,
  psmisc,
+ systemd,
 Section: net
 Priority: optional
 Homepage: https://atlas.ripe.net/
