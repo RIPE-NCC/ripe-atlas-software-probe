@@ -34,9 +34,9 @@ override_dh_auto_build: $(SOURCES)
 
 override_dh_auto_install: PKG:=debian/ripe-atlas-repo
 override_dh_auto_install:
-	install -d -m 0755 $(PKG)/etc/debsig/policies/$(FINGERPRINT)
+	install -d -m 0755 $(PKG)/etc/debsig/policies/$(KEYID)
 	install -d -m 0755 $(PKG)/usr/share/debsig/keyrings/$(KEYID)
-	install -m 0644 ripe-atlas.pol $(PKG)/etc/debsig/policies/$(FINGERPRINT)/ripe-atlas.pol
+	install -m 0644 ripe-atlas.pol $(PKG)/etc/debsig/policies/$(KEYID)/ripe-atlas.pol
 	install -m 0644 ripe-atlas.pub.gpg $(PKG)/usr/share/debsig/keyrings/$(KEYID)/ripe-atlas.pub.gpg
 
 override_dh_auto_test:
