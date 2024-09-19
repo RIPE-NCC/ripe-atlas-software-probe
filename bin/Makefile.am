@@ -32,7 +32,13 @@ CLEANFILES = \
 ripe-atlas:	ripe-atlas.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+if SHELL_FIXUP
+	$(AM_V_FIXUP)$(SHEFIX) $@
+endif
 
 resolvconf:	resolvconf.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+if SHELL_FIXUP
+	$(AM_V_FIXUP)$(SHEFIX) $@
+endif
