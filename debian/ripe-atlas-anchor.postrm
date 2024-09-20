@@ -24,11 +24,21 @@ set -e
 #DEBHELPER#
 
 atlas_newdir='/etc/ripe-atlas'
+fix_rundir()
+{
+	version=$(. /etc/os-release && printf '%s\n' "${VERSION%% *}")
+	if [ "$version" = "12" ]; then
+		echo "/run/ripe-atlas"
+	else
+		echo "/var/run/ripe-atlas"
+	fi
+}
 
 case "${1}" in
 	purge|remove|upgrade)
+		rm -f $(fix_rundir)/status/* "${atlas_newdir}/reg_servers.sh" \
+		      1>/dev/null 2>&1 || :
 		systemctl daemon-reload 1>/dev/null 2>&1
-		rm -f "${atlas_newdir}/reg_servers.sh" 1>/dev/null 2>&1
 		;;
 
 	failed-upgrade|abort-install|abort-upgrade|disappear)

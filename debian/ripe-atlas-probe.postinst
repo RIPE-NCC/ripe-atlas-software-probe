@@ -27,12 +27,13 @@ atlas_measurement='ripe-atlas-measurement'
 atlas_user='ripe-atlas'
 atlas_group='ripe-atlas'
 atlas_olddir='/var/atlas-probe'
-atlas_oldkey="${atlas_olddir}/etc/probe_key}"
+atlas_oldkey="${atlas_olddir}/etc/probe_key"
+atlas_oldmode="${atlas_olddir}/state/mode"
 atlas_oldconfig="${atlas_olddir}/state/config.txt"
 atlas_newdir='/etc/ripe-atlas'
 atlas_newkey="${atlas_newdir}/probe_key"
 atlas_newmode="${atlas_newdir}/mode"
-atlas_newconf="${atlas_newdir}/config.txt"
+atlas_newconfig="${atlas_newdir}/config.txt"
 service_name='ripe-atlas.service'
 atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 
@@ -82,11 +83,11 @@ case "${1}" in
 	configure)
 		migrate_file "${atlas_oldkey}"     "${atlas_newkey}"      0600 \
 		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldkey}.pub" "${atlas_newkey}.pub" 0644 \
+		migrate_file "${atlas_oldkey}.pub" "${atlas_newkey}.pub"  0644 \
 		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldmode}"    "${atlas_newmode}"	 0644 \
+		migrate_file "${atlas_oldmode}"    "${atlas_newmode}"	  0644 \
 		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldconfig}"  "${atlas_newconfig}"  0644 \
+		migrate_file "${atlas_oldconfig}"  "${atlas_newconfig}"   0644 \
 		             "${atlas_user}"       "${atlas_group}"
 
 		# clean up old atlas installation, it is now obsolete

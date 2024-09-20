@@ -41,20 +41,16 @@ case "${1}" in
 		rm -fr "${atlas_newdir}" \
 		       "/var/spool/ripe-atlas/" \
 		       "$(fix_rundir)" \
-			1>/dev/null 2>&1 || true
-		;;
-
-	upgrade)
-		rm -f "$(fix_rundir)/status/*" 1>/dev/null 2>&1 || true
+			1>/dev/null 2>&1 || :
 		;;
 
 	remove)
 		rm -fr "/var/spool/ripe-atlas/" \
 		       "$(fix_rundir)" \
-		       1>/dev/null 2>&1 || true
+		       1>/dev/null 2>&1 || :
 		;;
 
-	failed-upgrade|abort-install|abort-upgrade|disappear)
+	ugrade|failed-upgrade|abort-install|abort-upgrade|disappear)
 		;;
 
 	*)
