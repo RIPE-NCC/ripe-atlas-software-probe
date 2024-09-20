@@ -37,20 +37,7 @@ fix_rundir()
 
 
 case "${1}" in
-	purge)
-		rm -fr "${atlas_newdir}" \
-		       "/var/spool/ripe-atlas/" \
-		       "$(fix_rundir)" \
-			1>/dev/null 2>&1 || :
-		;;
-
-	remove)
-		rm -fr "/var/spool/ripe-atlas/" \
-		       "$(fix_rundir)" \
-		       1>/dev/null 2>&1 || :
-		;;
-
-	ugrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+	purge|remove|ugrade|failed-upgrade|abort-install|abort-upgrade|disappear)
 		;;
 
 	*)

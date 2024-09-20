@@ -36,8 +36,15 @@ fix_rundir()
 
 case "${1}" in
 	purge|remove|upgrade)
-		rm -f $(fix_rundir)/status/* "${atlas_newdir}/reg_servers.sh" \
+		rm -f $(fix_rundir)/status/* ${atlas_newdir}/reg_servers.sh \
 		      1>/dev/null 2>&1 || :
+		if [ "${1}" = 'purge' ] || [ "${1}" = 'remove' ]; then
+			rm -rf $(fix_rundir) /var/spool/ripe-atlas \
+			       1>/dev/null 2>&1 || :
+		fi
+		if [ "${1}" = 'purge' ]; then
+			rm -rf ${atlas_newdir} 1>/dev/null 2>&1 || :
+		fi
 		systemctl daemon-reload 1>/dev/null 2>&1
 		;;
 
