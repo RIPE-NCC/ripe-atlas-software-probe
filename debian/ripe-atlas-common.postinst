@@ -26,8 +26,9 @@ set -e
 atlas_measurement='ripe-atlas-measurement'
 atlas_user='ripe-atlas'
 atlas_group='ripe-atlas'
-atlas_newdir='/etc/ripe-atlas'
 atlas_measdir='/usr/libexec/ripe-atlas/measurement'
+atlas_newdir='/etc/ripe-atlas'
+atlas_newmode="${atlas_newdir}/mode"
 
 case "${1}" in
 	configure)
@@ -36,6 +37,10 @@ case "${1}" in
 		chown -R ${atlas_measurement}:${atlas_group} ${atlas_measdir}/busybox
 		chmod 4750 ${atlas_measdir}/busybox
 		setcap cap_net_raw=ep ${atlas_measdir}/busybox
+
+		if [ -f "${atlas_newmode}.atlasswprobe" ]; then
+			mv "${atlas_newmode}.atlasswprobe" "${atlas_newmode}"
+		fi
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

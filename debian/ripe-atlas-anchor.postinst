@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for ripe-atlas-anchor
+# postinst script for ripe-atlas-anchor.
 #
 # See: dh_installdeb(1).
 
@@ -23,19 +23,8 @@ set -e
 
 #DEBHELPER#
 
-atlas_measurement='ripe-atlas-measurement'
-atlas_user='ripe-atlas'
-atlas_group='ripe-atlas'
-atlas_olddir='/var/atlas-probe'
-atlas_oldkey="${atlas_olddir}/etc/probe_key"
-atlas_oldmode="${atlas_olddir}/state/mode"
-atlas_oldconfig="${atlas_olddir}/state/config.txt"
-atlas_newdir="/etc/ripe-atlas"
-atlas_newkey="${atlas_newdir}/probe_key"
-atlas_newmode="${atlas_newdir}/mode"
-atlas_newconfig="${atlas_newdir}/config.txt"
-atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 service_name='ripe-atlas.service'
+atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 
 get_state()
 {
@@ -61,44 +50,8 @@ clear_state()
 	rm -rf "${atlas_upgradedir}" 2>/dev/null
 }
 
-migrate_file()
-{
-	if ( [ -f "$1" ] && ! cmp -s "$1" "$2" 1>/dev/null 2>&1 ); then
-		install -D -p -m "$3" -o "$4" -g "$5" "$1" "$2" 1>/dev/null 2>&1;
-	fi
-}
-
-fix_rundir()
-{
-	version=$(. /etc/os-release && printf '%s\n' "${VERSION%% *}")
-	if [ "$version" = "12" ]; then
-		echo "/run/ripe-atlas"
-	else
-		echo "/var/run/ripe-atlas"
-	fi
-}
-
 case "${1}" in
 	configure)
-		migrate_file "${atlas_oldkey}"     "${atlas_newkey}"     0600 \
-		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldkey}.pub" "${atlas_newkey}.pub" 0644 \
-		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldmode}"    "${atlas_newmode}"    0644 \
-		             "${atlas_user}"       "${atlas_group}"
-		migrate_file "${atlas_oldconfig}"  "${atlas_newconfig}"  0644 \
-		             "${atlas_user}"       "${atlas_group}"
-
-		# clean up old atlas installation, it is now obsolete
-		if ( [ -f "${atlas_newkey}" ] &&
-		     [ -f "${atlas_newkey}.pub" ] &&
-		     [ -f "${atlas_newmode}" ] &&
-		     [ -d "${atlas_olddir}" ] ); then
-			# NOTE: ${atlas_newconfig} may not exist
-			# if ${atlas_oldconfig} did not either
-			rm -rf "${atlas_olddir}"
-		fi
-
 		if get_state "is-enabled"; then
 			systemctl enable "${service_name}" 1>/dev/null 2>&1
 		fi

@@ -35,9 +35,8 @@ fix_rundir()
 	fi
 }
 
-
 case "${1}" in
-	purge|remove|ugrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+	purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
 		;;
 
 	*)

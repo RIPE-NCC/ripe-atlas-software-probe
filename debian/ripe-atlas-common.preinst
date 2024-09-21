@@ -21,14 +21,22 @@ set -e
 atlas_measurement='ripe-atlas-measurement'
 atlas_user='ripe-atlas'
 atlas_group='ripe-atlas'
+atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 atlas_olddir='/var/atlas-probe'
 atlas_oldkey="${atlas_olddir}/etc/probe_key"
 atlas_oldmode="${atlas_olddir}/state/mode"
-atlas_oldconf="${atlas_olddir}/state/config.txt"
+atlas_oldconfig="${atlas_olddir}/state/config.txt"
 atlas_newdir='/etc/ripe-atlas'
 atlas_newkey="${atlas_newdir}/probe_key"
 atlas_newmode="${atlas_newdir}/mode"
-atlas_newconf="${atlas_newdir}/config.txt"
+atlas_newconfig="${atlas_newdir}/config.txt"
+
+migrate_file()
+{
+	if ( [ -f "$1" ] && ! cmp -s "$1" "$2" 1>/dev/null 2>&1 ); then
+		install -D -p -m "$3" -o "$4" -g "$5" "$1" "$2" 1>/dev/null 2>&1
+	fi
+}
 
 fix_rundir()
 {
@@ -49,6 +57,18 @@ case "$1" in
 		u ${atlas_measurement} - "RIPE Atlas Measurements" /var/spool/ripe-atlas -
 		m "${atlas_measurement}" "${atlas_group}"
 EOF
+
+		if ! [ -d "${atlas_newdir}" ]; then
+			install -d -m 0770 -o "${atlas_user}" -g "${atlas_group}" "${atlas_newdir}" 1>/dev/null 2>&1
+		fi
+		migrate_file "${atlas_oldkey}"     "${atlas_newkey}"                  0600 \
+		             "${atlas_user}"       "${atlas_group}"
+		migrate_file "${atlas_oldkey}.pub" "${atlas_newkey}.pub"              0644 \
+		             "${atlas_user}"       "${atlas_group}"
+		migrate_file "${atlas_oldmode}"    "${atlas_newmode}.atlasswprobe"    0644 \
+		             "${atlas_user}"       "${atlas_group}"
+		migrate_file "${atlas_oldconfig}"  "${atlas_newconfig}"               0644 \
+		             "${atlas_user}"       "${atlas_group}"
 		;;
 
 	upgrade|abort-upgrade)
