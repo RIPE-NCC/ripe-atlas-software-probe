@@ -76,8 +76,8 @@ case "${RELEASE}" in
 esac
 mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
 install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
-install -m 0644 "%{source_path}/%{oldkey_file}.${RELEASE}" %{buildroot}%{key_dir}/
-install -m 0644 "%{source_path}/%{newkey_file}.${RELEASE}" %{buildroot}%{key_dir}/
+install -m 0644 "%{source_path}/%{oldkey_file}.${RELEASE}" %{buildroot}%{key_dir}/%{oldkey_file}
+install -m 0644 "%{source_path}/%{newkey_file}.${RELEASE}" %{buildroot}%{key_dir}/%{newkey_file}
 
 %files
 %{repo_dir}/*
