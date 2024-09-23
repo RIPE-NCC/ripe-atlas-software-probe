@@ -72,8 +72,8 @@ build_image_prep:
     - pushd .repo
     - dpkg-buildpackage -b -us -uc
     - popd
-    - cp {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
-    - cp VERSION ${HOME}/${OS_VERSION}
+    - mv {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
+    - mv VERSION ${HOME}/${OS_VERSION}
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths:
