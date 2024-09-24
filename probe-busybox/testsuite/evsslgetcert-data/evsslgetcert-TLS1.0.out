@@ -1,0 +1,1 @@
+RESULT { "time":999999999, "dst_name":"www.ripe.net", "dst_port":"443", "ttr":1000.001000, "method":"TLS", "ver":"1.0", "dst_addr":"2606:4700::6812:142c", "af": 6, "src_addr":"2001:67c:2e8:1::c100:10a", "ttc": 1000.001000, "rt": 2000.002000, "server_cipher": "0x0000", "alert": { "level": 2, "description": 70 } }

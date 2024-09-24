@@ -1,0 +1,30 @@
+#!/bin/sh
+
+. ./testing.sh
+
+evping_test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=evping-data/"evping-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	export ATLAS_TESTS=yes ATLAS_UNSAFE=yes
+	r=$(cat "$output"; echo x); r=${r%?}
+	testing "evping-$name" "evping $opt -R $packets $target" "$r" "" ""
+}
+
+evping_test "-6" "ping.ripe.net" "6"
+evping_test "-4" "ping.ripe.net" "4"
+evping_test "-6 -c1" "ping.ripe.net" "c1"
+evping_test "-6 -s0" "ping.ripe.net" "s0"
+evping_test "-6 -s128" "ping.ripe.net" "s128"
+evping_test "-6 -s1024" "ping.ripe.net" "s1024"
+evping_test "-6 -s2048" "ping.ripe.net" "s2048"
+evping_test "-6 -A42" "ping.ripe.net" "A42"
+evping_test "-6 -A42 -B43" "ping.ripe.net" "B43"
+
+exit $FAILCOUNT
+

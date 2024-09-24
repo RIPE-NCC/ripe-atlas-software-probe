@@ -3,12 +3,11 @@ stages:
   - build
   - lint
   - prepare
-  - deploy:el8
-  - deploy:el9
+  - deploy
 
 variables:
-  # DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
-  # DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_DEBIAN11: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian11:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_DEBIAN12: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/debian12:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL8: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/prep:${CI_COMMIT_REF_SLUG}
@@ -22,26 +21,25 @@ variables:
       - /^devel.*/
       - /^testing$/
       - /^master$/
-      - tags
     changes:
       - ${DOCKER_DIR}/Dockerfile
   image: docker:latest
   script:
-    - docker build -t ${DOCKER_IMAGE} ${DOCKER_DIR}
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - docker build -t ${DOCKER_IMAGE} ${DOCKER_DIR}
     - docker push ${DOCKER_IMAGE}
 
-# build_image_debian11:
-#   variables:
-#     DOCKER_DIR: .gitlab-docker/debian11
-#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
-#   extends: .build_image
+build_image_debian11:
+  variables:
+    DOCKER_DIR: .gitlab-docker/debian11
+    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN11}
+  extends: .build_image
 
-# build_image_debian12:
-#   variables:
-#     DOCKER_DIR: .gitlab-docker/debian12
-#     DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
-#   extends: .build_image
+build_image_debian12:
+  variables:
+    DOCKER_DIR: .gitlab-docker/debian12
+    DOCKER_IMAGE: ${DOCKER_IMAGE_DEBIAN12}
+  extends: .build_image
 
 build_image_ol8:
   variables:
@@ -61,28 +59,38 @@ build_image_prep:
     DOCKER_IMAGE: ${DOCKER_IMAGE_PREP}
   extends: .build_image
 
-# .build-ci-debian:
-#   stage: build
-#   only:
-#     - /^devel.*/
-#     - tags
-#   script:
-#     - cd ripe-atlas-software-probe
-#     - dpkg-buildpackage -b -us -uc
-#     - cp ../ripe-atlas-*.deb .
-#   artifacts:
-#     name: "${CI_PROJECT_NAME}-${CI_BUILD_REF_NAME}"
-#     paths:
-#       - ripe-atlas-*.deb
-#     expire_in: never
+.build-ci-debian:
+  stage: build
+  only:
+    - /^devel.*/
+    - /^testing$/
+    - /^master$/
+  script:
+    - export HOME="${PWD}"
+    - mkdir -p ${HOME}/${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
+    - dpkg-buildpackage -b -us -uc
+    - pushd .repo
+    - dpkg-buildpackage -b -us -uc
+    - popd
+    - mv {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
+    - mv VERSION ${HOME}/${OS_VERSION}
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
+    paths:
+      - ./${OS_VERSION}
+    expire_in: never
 
-# build-ci-debian11:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN11}
+build-ci-debian11:
+  variables:
+    OS_VERSION: bullseye
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN11}
 
-# build-ci-debian12:
-#   extends: .build-ci-debian
-#   image: ${DOCKER_IMAGE_DEBIAN12}
+build-ci-debian12:
+  variables:
+    OS_VERSION: bookworm
+  extends: .build-ci-debian
+  image: ${DOCKER_IMAGE_DEBIAN12}
 
 .build-ci-rhel:
   stage: build
@@ -90,7 +98,6 @@ build_image_prep:
     - /^devel.*/
     - /^testing$/
     - /^master$/
-    - tags
   variables:
     REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
@@ -103,7 +110,9 @@ build_image_prep:
     - mkdir -p ${HOME}/${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build repo rpm
+    - pushd .repo
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
+    - popd
     - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
 
     # build x86_64 rpm
@@ -140,7 +149,6 @@ build-ci-el9:
     - /^devel.*/
     - /^testing$/
     - /^master$/
-    - tags
   script:
     - mkdir lint_report
     - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
@@ -168,7 +176,7 @@ lint-ci-el9:
   image: ${DOCKER_IMAGE_OL9}
   extends: .lint-ci-rhel
 
-.prepare-ci-rhel:
+.prepare-ci:
   stage: prepare
   script:
     - 'eval ${PREPARE}'
@@ -180,7 +188,18 @@ lint-ci-el9:
       - ./${OS_VERSION}-deployable
     expire_in: never
 
+.prepare-ci-rhel:
+  variables:
+    OS_DISTRIBUTION: rhel
+  extends: .prepare-ci
+
+.prepare-ci-debian:
+  variables:
+    OS_DISTRIBUTION: debian
+  extends: .prepare-ci
+
 .prepare-ci-el8:
+  stage: prepare
   needs:
     - job: build-ci-el8
       artifacts: true
@@ -189,6 +208,7 @@ lint-ci-el9:
   extends: .prepare-ci-rhel
 
 .prepare-ci-el9:
+  stage: prepare
   needs:
     - job: build-ci-el9
       artifacts: true
@@ -196,7 +216,26 @@ lint-ci-el9:
     OS_VERSION: el9
   extends: .prepare-ci-rhel
 
+.prepare-ci-debian11:
+  stage: prepare
+  needs:
+    - job: build-ci-debian11
+      artifacts: true
+  variables:
+    OS_VERSION: bullseye
+  extends: .prepare-ci-debian
+
+.prepare-ci-debian12:
+  stage: prepare
+  needs:
+    - job: build-ci-debian12
+      artifacts: true
+  variables:
+    OS_VERSION: bookworm
+  extends: .prepare-ci-debian
+
 prepare-ci-el8-devel:
+    stage: prepare
     only:
       - /^devel.*/
     extends: .prepare-ci-el8
@@ -204,13 +243,31 @@ prepare-ci-el8-devel:
       name: devel
 
 prepare-ci-el9-devel:
+    stage: prepare
     only:
       - /^devel.*/
     extends: .prepare-ci-el9
     environment:
       name: devel
 
+prepare-ci-debian11-devel:
+    stage: prepare
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-debian11
+    environment:
+      name: devel
+
+prepare-ci-debian12-devel:
+    stage: prepare
+    only:
+      - /^devel.*/
+    extends: .prepare-ci-debian12
+    environment:
+      name: devel
+
 prepare-ci-el8-testing:
+    stage: prepare
     only:
       - /^testing$/
     extends: .prepare-ci-el8
@@ -218,107 +275,243 @@ prepare-ci-el8-testing:
       name: testing
 
 prepare-ci-el9-testing:
+    stage: prepare
     only:
       - /^testing$/
     extends: .prepare-ci-el9
     environment:
       name: testing
 
+prepare-ci-debian11-testing:
+    stage: prepare
+    only:
+      - /^testing$/
+    extends: .prepare-ci-debian11
+    environment:
+      name: testing
+
+prepare-ci-debian12-testing:
+    stage: prepare
+    only:
+      - /^testing$/
+    extends: .prepare-ci-debian12
+    environment:
+      name: testing
+
 prepare-ci-el8-master:
+    stage: prepare
     only:
       - /^master$/
-      - tags
     extends: .prepare-ci-el8
     environment:
       name: master
 
 prepare-ci-el9-master:
+    stage: prepare
     only:
       - /^master$/
-      - tags
     extends: .prepare-ci-el9
     environment:
       name: master
 
+prepare-ci-debian11-master:
+    stage: prepare
+    only:
+      - /^master$/
+    extends: .prepare-ci-debian11
+    environment:
+      name: master
+
+prepare-ci-debian12-master:
+    stage: prepare
+    only:
+      - /^master$/
+    extends: .prepare-ci-debian12
+    environment:
+      name: master
+
+approve-ci:
+  stage: deploy
+  script: ':'
+  when: manual
+
 .deploy-ci:
   variables:
     REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
+  image: ${DOCKER_IMAGE_PREP}
   script:
     - 'eval ${DEPLOY}'
-  when: manual
+
+.deploy-ci-rhel:
+  variables:
+    OS_DISTRIBUTION: rhel
+    TARGET: ${OS_DISTRIBUTION}/${OS_VERSION}
+  extends: .deploy-ci
+
+.deploy-ci-debian:
+  variables:
+    OS_DISTRIBUTION: debian
+    TARGET: ${OS_DISTRIBUTION}/dists/${OS_VERSION}
+  extends: .deploy-ci
 
 .deploy-ci-el8:
-  stage: deploy:el8
+  stage: deploy
   variables:
     OS_VERSION: el8
   image: ${DOCKER_IMAGE_PREP}
-  extends: .deploy-ci
+  extends: .deploy-ci-rhel
+  resource_group: deploy
 
 .deploy-ci-el9:
-  stage: deploy:el9
+  stage: deploy
   variables:
     OS_VERSION: el9
   image: ${DOCKER_IMAGE_PREP}
-  extends: .deploy-ci
+  extends: .deploy-ci-rhel
+  resource_group: deploy
+
+.deploy-ci-debian11:
+  stage: deploy
+  variables:
+    OS_VERSION: bullseye
+  extends: .deploy-ci-debian
+  resource_group: deploy
+
+.deploy-ci-debian12:
+  stage: deploy
+  variables:
+    OS_VERSION: bookworm
+  extends: .deploy-ci-debian
+  resource_group: deploy
 
 deploy-ci-el8-devel:
+    needs:
+        - job: prepare-ci-el8-devel
+          artifacts: true
+        - job: approve-ci
     only:
       - /^devel.*/
-    needs:
-      - job: prepare-ci-el8-devel
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: devel
 
 deploy-ci-el9-devel:
+    needs:
+        - job: prepare-ci-el9-devel
+          artifacts: true
+        - job: approve-ci
     only:
       - /^devel.*/
-    needs:
-    - job: prepare-ci-el9-devel
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
-      name: devel      
+      name: devel
+
+deploy-ci-debian11-devel:
+    needs:
+        - job: prepare-ci-debian11-devel
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^devel.*/
+    extends: .deploy-ci-debian11
+    environment:
+      name: devel
+
+deploy-ci-debian12-devel:
+    needs:
+        - job: prepare-ci-debian12-devel
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^devel.*/
+    extends: .deploy-ci-debian12
+    environment:
+      name: devel
 
 deploy-ci-el8-testing:
+    needs:
+        - job: prepare-ci-el8-testing
+          artifacts: true
+        - job: approve-ci
     only:
       - /^testing$/
-    needs:
-      - job: prepare-ci-el8-testing
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: testing
 
 deploy-ci-el9-testing:
+    needs:
+        - job: prepare-ci-el9-testing
+          artifacts: true
+        - job: approve-ci
     only:
       - /^testing$/
-    needs:
-    - job: prepare-ci-el9-testing
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
       name: testing
 
+deploy-ci-debian11-testing:
+    needs:
+        - job: prepare-ci-debian11-testing
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^testing$/
+    extends: .deploy-ci-debian11
+    environment:
+      name: testing
+
+deploy-ci-debian12-testing:
+    needs:
+        - job: prepare-ci-debian12-testing
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^testing$/
+    extends: .deploy-ci-debian12
+    environment:
+      name: testing
+
 deploy-ci-el8-master:
+    needs:
+        - job: prepare-ci-el8-master
+          artifacts: true
+        - job: approve-ci
     only:
       - /^master$/
-      - tags
-    needs:
-      - job: prepare-ci-el8-master
-        artifacts: true
     extends: .deploy-ci-el8
     environment:
       name: master
 
 deploy-ci-el9-master:
+    needs:
+        - job: prepare-ci-el9-master
+          artifacts: true
+        - job: approve-ci
     only:
       - /^master$/
-      - tags
-    needs:
-    - job: prepare-ci-el9-master
-      artifacts: true
     extends: .deploy-ci-el9
     environment:
-      name: master         
+      name: master
+
+deploy-ci-debian11-master:
+    needs:
+        - job: prepare-ci-debian11-master
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^master$/
+    extends: .deploy-ci-debian11
+    environment:
+      name: master
+
+deploy-ci-debian12-testing:
+    needs:
+        - job: prepare-ci-debian12-master
+          artifacts: true
+        - job: approve-ci
+    only:
+      - /^master$/
+    extends: .deploy-ci-debian12
+    environment:
+      name: master

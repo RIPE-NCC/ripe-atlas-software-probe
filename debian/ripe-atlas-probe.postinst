@@ -23,23 +23,42 @@ set -e
 
 #DEBHELPER#
 
-atlas_olddir='var/atlas-probe'
-atlas_newdir='etc/ripe-atlas'
-atlas_newkey="${atlas_newdir}/probe_key"
-atlas_newmode="${atlas_newdir}/mode"
+service_name='ripe-atlas.service'
+atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
+
+get_state()
+{
+	if [ -f "${atlas_upgradedir}/$1" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+init_state()
+{
+	mkdir -p "${atlas_upgradedir}"
+	if systemctl "$1" --quiet "${service_name}" 1>/dev/null 2>&1; then
+		touch "${atlas_upgradedir}/$1" 2>/dev/null
+	else
+		rm -f "${atlas_upgradedir}/$1" 2>/dev/null
+	fi
+}
+
+clear_state()
+{
+        rm -rf "${atlas_upgradedir}" 2>/dev/null
+}
 
 case "${1}" in
 	configure)
-		# This will be regenerated when the service restarts
-		rm -f etc/ripe-atlas/reg_servers.sh 1>/dev/null 2>&1
-
-		# clean up old atlas installation, it is now obsolete
-		if ( [ -f "%{atlas_newkey}" ] &&
-		     [ -f "%{atlas_newkey}.pub" ] &&
-		     [ -f "%{atlas_newmode}" ] &&
-		     [ -d "%{atlas_olddir}" ] ); then
-			rm -rf "%{atlas_olddir}"
+		if get_state "is-enabled"; then
+			systemctl enable ${service_name} 1>/dev/null 2>&1
 		fi
+		if get_state "is-active"; then
+			systemctl start ${service_name} 1>/dev/null 2>&1
+		fi
+		clear_state
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

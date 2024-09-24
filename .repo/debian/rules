@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+
+include rules.mk
+
+KEY:=RPM-GPG-KEY-ripe-atlas-20240924.$(RELEASE)
+FINGERPRINT:=$(call fingerprint,$(KEY))
+KEYID:=$(call keyid,$(KEY))
+DISTRIBUTION:=$(call distribution)
+SOURCES:= \
+	ripe-atlas.list \
+	ripe-atlas.pol \
+	ripe-atlas.pub.gpg.asc \
+	ripe-atlas.pub.gpg
+
+# See debhelper(7) (uncomment to enable).
+# Output every command that modifies files on the build system.
+export DH_VERBOSE = 1
+
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+ripe-atlas.pub.gpg.asc:	$(KEY)
+	cp -f $< $@
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	@rm -f $(SOURCES)
+
+override_dh_auto_configure:
+
+override_dh_auto_build: $(SOURCES)
+
+override_dh_auto_install: PKG:=debian/ripe-atlas-repo
+override_dh_auto_install:
+	install -d -m 0755 $(PKG)/etc/debsig/policies/$(KEYID)
+	install -d -m 0755 $(PKG)/usr/share/debsig/keyrings/$(KEYID)
+	install -m 0644 ripe-atlas.pol $(PKG)/etc/debsig/policies/$(KEYID)/ripe-atlas.pol
+	install -m 0644 ripe-atlas.pub.gpg $(PKG)/usr/share/debsig/keyrings/$(KEYID)/ripe-atlas.pub.gpg
+
+override_dh_auto_test:

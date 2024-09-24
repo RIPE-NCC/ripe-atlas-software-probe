@@ -1,0 +1,34 @@
+#!/bin/sh
+
+. ./testing.sh
+
+catx()
+{
+	cat "$1" | sed 's/\\/\\\\/g'
+	echo x
+}
+
+evsslgetcert_test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=evsslgetcert-data/"evsslgetcert-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	export ATLAS_TESTS=yes ATLAS_UNSAFE=yes
+	r=$( catx "$output" ); r=${r%?}
+	testing "evsslgetcert-$name" "evsslgetcert $opt -R $packets $target" "$r" "" ""
+}
+
+evsslgetcert_test "-6" "atlas.ripe.net" "6"
+evsslgetcert_test "-4" "atlas.ripe.net" "4"
+evsslgetcert_test "-6 -A42" "atlas.ripe.net" "A42"
+evsslgetcert_test "-6 -B43 -A42" "atlas.ripe.net" "B43"
+evsslgetcert_test "-6 -h foo.example.com" "atlas.ripe.net" "h"
+evsslgetcert_test "-6 -V TLS1.0 -h www.ripe.net" "www.ripe.net" "TLS1.0"
+evsslgetcert_test "-4 -p 853" "8.8.8.8" "p853"
+
+exit $FAILCOUNT
+

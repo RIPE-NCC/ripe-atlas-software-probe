@@ -1,6 +1,6 @@
 Bug-Database: https://github.com/RIPE-NCC/ripe-atlas-software-probe/issues
 Bug-Submit: https://github.com/RIPE-NCC/ripe-atlas-software-probe/issues/new
-Changelog: https://github.com/RIPE-NCC/ripe-atlas-software-probe/blob/master/CHANGES
-Documentation: https://github.com/RIPE-NCC/ripe-atlas-software-probe/wiki
+Changelog: https://github.com/RIPE-NCC/ripe-atlas-software-probe/blob/master/CHANGES.rst
+Documentation: https://atlas.ripe.net/docs/
 Repository-Browse: https://github.com/RIPE-NCC/ripe-atlas-software-probe
 Repository: https://github.com/RIPE-NCC/ripe-atlas-software-probe.git

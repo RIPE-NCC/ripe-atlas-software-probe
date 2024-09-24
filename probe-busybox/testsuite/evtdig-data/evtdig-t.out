@@ -1,0 +1,1 @@
+RESULT { "fw":9999, "mver": "0.0.0", "time" : 999999999 , "lts" : 123 , "dst_name" : "manus.authdns.ripe.net" , "dst_addr" : "2001:67c:e0::7" , "dst_port" : "53" , "af" : 6 , "src_addr" : "2001:67c:2e8:1::c100:10a" , "proto" : "TCP" , "error" : { "timeout" : 5000} }

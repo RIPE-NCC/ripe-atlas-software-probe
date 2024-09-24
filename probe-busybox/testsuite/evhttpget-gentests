@@ -1,0 +1,28 @@
+#!/bin/sh
+
+test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	filebase=testsuite/evhttpget-data/"evhttpget-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	rm -f "$output" "$packets"
+	ATLAS_TESTS=yes ATLAS_UNSAFE=yes ./busybox evhttpget $opt -O "$output" -W "$packets" "$target"
+}
+
+test "-6" "http://www.ripe.net/" "6"
+test "-4" "http://www.ripe.net/" "4"
+test "-4 -A42" "http://www.ripe.net/" "A42"
+test "-4 -b43 -A42" "http://www.ripe.net/" "b43"
+test "-4" "https://www.ripe.net/" "https"
+test "-4 -0" "http://www.ripe.net/" "0"
+test "-4 -1" "http://www.ripe.net/" "1"
+test "-4 --host foo" "https://www.ripe.net/" "host"
+test "-4 --store-body 100" "https://www.ripe.net/" "body100"
+test "-4 --store-headers 100" "https://www.ripe.net/" "head100"
+test "-4 --user-agent foo" "https://www.ripe.net/" "user"
+test "-4 --etim" "https://www.ripe.net/" "etim"
+test "-4 --eetim" "https://www.ripe.net/" "eetim"

@@ -1,0 +1,26 @@
+Source: ripe-atlas-repo
+Section: net
+Priority: optional
+Build-Depends:
+ debhelper-compat (= 13),
+ autotools-dev,
+ libssl-dev,
+ gpg,
+Rules-Requires-Root: binary-targets
+Maintainer: Michel Stam <mstam@ripe.net>
+
+Package: ripe-atlas-repo
+Architecture: all
+Section: net
+Priority: optional
+Homepage: https://atlas.ripe.net/
+Description: RIPE Atlas repository specific files and configuration.
+ RIPE Atlas is the RIPE NCC's main Internet data collection system.
+ It is a global network of devices, called probes and anchors, that
+ actively measure Internet connectivity. Anyone can access this
+ data via Internet traffic maps, streaming data visualisations, and
+ an API. RIPE Atlas users can also perform customised measurements
+ to gain valuable data about their own networks.
+ .
+ This package contains files and configuration needed to use 'apt'
+ with the RIPE Atlas packages.

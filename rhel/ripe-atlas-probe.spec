@@ -78,7 +78,7 @@ echo "Getting Sources..."
 %{!?git_tag:%define git_tag master}
 %{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
+git clone -b %{git_tag} %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
 cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
@@ -111,7 +111,6 @@ touch %{buildroot}%{atlas_newdir}/reg_servers.sh
 %files
 %{_sbindir}/*
 %dir %{_datadir}/%{base_path}
-%{_unitdir}/%{service_name}
 %{_sysusersdir}/ripe-atlas.conf
 %{_tmpfilesdir}/ripe-atlas.conf
 %attr(0644, root, root) %{_datadir}/%{base_path}/measurement.conf
@@ -138,6 +137,7 @@ touch %{buildroot}%{atlas_newdir}/reg_servers.sh
 %{_libexecdir}/%{base_path}/scripts/*.sh
 
 %files -n ripe-atlas-probe
+%{_unitdir}/%{service_name}
 %{_datadir}/%{base_path}/known_hosts.reg
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %attr(0755, %{atlas_user}, %{atlas_group}) %{atlas_newdir}/reg_servers.sh
@@ -157,10 +157,17 @@ fi \
 %define clear_state() rm -rf %{rpm_statedir} 1>/dev/null 2>&1
 
 %pre -n ripe-atlas-common
-%init_state is-active
 %init_state is-enabled
-systemctl stop %{service_name} 1>/dev/null 2>&1
-systemctl disable %{service_name} 1>/dev/null 2>&1
+%init_state is-active
+
+if %{get_state is-enabled}; then
+    systemctl disable %{service_name} 1>/dev/null 2>&1
+fi
+
+if %{get_state is-active}; then
+    systemctl stop %{service_name} 1>/dev/null 2>&1
+fi
+
 %{_bindir}/systemd-sysusers --replace=%{_sysusersdir}/ripe-atlas.conf - <<EOF
 g %{atlas_group} -
 u %{atlas_user} - "RIPE Atlas" %{fix_rundir}/%{base_path} -
@@ -209,12 +216,12 @@ rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_serve
 
 %systemd_post %{service_name}
 
-if %{get_state is-active}; then
-	systemctl start %{service_name} 1>/dev/null 2>&1
+if %{get_state is-enabled}; then
+    systemctl enable %{service_name} 1>/dev/null 2>&1
 fi
 
-if %{get_state is-enabled}; then
-	systemctl enable %{service_name} 1>/dev/null 2>&1
+if %{get_state is-active}; then
+	systemctl start %{service_name} 1>/dev/null 2>&1
 fi
 
 %clear_state

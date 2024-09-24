@@ -1,3 +1,10 @@
+AM_V_FIXUP = $(am__v_FIXUP_@AM_V@)
+am__v_FIXUP_ = $(am__v_FIXUP_@AM_DEFAULT_V@)
+am__v_FIXUP_0 = @echo "  FIXUP   " $@;
+am__v_FIXUP_1 =
+
+SHEFIX = sed -i \
+             -e '1{s|^\#!/bin/sh|$(shebang)|}'
 SUBST_PATHS = sed \
              -e 's|@atlas_datadir[@]|$(atlas_datadir)|g' \
              -e 's|@atlas_execprefix[@]|$(atlas_execprefix)|g' \
@@ -45,3 +52,6 @@ SUBST_PATHS = sed \
 %.sh:	%.sh.in
 	@rm -f $@
 	$(AM_V_GEN)$(SUBST_PATHS) $< > $@
+if SHELL_FIXUP
+	$(AM_V_FIXUP)$(SHEFIX) $@
+endif

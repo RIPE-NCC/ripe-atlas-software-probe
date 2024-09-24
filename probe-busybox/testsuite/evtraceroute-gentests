@@ -1,0 +1,39 @@
+#!/bin/sh
+
+test()
+{
+	opt="$1"
+	target="$2"
+	name="$3"
+
+	echo "Test '$name'"
+
+	filebase=testsuite/evtraceroute-data/"evtraceroute-$name"
+	output="$filebase".out
+	packets="$filebase".net
+	rm -f "$output" "$packets"
+	ATLAS_TESTS=yes ATLAS_UNSAFE=yes ./busybox evtraceroute $opt -O "$output" -W "$packets" "$target"
+}
+
+test "-6 -I" ping.ripe.net "6"
+test "-4 -I" ping.ripe.net "4"
+test "-6 -U" ping.ripe.net "6U"
+test "-4 -U" ping.ripe.net "4U"
+test "-6 -T" ping.ripe.net "6T"
+test "-4 -T" ping.ripe.net "4T"
+test "-6 -A 42 -I" ping.ripe.net "A42"
+test "-6 -A 42 -B 43 -I" ping.ripe.net "B43"
+test "-6 -a 32 -I" ping.ripe.net "a32"
+test "-6 -a 32 -b 2 -I" ping.ripe.net "b2"
+test "-6 -c 4 -I" ping.ripe.net "c4"
+test "-6 -f 3 -I" ping.ripe.net "f3"
+test "-6 -m 2 -I" ping.ripe.net "m2"
+test "-6 -g 2 -I" g.root-servers.net "g2"
+test "-6 -p 443 -T" www.ripe.net "p443"
+test "-6 -S 0 -I" ping.ripe.net "S0"
+test "-6 -S 1024 -I" ping.ripe.net "S1024"
+test "-6 -S 2048 -I" ping.ripe.net "S2048"
+test "-6 -F -S 1352 -I" ping.ripe.net "F"
+test "-6 -H 512 -I" ping.ripe.net "H512"
+test "-6 -D 512 -I" ping.ripe.net "D512"
+test "-6 -t 128 -I" ping.ripe.net "t128"

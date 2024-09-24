@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # RIPE Atlas logging in shell script
 # Copyright (c) 2022 RIPE NCC

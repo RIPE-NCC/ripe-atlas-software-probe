@@ -1,0 +1,2 @@
+ripe-atlas.list				etc/apt/sources.list.d/
+ripe-atlas.pub.gpg.asc			etc/apt/trusted.gpg.d/

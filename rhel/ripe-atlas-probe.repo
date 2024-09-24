@@ -1,7 +1,0 @@
-[ripe-atlas-probe]
-name=RIPE Atlas Probe Repo
-baseurl=https://ftp.ripe.net/ripe/atlas/software-probe/
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-ripe-atlas
-enabled=1
-repo_gpgcheck=1
-gpgcheck=1

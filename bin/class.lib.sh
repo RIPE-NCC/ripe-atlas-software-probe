@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # Support functions for object oriented functionality in shell scripts
 # Copyright (c) 2022 RIPE NCC

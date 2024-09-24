@@ -1,6 +1,18 @@
 Release History
 ===============
 
+5100 (released 2024-09-24)
+--------------------------
+- All platforms
+  * As of this version, the ripe-atlas-probe-measurements repository on GitHub is deprecated. Its code has been merged into the ripe-atlas-software-probe repository
+  * Package can now be built with arbitrary shell shebangs. Note that only OpenWRT ash and bash are officially supported
+  * Bug fixed where permissions are wrong when systemd is disabled (reported by César de Tassis Filho mailto:ctassisf@gmail.com)
+  * A new code signing key has been introduced. It only signs Debian packages currently, but will sign the RHEL packages in an upcoming release as well. The current RHEL key will then be deprecated
+- Software probes
+  * Streamlined deployment on RHEL CI/CD
+  * systemd unit ownership moved to probe and anchor packages
+  * Debian 11/12 x86_64 support added
+
 5090 (released 2024-07-12)
 --------------------------
 - All platforms

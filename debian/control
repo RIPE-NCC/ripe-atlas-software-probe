@@ -11,11 +11,14 @@ Maintainer: Michel Stam <mstam@ripe.net>
 Package: ripe-atlas-common
 Architecture: any
 Depends:
+ bash,
  ${shlibs:Depends},
  ${misc:Depends},
- libssl3 | libssl1,
+ libssl3 | libssl1.1,
  net-tools,
  openssh-client,
+ psmisc,
+ systemd,
 Section: net
 Priority: optional
 Homepage: https://atlas.ripe.net/
@@ -33,7 +36,7 @@ Description: RIPE Atlas essential components
 Package: ripe-atlas-probe
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
-Conflicts: ripe-atlas-anchor
+Conflicts: ripe-atlas-anchor, atlasswprobe
 Replaces: atlasswprobe
 Section: net
 Priority: optional
@@ -54,7 +57,7 @@ Description: RIPE Atlas probe specific files and configuration
 Package: ripe-atlas-anchor
 Architecture: all
 Depends: ripe-atlas-common (= ${binary:Version})
-Conflicts: ripe-atlas-probe
+Conflicts: ripe-atlas-probe, atlasswprobe
 Replaces: atlasswprobe
 Section: net
 Priority: optional

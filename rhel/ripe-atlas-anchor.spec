@@ -68,10 +68,31 @@ echo "Getting Sources..."
 %{!?git_tag:%define git_tag master}
 %{!?git_source:%define git_source https://github.com/RIPE_NCC}
 
-git clone -b %{git_tag} --recursive %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
+git clone -b %{git_tag} %{git_source}/%{git_repo}.git %{_builddir}/%{build_dirname}
 
 cd %{_builddir}/%{build_dirname}
 %{?git_commit:git checkout %{git_commit}}
+
+%build
+cd %{_builddir}/%{build_dirname}
+autoreconf -iv
+./configure \
+    --prefix=%{_prefix} \
+    --sysconfdir=%{_sysconfdir} \
+    --localstatedir=%{_localstatedir} \
+    --libdir=%{_libdir} \
+%if 0%{?rhel} >= 9
+    --runstatedir=%{fix_rundir} \
+%endif
+    --with-user=%{atlas_user} \
+    --with-group=%{atlas_group} \
+    --with-measurement-user=%{atlas_measurement} \
+    --enable-systemd \
+    --disable-chown \
+    --disable-setcap-install \
+    --with-install-mode=anchor
+make
+
 
 %install
 mkdir -p %{buildroot}%{_datadir}/%{base_path}
@@ -81,10 +102,13 @@ install -m 0755 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.dev %
 install -m 0755 %{_builddir}/%{build_dirname}/config/common/reg_servers.sh.test %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.test
 install -m 0755 %{_builddir}/%{build_dirname}/config/anchor/reg_servers.sh.prod %{buildroot}%{_libexecdir}/%{base_path}/scripts/reg_servers.sh.prod
 mkdir -p %{buildroot}%{atlas_newdir}
+mkdir -p %{buildroot}%{_unitdir}
+install -m 0644 %{_builddir}/%{build_dirname}/config/common/%{service_name} %{buildroot}%{_unitdir}/%{service_name}
 touch %{buildroot}%{atlas_newdir}/reg_servers.sh
 
 %files
 %{_datadir}/%{base_path}/known_hosts.reg
+%{_unitdir}/%{service_name}
 %{_libexecdir}/%{base_path}/scripts/reg_servers.sh.*
 %ghost %attr(0755, %{atlas_user}, %{atlas_group}) %{atlas_newdir}/reg_servers.sh
 
@@ -131,13 +155,15 @@ rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_serve
 
 %systemd_post %{service_name}
 
+if %{get_state is-enabled}; then
+    systemctl enable %{service_name} 1>/dev/null 2>&1
+fi
+
 if %{get_state is-active}; then
 	systemctl start %{service_name} 1>/dev/null 2>&1
 fi
 
-if %{get_state is-enabled}; then
-	systemctl enable %{service_name} 1>/dev/null 2>&1
-fi
+%clear_state
 exit 0
 
 %preun
