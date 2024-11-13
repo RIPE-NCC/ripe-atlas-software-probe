@@ -332,6 +332,10 @@ prepare-ci-debian12-master:
 
 approve-ci:
   stage: deploy
+  only:
+    - /^devel.*/
+    - /^testing$/
+    - /^master$/
   script: ':'
   when: manual
 
