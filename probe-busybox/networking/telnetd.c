@@ -120,6 +120,7 @@
 #include "common_bufsiz.h"
 #include <syslog.h>
 #include <sys/mount.h>
+#include <sys/reboot.h>
 #include "atlas_path.h"
 
 #if DEBUG
