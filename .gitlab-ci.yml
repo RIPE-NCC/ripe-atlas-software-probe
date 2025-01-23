@@ -509,7 +509,7 @@ deploy-ci-debian11-master:
     environment:
       name: master
 
-deploy-ci-debian12-testing:
+deploy-ci-debian12-master:
     needs:
         - job: prepare-ci-debian12-master
           artifacts: true
