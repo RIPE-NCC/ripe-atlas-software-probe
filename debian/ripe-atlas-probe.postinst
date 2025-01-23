@@ -25,6 +25,8 @@ set -e
 
 service_name='ripe-atlas.service'
 atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
+atlas_newdir='/etc/ripe-atlas'
+atlas_newkey="${atlas_newdir}/probe_key"
 
 get_state()
 {
@@ -50,8 +52,35 @@ clear_state()
         rm -rf "${atlas_upgradedir}" 2>/dev/null
 }
 
+generate_key()
+{
+	if (! [ -d "${atlas_newdir}" ]); then
+		mkdir -p "${atlas_newdir}"
+		chown -R "${atlas_user}:${atlas_group}" "${atlas_newdir}"
+	fi
+	ssh-keygen -t rsa -P '' -C $(hostname -s) -f "${atlas_newkey}"
+	chown -R "${atlas_user}:${atlas_group}" "${atlas_newkey}"
+	chown -R "${atlas_user}:${atlas_group}" "${atlas_newkey}.pub"
+}
+
+display_reginfo()
+{
+	echo "Installation complete! Your probe's public key is:"
+	cat "${atlas_newkey}.pub"
+	echo "Use this key to register your probe at:"
+	echo "https://atlas.ripe.net/apply/swprobe/"
+	echo "After this step, you can use:"
+	echo "systemctl enable --now ${service_name}"
+	echo "to start the RIPE Atlas service."
+}
+
 case "${1}" in
 	configure)
+		if (!  [ -f "${atlas_newkey}" ]); then
+			generate_key
+			display_reginfo
+		fi
+
 		if get_state "is-enabled"; then
 			systemctl enable ${service_name} 1>/dev/null 2>&1
 		fi
