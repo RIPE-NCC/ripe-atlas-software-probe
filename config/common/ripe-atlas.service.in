@@ -12,5 +12,90 @@ ExecStop=/usr/bin/killall -n 0 telnetd perd eperd eooqd
 Restart=always
 TimeoutStopSec=60
 
+# Exposure level 9.2 -> 6.3
+# register ok, ok for measurements (built-in graphs)
+# most measurement binaries call /usr/libexec/ripe-atlas/measurement/busybox
+# which is setuid ripe-atlas-measurements user.
+# Reduce Attack Surface
+# NoNewPrivileges=yes
+PrivateTmp=true
+# PrivateDevices=yes
+PrivateMounts=true
+# ProtectHome=yes
+ProtectHome=read-only
+ProtectSystem=full
+
+# PrivateUsers=true
+# DynamicUser=true
+
+UMask=077
+
+ReadWritePaths=/etc/ripe-atlas/ /var/spool/ripe-atlas/ /run/ripe-atlas/ /home/atlas/data
+# ReadOnlyPaths=/var/run/ripe-atlas/
+# need to be able to see both ripe-atlas and ripe-atlas-measurements processes
+# InaccessiblePaths=/proc
+ProtectProc=ptraceable
+# ProtectKernelTunables=true
+# ProtectKernelModules=yes
+# ProtectKernelLogs=yes
+# ProtectHostname=yes
+# ProtectClock=yes
+# ProtectControlGroups=true
+# LockPersonality=true
+# RestrictRealtime=true
+# RestrictNamespaces=yes
+# RestrictSUIDSGID=yes
+# MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+
+# PrivateNetwork=yes
+# RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+# RestrictAddressFamilies=~AF_PACKET
+
+IPAccounting=yes
+# IPAddressAllow=localhost link-local multicast 10.0.0.0/8 192.168.0.0/16
+# This blocks all private networks except 192.168.0.0/16, likely used to reach Internet
+# May need to adapt to your context!
+IPAddressDeny=172.20.0.0/14 172.31.0.0/16 10.0.0.0/8 fd00::/8 172.24.0.0/16 2001:db8:dead:beef::/64 100.64.0.0/10 fd7a:115c:a1e0::/96
+
+# https://github.com/RIPE-NCC/ripe-atlas-software-probe/blob/master/openwrt/files/capabilities.json
+CapabilityBoundingSet=CAP_NET_RAW CAP_SETUID
+CapabilityBoundingSet=~CAP_AUDIT_CONTROL CAP_AUDIT_READ CAP_DAC_READ_SEARCH
+CapabilityBoundingSet=~CAP_BLOCK_SUSPEND
+CapabilityBoundingSet=~CAP_DAC_* CAP_FOWNER CAP_IPC_OWNER
+CapabilityBoundingSet=~CAP_FSETID CAP_SETFCAP
+CapabilityBoundingSet=~CAP_IPC_LOCK
+# CapabilityBoundingSet=~CAP_KILL
+CapabilityBoundingSet=~CAP_LEASE
+CapabilityBoundingSet=~CAP_LINUX_IMMUTABLE
+CapabilityBoundingSet=~CAP_NET_ADMIN
+CapabilityBoundingSet=~CAP_NET_BROADCAST
+# CapabilityBoundingSet=~CAP_NET_RAW
+# FIXME!
+# eooqd: setresuid: Operation not permitted
+# evping: setresuid: Operation not permitted
+# rptaddrs: setuid: Operation not permitted
+# CapabilityBoundingSet=~CAP_SETUID CAP_SETGID CAP_SETPCAP
+CapabilityBoundingSet=~CAP_SETPCAP
+CapabilityBoundingSet=~CAP_SYS_RAWIO
+CapabilityBoundingSet=~CAP_SYS_PTRACE
+CapabilityBoundingSet=~CAP_SYS_NICE CAP_SYS_RESOURCE
+CapabilityBoundingSet=~CAP_SYS_BOOT
+CapabilityBoundingSet=~CAP_SYS_CHROOT
+CapabilityBoundingSet=~CAP_SYS_PACCT
+CapabilityBoundingSet=~CAP_SYS_TTY_CONFIG
+CapabilityBoundingSet=~CAP_SYS_ADMIN
+
+# SystemCallFilter=@system-service
+# SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @privileged @raw-io @reboot @resources @swap
+# SystemCallArchitectures=native
+# When system call is disallowed, return error code instead of killing process
+SystemCallErrorNumber=EPERM
+
+CPUWeight=30
+CPUQuota=30%
+MemoryMax=1G
+IOWeight=30
+
 [Install]
 WantedBy=multi-user.target
