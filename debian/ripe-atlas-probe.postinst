@@ -27,6 +27,8 @@ service_name='ripe-atlas.service'
 atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 atlas_newdir='/etc/ripe-atlas'
 atlas_newkey="${atlas_newdir}/probe_key"
+atlas_user='ripe-atlas'
+atlas_group='ripe-atlas'
 
 get_state()
 {
