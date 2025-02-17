@@ -18,13 +18,17 @@ build_image:
   stage: docker_image
   only:
     - branches
-  image: docker:latest
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
   variables:
     DOCKER_IMAGE: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
-    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
-    - docker build -t ${DOCKER_IMAGE} -f .gitlab-docker/${OS}-Dockerfile .
-    - docker push ${DOCKER_IMAGE}
+    - /kaniko/executor
+      --registry-mirror "${DOCKER_REGISTRY_MIRROR}"
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/.gitlab-docker/${OS}-Dockerfile"
+      --destination "${DOCKER_IMAGE}"
   parallel:
     matrix:
       - OS:
