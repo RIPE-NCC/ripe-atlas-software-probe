@@ -14,7 +14,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   RPMS_DIR: rpmbuild/RPMS
 
-.build_image:
+build_image:
   stage: docker_image
   only:
     - branches
@@ -25,31 +25,14 @@ variables:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker build -t ${DOCKER_IMAGE} -f .gitlab-docker/${OS}-Dockerfile .
     - docker push ${DOCKER_IMAGE}
-
-build_image_debian11:
-  variables:
-    OS: deb11
-  extends: .build_image
-
-build_image_debian12:
-  variables:
-    OS: deb12
-  extends: .build_image
-
-build_image_ol8:
-  variables:
-    OS: ol8
-  extends: .build_image
-
-build_image_ol9:
-  variables:
-    OS: ol9
-  extends: .build_image
-
-build_image_prep:
-  variables:
-    OS: prep
-  extends: .build_image
+  parallel:
+    matrix:
+      - OS:
+          - deb11
+          - deb12
+          - ol8
+          - ol9
+          - prep
 
 .build-ci-debian:
   stage: build
