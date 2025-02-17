@@ -17,12 +17,7 @@ variables:
 .build_image:
   stage: docker_image
   only:
-    refs:
-      - /^devel.*/
-      - /^testing$/
-      - /^master$/
-    changes:
-      - ${DOCKER_DIR}/Dockerfile
+    - branches
   image: docker:latest
   variables:
     DOCKER_IMAGE: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
