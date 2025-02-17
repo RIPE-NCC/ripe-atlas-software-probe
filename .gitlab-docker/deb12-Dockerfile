@@ -1,13 +1,6 @@
-FROM debian:12.0
+FROM debian:12
 
 MAINTAINER mstam@ripe.net
 
-RUN apt-get update
-RUN apt-get dist-upgrade -y
-RUN apt-get install -y libssl-dev
-RUN apt-get install -y build-essential
-RUN apt-get install -y autoconf
-RUN apt-get install -y debhelper
-RUN apt-get install -y gpg
-RUN apt-get install -y lsb-release
-RUN apt-get install -y systemd
+RUN apt-get update && \
+    apt-get install -y libssl-dev build-essential autoconf debhelper gpg lsb-release systemd
