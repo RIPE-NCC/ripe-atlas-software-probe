@@ -38,38 +38,29 @@ build_image:
           - ol9
           - prep
 
-.build-ci-debian:
+build-ci-debian:
   stage: build
   only:
-    - /^devel.*/
-    - /^testing$/
-    - /^master$/
+    - branches
+  image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
-    - export HOME="${PWD}"
-    - mkdir -p ${HOME}/${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
+    - export OS_VERSION="$( . /etc/os-release && echo $VERSION_CODENAME )" # extract debian release codename (e.g. bookworm)
+    - mkdir -p ${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
     - dpkg-buildpackage -b -us -uc
     - pushd .repo
     - dpkg-buildpackage -b -us -uc
     - popd
-    - mv {..,.}/ripe-atlas-*.deb ${HOME}/${OS_VERSION}/main/binary-amd64
-    - mv VERSION ${HOME}/${OS_VERSION}
+    - mv {..,.}/ripe-atlas-*.deb ${OS_VERSION}/main/binary-amd64
+    - mv VERSION ${OS_VERSION}
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths:
       - ./${OS_VERSION}
     expire_in: never
-
-build-ci-debian11:
-  variables:
-    OS_VERSION: bullseye
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN11}
-
-build-ci-debian12:
-  variables:
-    OS_VERSION: bookworm
-  extends: .build-ci-debian
-  image: ${DOCKER_IMAGE_DEBIAN12}
+  parallel:
+    matrix:
+      - OS: deb11
+      - OS: deb12
 
 .build-ci-rhel:
   stage: build
@@ -198,7 +189,10 @@ lint-ci-el9:
 .prepare-ci-debian11:
   stage: prepare
   needs:
-    - job: build-ci-debian11
+    - job: build-ci-debian
+      parallel:
+        matrix:
+          - OS: deb11
       artifacts: true
   variables:
     OS_VERSION: bullseye
@@ -207,7 +201,10 @@ lint-ci-el9:
 .prepare-ci-debian12:
   stage: prepare
   needs:
-    - job: build-ci-debian12
+    - job: build-ci-debian
+      parallel:
+        matrix:
+          - OS: deb12
       artifacts: true
   variables:
     OS_VERSION: bookworm
