@@ -25,6 +25,7 @@ build_image:
     DOCKER_IMAGE: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
     - /kaniko/executor
+      --cache=true --cache-ttl=168h
       --registry-mirror "${DOCKER_REGISTRY_MIRROR}"
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/.gitlab-docker/${OS}-Dockerfile"
