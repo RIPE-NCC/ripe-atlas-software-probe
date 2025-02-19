@@ -12,7 +12,6 @@ variables:
   DOCKER_IMAGE_OL9: ${CI_REGISTRY_IMAGE}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY_IMAGE}/prep:${CI_COMMIT_REF_SLUG}
   GIT_SUBMODULE_STRATEGY: recursive
-  RPMS_DIR: rpmbuild/RPMS
 
 build_image:
   stage: docker_image
@@ -63,56 +62,48 @@ build-ci-debian:
       - OS: deb11
       - OS: deb12
 
-.build-ci-rhel:
+build-ci-rhel:
   stage: build
   only:
-    - /^devel.*/
-    - /^testing$/
-    - /^master$/
+    - branches
+  image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   variables:
+    RPMS_DIR: rpmbuild/RPMS
     REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
     X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
     REPO_GIT_SOURCE: https://${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD}@${URL}
   script:
+    - export OS_VERSION="$( . /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2 )" # extract el release (e.g. el9)
+    - export HOME="${PWD}" # rpmbuild seems to use HOME for some folders
     # build define list
     - REPO_GIT_TAG=""
     - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
-    - export HOME="${PWD}"
-    - mkdir -p ${HOME}/${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
+    - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
     # build repo rpm
     - pushd .repo
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
     - popd
-    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
+    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
 
     # build x86_64 rpm
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-probe.spec
-    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
-    - cp -a ${HOME}/${X86_RPM_PATH} ${HOME}/${OS_VERSION}/x86_64
-    - cp ${HOME}/rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${HOME}/${OS_VERSION}
+    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
+    - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
+    - cp rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${OS_VERSION}
 
     # build anchor rpm
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-anchor.spec
-    - cp -a ${HOME}/${REPO_RPM_PATH} ${HOME}/${OS_VERSION}/noarch
-
+    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths:
       - ./${OS_VERSION}
     expire_in: never
-
-build-ci-el8:
-  variables:
-    OS_VERSION: el8
-  image: ${DOCKER_IMAGE_OL8}
-  extends: .build-ci-rhel
-
-build-ci-el9:
-  variables:
-    OS_VERSION: el9
-  image: ${DOCKER_IMAGE_OL9}
-  extends: .build-ci-rhel
+  parallel:
+    matrix:
+      - OS: ol8
+      - OS: ol9
 
 .lint-ci-rhel:
   stage: lint
@@ -127,11 +118,14 @@ build-ci-el9:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}-lint-report"
     paths:
       - ./lint_report
-    expire_in: never  
+    expire_in: never
 
 lint-ci-el8:
   needs:
-    - job: build-ci-el8
+    - job: build-ci-rhel
+      parallel:
+        matrix:
+          - OS: ol8
       artifacts: true 
   variables:
     OS_VERSION: el8
@@ -140,7 +134,10 @@ lint-ci-el8:
 
 lint-ci-el9:
   needs:
-    - job: build-ci-el9
+    - job: build-ci-rhel
+      parallel:
+        matrix:
+          - OS: ol9
       artifacts: true 
   variables:
     OS_VERSION: el9
@@ -172,8 +169,10 @@ lint-ci-el9:
 .prepare-ci-el8:
   stage: prepare
   needs:
-    - job: build-ci-el8
-      artifacts: true
+    - job: build-ci-rhel
+      parallel:
+        matrix:
+          - OS: ol8
   variables:
     OS_VERSION: el8
   extends: .prepare-ci-rhel
@@ -181,8 +180,10 @@ lint-ci-el9:
 .prepare-ci-el9:
   stage: prepare
   needs:
-    - job: build-ci-el9
-      artifacts: true
+    - job: build-ci-rhel
+      parallel:
+        matrix:
+          - OS: ol9
   variables:
     OS_VERSION: el9
   extends: .prepare-ci-rhel
