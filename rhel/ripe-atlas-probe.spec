@@ -156,11 +156,14 @@ fi \
 
 %define clear_state() rm -rf %{rpm_statedir} 1>/dev/null 2>&1
 
-%define generate_key() \
+%define ensure_newdir_is_present() \
 if (! [ -d "%{atlas_newdir}" ]); then \
 	mkdir -p "%{atlas_newdir}" \
 	chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" \
 fi \
+%{nil}
+
+%define generate_key() \
 ssh-keygen -t rsa -P '' -C "$(hostname -s)" -f "%{atlas_newkey}" \
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}" \
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}.pub" \
@@ -233,6 +236,8 @@ fi
 # clean environment of previous version (if any)
 # on upgrade systemd restarts after this
 rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
+
+%ensure_newdir_is_present
 
 if (! [ -f "%{atlas_newkey}" ] ); then
 	%generate_key

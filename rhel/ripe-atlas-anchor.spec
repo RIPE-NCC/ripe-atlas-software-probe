@@ -132,11 +132,14 @@ if ( [ -f "%1" ] && ! cmp -s "%1" "%2" 1>/dev/null 2>&1 ); then \
 fi \
 %{nil}
 
-%define generate_key() \
+%define ensure_newdir_is_present() \
 if (! [ -d "%{atlas_newdir}" ]); then \
         mkdir -p "%{atlas_newdir}" \
         chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newdir}" \
 fi \
+%{nil}
+
+%define generate_key() \
 ssh-keygen -t rsa -P '' -C "$(hostname -s)" -f "%{atlas_newkey}" \
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}" \
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}.pub" \
@@ -173,9 +176,17 @@ fi
 # on upgrade systemd restarts after this
 rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_servers.sh
 
+%ensure_newdir_is_present
+
 if (! [ -f "%{atlas_newkey}" ]); then
 	%generate_key
 	%display_reginfo
+fi
+
+if ! [ -f %{atlas_newconfig} ]; then
+	touch -m 0644 %{atlas_newconfig}
+	echo "RXTXRPT=yes" >> %{atlas_newconfig}
+	chown -R %{atlas_user}:%{atlas_group} %{atlas_newconfig}
 fi
 
 %systemd_post %{service_name}

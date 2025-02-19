@@ -27,6 +27,7 @@ service_name='ripe-atlas.service'
 atlas_upgradedir='/var/lib/ripe-atlas-upgrade'
 atlas_newdir='/etc/ripe-atlas'
 atlas_newkey="${atlas_newdir}/probe_key"
+atlas_newconfig="${atlas_newdir}/config.txt"
 atlas_user='ripe-atlas'
 atlas_group='ripe-atlas'
 
@@ -54,12 +55,16 @@ clear_state()
 	rm -rf "${atlas_upgradedir}" 2>/dev/null
 }
 
-generate_key()
+ensure_newdir_is_present()
 {
 	if (! [ -d "${atlas_newdir}" ]); then
 		mkdir -p "${atlas_newdir}"
 		chown -R "${atlas_user}:${atlas_group}" "${atlas_newdir}"
 	fi
+}
+
+generate_key()
+{
 	ssh-keygen -t rsa -P '' -C "$(hostname -s)" -f "${atlas_newkey}"
 	chown -R "${atlas_user}:${atlas_group}" "${atlas_newkey}"
 	chown -R "${atlas_user}:${atlas_group}" "${atlas_newkey}.pub"
@@ -78,10 +83,22 @@ display_reginfo()
 
 case "${1}" in
 	configure)
+		ensure_newdir_is_present
+
 		if (! [ -f "${atlas_newkey}" ]); then
 			generate_key
 			display_reginfo
 		fi
+		# Ensure interface traffic counters are
+		# enabled by default for anchors
+
+		if [ ! -f "${atlas_newconfig}" ]; then
+			touch -m 644 "${atlas_newconfig}"
+			echo "RXTXRPT=yes" >> "${atlas_newconfig}"
+			chown -R "${atlas_user}":"${atlas_group}" \
+				 "${atlas_newconfig}"
+		fi
+
 		if get_state "is-enabled"; then
 			systemctl enable "${service_name}" 1>/dev/null 2>&1
 		fi
