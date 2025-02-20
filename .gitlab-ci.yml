@@ -10,8 +10,6 @@ variables:
 
 build_image:
   stage: docker_image
-  only:
-    - branches
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
@@ -35,8 +33,6 @@ build_image:
 
 build-ci-debian:
   stage: build
-  only:
-    - branches
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
     - export OS_VERSION="$( . /etc/os-release && echo $VERSION_CODENAME )" # extract debian release codename (e.g. bookworm)
@@ -60,8 +56,6 @@ build-ci-debian:
 
 build-ci-rhel:
   stage: build
-  only:
-    - branches
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   variables:
     RPMS_DIR: rpmbuild/RPMS
