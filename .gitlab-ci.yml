@@ -27,6 +27,7 @@ build_image:
       - OS:
           - deb11
           - deb12
+          - deb12-arm64
           - ol8
           - ol9
           - prep
@@ -36,12 +37,12 @@ build-ci-debian:
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
     - export OS_VERSION="$( . /etc/os-release && echo $VERSION_CODENAME )" # extract debian release codename (e.g. bookworm)
-    - mkdir -p ${OS_VERSION}/main/binary-amd64   # create a repo with same structure as prod
-    - dpkg-buildpackage -b -us -uc
+    - mkdir -p ${OS_VERSION}/main/binary-${ARCH}   # create a repo with same structure as prod
+    - dpkg-buildpackage -b ${CROSS_ARGS} -us -uc
     - pushd .repo
-    - dpkg-buildpackage -b -us -uc
+    - dpkg-buildpackage -b ${CROSS_ARGS} -us -uc
     - popd
-    - mv {..,.}/ripe-atlas-*.deb ${OS_VERSION}/main/binary-amd64
+    - mv {..,.}/ripe-atlas-*.deb ${OS_VERSION}/main/binary-${ARCH}
     - mv VERSION ${OS_VERSION}
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
@@ -51,8 +52,15 @@ build-ci-debian:
   dependencies: [] # Don't download any artifacts
   parallel:
     matrix:
-      - OS: deb11
-      - OS: deb12
+      - ARCH: amd64
+        OS:
+          - deb11
+          - deb12
+      - ARCH: arm64
+        OS: deb12-arm64
+        CROSS_COMPILE: aarch64-linux-gnu-
+        CROSS_ARGS: -aarm64 -Pcross,nocheck
+
 
 build-ci-rhel:
   stage: build
