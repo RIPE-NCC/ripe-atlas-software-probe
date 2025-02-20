@@ -56,6 +56,7 @@ build-ci-debian:
     paths:
       - ./${OS_VERSION}
     expire_in: never
+  dependencies: [] # Don't download any artifacts
   parallel:
     matrix:
       - OS: deb11
@@ -98,6 +99,7 @@ build-ci-rhel:
     paths:
       - ./${OS_VERSION}
     expire_in: never
+  dependencies: [] # Don't download any artifacts
   parallel:
     matrix:
       - OS: ol8
@@ -117,6 +119,8 @@ lint-ci-rhel:
     paths:
       - ./lint_report
     expire_in: never
+  dependencies:
+    - build-ci-rhel # Only download artifacts for RHEL
   parallel:
     matrix:
       - OS: ol8
