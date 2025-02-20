@@ -105,13 +105,13 @@ build-ci-rhel:
       - OS: ol8
       - OS: ol9
 
-.lint-ci-rhel:
+lint-ci-rhel:
   stage: lint
   only:
-    - /^devel.*/
-    - /^testing$/
-    - /^master$/
+    - branches
+  image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
+    - export OS_VERSION="$( . /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2 )" # extract el release (e.g. el9)
     - mkdir lint_report
     - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
   artifacts:
@@ -119,30 +119,10 @@ build-ci-rhel:
     paths:
       - ./lint_report
     expire_in: never
-
-lint-ci-el8:
-  needs:
-    - job: build-ci-rhel
-      parallel:
-        matrix:
-          - OS: ol8
-      artifacts: true 
-  variables:
-    OS_VERSION: el8
-  image: ${DOCKER_IMAGE_OL8}
-  extends: .lint-ci-rhel
-
-lint-ci-el9:
-  needs:
-    - job: build-ci-rhel
-      parallel:
-        matrix:
-          - OS: ol9
-      artifacts: true 
-  variables:
-    OS_VERSION: el9
-  image: ${DOCKER_IMAGE_OL9}
-  extends: .lint-ci-rhel
+  parallel:
+    matrix:
+      - OS: ol8
+      - OS: ol9
 
 .prepare-ci:
   stage: prepare
