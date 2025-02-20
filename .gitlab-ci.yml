@@ -11,7 +11,6 @@ variables:
   DOCKER_IMAGE_OL8: ${CI_REGISTRY_IMAGE}/ol8:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_OL9: ${CI_REGISTRY_IMAGE}/ol9:${CI_COMMIT_REF_SLUG}
   DOCKER_IMAGE_PREP: ${CI_REGISTRY_IMAGE}/prep:${CI_COMMIT_REF_SLUG}
-  GIT_SUBMODULE_STRATEGY: recursive
 
 build_image:
   stage: docker_image
@@ -76,7 +75,6 @@ build-ci-rhel:
     - export OS_VERSION="$( . /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2 )" # extract el release (e.g. el9)
     - export HOME="${PWD}" # rpmbuild seems to use HOME for some folders
     # build define list
-    - REPO_GIT_TAG=""
     - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
     - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
 
