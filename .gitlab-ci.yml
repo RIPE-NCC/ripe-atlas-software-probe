@@ -27,7 +27,7 @@ build_image:
       --cache=true --cache-ttl=168h
       --registry-mirror "${DOCKER_REGISTRY_MIRROR}"
       --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/.gitlab-docker/${OS}-Dockerfile"
+      --dockerfile "${CI_PROJECT_DIR}/.gitlab-ci/${OS}-Dockerfile"
       --destination "${DOCKER_IMAGE}"
   parallel:
     matrix:
