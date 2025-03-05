@@ -11,6 +11,22 @@ ExecStart=@sbindir@/ripe-atlas
 ExecStop=/usr/bin/killall -n 0 telnetd perd eperd eooqd
 Restart=always
 TimeoutStopSec=60
+DevicePolicy=closed
+KeyringMode=private
+ProtectHome=yes
+PrivateTmp=yes
+RemoveIPC=yes
+CapabilityBoundingSet=~CAP_WAKE_ALARM
+CapabilityBoundingSet=~CAP_SYS_BOOT
+CapabilityBoundingSet=~CAP_LINUX_IMMUTABLE
+CapabilityBoundingSet=~CAP_IPC_LOCK
+CapabilityBoundingSet=~CAP_SYS_CHROOT
+CapabilityBoundingSet=~CAP_SYS_TIME
+CapabilityBoundingSet=~CAP_KILL
+CapabilityBoundingSet=~CAP_BLOCK_SUSPEND
+CapabilityBoundingSet=~CAP_SYS_PTRACE
+CapabilityBoundingSet=~CAP_AUDIT_CONTROL
+CapabilityBoundingSet=~CAP_MKNOD
 
 [Install]
 WantedBy=multi-user.target

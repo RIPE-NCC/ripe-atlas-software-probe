@@ -251,6 +251,10 @@ if %{get_state is-enabled}; then
 fi
 
 if %{get_state is-active}; then
+	# Ensure any changes to the systemd unit
+	# become known to the system before
+	# restarting the service
+	systemctl daemon-reload
 	systemctl start %{service_name} 1>/dev/null 2>&1
 fi
 
