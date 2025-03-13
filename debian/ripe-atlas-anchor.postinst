@@ -70,24 +70,12 @@ generate_key()
 	chown -R "${atlas_user}:${atlas_group}" "${atlas_newkey}.pub"
 }
 
-display_reginfo()
-{
-	echo "Installation complete! Your probe's public key is:"
-	cat "${atlas_newkey}.pub"
-	echo "Use this key to register your probe at:"
-	echo "https://atlas.ripe.net/apply/swprobe/"
-	echo "After this step, you can use:"
-	echo "systemctl enable --now ${service_name}"
-	echo "to start the RIPE Atlas service."
-}
-
 case "${1}" in
 	configure)
 		ensure_newdir_is_present
 
 		if (! [ -f "${atlas_newkey}" ]); then
 			generate_key
-			display_reginfo
 		fi
 		# Ensure interface traffic counters are
 		# enabled by default for anchors

@@ -145,16 +145,6 @@ chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}" \
 chown -R "%{atlas_user}:%{atlas_group}" "%{atlas_newkey}.pub" \
 %{nil}
 
-%define display_reginfo() \
-echo "Installation complete! Your probe's public key is:" \
-cat "%{atlas_newkey}.pub" \
-echo "Use this key to register your probe at:" \
-echo "https://atlas.ripe.net/apply/swprobe/" \
-echo "After this step, you can use:" \
-echo "systemctl enable --now %{service_name}" \
-echo "to start the RIPE Atlas service." \
-%{nil}
-
 %post
 # Migrate configuration files
 %migrate_file %{atlas_oldkey}     %{atlas_newkey}     0600 %{atlas_user} %{atlas_group}
@@ -180,7 +170,6 @@ rm -fr %{fix_rundir}/%{base_path}/status/* %{_sysconfdir}/%{base_path}/reg_serve
 
 if (! [ -f "%{atlas_newkey}" ]); then
 	%generate_key
-	%display_reginfo
 fi
 
 if ! [ -f %{atlas_newconfig} ]; then
