@@ -153,23 +153,6 @@ cscope.in.out
 cscope.out
 cscope.po.out
 
-probe-busybox/libevent-2.0.20-stable/autom4te.cache
-probe-busybox/libevent-2.0.20-stable/config.h
-probe-busybox/libevent-2.0.20-stable/config.log
-probe-busybox/libevent-2.0.20-stable/config.status
-probe-busybox/libevent-2.0.20-stable/.deps
-probe-busybox/libevent-2.0.20-stable/include/event2/event-config.h
-probe-busybox/libevent-2.0.20-stable/include/Makefile
-probe-busybox/libevent-2.0.20-stable/*.la
-probe-busybox/libevent-2.0.20-stable/.libs
-probe-busybox/libevent-2.0.20-stable/libtool
-probe-busybox/libevent-2.0.20-stable/*.lo
-probe-busybox/libevent-2.0.20-stable/Makefile
-probe-busybox/libevent-2.0.20-stable/*.pc
-probe-busybox/libevent-2.0.20-stable/sample
-probe-busybox/libevent-2.0.20-stable/sample/.libs/*
-probe-busybox/libevent-2.0.20-stable/stamp-h1
-probe-busybox/libevent-2.0.20-stable/test
 probe-busybox/include/atlas_path.h
 
 #
