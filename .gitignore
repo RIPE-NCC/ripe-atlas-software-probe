@@ -155,6 +155,8 @@ cscope.po.out
 
 probe-busybox/include/atlas_path.h
 
+.vscode
+
 #
 # Never ignore these
 #
