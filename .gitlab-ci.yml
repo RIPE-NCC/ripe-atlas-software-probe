@@ -46,8 +46,9 @@ build-ci-debian:
     - mv VERSION ${OS_VERSION}
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
-    paths:
-      - ./${OS_VERSION}
+    paths: # dynamic variables (exported from script) cannot be used
+      - ./bookworm
+      - ./bullseye
     expire_in: never
   dependencies: [] # Don't download any artifacts
   parallel:
@@ -94,8 +95,9 @@ build-ci-rhel:
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
-    paths:
-      - ./${OS_VERSION}
+    paths: # dynamic variables (exported from script) cannot be used
+      - ./el8
+      - ./el9
     expire_in: never
   dependencies: [] # Don't download any artifacts
   parallel:
