@@ -4,7 +4,6 @@
 %define		repo_dir		%{_sysconfdir}/yum.repos.d
 %define		repo_file		ripe-atlas.repo
 %define		key_dir			%{_sysconfdir}/pki/rpm-gpg
-%define		oldkey_file		RPM-GPG-KEY-ripe-atlas-20220721
 %define		newkey_file		RPM-GPG-KEY-ripe-atlas-20240924
 
 %define		source_path		%{_builddir}/%{base_name}/.repo
@@ -76,7 +75,6 @@ case "${RELEASE}" in
 esac
 mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
 install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
-install -m 0644 "%{source_path}/%{oldkey_file}.${RELEASE}" %{buildroot}%{key_dir}/%{oldkey_file}
 install -m 0644 "%{source_path}/%{newkey_file}.${RELEASE}" %{buildroot}%{key_dir}/%{newkey_file}
 
 %files
