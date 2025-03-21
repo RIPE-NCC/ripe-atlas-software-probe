@@ -1,0 +1,76 @@
+<p align="center">
+  <a href="https://atlas.ripe.net"><img src="https://raw.githubusercontent.com/RIPE-NCC/ripe-atlas-software-probe/master/logo.svg?sanitize=true&raw=true"/></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases"><img alt="RIPE Atlas Version" src="https://img.shields.io/github/v/release/RIPE-NCC/ripe-atlas-software-probe?display_name=release&label=version&color=blue&style=flat"></a>
+  <img alt="Stable" src="https://img.shields.io/badge/status-stable-brightgreen&style=flat">
+  <img alt="License" src="https://img.shields.io/github/license/RIPE-NCC/ripe-atlas-software-probe?color=blue&style=flat">
+  <a href="https://atlas.ripe.net/docs/"><img alt="Documentation" src="https://img.shields.io/badge/Docs-blue.svg?style=style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0NDggNTEyIj48cGF0aCBmaWxsPSIjZmZmZmZmIiBkPSJNMzU2IDE2MEgxODhjLTYuNiAwLTEyLTUuNC0xMi0xMnYtOGMwLTYuNiA1LjQtMTIgMTItMTJoMTY4YzYuNiAwIDEyIDUuNCAxMiAxMnY4YzAgNi42LTUuNCAxMi0xMiAxMnptMTIgNTJ2LThjMC02LjYtNS40LTEyLTEyLTEySDE4OGMtNi42IDAtMTIgNS40LTEyIDEydjhjMCA2LjYgNS40IDEyIDEyIDEyaDE2OGM2LjYgMCAxMi01LjQgMTItMTJ6bTY0LjcgMjY4aDMuM2M2LjYgMCAxMiA1LjQgMTIgMTJ2OGMwIDYuNi01LjQgMTItMTIgMTJIODBjLTQ0LjIgMC04MC0zNS44LTgwLTgwVjgwQzAgMzUuOCAzNS44IDAgODAgMGgzNDRjMTMuMyAwIDI0IDEwLjcgMjQgMjR2MzY4YzAgMTAtNi4yIDE4LjYtMTQuOSAyMi4yLTMuNiAxNi4xLTQuNCA0NS42LS40IDY1Ljh6TTEyOCAzODRoMjg4VjMySDEyOHYzNTJ6bS05NiAxNmMxMy40LTEwIDMwLTE2IDQ4LTE2aDE2VjMySDgwYy0yNi41IDAtNDggMjEuNS00OCA0OHYzMjB6bTM3Mi4zIDgwYy0zLjEtMjAuNC0yLjktNDUuMiAwLTY0SDgwYy02NCAwLTY0IDY0IDAgNjRoMzI0LjN6Ij48L3BhdGg+PC9zdmc+Cg=="></a> <!-- svg taken from atlas.ripe.net/docs -->
+</p>
+<p align="center">
+  <img alt="Runs on" src="https://img.shields.io/badge/Runs_on%3A-grey?style=flat">
+  <img alt="Debian Support" src="https://img.shields.io/badge/Debian-A81D33?style=flat&logo=debian&logoColor=white">
+  <img alt="Raspberry Pi Support" src="https://img.shields.io/badge/-Raspberry_Pi-C51A4A?style=flat&logo=Raspberry-Pi&logoColor=white">
+  <img alt="Enterprise Linux Support" src="https://img.shields.io/badge/Enterprise_Linux-EE0000?style=flat&logo=linux&logoColor=white">
+</p>
+
+---
+
+[**RIPE Atlas**](https://atlas.ripe.net/) is a global network of probes that measure Internet connectivity and reachability, providing an unprecedented understanding of the state of the Internet in real time.
+
+This project contains the probe code that powers software probes.
+
+We release binary packages for the `amd64` variants of Debian 11 & 12, (Oracle) Enterprise Linux 8 & 9, and `arm64` variant of Raspberry Pi OS 12.
+The source code also allows for building of an OpenWRT 22.03 package.
+
+## Installation
+
+### Debian & Raspberry Pi OS
+
+```sh
+# Download: Debian 11 & Debian 12 & Raspberry Pi OS 12
+ARCH=$(dpkg --print-architecture)
+CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/main/binary-"$ARCH"/ripe-atlas-repo_1.5-2_all.deb
+
+# Install: Debian 11 & Debian 12 & Raspberry Pi OS 12
+sudo dpkg -i ripe-atlas-repo_1.5-2_all.deb
+sudo apt update
+sudo apt-get install ripe-atlas-probe
+```
+
+### Enterprise Linux
+
+```sh
+# Download: Enterprise Linux 8 & Enterprise Linux 9
+EL_VER=$(. /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2)
+curl -fO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/ripe-atlas-repo-1.5-2."$EL_VER".noarch.rpm
+
+# Install: Enterprise Linux 8 & Enterprise Linux 9
+sudo rpm -Uvh ripe-atlas-repo-1.5-2.*.noarch.rpm
+sudo dnf install ripe-atlas-probe
+```
+
+## Configuration options
+
+Currently there are three runtime configuration options available.
+To use them, create the file `/etc/ripe-atlas/config.txt` and add a line per desired configuration setting.
+
+| Configuration | Description | Default |
+| --- | --- | --- |
+| `RXTXRPT` | Sending interface traffic statistics as Atlas measurement results | `RXTXRPT=no` |
+| `TELNETD_PORT` | TCP port used for telnetd | `TELNETD_PORT=2023` |
+| `HTTP_POST_PORT` | TCP port used for httppost | `HTTPD_PORT=8080` |
+
+## FAQ
+
+### Generic installation instructions
+
+The public key is stored in `/etc/ripe-atlas/probe_key.pub`. Use it to register your probe at <https://atlas.ripe.net/apply/swprobe/>.
+
+### TCP ports conflict
+
+The software probe uses TCP ports 2023 and 8080 internally.
+If another service is using these ports then the probe will not function correctly.
+To avoid conflicts, runtime configuration options can be used to make the probe use different port numbers.
