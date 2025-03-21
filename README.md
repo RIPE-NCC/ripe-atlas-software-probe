@@ -24,6 +24,9 @@ This project contains the probe code that powers software probes.
 We release binary packages for the `amd64` variants of Debian 11 & 12, (Oracle) Enterprise Linux 8 & 9, and `arm64` variant of Raspberry Pi OS 12.
 The source code also allows for building of an OpenWRT 22.03 package.
 
+> [!NOTE]
+> If you are upgrading from 5080 or earlier, please read [the corresponding section in the FAQ](#upgrading-from-5080-and-earlier).
+
 ## Installation
 
 ### Debian & Raspberry Pi OS
@@ -73,4 +76,21 @@ The public key is stored in `/etc/ripe-atlas/probe_key.pub`. Use it to register 
 
 The software probe uses TCP ports 2023 and 8080 internally.
 If another service is using these ports then the probe will not function correctly.
-To avoid conflicts, runtime configuration options can be used to make the probe use different port numbers.
+To avoid conflicts, [runtime configuration options](#configuration-options) can be used to make the probe use different port numbers.
+
+### Upgrading from 5080 and earlier
+
+#### Automatic updates
+
+Starting with release 5080 (September 2022), the package will no longer automatically update.
+
+The intent of this decision is to conform to operational practices andto make deployment and maintenance easier on hosts (and the Atlas team).
+If you wish to keep automatically updating your software probe, please install the automatic update package of your choice.
+
+Suggested solutions available are `yum-cron`, `dnf-automatic` or `unattended-upgrades`.
+
+#### Upgrade from atlasswprobe (5080)
+
+Upgrading from atlasswprobe will attempt to migrate existing probe keys and configuration.
+
+Existing probe state will be removed (`/var/atlas-probe`).
