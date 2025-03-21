@@ -89,8 +89,15 @@ If you wish to keep automatically updating your software probe, please install t
 
 Suggested solutions available are `yum-cron`, `dnf-automatic` or `unattended-upgrades`.
 
-#### Upgrade from atlasswprobe (5080)
+#### Upgrade from `atlasswprobe` (5080)
 
-Upgrading from atlasswprobe will attempt to migrate existing probe keys and configuration.
+The big change in 5090 was towards a more FHS compliant structure, moving away from `/var/atlas-probe/`.
 
-Existing probe state will be removed (`/var/atlas-probe`).
+As such, upgrading from `atlasswprobe` will attempt to migrate existing probe keys and configuration, while existing state in `/var/altas-probe` will be removed.
+
+We have tested the upgrade process thoroughly, but still recommend backing up your probe key and configuration files before upgrading.
+
+> [!CAUTION]
+> Removing `atlasswprobe` will remove data within `/var/atlas-probe`, including your key and configuration
+>
+> As such, **install the new version** instead of removing the old one and installing the new one.
