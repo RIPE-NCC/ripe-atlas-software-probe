@@ -233,3 +233,19 @@ deploy-ci-master:
     extends: .deploy-ci
     environment:
       name: master
+
+changelog:
+  image: python:3.11-alpine
+  stage: prepare
+  script:
+    - apk add git bash
+    - export SOFTWARE_PROBE_REPO="${PWD}"
+    - git clone ${CHANGELOG_REPO}
+    - $CHANGELOG
+  artifacts:
+    paths:
+      - $CHANGELOG_FILE
+    when: always # artifacts get produced when job fails
+  only:
+      - /^master$/
+  needs: []
