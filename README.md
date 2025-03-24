@@ -55,6 +55,10 @@ sudo rpm -Uvh ripe-atlas-repo-1.5-2.*.noarch.rpm
 sudo dnf install ripe-atlas-probe
 ```
 
+### Other platforms
+
+For other platforms, please refer to the [building instructions](BUILD.md).
+
 ## Configuration options
 
 Currently there are three runtime configuration options available.
