@@ -21,7 +21,7 @@ The source code can build 4 different packages:
 
 ## Enterprise Linux
 
-If you need to build the package yourself, even though we provide RPMs for `amd64` EL8 and EL9, you can use the following instructions:
+We provide RPMs for `amd64` EL8 and EL9, as shown in [README.md](README.md#enterprise-linux). To manually build an RPM package, we provide the following instructions
 
 ```sh
 # Building dependencies
@@ -56,7 +56,7 @@ popd
 
 ## Debian / RPi OS
 
-If you need to build the package yourself, even though we provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (cross-built from `amd64` Debian 12), you can use the following instructions:
+We provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (cross-built from `amd64` Debian 12), as shown in [README.md](README.md#debian--raspberry-pi-os). To manually build a DEB package, we provide the following instructions:
 
 ```sh
 # Building dependencies
