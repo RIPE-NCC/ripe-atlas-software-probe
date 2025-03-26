@@ -9,10 +9,13 @@
 %define		source_path		%{_builddir}/%{base_name}/.repo
 %define		repo_path		%{source_path}/%{repo_file}
 
+%define		repo_majver		%(find . -name REPO_MAJVER | head -1 | xargs -I {} sh -c "cat {}")
+%define		repo_minver		%(find . -name REPO_MINVER | head -1 | xargs -I {} sh -c "cat {}")
+
 Name:           ripe-atlas-repo
 Summary:        RIPE Atlas Software Probe Repo
-Version:        1.5
-Release:        2%{?dist}
+Version:        %{repo_majver}
+Release:        %{repo_minver}%{?dist}
 License:        RIPE NCC
 Group:          Applications/Internet
 BuildArch:	noarch
