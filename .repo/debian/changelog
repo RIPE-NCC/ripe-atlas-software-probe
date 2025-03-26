@@ -1,5 +1,11 @@
+ripe-atlas-repo (1.5-3) bookworm bullseye; urgency=medium
+
+  * Remove deprecated signing key for RHEL packages
+
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 26 Mar 2025 00:00:00 +0000
+
 ripe-atlas-repo (1.5-2) bookworm bullseye; urgency=medium
 
   * Initial version after restructuring
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Sep 2024 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Sep 2024 00:00:00 +0000

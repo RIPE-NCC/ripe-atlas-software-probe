@@ -1,8 +1,21 @@
-ripe-atlas-software-probe (5101) bookworm bullseye; urgency=medium
+ripe-atlas-software-probe (5110) bookworm bullseye; urgency=medium
 
-  * development version
+  * All platforms
+    - Updated telnetd.c to add a missing include which caused the probe's compilation to fail in Alpine Linux 3.21 (committed by César de Tassis Filho mailto:ctassisf@gmail.com)
+    - The code signing key introduced in release 5100 will as of this release be
+used to sign RHEL packages as well. The current RHEL key is therefore deprecated
+as of this release
+  * Software Probes
+    - Fixed typo in GitHub org url for RHEL ripe-atlas-anchor specfile (authored by by Pouria Mousavizadeh Tehrani mailto:info@spmzt.net)
+    - Fixed typo in GitHub org url for RHEL ripe-atlas-probe specfile (committed by eeple mailto:m.renusson@gmail.com)
+    - Hardened the security of the RIPE Atlas service unit (reported by Marek Küthe mailto:m.k@mk16.de)
+    - Added missing requirement for procps-ng on RHEL9 to RHEL probe package specfile (committed by Robert Scheck mailto:robert-scheck@users.noreply.github.com)
+    - Probe private/public key pair is now generated immediately after installation, without needing the service to start up
+    - Probe installation scripts also display registration instructions for RHEL a
+nd Debian
+    - Debian 12 arm64 support added
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 13 Mar 2025 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 26 Mar 2025 00:00:00 +0000
 
 ripe-atlas-software-probe (5100) bookworm bullseye; urgency=medium
 
@@ -16,7 +29,7 @@ ripe-atlas-software-probe (5100) bookworm bullseye; urgency=medium
     - systemd unit ownership moved to probe and anchor packages
     - Debian 11/12 x86_64 support added
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Sep 2024 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Sep 2024 00:00:00 +0000
 
 ripe-atlas-software-probe (5090) bookworm bullseye; urgency=medium
 
@@ -39,7 +52,7 @@ ripe-atlas-software-probe (5090) bookworm bullseye; urgency=medium
     - Bash is now a requirement
     - RPM now validates properly
 
- -- RIPE Atlas Team <atlas@ripe.net>  Fri, 12 Jul 2024 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Fri, 12 Jul 2024 00:00:00 +0000
 
 ripe-atlas-software-probe (5080) bookworm bullseye; urgency=medium
 
@@ -56,14 +69,14 @@ ripe-atlas-software-probe (5080) bookworm bullseye; urgency=medium
     - JSON style logging framework introduced, initially for process restarting
     - Filesystem bug fixed that prevented release of flash firmware
 
- -- RIPE Atlas Team <atlas@ripe.net>  Fri, 23 Sep 2022 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Fri, 23 Sep 2022 00:00:00 +0000
 
 ripe-atlas-software-probe (5070) bookworm bullseye; urgency=medium
 
   * Fix bug that caused processes to restart erroneously.
   * Added support for NTP size extension (by Daniel Drown)
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 31 May 2022 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 31 May 2022 00:00:00 +0000
 
 ripe-atlas-software-probe (5060) bookworm bullseye; urgency=medium
 
@@ -76,20 +89,20 @@ ripe-atlas-software-probe (5060) bookworm bullseye; urgency=medium
   * Updated cipher list in sslgetcert to Firefox 89.0.2
   * Support for DNS-over-HTTPS measurements
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 16 Mar 2022 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 16 Mar 2022 00:00:00 +0000
 
 ripe-atlas-software-probe (5050) bookworm bullseye; urgency=medium
 
   * This is an administrative release, it does not have any changes.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 16 Feb 2022 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 16 Feb 2022 00:00:00 +0000
 
 ripe-atlas-software-probe (5040) bookworm bullseye; urgency=medium
 
   * Measurement changes (version 2.4.1):
     - Firmware 5030 introduced a regression where a specific type of TCP connect failure would cause the probe to stop performing measurements.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Oct 2021 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Oct 2021 00:00:00 +0000
 
 ripe-atlas-software-probe (5030) bookworm bullseye; urgency=medium
 
@@ -104,7 +117,7 @@ ripe-atlas-software-probe (5030) bookworm bullseye; urgency=medium
     - Option to set AD bit in DNS queries
     - Initial support for testing Atlas measurement code
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 13 Sep 2021 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 13 Sep 2021 00:00:00 +0000
 
 ripe-atlas-software-probe (5020) bookworm bullseye; urgency=medium
 
@@ -114,7 +127,7 @@ ripe-atlas-software-probe (5020) bookworm bullseye; urgency=medium
   * Suppress some debug output from dfrm (measurement busybox 2.2.1)
   * Make response to a reg. server returning WAIT more robust
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 06 Apr 2020 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 06 Apr 2020 00:00:00 +0000
 
 ripe-atlas-software-probe (5010) bookworm bullseye; urgency=medium
 
@@ -131,7 +144,7 @@ ripe-atlas-software-probe (5010) bookworm bullseye; urgency=medium
     - 'httppost' should only set the system if the environment variable HTTPPOST_ALLOW_STIME is set
     - Add '--ttl' option in DNS measurements to report the TTL on replies (for UDP)
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 13 Jan 2020 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 13 Jan 2020 00:00:00 +0000
 
 ripe-atlas-software-probe (5000) bookworm bullseye; urgency=medium
 
@@ -144,13 +157,13 @@ ripe-atlas-software-probe (5000) bookworm bullseye; urgency=medium
   * Probe firmware 5000
     - First release of software probes - sync up probe firmware versions between hardware and software
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 07 Oct 2019 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 07 Oct 2019 00:00:00 +0000
 
 ripe-atlas-software-probe (4980) bookworm bullseye; urgency=medium
 
   * Disable TCP SACK
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 10 Apr 2019 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 10 Apr 2019 00:00:00 +0000
 
 ripe-atlas-software-probe (4970) bookworm bullseye; urgency=medium
 
@@ -158,14 +171,14 @@ ripe-atlas-software-probe (4970) bookworm bullseye; urgency=medium
   * Generate a new value for the "$r" macro in DNS measurements for each resolver when "use probe's resolvers" is in effect
   * Fixed a bug in TCP traceroute when some measurements did not run if there were more than 256 measurements defined
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 25 Mar 2019 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 25 Mar 2019 00:00:00 +0000
 
 ripe-atlas-software-probe (4960) bookworm bullseye; urgency=medium
 
   * Fix local time management to deal with cases where the probe did not adjust its local time correctly
   * Add support for reinstalling the current firmware if (filesystem) corruption is suspected
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 26 Feb 2019 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 26 Feb 2019 00:00:00 +0000
 
 ripe-atlas-software-probe (4950) bookworm bullseye; urgency=medium
 
@@ -175,7 +188,7 @@ ripe-atlas-software-probe (4950) bookworm bullseye; urgency=medium
   * Added support to send DNS queries with IPv6 destination option (API/UI support is in the works)
   * Code shuffles to record timestamps for response time as close as possible to sending and receiving calls
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 20 Feb 2019 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 20 Feb 2019 00:00:00 +0000
 
 ripe-atlas-software-probe (4940) bookworm bullseye; urgency=medium
 
@@ -189,13 +202,13 @@ ripe-atlas-software-probe (4940) bookworm bullseye; urgency=medium
   * Internal code changes to align the behaviour/scripts used on v3 and v4 probes
   * Fix a bug where probes no longer sent DNS "sos" queries
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 17 Jul 2018 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 17 Jul 2018 00:00:00 +0000
 
 ripe-atlas-software-probe (4930) bookworm bullseye; urgency=medium
 
   * This firmware is a clone of 4910, aimed exclusively for the upcoming v4 probes
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 21 May 2018 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 21 May 2018 00:00:00 +0000
 
 ripe-atlas-software-probe (4910) bookworm bullseye; urgency=medium
 
@@ -208,13 +221,13 @@ ripe-atlas-software-probe (4910) bookworm bullseye; urgency=medium
   * Anchor
     - Support added for CentOS 6 and 7
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 08 Jan 2018 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 08 Jan 2018 00:00:00 +0000
 
 ripe-atlas-software-probe (4790) bookworm bullseye; urgency=medium
 
   * This is a v1/v2 only release meant to fix stability issues that resulted in stretching the hardware capabilities too far.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 29 May 2017 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 29 May 2017 00:00:00 +0000
 
 ripe-atlas-software-probe (4780) bookworm bullseye; urgency=medium
 
@@ -225,14 +238,14 @@ ripe-atlas-software-probe (4780) bookworm bullseye; urgency=medium
   * Report time-to-complete in TLS/SSL results even if fetching the actual certificate fails
   * Fixed a bug where there were no results delivered for DNS measurements with the "include the abuf" option turned off
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 22 May 2017 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 22 May 2017 00:00:00 +0000
 
 ripe-atlas-software-probe (4770) bookworm bullseye; urgency=medium
 
   * Fixed a regression where DNS measurements using TCP transport always failed
   * Fixed a bug where WiFi measurements could sometimes report using the wrong outgoing network interface
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 22 Mar 2017 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 22 Mar 2017 00:00:00 +0000
 
 ripe-atlas-software-probe (4760) bookworm bullseye; urgency=medium
 
@@ -240,14 +253,14 @@ ripe-atlas-software-probe (4760) bookworm bullseye; urgency=medium
   * Unexpectedly terminated TCP connections caused SIGPIPE signals crashing the measurement the process
   * Various stability and security fixes to the measurement code
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 23 Feb 2017 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 23 Feb 2017 00:00:00 +0000
 
 ripe-atlas-software-probe (4750) bookworm bullseye; urgency=medium
 
   * First release of wifi firmware (4755)
   * Various security/stability fixes in the measurement code
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Jan 2017 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 24 Jan 2017 00:00:00 +0000
 
 ripe-atlas-software-probe (4740) bookworm bullseye; urgency=medium
 
@@ -258,7 +271,7 @@ ripe-atlas-software-probe (4740) bookworm bullseye; urgency=medium
   * Check for read-only USB and send SOS message if that's the case
   * Fixed kernel to not download new firmware if the usb stick is read-only
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 08 Aug 2016 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 08 Aug 2016 00:00:00 +0000
 
 ripe-atlas-software-probe (4730) bookworm bullseye; urgency=medium
 
@@ -267,7 +280,7 @@ ripe-atlas-software-probe (4730) bookworm bullseye; urgency=medium
   * Fixed an error case where  results of one-off traceroutes could have interfered with ongoing traceroutes
   * Added preliminary support for specifying a timeout parameter for DNS measurements
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 18 Jan 2016 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 18 Jan 2016 00:00:00 +0000
 
 ripe-atlas-software-probe (4720) bookworm bullseye; urgency=medium
 
@@ -281,13 +294,13 @@ ripe-atlas-software-probe (4720) bookworm bullseye; urgency=medium
   * The probes, in addition to the infrastructure, now also enforce the restriction that local (RFC1918 and link-local) addresses should not be measured.
   * When removing static configuration from a probe, the statically added previous DNS server was still used
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 05 Oct 2015 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 05 Oct 2015 00:00:00 +0000
 
 ripe-atlas-software-probe (4700) bookworm bullseye; urgency=medium
 
   * This is mostly a maintenance release, with internal behavioural changes only.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 06 Jul 2015 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 06 Jul 2015 00:00:00 +0000
 
 ripe-atlas-software-probe (4680) bookworm bullseye; urgency=medium
 
@@ -298,7 +311,7 @@ ripe-atlas-software-probe (4680) bookworm bullseye; urgency=medium
   * Stability issues on v1/v2 probes when HTTP measurements immediately fail with connection errors
   * "SSLCert" measurements now also support TLS
 
- -- RIPE Atlas Team <atlas@ripe.net>  Sat, 28 Mar 2015 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Sat, 28 Mar 2015 00:00:00 +0000
 
 ripe-atlas-software-probe (4670) bookworm bullseye; urgency=medium
 
@@ -306,7 +319,7 @@ ripe-atlas-software-probe (4670) bookworm bullseye; urgency=medium
   * Fixed wrong host header for IPv6 literals in http measurements
   * Probes are now trying to avoid starting too many measurements at exactly the same second
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 14 Jan 2015 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 14 Jan 2015 00:00:00 +0000
 
 ripe-atlas-software-probe (4660) bookworm bullseye; urgency=medium
 
@@ -316,7 +329,7 @@ ripe-atlas-software-probe (4660) bookworm bullseye; urgency=medium
   * Enhancement: in ping, report IP version and target address even if socket connect fails
   * Experimental suport for NTP measurements (not publicly available yet)
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 25 Aug 2014 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 25 Aug 2014 00:00:00 +0000
 
 ripe-atlas-software-probe (4650) bookworm bullseye; urgency=medium
 
@@ -327,7 +340,7 @@ ripe-atlas-software-probe (4650) bookworm bullseye; urgency=medium
   * Fixed bug in parsing multiple IPv6 extension headers in traceroute
   * Fixed bug in DNS where RA flag was set in requests
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 08 Jul 2014 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 08 Jul 2014 00:00:00 +0000
 
 ripe-atlas-software-probe (4610) bookworm bullseye; urgency=medium
 
@@ -336,13 +349,13 @@ ripe-atlas-software-probe (4610) bookworm bullseye; urgency=medium
   * Querying the local DNS resolver could result in multiple results (one per resolver), but these could not be accessed in the data store. The new version collects results from all resolvers into one data structure. See the /apis/result-format/#version-4610-dns-lookup for details.
   * In addition, this firmware adds preliminary support for using IPv6 extension headers. This will be available in the UI and in the API at a later date.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 17 Mar 2014 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 17 Mar 2014 00:00:00 +0000
 
 ripe-atlas-software-probe (4600) bookworm bullseye; urgency=medium
 
   * The new firmware release (4600) contains bug fixes for missing fields in ping results (TTL and source address). It also incorporates a more secure way for the probes to authenticate new firmwares before upgrading.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 17 Feb 2014 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 17 Feb 2014 00:00:00 +0000
 
 ripe-atlas-software-probe (4580) bookworm bullseye; urgency=medium
 
@@ -350,7 +363,7 @@ ripe-atlas-software-probe (4580) bookworm bullseye; urgency=medium
   * We upgraded the v3 probes to a new, corrected firmware version (4580), and improved the checks in our firmware release process. The new firmware is otherwise functionally equivalent to the previous one.
   * This issue did not affect version 1/2 probes and anchors.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 16 Dec 2013 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 16 Dec 2013 00:00:00 +0000
 
 ripe-atlas-software-probe (4570) bookworm bullseye; urgency=medium
 
@@ -362,13 +375,13 @@ ripe-atlas-software-probe (4570) bookworm bullseye; urgency=medium
   * Support "number of retries" option in DNS measurements
   * Note that the use of the new measurement flag will be enabled in the UI and API at a later stage.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Nov 2013 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Nov 2013 00:00:00 +0000
 
 ripe-atlas-software-probe (4520) bookworm bullseye; urgency=medium
 
   * This is a bug fix release for all probe architectures. There is a small bug in the probe measurement code that can be trigger only if a controller sends the wrong commands to a probe.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 23 Apr 2013 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 23 Apr 2013 00:00:00 +0000
 
 ripe-atlas-software-probe (4510) bookworm bullseye; urgency=medium
 
@@ -382,7 +395,7 @@ ripe-atlas-software-probe (4510) bookworm bullseye; urgency=medium
     - Kill Atlas processes on install/uninstall
     - Anchor now requires daemontools to be installed
 
- -- RIPE Atlas Team <atlas@ripe.net>  Tue, 23 Apr 2013 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Tue, 23 Apr 2013 00:00:00 +0000
 
 ripe-atlas-software-probe (4500) bookworm bullseye; urgency=medium
 
@@ -392,7 +405,7 @@ ripe-atlas-software-probe (4500) bookworm bullseye; urgency=medium
   * Fixed "error" : { "TUCONNECT" : "Success"}. Before this version DNS TCP and HTTPget reported an error message "Success".
   * First release of anchor package
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 28 Feb 2013 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 28 Feb 2013 00:00:00 +0000
 
 ripe-atlas-software-probe (4480) bookworm bullseye; urgency=medium
 
@@ -404,7 +417,7 @@ ripe-atlas-software-probe (4480) bookworm bullseye; urgency=medium
   * The probe uptime is now in the DNS SOS messages that are sent by probes before they try to connect. This will allow making a distinction between various reasons for disconnects: e.g. probe reboot vs. network problems.
   * Initial version for anchor package added (Anand Buddhev)
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 03 Oct 2012 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 03 Oct 2012 00:00:00 +0000
 
 ripe-atlas-software-probe (4470) bookworm bullseye; urgency=medium
 
@@ -413,19 +426,19 @@ ripe-atlas-software-probe (4470) bookworm bullseye; urgency=medium
     - The second one is where traceroute sometimes reports a timestamp of 0.
   * In addition, the firmware now has IPv6 literals for the registrations servers, so an IPv6-only probe can connect to a registration server even if it doesn't have a DNS resolver.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 20 Sep 2012 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 20 Sep 2012 00:00:00 +0000
 
 ripe-atlas-software-probe (4460) bookworm bullseye; urgency=medium
 
   * The main new feature in this firmware is the use of libevent and rewriting the measurement code to use it. This provides a much higher capacity for doing measurements. In addition, the probe now reports results in JSON. Expect the traceroute output to be completely different. The are a number of small changes. For example, the DHCP client now sets the client-id and vendor class. Please note that if you have given the probe a static IPv4 address through DHCP and the probes stops working then this may be caused by the change in DHCP client-id.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Jun 2012 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Thu, 21 Jun 2012 00:00:00 +0000
 
 ripe-atlas-software-probe (4310) bookworm bullseye; urgency=medium
 
   * This firmware contains a number of small fixes that deal with exceptional conditions. Probes should also reconnected slightly quicker after a disconnect.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 22 Feb 2012 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 22 Feb 2012 00:00:00 +0000
 
 ripe-atlas-software-probe (4270) bookworm bullseye; urgency=medium
 
@@ -433,16 +446,16 @@ ripe-atlas-software-probe (4270) bookworm bullseye; urgency=medium
   * Traceroutes to fixed destinations
   * DNS root server anycast instance checks
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 10 Oct 2011 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 10 Oct 2011 00:00:00 +0000
 
 ripe-atlas-software-probe (4030) bookworm bullseye; urgency=medium
 
   * We're in the process of rolling out a new firmware version. It enables a new feature that has been asked by members of the community: /howtos/probe-static-network-config.md. Using the UI, one can ask the probe to try to use static IPv4/IPv6 addresses (and DNS resolvers). If these settings don't work, the probes will fall back to using DHCP. As a byproduct, this feature also allows IPv6-only deployments.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 04 Jul 2011 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 04 Jul 2011 00:00:00 +0000
 
 ripe-atlas-software-probe (4020) bookworm bullseye; urgency=medium
 
   * The new firmware version enables the use of a second registration server (woolsey.atlas.ripe.net). All probes are expected to upgrade automatically in the coming days.
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 07 Feb 2011 00:00:00 -0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 07 Feb 2011 00:00:00 +0000

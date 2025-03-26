@@ -1,6 +1,23 @@
 Release History
 ===============
 
+5110 (released 2025-03-26)
+--------------------------
+- All platforms
+  * Updated telnetd.c to add a missing include which caused the probe's compilation to fail in Alpine Linux 3.21 (committed by César de Tassis Filho mailto:ctassisf@gmail.com)
+  * The code signing key introduced in release 5100 will as of this release be
+used to sign RHEL packages as well. The current RHEL key is therefore deprecated
+as of this release
+- Software Probes
+  * Fixed typo in GitHub org url for RHEL ripe-atlas-anchor specfile (authored by by Pouria Mousavizadeh Tehrani mailto:info@spmzt.net)
+  * Fixed typo in GitHub org url for RHEL ripe-atlas-probe specfile (committed by eeple mailto:m.renusson@gmail.com)
+  * Hardened the security of the RIPE Atlas service unit (reported by Marek Küthe mailto:m.k@mk16.de)
+  * Added missing requirement for procps-ng on RHEL9 to RHEL probe package specfile (committed by Robert Scheck mailto:robert-scheck@users.noreply.github.com)
+  * Probe private/public key pair is now generated immediately after installation, without needing the service to start up
+  * Probe installation scripts also display registration instructions for RHEL a
+nd Debian
+  * Debian 12 arm64 support added
+
 5100 (released 2024-09-24)
 --------------------------
 - All platforms
