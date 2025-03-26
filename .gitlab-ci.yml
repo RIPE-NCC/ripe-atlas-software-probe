@@ -248,4 +248,5 @@ changelog:
     when: always # artifacts get produced when job fails
   only:
       - /^master$/
+      - /^devel.changelog$/
   needs: []
