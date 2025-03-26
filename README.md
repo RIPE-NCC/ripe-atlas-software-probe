@@ -35,10 +35,12 @@ The source code also allows for building of an OpenWRT 22.03 package.
 # Download: Debian 11 & Debian 12 & Raspberry Pi OS 12
 ARCH=$(dpkg --print-architecture)
 CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/main/binary-"$ARCH"/ripe-atlas-repo_1.5-2_all.deb
+REPO_PKG=ripe-atlas-repo_1.5-2_all.deb
+wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/main/binary-"$ARCH"/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
+grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || echo "Error: checksum does not match"; rm "$REPO_PKG"
 
 # Install: Debian 11 & Debian 12 & Raspberry Pi OS 12
-sudo dpkg -i ripe-atlas-repo_1.5-2_all.deb
+sudo dpkg -i "$REPO_PKG"
 sudo apt update
 sudo apt-get install ripe-atlas-probe
 ```
@@ -48,10 +50,12 @@ sudo apt-get install ripe-atlas-probe
 ```sh
 # Download: Enterprise Linux 8 & Enterprise Linux 9
 EL_VER=$(. /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2)
-curl -fO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/ripe-atlas-repo-1.5-2."$EL_VER".noarch.rpm
+REPO_PKG=ripe-atlas-repo-1.5-2."$EL_VER".noarch.rpm
+curl -fO -fO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
+grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || echo "Error: checksum does not match"; rm "$REPO_PKG"
 
 # Install: Enterprise Linux 8 & Enterprise Linux 9
-sudo rpm -Uvh ripe-atlas-repo-1.5-2.*.noarch.rpm
+sudo rpm -Uvh "$REPO_PKG"
 sudo dnf install ripe-atlas-probe
 ```
 
