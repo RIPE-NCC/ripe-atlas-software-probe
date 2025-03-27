@@ -54,6 +54,14 @@ popd
 > | `git_commit` | Specify a particular commit hash | |
 >
 
+> [!TIP]
+> The signed packages we provide can be verified using `rpm`:
+> ```sh
+> rpm --import /etc/pki/rpm-gpg/*ripe-atlas*
+> rpm -K ./ripe-atlas*.rpm
+> ```
+> This can **only** be done after the `ripe-atlas-repo` package has been installed.
+
 ## Debian / RPi OS
 
 We provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (cross-built from `amd64` Debian 12), as shown in [README.md](README.md#debian--raspberry-pi-os). To manually build a DEB package, we provide the following instructions:
