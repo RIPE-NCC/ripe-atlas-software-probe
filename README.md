@@ -37,7 +37,7 @@ ARCH=$(dpkg --print-architecture)
 CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
 REPO_PKG=ripe-atlas-repo_1.5-2_all.deb
 wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/main/binary-"$ARCH"/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
-grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || echo "Error: checksum does not match"; rm "$REPO_PKG"
+grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG"
 
 # Install: Debian 11 & Debian 12 & Raspberry Pi OS 12
 sudo dpkg -i "$REPO_PKG"
@@ -52,7 +52,7 @@ sudo apt-get install ripe-atlas-probe
 EL_VER=$(. /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2)
 REPO_PKG=ripe-atlas-repo-1.5-2."$EL_VER".noarch.rpm
 curl -fO -fO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
-grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || echo "Error: checksum does not match"; rm "$REPO_PKG"
+grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG"
 
 # Install: Enterprise Linux 8 & Enterprise Linux 9
 sudo rpm -Uvh "$REPO_PKG"
