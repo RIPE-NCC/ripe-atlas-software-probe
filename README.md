@@ -24,9 +24,6 @@ This project contains the probe code that powers software probes.
 We release binary packages for the `amd64` variants of Debian 11 & 12, (Oracle) Enterprise Linux 8 & 9, and `arm64` variant of Raspberry Pi OS 12.
 The source code also allows for building of an OpenWRT 22.03 package.
 
-> [!NOTE]
-> If you are upgrading from 5080 or earlier, please read [the corresponding section in the FAQ](#upgrading-from-5080-and-earlier).
-
 ## Installation
 
 ### Debian & Raspberry Pi OS
@@ -74,6 +71,24 @@ To use them, create the file `/etc/ripe-atlas/config.txt` and add a line per des
 | `TELNETD_PORT` | TCP port used for telnetd | `TELNETD_PORT=2023` |
 | `HTTP_POST_PORT` | TCP port used for httppost | `HTTPD_PORT=8080` |
 
+## Upgrading
+
+### v5090 and later
+
+For officially supported and provided packages, use your system's package manager to upgrade the package:
+
+* Debian: `apt update && apt upgrade`
+* Enterprise Linux: `dnf upgrade`
+
+### v5080 and earlier (`atlasswprobe`)
+
+Follow the [standard installation instructions](#installation) to upgrade to the latest version.
+
+See [the FAQ](#upgrade-from-atlasswprobe-5080) for more information about the upgrade process and changes.
+
+> [!NOTE]
+> We have tested the upgrade process thoroughly, but still recommend backing up your probe key and configuration files before upgrading.
+
 ## FAQ
 
 ### Generic installation instructions
@@ -92,20 +107,26 @@ To avoid conflicts, [runtime configuration options](#configuration-options) can 
 
 Starting with release 5080 (September 2022), the package will no longer automatically update.
 
-The intent of this decision is to conform to operational practices andto make deployment and maintenance easier on hosts (and the Atlas team).
+The intent of this decision is to conform to operational practices and to make deployment and maintenance easier on hosts (and the Atlas team).
 If you wish to keep automatically updating your software probe, please install the automatic update package of your choice.
 
 Suggested solutions available are `yum-cron`, `dnf-automatic` or `unattended-upgrades`.
 
 #### Upgrade from `atlasswprobe` (5080)
 
-The big change in 5090 was towards a more FHS compliant structure, moving away from `/var/atlas-probe/`.
+To upgrade from 5080 on Debian, or on older non-repo Enterprise Linux versions, you can follow [the standard installation instructions](#installation).
 
-As such, upgrading from `atlasswprobe` will attempt to migrate existing probe keys and configuration, while existing state in `/var/altas-probe` will be removed.
+Upgrading from `atlasswprobe` will attempt to migrate existing probe keys and configuration, while existing state in `/var/altas-probe/` will be removed, as the big change in 5090 was towards a more FHS compliant structure, moving away from `/var/atlas-probe/`.
 
-We have tested the upgrade process thoroughly, but still recommend backing up your probe key and configuration files before upgrading.
+Due to the changes, even though we have tested the upgrade process thoroughly, we still recommend backing up your probe key and configuration files before upgrading.
 
 > [!CAUTION]
 > Removing `atlasswprobe` will remove data within `/var/atlas-probe`, including your key and configuration
 >
-> As such, **install the new version** instead of removing the old one and installing the new one.
+> As such, **install the new version** instead of removing the old one and installing the new one. The old version will automatically be removed.
+
+> [!TIP]
+> If you did remove the old version, **your original key has been deleted** and a new one has been generated.
+> Your new key will have been printed during the installation, but you can also find it in `/etc/ripe-atlas/probe_key.pub`.
+>
+> To update your key, go to [your probes page on atlas.ripe.net](https://atlas.ripe.net/probes/mine), click on the respective probe ID, and click on "Manage". On this page, you can update the SSH key of your probe.
