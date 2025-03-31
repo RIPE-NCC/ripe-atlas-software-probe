@@ -14,4 +14,6 @@ RUN dpkg --add-architecture arm64 && \
         # hidden dependency for .repo
         gpg \
         # .service file (from initial .in file) is not found otherwise
-        systemd
+        systemd \
+	# .repo uses it to determine distribution (.in file)
+	lsb-release
