@@ -11,6 +11,7 @@ Release History
   * Fixed typo in GitHub org url for RHEL ripe-atlas-probe specfile (authored by eeple mailto:m.renusson@gmail.com)
   * Hardened the security of the RIPE Atlas service unit (reported by Marek Küthe mailto:m.k@mk16.de)
   * Added missing requirement for procps-ng on RHEL9 to RHEL probe package specfile (authored by Robert Scheck mailto:robert-scheck@users.noreply.github.com)
+  * Document runtime options for custom TCP ports (authored by AtlasMUC mailto:AtlasMUC@mail.de)
   * Probe private/public key pair is now generated immediately after installation, without needing the service to start up
   * Probe installation scripts also display registration instructions for RHEL and Debian
   * Debian 12 arm64 support added
