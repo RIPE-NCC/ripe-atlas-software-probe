@@ -48,7 +48,7 @@ sudo apt-get install ripe-atlas-probe
 # Download: Enterprise Linux 8 & Enterprise Linux 9
 EL_VER=$(. /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2)
 REPO_PKG=ripe-atlas-repo-1.5-3."$EL_VER".noarch.rpm
-curl -fO -fO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
+curl -fO -LfO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
 grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || ( printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG" )
 
 # Install: Enterprise Linux 8 & Enterprise Linux 9
