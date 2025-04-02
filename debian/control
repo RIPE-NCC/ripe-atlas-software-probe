@@ -21,6 +21,7 @@ Depends:
  openssh-client,
  psmisc,
  systemd,
+ libcap2-bin,
 Section: net
 Priority: optional
 Homepage: https://atlas.ripe.net/
