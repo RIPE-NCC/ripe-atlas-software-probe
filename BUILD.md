@@ -126,7 +126,7 @@ service ripe-atlas start
 
 ## Manual
 
-The software probe can be built and insatlled manually using `autoconf` tooling, but we recommend against it.
+The software probe can be built and installed manually using `autoconf` tooling, but we recommend against it.
 
 ```sh
 # Building
