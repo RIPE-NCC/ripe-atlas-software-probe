@@ -68,7 +68,7 @@ We provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (c
 
 ```sh
 # Building dependencies
-sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools
+sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools systemd
 git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 pushd ripe-atlas-software-probe
 git checkout master
@@ -92,6 +92,13 @@ popd
 > debsig-verify ./ripe-atlas-probe_*.deb
 > ```
 > This can **only** be done after the `ripe-atlas-repo` package has been installed.
+
+> [!TIP]
+> If you have an error mentioning `setcap: not found`, you can install the `libcap2-bin` package:
+> ```sh
+> apt-get install libcap2-bin
+> ```
+> This will be fixed in a future release.
 
 ## OpenWRT
 
