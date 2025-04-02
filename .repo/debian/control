@@ -6,6 +6,8 @@ Build-Depends:
  autotools-dev,
  libssl-dev,
  gpg,
+Depends:
+ ca-certificates,
 Rules-Requires-Root: binary-targets
 Maintainer: RIPE Atlas Team <atlas@ripe.net>
 Uploaders: Trix Taiclet <ttaiclet@ripe.net>,
