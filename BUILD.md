@@ -19,6 +19,44 @@ The source code can build 4 different packages:
 > [!TIP]
 > It is not required to install `sudo`, even though the instructions might make use of it; having root privileges is sufficient.
 
+## Debian / RPi OS
+
+We provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (cross-built from `amd64` Debian 12), as shown in [README.md](README.md#debian--raspberry-pi-os). To manually build a DEB package, we provide the following instructions:
+
+```sh
+# Building dependencies
+sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools systemd
+git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
+pushd ripe-atlas-software-probe
+git checkout master
+
+# Building the packages
+dpkg-buildpackage -b -us -uc
+cp ../ripe-atlas-*.deb .
+pushd .repo
+dpkg-buildpackage -b -us -uc
+popd
+
+# Installing the probe package
+sudo dpkg -i ripe-atlas-common*.deb ripe-atlas-probe*.deb
+# Follow the instructions printed after installation to start and register and your probe
+popd
+```
+
+> [!TIP]
+> The signed packages we provide can be verified using `debsig-verify`:
+> ```sh
+> debsig-verify ./ripe-atlas-probe_*.deb
+> ```
+> This can **only** be done after the `ripe-atlas-repo` package has been installed.
+
+> [!TIP]
+> If you have an error mentioning `setcap: not found`, you can install the `libcap2-bin` package:
+> ```sh
+> apt-get install libcap2-bin
+> ```
+> This will be fixed in a future release.
+
 ## Enterprise Linux
 
 We provide RPMs for `amd64` EL8 and EL9, as shown in [README.md](README.md#enterprise-linux). To manually build an RPM package, we provide the following instructions
@@ -61,44 +99,6 @@ popd
 > rpm -K ./ripe-atlas*.rpm
 > ```
 > This can **only** be done after the `ripe-atlas-repo` package has been installed.
-
-## Debian / RPi OS
-
-We provide DEBs for `amd64` Debian 11 & 12 and `arm64` for Raspberry Pi OS 12 (cross-built from `amd64` Debian 12), as shown in [README.md](README.md#debian--raspberry-pi-os). To manually build a DEB package, we provide the following instructions:
-
-```sh
-# Building dependencies
-sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools systemd
-git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
-pushd ripe-atlas-software-probe
-git checkout master
-
-# Building the packages
-dpkg-buildpackage -b -us -uc
-cp ../ripe-atlas-*.deb .
-pushd .repo
-dpkg-buildpackage -b -us -uc
-popd
-
-# Installing the probe package
-sudo dpkg -i ripe-atlas-common*.deb ripe-atlas-probe*.deb
-# Follow the instructions printed after installation to start and register and your probe
-popd
-```
-
-> [!TIP]
-> The signed packages we provide can be verified using `debsig-verify`:
-> ```sh
-> debsig-verify ./ripe-atlas-probe_*.deb
-> ```
-> This can **only** be done after the `ripe-atlas-repo` package has been installed.
-
-> [!TIP]
-> If you have an error mentioning `setcap: not found`, you can install the `libcap2-bin` package:
-> ```sh
-> apt-get install libcap2-bin
-> ```
-> This will be fixed in a future release.
 
 ## OpenWRT
 
