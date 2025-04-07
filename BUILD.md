@@ -107,7 +107,7 @@ These instructions make use of OpenWRT's build system. This has been tested for 
 Add the following line as a feed in `feeds.conf`:
 
 ```text
-src-git ripe-atlas git@github.com:RIPE-NCC/ripe-atlas-software-probe.git
+src-git ripeatlas https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 ```
 
 Then run `scripts/feeds install -a` from the toplevel OpenWRT directory.
