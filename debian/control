@@ -6,7 +6,9 @@ Build-Depends:
  autotools-dev,
  libssl-dev,
 Rules-Requires-Root: binary-targets
-Maintainer: Michel Stam <mstam@ripe.net>
+Maintainer: RIPE Atlas Team <atlas@ripe.net>
+Uploaders: Trix Taiclet <ttaiclet@ripe.net>,
+           Marios Mavropoulos <mmavropoulos@ripe.net>
 
 Package: ripe-atlas-common
 Architecture: any
