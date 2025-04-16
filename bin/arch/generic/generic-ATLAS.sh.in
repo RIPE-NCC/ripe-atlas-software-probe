@@ -49,7 +49,7 @@ get_ether_addr
 
 # Create ssh keys if they are not there yet.
 if [ ! -f $ATLAS_SYSCONFDIR/probe_key ]; then
-    name=$(hostname -s)
+    name=$(uname -n)
     ssh-keygen -t rsa -P '' -C $name -f $ATLAS_SYSCONFDIR/probe_key
     chown -R @ripe_atlas_user@:@ripe_atlas_group@ $ATLAS_SYSCONFDIR
 fi
