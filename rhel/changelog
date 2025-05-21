@@ -16,7 +16,7 @@
 * Tue Sep 24 2024 RIPE Atlas Team <atlas@ripe.net> - 5100
 - All platforms
   - As of this version, the ripe-atlas-probe-measurements repository on GitHub is deprecated. Its code has been merged into the ripe-atlas-software-probe repository
-  - Package can now be built with arbitrary shell shebangs. Note that only OpenWRT ash and bash are officially supported
+  - Package can now be built with arbitrary shell shebangs. Note that only OpenWrt ash and bash are officially supported
   - Bug fixed where permissions are wrong when systemd is disabled (reported by César de Tassis Filho mailto:ctassisf@gmail.com)
   - A new code signing key has been introduced. It only signs Debian packages currently, but will sign the RHEL packages in an upcoming release as well. The current RHEL key will then be deprecated
 - Software probes
@@ -35,7 +35,7 @@
 - Software probes
   - Added support for Oracle EL8 and RHEL9 (Oracle EL9 / Rocky Linux 9)
   - Added initial code for Debian 11/12 (Support incomplete)
-  - Added initial code for OpenWRT 22.03 (Support incomplete)
+  - Added initial code for OpenWrt 22.03 (Support incomplete)
   - Fix Atlas not working on SELinux (RHBA-2023:5062); Robert Scheck
   - Sanitised log messages (unnecessary errors)
   - Probe sub architecture now reports ID, VERSION and PLATFORM
@@ -53,7 +53,7 @@
 - Cleanup on v3 hardware probe to align with v4 and v5 probes.
   - Streamline build process for flash and USB firmware
   - Removal of unused software / functionality
-  - Revert to stock OpenWRT insofar as possible
+  - Revert to stock OpenWrt insofar as possible
   - Code refactoring to remove duplicate implementation of LED behaviour
   - JSON style logging framework introduced, initially for process restarting
   - Filesystem bug fixed that prevented release of flash firmware

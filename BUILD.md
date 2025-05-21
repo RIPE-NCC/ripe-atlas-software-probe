@@ -100,9 +100,9 @@ popd
 > ```
 > This can **only** be done after the `ripe-atlas-repo` package has been installed.
 
-## OpenWRT
+## OpenWrt
 
-These instructions make use of OpenWRT's build system. This has been tested for OpenWRT 22.03, which will be fully supported in an upcoming release.
+These instructions make use of OpenWrt's build system. This has been tested for OpenWrt 22.03, which will be fully supported in an upcoming release.
 
 Add the following line as a feed in `feeds.conf`:
 
@@ -110,7 +110,7 @@ Add the following line as a feed in `feeds.conf`:
 src-git ripeatlas https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 ```
 
-Then run `scripts/feeds install -a` from the toplevel OpenWRT directory.
+Then run `scripts/feeds install -a` from the toplevel OpenWrt directory.
 
 The default branch checked out is master, other branches can be checked out by appending `;<BRANCH>` or `^commit` to the line. See [the upstream feeds docs](https://openwrt.org/docs/guide-developer/feeds) for more information.
 
