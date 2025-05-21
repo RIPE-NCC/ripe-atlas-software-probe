@@ -21,7 +21,7 @@ CHOWN_FOR_MSM=:
 CHMOD_FOR_MSM=chmod_for_msm
 SET_HOSTNAME=:
 
-# For OpenWRT we need telnetd to run as root.
+# For OpenWrt we need telnetd to run as root.
 telnetd()
 {
 	$SU_CMD $BB_BASE_DIR/usr/sbin/telnetd "$@"

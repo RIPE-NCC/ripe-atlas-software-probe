@@ -22,7 +22,7 @@
 This project contains the probe code that powers software probes.
 
 We release binary packages for the `amd64` variants of Debian 11 & 12, (Oracle) Enterprise Linux 8 & 9, and `arm64` variant of Raspberry Pi OS 12.
-The source code also allows for building of an OpenWRT 22.03 package.
+The source code also allows for building of an OpenWrt 22.03 package.
 
 ## Installation
 
