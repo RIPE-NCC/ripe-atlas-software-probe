@@ -234,7 +234,7 @@ deploy-ci-master:
     environment:
       name: master
 
-changelog:
+.changelog:
   image: python:3.11-alpine
   stage: prepare
   script:
@@ -246,7 +246,18 @@ changelog:
     paths:
       - $CHANGELOG_FILE
     when: always # artifacts get produced when job fails
-  only:
-      - /^master$/
-      - /^devel.changelog$/
   needs: []
+
+changelog-manual:
+  extends: .changelog
+  except:
+    - master
+    - testing
+  allow_failure: true
+  when: manual
+
+changelog-automatic:
+  extends: .changelog
+  only:
+    - master
+    - testing
