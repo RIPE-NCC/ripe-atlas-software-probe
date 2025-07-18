@@ -543,6 +543,7 @@ static void send_pkt(struct ntpstate *state)
 	}
 
 	ntphdr->ntp_flags= (NTP_VERSION << NTP_VERSION_SHIFT) | NTP_MODE_CLIENT;
+	ntphdr->ntp_reference_id= htonl(0x52495045);  /* "RIPE" */
 
 	gettimeofday(&state->xmit_time, NULL);
 
