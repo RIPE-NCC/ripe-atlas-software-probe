@@ -28,6 +28,7 @@ build_image:
           - deb11
           - deb12
           - deb12-arm64
+          - deb13
           - ol8
           - ol9
           - prep
@@ -49,6 +50,7 @@ build-ci-debian:
     paths: # dynamic variables (exported from script) cannot be used
       - ./bookworm
       - ./bullseye
+      - ./trixie
     expire_in: never
   dependencies: [] # Don't download any artifacts
   parallel:
@@ -57,8 +59,11 @@ build-ci-debian:
         OS:
           - deb11
           - deb12
+          - deb13
       - ARCH: arm64
-        OS: deb12-arm64
+        OS:
+          - deb12-arm64
+          - deb13
         CROSS_COMPILE: aarch64-linux-gnu-
         CROSS_ARGS: -aarm64 -Pcross,nocheck
 
@@ -147,6 +152,7 @@ lint-ci-rhel:
         OS_VERSION:
           - bullseye
           - bookworm
+          - trixie
 
 prepare-ci-devel:
     extends: .prepare-ci
@@ -199,6 +205,7 @@ approve-ci:
         OS_VERSION:
           - bullseye
           - bookworm
+          - trixie
   resource_group: deploy
 
 deploy-ci-devel:
