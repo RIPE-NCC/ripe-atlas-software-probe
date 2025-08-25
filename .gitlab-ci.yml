@@ -31,6 +31,8 @@ build_image:
           - deb13
           - ol8
           - ol9
+          - ol10
+          - ol10-rpmlint
           - prep
 
 build-ci-debian:
@@ -103,12 +105,15 @@ build-ci-rhel:
     paths: # dynamic variables (exported from script) cannot be used
       - ./el8
       - ./el9
+      - ./el10
     expire_in: never
   dependencies: [] # Don't download any artifacts
   parallel:
     matrix:
-      - OS: ol8
-      - OS: ol9
+      - OS:
+        - ol8
+        - ol9
+        - ol10
 
 lint-ci-rhel:
   stage: lint
@@ -128,8 +133,10 @@ lint-ci-rhel:
     - build-ci-rhel # Only download artifacts for RHEL
   parallel:
     matrix:
-      - OS: ol8
-      - OS: ol9
+      - OS:
+        - ol8
+        - ol9
+        - ol10-rpmlint
 
 .prepare-ci:
   stage: prepare
@@ -148,6 +155,7 @@ lint-ci-rhel:
         OS_VERSION:
           - el8
           - el9
+          - el10
       - OS_DISTRIBUTION: debian
         OS_VERSION:
           - bullseye
@@ -200,6 +208,7 @@ approve-ci:
         OS_VERSION:
           - el8
           - el9
+          - el10
       - OS_DISTRIBUTION: debian
         DEBIAN_ONLY: dists/
         OS_VERSION:
