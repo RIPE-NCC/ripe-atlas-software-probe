@@ -43,7 +43,7 @@ Group:      	Applications/Internet
 Version:    	%{version}
 Release:    	1%{?dist}
 License:    	GPLv3.0
-Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} %{?el9:procps-ng} net-tools hostname /bin/sh bash
+Requires:   	%{?el6:daemontools} %{?el7:psmisc} %{?el8:psmisc} openssh-clients iproute %{?el7:sysvinit-tools} %{?el8:procps-ng} %{?el9:procps-ng} %{?el10:procps-ng} net-tools hostname /bin/sh bash
 Requires(pre):  %{_sbindir}/semanage %{_bindir}/systemd-sysusers %{_bindir}/systemd-tmpfiles
 Requires(post): %{_sbindir}/semanage
 BuildRequires:	rpm systemd-rpm-macros %{?el7:systemd} %{?el8:systemd} openssl-devel autoconf automake libtool make
