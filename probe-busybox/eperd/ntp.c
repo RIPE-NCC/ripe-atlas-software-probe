@@ -903,13 +903,13 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 	snprintf(line, sizeof(line), ", " DBQ(rtt) ": %f", d);
 	add_str(state, line);
 
-	d= (ntohl(ntphdr->ntp_origin_ts.ntp_seconds) +
-		final_ts.ntp_seconds)/2.0 -
-		(ntohl(ntphdr->ntp_receive_ts.ntp_seconds) +
-		ntohl(ntphdr->ntp_transmit_ts.ntp_seconds))/2.0 +
-		(ntohl(ntphdr->ntp_origin_ts.ntp_fraction)/NTP_4G +
-		final_ts.ntp_fraction/NTP_4G)/2.0 -
-		(ntohl(ntphdr->ntp_receive_ts.ntp_fraction)/NTP_4G +
+	d= (ntohl(ntphdr->ntp_origin_ts.ntp_seconds) -
+		final_ts.ntp_seconds)/2.0 +
+		(ntohl(ntphdr->ntp_receive_ts.ntp_seconds) -
+		ntohl(ntphdr->ntp_transmit_ts.ntp_seconds))/2.0 -
+		(ntohl(ntphdr->ntp_origin_ts.ntp_fraction)/NTP_4G -
+		final_ts.ntp_fraction/NTP_4G)/2.0 +
+		(ntohl(ntphdr->ntp_receive_ts.ntp_fraction)/NTP_4G -
 		ntohl(ntphdr->ntp_transmit_ts.ntp_fraction)/NTP_4G)/2.0;
 	snprintf(line, sizeof(line), ", " DBQ(offset) ": %f", d);
 	add_str(state, line);
