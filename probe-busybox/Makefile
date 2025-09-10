@@ -271,8 +271,8 @@ export quiet Q KBUILD_VERBOSE
 # Look for make include files relative to root of kernel src
 MAKEFLAGS += --include-dir=$(srctree)
 
-HOSTCC  	= gcc
-HOSTCXX  	= g++
+HOSTCC  	?= gcc
+HOSTCXX  	?= g++
 HOSTCFLAGS	:=
 HOSTCXXFLAGS	:=
 # We need some generic definitions
@@ -289,7 +289,7 @@ MAKEFLAGS += -rR
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
-CC		= $(CROSS_COMPILE)gcc
+CC		?= $(CROSS_COMPILE)gcc
 LD		= $(CC) -nostdlib
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar

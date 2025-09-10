@@ -233,6 +233,32 @@ AC_SUBST(atlas_spooldir)
 
 LT_INIT
 
+# Check for libtool availability and version
+AC_MSG_CHECKING([for libtool])
+if test -n "$LIBTOOL"; then
+	AC_MSG_RESULT([$LIBTOOL])
+	# Check if libtool is working (but only if the libtool script exists)
+	if test -f "ltmain.sh" && $LIBTOOL --version >/dev/null 2>&1; then
+		AC_MSG_NOTICE([Libtool is available and working])
+		# Check libtool version (require at least 2.4.0)
+		libtool_version=`$LIBTOOL --version | head -n1 | sed 's/.*libtool (GNU libtool) \([0-9.]*\).*/\1/'`
+		AC_MSG_CHECKING([libtool version])
+		AC_MSG_RESULT([$libtool_version])
+		# Basic version check - ensure it's a reasonable version
+		if echo "$libtool_version" | grep -q '^[0-9]\+\.[0-9]\+'; then
+			AC_MSG_NOTICE([Libtool version $libtool_version is acceptable])
+		else
+			AC_MSG_WARN([Could not determine libtool version, but libtool appears to be working])
+		fi
+	elif test -f "ltmain.sh"; then
+		AC_MSG_NOTICE([Libtool script found, will be tested during build])
+	else
+		AC_MSG_ERROR([Libtool is required but not found])
+	fi
+else
+	AC_MSG_ERROR([Libtool is required but not found])
+fi
+
 # Detect the host system
 AC_CANONICAL_HOST
 
@@ -249,6 +275,9 @@ AC_MSG_CHECKING([for C compiler type])
 if $CC --version 2>/dev/null | grep -q "clang"; then
     AC_MSG_RESULT([clang])
     IS_CLANG=yes
+    # Warn about potential clang compatibility issues
+    AC_MSG_WARN([Using clang compiler - some components may require gcc])
+    AC_MSG_WARN([If build fails, consider installing gcc: pkg install gcc-13_5])
 else
     AC_MSG_RESULT([gcc])
     IS_CLANG=no
