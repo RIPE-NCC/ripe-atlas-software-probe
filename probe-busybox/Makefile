@@ -503,7 +503,11 @@ libs-y		:= \
 		miscutils/ \
 		networking/ \
 		libevent-2.1.11-stable/.libs/libevent.a \
-		libevent-2.1.11-stable/.libs/libevent_openssl.a \
+
+# Conditionally include OpenSSL library if it exists
+ifneq ($(wildcard libevent-2.1.11-stable/.libs/libevent_openssl.a),)
+libs-y += libevent-2.1.11-stable/.libs/libevent_openssl.a
+endif
 
 endif # KBUILD_EXTMOD
 
@@ -734,8 +738,13 @@ busybox: busybox_unstripped
 ifeq ($(SKIP_STRIP),y)
 	$(Q)cp $< $@
 else
+ifeq ($(shell uname -s),Darwin)
+	$(Q)cp busybox_unstripped $@
+	$(Q)$(STRIP) $@
+else
 	$(Q)$(STRIP) -s --remove-section=.note --remove-section=.comment \
 		busybox_unstripped -o $@
+endif
 # strip is confused by PIE executable and does not set exec bits
 	$(Q)chmod a+x $@
 endif

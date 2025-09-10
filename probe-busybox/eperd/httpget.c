@@ -915,8 +915,16 @@ static void report(struct hgstate *state)
 				state->socklen, namebuf, sizeof(namebuf),
 				NULL, 0, NI_NUMERICHOST);
 
+					/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
 			snprintf(line, sizeof(line),
-				", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
+				", " DBQ(dst_addr) ":" DBQ(%s), truncated);
+		}
 			add_str(state, line);
 		}
 
@@ -939,8 +947,16 @@ static void report(struct hgstate *state)
 			state->loc_socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line), ", " DBQ(src_addr) ":" DBQ(%s),
-			namebuf);
+		/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
+			snprintf(line, sizeof(line), ", " DBQ(src_addr) ":" DBQ(%s),
+				truncated);
+		}
 		add_str(state, line);
 	}
 
@@ -2078,8 +2094,16 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 			env->dns_curr->ai_addrlen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line),
-			", " DBQ(dst_addr) ":" DBQ(%s) " }", namebuf);
+		/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
+			snprintf(line, sizeof(line),
+				", " DBQ(dst_addr) ":" DBQ(%s) " }", truncated);
+		}
 		add_str(state, line);
 
 		state->dnserr= 1;

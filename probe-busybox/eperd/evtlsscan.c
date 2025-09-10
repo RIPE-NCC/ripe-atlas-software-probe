@@ -31,6 +31,9 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>

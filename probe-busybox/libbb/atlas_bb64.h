@@ -8,7 +8,7 @@ struct buf
         size_t offset;
         size_t size;
         size_t maxsize;
-        char *buf;
+        unsigned char *buf;
         int fd;
 };
 

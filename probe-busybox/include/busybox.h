@@ -40,11 +40,14 @@ extern const uint8_t applet_install_loc[] ALIGN1;
 #endif
 
 #if ENABLE_FEATURE_INSTALLER
-#define APPLET_INSTALL_LOC(i) ({ \
-	unsigned v = (i); \
-	if (v & 1) v = applet_install_loc[v/2] >> 4; \
-	else v = applet_install_loc[v/2] & 0xf; \
-	v; })
+static ALWAYS_INLINE unsigned applet_install_loc_func(unsigned i)
+{
+	unsigned v = i;
+	if (v & 1) v = applet_install_loc[v/2] >> 4;
+	else v = applet_install_loc[v/2] & 0xf;
+	return v;
+}
+#define APPLET_INSTALL_LOC(i) applet_install_loc_func(i)
 #endif
 
 

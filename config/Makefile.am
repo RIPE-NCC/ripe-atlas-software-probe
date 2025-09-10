@@ -53,6 +53,10 @@ endif
 
 endif
 
+# FreeBSD rc.d service script
+CLEANFILES += \
+	     freebsd/ripe-atlas.rc.d
+
 atlas_sysconf_DATA = \
 			common/mode
 
@@ -104,3 +108,15 @@ endif
 if DO_CHOWN
 	chown $(ripe_atlas_user):$(ripe_atlas_group) $(DESTDIR)/$(atlas_sysconfdir)/mode
 endif
+
+# Install FreeBSD rc.d service script
+	@if [ "$(probe_type)" = "freebsd" ]; then \
+		echo "Installing FreeBSD rc.d service script"; \
+		mkdir -p $(DESTDIR)/usr/local/etc/rc.d; \
+		cp config/freebsd/ripe-atlas.rc.d $(DESTDIR)/usr/local/etc/rc.d/ripe-atlas; \
+		chmod 755 $(DESTDIR)/usr/local/etc/rc.d/ripe-atlas; \
+		echo "FreeBSD service script installed to /usr/local/etc/rc.d/ripe-atlas"; \
+		echo "To enable the service, add to /etc/rc.conf:"; \
+		echo "  echo 'ripe_atlas_enable=\"YES\"' >> /etc/rc.conf"; \
+		echo "Then start with: service ripe-atlas start"; \
+	fi

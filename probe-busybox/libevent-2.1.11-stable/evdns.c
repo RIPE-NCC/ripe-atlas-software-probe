@@ -2534,6 +2534,7 @@ evdns_nameserver_add_impl_(struct evdns_base *base, const struct sockaddr *addre
 	if (ns->socket < 0) { err = 1; goto out1; }
 	if (ns->base->interface_name)
 	{
+#ifdef SO_BINDTODEVICE
 		if (setsockopt(ns->socket, SOL_SOCKET, SO_BINDTODEVICE,
 			ns->base->interface_name,
 			strlen(ns->base->interface_name)+1) == -1)
@@ -2541,6 +2542,11 @@ evdns_nameserver_add_impl_(struct evdns_base *base, const struct sockaddr *addre
 			err= 2;
 			goto out2;
 		}
+#else
+		/* SO_BINDTODEVICE not available on this platform */
+		/* For FreeBSD, we could use IP_BOUND_IF or similar, but for now just skip */
+		log(EVDNS_LOG_WARN, "Interface binding not supported on this platform");
+#endif
 	}
 
 	if (base->global_outgoing_addrlen &&

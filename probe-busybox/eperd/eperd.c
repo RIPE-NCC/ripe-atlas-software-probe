@@ -471,19 +471,7 @@ int eperd_main(int argc UNUSED_PARAM, char **argv)
 /* We set environment *before* vfork (because we want to use vfork),
  * so we cannot use setenv() - repeated calls to setenv() may leak memory!
  * Using putenv(), and freeing memory after unsetenv() won't leak */
-static void safe_setenv4(char **pvar_val, const char *var, const char *val /*, int len*/)
-{
-	const int len = 4; /* both var names are 4 char long */
-	char *var_val = *pvar_val;
-
-	if (var_val) {
-		var_val[len] = '\0'; /* nuke '=' */
-		unsetenv(var_val);
-		free(var_val);
-	}
-	*pvar_val = xasprintf("%s=%s", var, val);
-	putenv(*pvar_val);
-}
+/* Note: safe_setenv4 function was removed as it was unused */
 #endif
 
 static void do_distr(CronLine *line)
@@ -781,7 +769,7 @@ static void set_timeout(CronLine *line, int init_next_cycle)
  */
 static int Insert(CronLine *line)
 {
-	CronLine *last;
+	CronLine *last = NULL;
 
 	if (oldLine)
 	{

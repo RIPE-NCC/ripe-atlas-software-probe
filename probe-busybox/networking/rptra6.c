@@ -17,9 +17,28 @@
 
 #include "libbb.h"
 
+#ifdef __APPLE__
+#ifndef IPV6_PKTINFO
+#define IPV6_PKTINFO 46
+#endif
+#ifndef IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT 47
+#endif
+#ifndef IPV6_RECVPKTINFO
+#define IPV6_RECVPKTINFO 36
+#endif
+#ifndef IPV6_RECVHOPLIMIT
+#define IPV6_RECVHOPLIMIT 37
+#endif
+#endif
+
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
+#include <arpa/inet.h>
 
 #define OPT_STRING	"lsI:P:r:u:"
 
@@ -45,13 +64,16 @@ struct in6_addr in6addr_all_nodes = IN6ADDR_ALL_NODES_INIT;        /* ff02::1 */
 #define MAX_RTR_SOLICITATIONS 3
 #define RTR_SOLICITATION_INTERVAL 4
 
+#ifndef __OPT_RDNSS_DEFINED
+#define __OPT_RDNSS_DEFINED
 struct opt_rdnss             /* RDNSS option */
 {
 	uint8_t   nd_opt_rdnss_type;
 	uint8_t   nd_opt_rdnss_len;
 	uint16_t  nd_opt_rdnss_reserved;
 	uint32_t  nd_opt_rdnss_lifetime;
-};
+} __attribute__((packed));
+#endif
 
 static int solicit_retries;
 static int solicit_sock;
@@ -74,7 +96,6 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 	uint32_t lifetime;
 	struct nd_router_advert *ra;
 	struct nd_opt_hdr *oh;
-	struct opt_rdnss *rdnss;
 	FILE *f;
 	char namebuf[NI_MAXHOST+16];	/* Space for address plus
 					 * interface name */
@@ -106,72 +127,73 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 		switch(oh->nd_opt_type)
 		{
 		case OPT_RDNSS:	/* 25 */
-
-			rdnss= (struct opt_rdnss *)oh;
-			lifetime= ntohl(rdnss->nd_opt_rdnss_lifetime);
-			/* Assume one year is infinite enough */
-			if (lifetime == (uint32_t)-1)
-				lifetime= 365*24*3600;
-
-			n_dns= 0;
-
-			for (i= 8; i+16 <= olen; i+= 16)
 			{
-				if (lifetime == 0)
-				{
-					/* zero lifetime implies empty list */
-					break;
-				}
-				inet_ntop(AF_INET6, ((char *)oh)+i,
-					namebuf, sizeof(namebuf));
-				if (IN6_IS_ADDR_LINKLOCAL(((char *)oh)+i)
-					&& interface_name != NULL)
-				{
-					strlcat(namebuf, "%",
-						sizeof(namebuf));
-					strlcat(namebuf, interface_name,
-						sizeof(namebuf));
-				}
-				if (n_dns < N_DNS)
-				{
-					strcpy(dnsnext[n_dns], namebuf);
-					n_dns++;
-				}
-			}
+				struct opt_rdnss rdnss_temp;
+				memcpy(&rdnss_temp, oh, sizeof(rdnss_temp));
+				lifetime= ntohl(rdnss_temp.nd_opt_rdnss_lifetime);
+				/* Assume one year is infinite enough */
+				if (lifetime == (uint32_t)-1)
+					lifetime= 365*24*3600;
 
-			/* Check if the list of resolvers changed */
-			for (n_dns= 0; n_dns < N_DNS; n_dns++)
-			{
-				if (strcmp(dnscurr[n_dns],
-					dnsnext[n_dns]) != 0)
-				{
-					break;
-				}
-			}
-			if (str_resolv && n_dns < N_DNS)
-			{
-				memcpy(dnscurr, dnsnext,
-					sizeof(dnsnext));
+				n_dns= 0;
 
-				/* Ignore errors */
-				f= fopen(str_resolv_new, "w");
-				for (n_dns= 0; n_dns<N_DNS; n_dns++)
+				for (i= 8; i+16 <= olen; i+= 16)
 				{
-					if (strlen(dnscurr[n_dns]) == 0)
+					if (lifetime == 0)
+					{
+						/* zero lifetime implies empty list */
 						break;
-					fprintf(f, "nameserver %s\n",
-						dnscurr[n_dns]);
+					}
+					inet_ntop(AF_INET6, ((char *)oh)+i,
+						namebuf, sizeof(namebuf));
+					if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)((char *)oh)+i)
+						&& interface_name != NULL)
+					{
+						strlcat(namebuf, "%",
+							sizeof(namebuf));
+						strlcat(namebuf, interface_name,
+							sizeof(namebuf));
+					}
+					if (n_dns < N_DNS)
+					{
+						strcpy(dnsnext[n_dns], namebuf);
+						n_dns++;
+					}
 				}
-				fclose(f);
-				rename(str_resolv_new, str_resolv);
-				if (update_cmd)
-					system(update_cmd);
+
+				/* Check if the list of resolvers changed */
+				for (n_dns= 0; n_dns < N_DNS; n_dns++)
+				{
+					if (strcmp(dnscurr[n_dns],
+						dnsnext[n_dns]) != 0)
+					{
+						break;
+					}
+				}
+				if (str_resolv && n_dns < N_DNS)
+				{
+					memcpy(dnscurr, dnsnext,
+						sizeof(dnsnext));
+
+					/* Ignore errors */
+					f= fopen(str_resolv_new, "w");
+					for (n_dns= 0; n_dns<N_DNS; n_dns++)
+					{
+						if (strlen(dnscurr[n_dns]) == 0)
+							break;
+						fprintf(f, "nameserver %s\n",
+							dnscurr[n_dns]);
+					}
+					fclose(f);
+					rename(str_resolv_new, str_resolv);
+					if (update_cmd)
+						system(update_cmd);
+				}
+				if (lifetime)
+					*dnsexpires= time(NULL) + lifetime;
+				else
+					*dnsexpires= 0;
 			}
-			if (lifetime)
-				*dnsexpires= time(NULL) + lifetime;
-			else
-				*dnsexpires= 0;
-		
 			break;
 		}
 
@@ -199,7 +221,7 @@ static void log_ra(char *out_name, char *new_name,
 	struct sockaddr_in6 *remotep,
 	struct msghdr *msgp, char *packet, ssize_t nrecv)
 {
-	int i, r, first, rcvd_ttl, olen;
+	int i, r, first, rcvd_ttl = 255, olen;
 	uint8_t flags_reserved;
 	size_t o;
 	FILE *of;
@@ -210,7 +232,6 @@ static void log_ra(char *out_name, char *new_name,
 	struct nd_opt_hdr *oh;
 	struct nd_opt_prefix_info *pi;
 	struct nd_opt_mtu *mtup;
-	struct opt_rdnss *rdnssp;
 	struct stat sb;
 	char namebuf[NI_MAXHOST];
 
@@ -377,27 +398,29 @@ static void log_ra(char *out_name, char *new_name,
 			break;
 
 		case OPT_RDNSS:	/* 25 */
-			fprintf(of, "{ " DBQ(type) ": " DBQ(rdnss));
-			rdnssp= (struct opt_rdnss *)oh;
-			if (rdnssp->nd_opt_rdnss_reserved)
 			{
-				fprintf(of, ", " DBQ(reserved) ": %d",
-				ntohs(rdnssp->nd_opt_rdnss_reserved));
-			}
-			fprintf(of, ", " DBQ(lifetime) ": %d",
-				ntohl(rdnssp->nd_opt_rdnss_lifetime));
+				struct opt_rdnss rdnss_temp;
+				memcpy(&rdnss_temp, oh, sizeof(rdnss_temp));
+				fprintf(of, "{ " DBQ(type) ": " DBQ(rdnss));
+				if (rdnss_temp.nd_opt_rdnss_reserved)
+				{
+					fprintf(of, ", " DBQ(reserved) ": %d",
+					ntohs(rdnss_temp.nd_opt_rdnss_reserved));
+				}
+				fprintf(of, ", " DBQ(lifetime) ": %d",
+					ntohl(rdnss_temp.nd_opt_rdnss_lifetime));
 
-			fprintf(of, ", " DBQ(addrs) ": [ ");
-			for (i= 8; i+16 <= olen; i+= 16)
-			{
-				inet_ntop(AF_INET6, ((char *)oh)+i,
-					namebuf, sizeof(namebuf));
-				fprintf(of, "%s" DBQ(%s),
-					i == 8 ? "" : ", ",
-					namebuf);
+				fprintf(of, ", " DBQ(addrs) ": [ ");
+				for (i= 8; i+16 <= olen; i+= 16)
+				{
+					inet_ntop(AF_INET6, ((char *)oh)+i,
+						namebuf, sizeof(namebuf));
+					fprintf(of, "%s" DBQ(%s),
+						i == 8 ? "" : ", ",
+						namebuf);
+				}
+				fprintf(of, " ] }");
 			}
-			fprintf(of, " ] }");
-
 			break;
 
 		default:
@@ -532,12 +555,18 @@ int rptra6_main(int argc, char *argv[])
 	if (str_interface)
 	{
 		interface_name= strdup(str_interface);
+#ifdef __FreeBSD__
+		/* SO_BINDTODEVICE is not available on FreeBSD */
+		/* On FreeBSD, we would need to use if_nametoindex() and bind to specific interface */
+		/* For now, just continue as this is not critical for basic functionality */
+#else
 		if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE,
 			str_interface, strlen(str_interface)+1) == -1)
 		{
 			close(sock);
 			return 1;
 		}
+#endif
 	}
 
 	on = 1;

@@ -6,10 +6,7 @@ fi
 
 . $ATLAS_SCRIPTS/common-pre.sh
 
-# Detect OS for command selection
-OS_TYPE=$(uname -s)
-
-# Commands
+# FreeBSD specific commands
 MANUAL_UPGRADE_CMD=:
 TRY_UPGRADE_CMD=:
 FINDPID_SSH_CMD=findpid_ssh
@@ -23,30 +20,15 @@ CHOWN_FOR_MSM=:
 CHMOD_FOR_MSM=:
 SET_HOSTNAME=:
 
-# OS-specific command overrides
-if [ "$OS_TYPE" = "FreeBSD" ]; then
-	# FreeBSD specific commands
-	FINDPID_SSH_CMD=findpid_ssh
-	KILL_PERDS_CMD=kill_perds
-	KILL_SSH_CMD=kill_ssh
-	KILL_TELNETD_CMD=kill_telnetd
-	# FreeBSD doesn't have telnetd in the same way
-	telnetd()
-	{
-		$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
-	}
-else
-	# Linux/other OS commands
-	# For OpenWRT we need telnetd to run as root.
-	telnetd()
-	{
-		$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
-	}
-fi
+# FreeBSD specific telnetd function
+telnetd()
+{
+	$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
+}
 
 # Various files and directories
 : ${HOME:=${ATLAS_SPOOLDIR}}; export HOME	# Set HOME if it isn't set
-RESOLV_CONF=@sysconfdir@/resolv.conf
+RESOLV_CONF=/etc/resolv.conf
 MODE_FILE=$ATLAS_SYSCONFDIR/mode
 
 # Other conf
@@ -60,7 +42,8 @@ STATE_DIR=$ATLAS_DATA; export STATE_DIR
 # Files
 REG_SERVERS_SOURCE=$ATLAS_SCRIPTS/reg_servers.sh
 
-. $ATLAS_SCRIPTS/linux-functions.sh
+# FreeBSD specific functions
+. $ATLAS_SCRIPTS/freebsd-functions.sh
 
 # Get ethernet address
 get_ether_addr

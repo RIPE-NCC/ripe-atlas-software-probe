@@ -1,0 +1,29 @@
+# FreeBSD specific functions
+
+# Get ethernet address for FreeBSD
+get_ether_addr()
+{
+	# FreeBSD way to get ethernet address
+	ifconfig | grep -E "^[a-z0-9]+:" | grep -v lo0 | head -1 | awk '{print $1}' | sed 's/://'
+}
+
+# FreeBSD specific process management
+findpid_ssh()
+{
+	pgrep -f "sshd.*$1"
+}
+
+kill_perds()
+{
+	pkill -f "perd.*$1"
+}
+
+kill_ssh()
+{
+	pkill -f "sshd.*$1"
+}
+
+kill_telnetd()
+{
+	pkill -f "telnetd.*$1"
+}

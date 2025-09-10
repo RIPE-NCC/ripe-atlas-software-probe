@@ -256,9 +256,10 @@ ifdef builtin-target
 quiet_cmd_link_o_target = LD      $@
 # If the list of objects to link is empty, just create an empty built-in.o
 # -nostdlib is added to make "make LD=gcc ..." work (some people use that)
+# On macOS, ar requires at least one input file, so we create a dummy if needed
 cmd_link_o_target = $(if $(strip $(obj-y)),\
 		$(LD) -nostdlib $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
-		rm -f $@; $(AR) rcs $@)
+		echo ".text" | $(CC) -x assembler - -c -o $(@D)/.empty.o 2>/dev/null; $(LD) -nostdlib $(ld_flags) -r -o $@ $(@D)/.empty.o 2>/dev/null || touch $@; rm -f $(@D)/.empty.o)
 
 $(builtin-target): $(obj-y) FORCE
 	$(call if_changed,link_o_target)
@@ -271,7 +272,8 @@ endif # builtin-target
 #
 ifdef lib-target
 quiet_cmd_link_l_target = AR      $@
-cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(lib-y)
+# On macOS, ar requires at least one input file, so we create a dummy if needed
+cmd_link_l_target = rm -f $@; $(if $(strip $(lib-y)),$(AR) $(EXTRA_ARFLAGS) rcs $@ $(lib-y),touch $@)
 
 $(lib-target): $(lib-y) FORCE
 	$(call if_changed,link_l_target)

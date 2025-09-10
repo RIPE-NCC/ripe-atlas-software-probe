@@ -4,6 +4,16 @@
  */
 
 #include "libbb.h"
+#include <netinet/in.h>
+
+#ifdef __APPLE__
+#ifndef IPV6_DSTOPTS
+#define IPV6_DSTOPTS 23
+#endif
+#ifndef IPV6_HOPOPTS
+#define IPV6_HOPOPTS 22
+#endif
+#endif
 
 #define OPT_PAD1 0
 #define OPT_PADN 1

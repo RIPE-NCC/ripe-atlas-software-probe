@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/utsname.h>
 #include <stdarg.h>
 #include "atlasinit.h"
 #include "atlas_path.h"
@@ -132,14 +133,16 @@ int atlasinit_main( int argc, char *argv[] )
 static void print_token_ver (FILE * write_to, int flag_rereg) 
 {
 	float root_fs_ver = 0;
-	FILE *fp = xfopen_for_read("/proc/version");
 	FILE *fpv;
 	char *my_mac, *path;
+	char kernel_version[256] = "unknown";
 
-	bzero( line, ATLAS_BUF_SIZE );
-	fscanf (fp, "%s", line);
-	fscanf (fp, "%s", line);
-	fscanf (fp, "%s", line);
+	// Portable way to get kernel version using uname system call
+	struct utsname uts;
+	if (uname(&uts) == 0) {
+		strncpy(kernel_version, uts.release, sizeof(kernel_version) - 1);
+		kernel_version[sizeof(kernel_version) - 1] = '\0';
+	}
 
 	asprintf(&path, "%s/%s", ATLAS_DATADIR, FIRMWARE_APPS_VERSION_REL);
 	fpv = fopen(path, "r");
@@ -155,13 +158,12 @@ static void print_token_ver (FILE * write_to, int flag_rereg)
 	if(flag_rereg >  0)
 		fprintf(write_to, "P_TO_R_INIT\n");
 	my_mac = getenv("ETHER_SCANNED");
-	fprintf(write_to, "TOKEN_SPECS probev1 %s", line);
+	fprintf(write_to, "TOKEN_SPECS probev1 %s", kernel_version);
 	if (my_mac !=  NULL) 
 		fprintf(write_to, "-%s ", my_mac );
 	fprintf(write_to, " %d\n", (int)root_fs_ver);
 	if(flag_rereg >  0)
 		fprintf(write_to, "REASON_FOR_REGISTRATION %s\n", str_reason);
-	fclose(fp);
 }
 
 static char *skip_session_id(char *start)

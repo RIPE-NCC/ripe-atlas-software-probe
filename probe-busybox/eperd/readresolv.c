@@ -46,7 +46,6 @@ void get_local_resolvers(char *nslist[MAXNS], int *resolv_max, char *ifname)
 #endif 	
 	char buf[LINEL]; 
 	char filename[80];
-	char *buf_start;
 	int  i = 0;
 	struct stat sb;
 	FILE *R;
@@ -76,14 +75,13 @@ void get_local_resolvers(char *nslist[MAXNS], int *resolv_max, char *ifname)
 	R = fopen (filename, "r");
 	if (R != NULL) {
 		while ( (fgets (buf, LINEL, R)) && (i < MAXNS)) {	
-			buf_start = buf;
 			if(resolv_conf_parse_line(&nslist[i], buf) ) {
-				// crondlog(LVL5 "parsed file %s , line %s i=%d", filename, buf_start, i);
+				// crondlog(LVL5 "parsed file %s , line %s i=%d", filename, buf, i);
 				i++;
 			}
 			else 
 			{
-				// crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", filename, i, buf_start);
+				// crondlog(LVL5 "ERROR failed to parse from  %s i=%d, line %s", filename, i, buf);
 			}
 		}
 		fclose (R);

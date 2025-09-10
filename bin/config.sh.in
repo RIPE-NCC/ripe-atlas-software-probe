@@ -25,6 +25,10 @@ get_arch()
 			echo 'fluffy'
 			;;
 
+		*"freebsd"*)
+			echo 'freebsd'
+			;;
+
 		*)
 			echo 'unknown board'
 			exit 1
@@ -37,6 +41,8 @@ get_sub_arch()
 {
 	arch=`get_arch`
 	if [ "x$arch" = 'xfluffy' ]; then
+		echo "$PROBE_TYPE"
+	elif [ "x$arch" = 'xfreebsd' ]; then
 		echo "$PROBE_TYPE"
 	else
 		echo ""

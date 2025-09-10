@@ -8,13 +8,16 @@
 #ifndef FIX_U32_H
 #define FIX_U32_H 1
 
+#include "../../config.h"
+
 /* Try hard to pull in u32 types and such.
  * Otherwise, #include "fix_u32.h" + #include <linux/foo.h>
  * may end up typedef'ing bb_hack_u32 inside foo.h,
  * and repeated typedefs aren't allowed in C/C++.
  */
-#include <asm/types.h>
+#ifdef HAVE_LINUX_TYPES_H
 #include <linux/types.h>
+#endif
 
 /* In case above includes still failed to provide the types,
  * provide them ourself

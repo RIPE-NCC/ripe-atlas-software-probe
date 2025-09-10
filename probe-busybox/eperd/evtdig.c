@@ -23,7 +23,8 @@
 //config:       default n
 //config:       depends on EVTDIG
 //config:       help
-//config:        extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
+//config:        extra debug info. Also may cause segfault or/and memory leak.
+//config:        Add at your own risk.
 
 //applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_ROOT, BB_SUID_DROP))
 
@@ -178,6 +179,9 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -271,6 +275,143 @@
 
 // seems the following are defined in header files we use
 
+// Basic DNS record types that are missing on macOS
+#ifndef ns_t_a
+#define ns_t_a       1
+#endif
+
+#ifndef T_A
+#define T_A          ns_t_a
+#endif
+
+#ifndef ns_t_aaaa
+#define ns_t_aaaa    28
+#endif
+
+#ifndef T_AAAA
+#define T_AAAA       ns_t_aaaa
+#endif
+
+#ifndef ns_t_any
+#define ns_t_any     255
+#endif
+
+#ifndef T_ANY
+#define T_ANY        ns_t_any
+#endif
+
+#ifndef ns_t_afsdb
+#define ns_t_afsdb   18
+#endif
+
+#ifndef T_AFSDB
+#define T_AFSDB      ns_t_afsdb
+#endif
+
+#ifndef ns_t_axfr
+#define ns_t_axfr    252
+#endif
+
+#ifndef T_AXFR
+#define T_AXFR       ns_t_axfr
+#endif
+
+#ifndef ns_t_cname
+#define ns_t_cname   5
+#endif
+
+#ifndef T_CNAME
+#define T_CNAME      ns_t_cname
+#endif
+
+#ifndef ns_t_key
+#define ns_t_key     25
+#endif
+
+#ifndef T_KEY
+#define T_KEY        ns_t_key
+#endif
+
+#ifndef ns_t_loc
+#define ns_t_loc     29
+#endif
+
+#ifndef T_LOC
+#define T_LOC        ns_t_loc
+#endif
+
+#ifndef ns_t_mx
+#define ns_t_mx      15
+#endif
+
+#ifndef T_MX
+#define T_MX         ns_t_mx
+#endif
+
+#ifndef ns_t_naptr
+#define ns_t_naptr   35
+#endif
+
+#ifndef T_NAPTR
+#define T_NAPTR      ns_t_naptr
+#endif
+
+#ifndef ns_t_ns
+#define ns_t_ns      2
+#endif
+
+#ifndef T_NS
+#define T_NS         ns_t_ns
+#endif
+
+#ifndef ns_t_ptr
+#define ns_t_ptr     12
+#endif
+
+#ifndef T_PTR
+#define T_PTR        ns_t_ptr
+#endif
+
+#ifndef ns_t_rp
+#define ns_t_rp      17
+#endif
+
+#ifndef T_RP
+#define T_RP         ns_t_rp
+#endif
+
+#ifndef ns_t_sig
+#define ns_t_sig     24
+#endif
+
+#ifndef T_SIG
+#define T_SIG        ns_t_sig
+#endif
+
+#ifndef ns_t_srv
+#define ns_t_srv     33
+#endif
+
+#ifndef T_SRV
+#define T_SRV        ns_t_srv
+#endif
+
+#ifndef ns_t_tsig
+#define ns_t_tsig    250
+#endif
+
+#ifndef T_TSIG
+#define T_TSIG       ns_t_tsig
+#endif
+
+#ifndef ns_t_txt
+#define ns_t_txt     16
+#endif
+
+#ifndef T_TXT
+#define T_TXT        ns_t_txt
+#endif
+
 #ifndef ns_t_apl
 #define ns_t_apl   42
 #endif
@@ -293,6 +434,97 @@
 
 #ifndef T_CERT
 #define T_CERT ns_t_cert
+#endif 
+
+// Define missing DNS record type constants for macOS compatibility
+#ifndef T_A
+#define T_A 1
+#endif
+
+#ifndef T_AAAA
+#define T_AAAA 28
+#endif
+
+#ifndef T_ANY
+#define T_ANY 255
+#endif
+
+#ifndef T_AFSDB
+#define T_AFSDB 18
+#endif
+
+#ifndef T_AXFR
+#define T_AXFR 252
+#endif
+
+#ifndef T_CNAME
+#define T_CNAME 5
+#endif
+
+#ifndef T_KEY
+#define T_KEY 25
+#endif
+
+#ifndef T_LOC
+#define T_LOC 29
+#endif
+
+#ifndef T_MX
+#define T_MX 15
+#endif
+
+#ifndef T_NAPTR
+#define T_NAPTR 35
+#endif
+
+#ifndef T_NS
+#define T_NS 2
+#endif
+
+#ifndef T_PTR
+#define T_PTR 12
+#endif
+
+#ifndef T_RP
+#define T_RP 17
+#endif
+
+#ifndef T_SIG
+#define T_SIG 24
+#endif
+
+#ifndef T_SRV
+#define T_SRV 33
+#endif
+
+#ifndef T_TSIG
+#define T_TSIG 250
+#endif
+
+#ifndef T_TXT
+#define T_TXT 16
+#endif
+
+#ifndef T_SOA
+#define T_SOA 6
+#endif
+
+// Define missing DNS class constants
+#ifndef C_IN
+#define C_IN 1
+#endif
+
+#ifndef C_CHAOS
+#define C_CHAOS 3
+#endif
+
+// Define missing IPv6 constants for macOS compatibility
+#ifndef IPV6_RECVHOPLIMIT
+#define IPV6_RECVHOPLIMIT 37
+#endif
+
+#ifndef IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT 47
 #endif 
 
 #ifndef ns_t_dname
@@ -1126,27 +1358,26 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 			sha256_begin(&sha256_ctx);
 			if (qry->opt_AF == AF_INET)
 			{
+				struct sockaddr_in *sin4;
+				sin4 = (struct sockaddr_in *)&qry->loc_sin6;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in *)&qry->
-					loc_sin6)->sin_addr,
-					sizeof((struct sockaddr_in *)&qry->
-                                        loc_sin6)->sin_addr);
+					&sin4->sin_addr,
+					sizeof(sin4->sin_addr));
+				sin4 = (struct sockaddr_in *)&qry->res->ai_addr;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in *)&qry->
-					res->ai_addr)->sin_addr,
-					sizeof((struct sockaddr_in *)&qry->
-                                        res->ai_addr)->sin_addr);
+					&sin4->sin_addr,
+					sizeof(sin4->sin_addr));
 			}
 			else
 			{
+				struct sockaddr_in6 *sin6;
 				sha256_hash(&sha256_ctx,
 					&qry->loc_sin6.sin6_addr,
 					sizeof(qry->loc_sin6.sin6_addr));
+				sin6 = (struct sockaddr_in6 *)&qry->res->ai_addr;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in6 *)&qry->res->
-					ai_addr)->sin6_addr,
-					sizeof(((struct sockaddr_in6 *)&qry->
-					res->ai_addr)->sin6_addr));
+					&sin6->sin6_addr,
+					sizeof(sin6->sin6_addr));
 			}
 			sha256_hash(&sha256_ctx,
 				&qry->cookie_state->client_secret,
@@ -1231,7 +1462,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 /* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	int r, fd, on;
+	int r, fd = -1, on;
 	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
@@ -3247,7 +3478,7 @@ void tdig_start (void *arg)
 
 		if (qry->response_in)
 		{
-			size_t len;
+			size_t resp_len;
 
 			qry->resp_file= fopen(qry->response_in, "r");
 			if (!qry->resp_file)
@@ -3256,11 +3487,11 @@ void tdig_start (void *arg)
 					qry->response_in);
 			}
 
-			len= sizeof(sin6);
+			resp_len= sizeof(sin6);
 			read_response_file(qry->resp_file, RESP_PEERNAME,
-				&len, &sin6);
+				&resp_len, &sin6);
 			tcp_beforeconnect(&qry->tu_env,
-				(struct sockaddr *)&sin6, len);
+				(struct sockaddr *)&sin6, resp_len);
 			tcp_connected(&qry->tu_env, NULL);
 			tcp_writecb(NULL, &qry->tu_env);
 			while(qry->resp_file != NULL)
@@ -4073,7 +4304,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			if ((len & 0xc0) != 0xc0)
 			{
 				/* Bad format */
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"format-error at %lu: value 0x%x",
 					(unsigned long)offset, len);
 				*count= -1;
@@ -4084,7 +4315,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			noffset= ((len & ~0xc0) << 8) | base[offset+1];
 			if (noffset >= size)
 			{
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"offset-error at %lu: offset %lu",
 					(unsigned long)offset, (unsigned long)noffset);
 				*count= -1;
@@ -4095,7 +4326,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			if (jump_count > 256)
 			{
 				/* Too many */
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"too many redirects at %lu",
 						(unsigned long)offset);
 				*count= -1;
@@ -4117,7 +4348,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		}
 		if (offset+len+1 > size)
 		{
-			snprintf((char *)name, sizeof(name),
+			snprintf((char *)name, 256,
 				"buf-bounds-error at %lu: len %d",
 					(unsigned long)offset, len);
 			*count= -1;
@@ -4127,7 +4358,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 
 		if (p+len+1 > 255)
 		{
-			snprintf((char *)name, sizeof(name),
+			snprintf((char *)name, 256,
 					"name-length-error at %lu: len %d",
 					(unsigned long)offset, p+len+1);
 			*count= -1;

@@ -28,27 +28,18 @@ if [ -z "$STATE_FILE" ] ; then
 fi
 
 . $ATLAS_SCRIPTS/$DEVICE_NAME-common.sh
-. $ATLAS_SCRIPTS/linux-functions.sh
+. $ATLAS_SCRIPTS/freebsd-functions.sh
 
 get_arch()
 {
-	echo "fluffy"
+	echo "freebsd"
 }
 
 get_sub_arch()
 {
-	local ID='generic'
-	local VERSION_ID='unknown'
+	local ID='freebsd'
+	local VERSION_ID=$(uname -r | cut -d'-' -f1)
 	local ARCH=$(uname -m)
-
-	# Detect FreeBSD
-	if [ "$(uname -s)" = "FreeBSD" ]; then
-		ID='freebsd'
-		VERSION_ID=$(uname -r | cut -d'-' -f1)
-		ARCH=$(uname -m)
-	elif [ -r '/etc/os-release' ]; then
-		. /etc/os-release
-	fi
 	echo "${ID}/${VERSION_ID}/${ARCH}"
 }
 

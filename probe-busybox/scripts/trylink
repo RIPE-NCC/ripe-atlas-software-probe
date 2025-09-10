@@ -60,6 +60,15 @@ check_cc() {
     return $r
 }
 
+# macOS strip doesn't support --remove-section option
+strip_binary() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        $STRIP -s "$@"
+    else
+        $STRIP -s --remove-section=.note --remove-section=.comment "$@"
+    fi
+}
+
 check_libc_is_glibc() {
     local tempname="$(mktemp tmp.XXXXXXXXXX)"
     local r
@@ -91,9 +100,20 @@ if ! check_cc "-Wl,--sort-section,alignment"; then
     SORT_SECTION=""
 fi
 
-START_GROUP="-Wl,--start-group"
-END_GROUP="-Wl,--end-group"
-INFO_OPTS="-Wl,--warn-common -Wl,-Map,$EXE.map -Wl,--verbose"
+# macOS linker doesn't support --start-group and --end-group
+if [ "$(uname -s)" = "Darwin" ]; then
+    START_GROUP=""
+    END_GROUP=""
+else
+    START_GROUP="-Wl,--start-group"
+    END_GROUP="-Wl,--end-group"
+fi
+# macOS linker doesn't support --warn-common, -Map, or --verbose
+if [ "$(uname -s)" = "Darwin" ]; then
+    INFO_OPTS=""
+else
+    INFO_OPTS="-Wl,--warn-common -Wl,-Map,$EXE.map -Wl,--verbose"
+fi
 
 # gold may not support --sort-common (yet)
 SORT_COMMON="-Wl,--sort-common"
@@ -264,7 +284,7 @@ if test "$CONFIG_BUILD_LIBBUSYBOX" = y; then
 	cat $EXE.out
 	exit 1
     }
-    $STRIP -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/libbusybox.so.$BB_VER"
+    strip_binary $EXE -o "$sharedlib_dir/libbusybox.so.$BB_VER"
     chmod a+x "$sharedlib_dir/libbusybox.so.$BB_VER"
     echo "libbusybox: $sharedlib_dir/libbusybox.so.$BB_VER"
 fi
@@ -285,7 +305,7 @@ if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
 	cat $EXE.out
 	exit 1
     }
-    $STRIP -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/busybox"
+    strip_binary $EXE -o "$sharedlib_dir/busybox"
     echo "busybox linked against libbusybox: $sharedlib_dir/busybox"
 fi
 
@@ -322,7 +342,7 @@ int main(int argc, char **argv)
 	    exit 1
 	}
 	rm -- "$sharedlib_dir/applet.c" $EXE.out
-	$STRIP -s --remove-section=.note --remove-section=.comment $EXE
+	strip_binary $EXE
 	# Let user see that we do something - list the names of created binaries:
 	echo "$EXE"
 

@@ -43,6 +43,15 @@
 
 /* Include generated applet names, pointers to <applet>_main, etc */
 #include "applet_tables.h"
+
+#ifdef __APPLE__
+#ifndef setresgid
+#define setresgid(rgid, egid, sgid) setgid(egid)
+#endif
+#ifndef setresuid
+#define setresuid(ruid, euid, suid) setuid(euid)
+#endif
+#endif
 /* ...and if applet_tables generator says we have only one applet... */
 #ifdef SINGLE_APPLET_MAIN
 # undef ENABLE_FEATURE_INDIVIDUAL

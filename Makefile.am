@@ -40,7 +40,12 @@ endif
 # Technically this hack belongs in probe-busybox, but it is here
 # because busybox is a different build system.
 install-exec-hook:
-	$(install_sh) $(ATLAS_OWN_SUID_OPTS) $(ATLAS_OWN_MEAS_OPTS) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
 if SETCAP_INSTALL
-	setcap cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
+	@echo "Using capabilities instead of SUID - more secure"
+	$(install_sh) -m 0750 -o root -g $(ripe_atlas_group) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
+	@echo "Setting capabilities for raw socket access and device binding"
+	$(SETCAP) cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
+else
+	@echo "Fall back to SUID root when setcap is not available"
+	$(install_sh) -m 4750 -o root -g $(ripe_atlas_group) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
 endif

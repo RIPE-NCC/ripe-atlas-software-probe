@@ -796,9 +796,8 @@ error:
 
 static int check_result(FILE *tcp_file)
 {
-	int major, minor;
 	size_t len;
-	char *cp, *check, *line;
+	char *cp, *line;
 	const char *prefix;
 	char buffer[1024];
 	
@@ -841,22 +840,11 @@ static int check_result(FILE *tcp_file)
 		return 0;
 	}
 	cp= line+len;
-	major= strtoul(cp, &check, 10);
-	if (check == cp || check[0] != '.')
-	{
-		fprintf(stderr, "bad major version in response '%s'\n", line);
-		return 0;
-	}
-	cp= check+1;
-	minor= strtoul(cp, &check, 10);
-	if (check == cp || check[0] == '\0' ||
-		!isspace(*(unsigned char *)check))
-	{
-		fprintf(stderr, "bad major version in response '%s'\n", line);
-		return 0;
-	}
-
-	skip_spaces(check, &cp);
+	
+	/* Skip version number (we don't need to parse it) */
+	while (*cp && *cp != ' ' && *cp != '\t') cp++;
+	
+	skip_spaces(cp, &cp);
 
 	if (!isdigit(*(unsigned char *)cp))
 	{

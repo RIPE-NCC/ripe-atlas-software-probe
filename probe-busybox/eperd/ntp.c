@@ -16,6 +16,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <arpa/inet.h>
 
 #include "eperd.h"
 #include "atlas_path.h"

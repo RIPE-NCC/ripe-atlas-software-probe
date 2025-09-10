@@ -15,14 +15,265 @@
 #include <netinet/icmp6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <arpa/inet.h>
+
+/* Platform-specific includes */
+#ifdef __FreeBSD__
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/ip_var.h>
+#include <netinet/tcp_var.h>
+#else
+/* Linux and other systems */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#endif
 
 #include "eperd.h"
 #include "atlas_path.h"
 
+#ifdef __APPLE__
+#ifndef IPV6_PKTINFO
+#define IPV6_PKTINFO 46
+#endif
+#ifndef IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT 47
+#endif
+#ifndef IPV6_RECVPKTINFO
+#define IPV6_RECVPKTINFO 36
+#endif
+#ifndef IPV6_RECVHOPLIMIT
+#define IPV6_RECVHOPLIMIT 37
+#endif
+#endif
+
+/* Platform-specific struct member handling */
+#ifdef __FreeBSD__
+/* FreeBSD uses different struct member names */
+#define TCP_SOURCE tcphdr->th_sport
+#define TCP_DEST tcphdr->th_dport
+#define TCP_SEQ tcphdr->th_seq
+#define TCP_ACK tcphdr->th_ack
+#define TCP_OFF tcphdr->th_off
+#define TCP_FLAGS tcphdr->th_flags
+#define TCP_WINDOW tcphdr->th_win
+#define TCP_CHECKSUM tcphdr->th_sum
+#define TCP_URGENT tcphdr->th_urp
+
+#define UDP_SOURCE udphdr->uh_sport
+#define UDP_DEST udphdr->uh_dport
+#define UDP_LEN udphdr->uh_ulen
+#define UDP_CHECKSUM udphdr->uh_sum
+#else
+/* Linux and other systems */
+#define TCP_SOURCE tcphdr->source
+#define TCP_DEST tcphdr->dest
+#define TCP_SEQ tcphdr->seq
+#define TCP_ACK tcphdr->ack_seq
+#define TCP_OFF tcphdr->doff
+#define TCP_FLAGS tcphdr->flags
+#define TCP_WINDOW tcphdr->window
+#define TCP_CHECKSUM tcphdr->check
+#define TCP_URGENT tcphdr->urg_ptr
+
+#define UDP_SOURCE udphdr->source
+#define UDP_DEST udphdr->dest
+#define UDP_LEN udphdr->len
+#define UDP_CHECKSUM udphdr->check
+#endif
+
+
+/* Define missing TCP header struct members as aliases */
+#ifndef seq
+#define seq th_seq
+#endif
+#ifndef ack_seq
+#define ack_seq th_ack
+#endif
+#ifndef doff
+#define doff th_off
+#endif
+#ifndef syn
+#define syn th_flags
+#endif
+#ifndef fin
+#define fin th_flags
+#endif
+#ifndef rst
+#define rst th_flags
+#endif
+#ifndef psh
+#define psh th_flags
+#endif
+#ifndef ack
+#define ack th_flags
+#endif
+#ifndef urg
+#define urg th_flags
+#endif
+
+/* Helper macros for TCP flags - platform independent */
+#define TCP_SYN_FLAG 0x02
+#define TCP_FIN_FLAG 0x01
+#define TCP_RST_FLAG 0x04
+#define TCP_PSH_FLAG 0x08
+#define TCP_ACK_FLAG 0x10
+#define TCP_URG_FLAG 0x20
+
+/* Platform-independent byte order detection */
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
+#define IS_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#elif defined(__BYTE_ORDER) && defined(__LITTLE_ENDIAN)
+#define IS_LITTLE_ENDIAN (__BYTE_ORDER == __LITTLE_ENDIAN)
+#elif defined(_BYTE_ORDER) && defined(_LITTLE_ENDIAN)
+#define IS_LITTLE_ENDIAN (_BYTE_ORDER == _LITTLE_ENDIAN)
+#elif defined(BYTE_ORDER) && defined(LITTLE_ENDIAN)
+#define IS_LITTLE_ENDIAN (BYTE_ORDER == LITTLE_ENDIAN)
+#elif defined(__i386__) || defined(__x86_64__) || defined(__arm__) || defined(__aarch64__)
+#define IS_LITTLE_ENDIAN 1
+#elif defined(__powerpc__) || defined(__sparc__) || defined(__mips__)
+#define IS_LITTLE_ENDIAN 0
+#else
+/* Default to little endian for most modern systems */
+#define IS_LITTLE_ENDIAN 1
+#endif
+
+/* Platform-specific IPv6 constants and socket options */
+#ifdef __FreeBSD__
+/* FreeBSD-specific constants */
+#ifndef SOL_IPV6
+#define SOL_IPV6 IPPROTO_IPV6
+#endif
+
+#ifndef IPV6_UNICAST_HOPS
+#define IPV6_UNICAST_HOPS 16
+#endif
+
+#ifndef IPV6_PMTUDISC_DO
+#define IPV6_PMTUDISC_DO 2
+#endif
+
+#ifndef IPV6_PMTUDISC_DONT
+#define IPV6_PMTUDISC_DONT 0
+#endif
+
+#ifndef IPV6_MTU_DISCOVER
+#define IPV6_MTU_DISCOVER 23
+#endif
+
+#ifndef IP_PMTUDISC_DO
+#define IP_PMTUDISC_DO 2
+#endif
+
+#ifndef IP_PMTUDISC_DONT
+#define IP_PMTUDISC_DONT 0
+#endif
+
+#ifndef IP_MTU_DISCOVER
+#define IP_MTU_DISCOVER 10
+#endif
+
+#ifndef ICMP_TIME_EXCEEDED
+#define ICMP_TIME_EXCEEDED 11
+#endif
+
+#ifndef ICMP_DEST_UNREACH
+#define ICMP_DEST_UNREACH 3
+#endif
+#else
+/* Linux and other systems */
+#ifndef SOL_IPV6
+#define SOL_IPV6 IPPROTO_IPV6
+#endif
+
+#ifndef IPV6_UNICAST_HOPS
+#define IPV6_UNICAST_HOPS 16
+#endif
+
+#ifndef IPV6_PMTUDISC_DO
+#define IPV6_PMTUDISC_DO 2
+#endif
+
+#ifndef IPV6_PMTUDISC_DONT
+#define IPV6_PMTUDISC_DONT 0
+#endif
+
+#ifndef IPV6_MTU_DISCOVER
+#define IPV6_MTU_DISCOVER 23
+#endif
+
+#ifndef IP_PMTUDISC_DO
+#define IP_PMTUDISC_DO 2
+#endif
+
+#ifndef IP_PMTUDISC_DONT
+#define IP_PMTUDISC_DONT 0
+#endif
+
+#ifndef IP_MTU_DISCOVER
+#define IP_MTU_DISCOVER 10
+#endif
+
+#ifndef ICMP_TIME_EXCEEDED
+#define ICMP_TIME_EXCEEDED 11
+#endif
+
+#ifndef ICMP_DEST_UNREACH
+#define ICMP_DEST_UNREACH 3
+#endif
+#endif
+
 #define SAFE_PREFIX_REL ATLAS_DATA_NEW_REL
 
-#ifndef STANDALONE_BUSYBOX
-#define uh_sport source
+/* Platform-specific function wrappers */
+#ifdef __FreeBSD__
+/* FreeBSD-specific socket option handling */
+static inline int set_ipv6_unicast_hops(int sock, int hops) {
+    return setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &hops, sizeof(hops));
+}
+
+static inline int set_ipv6_mtu_discover(int sock, int value) {
+    return setsockopt(sock, IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, sizeof(value));
+}
+
+static inline int set_ip_ttl(int sock, int ttl) {
+    return setsockopt(sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+}
+
+static inline int set_ip_mtu_discover(int sock, int value) {
+    return setsockopt(sock, IPPROTO_IP, IP_MTU_DISCOVER, &value, sizeof(value));
+}
+#else
+/* Linux and other systems */
+static inline int set_ipv6_unicast_hops(int sock, int hops) {
+    return setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &hops, sizeof(hops));
+}
+
+static inline int set_ipv6_mtu_discover(int sock, int value) {
+    return setsockopt(sock, IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, sizeof(value));
+}
+
+static inline int set_ip_ttl(int sock, int ttl) {
+    return setsockopt(sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+}
+
+static inline int set_ip_mtu_discover(int sock, int value) {
+    return setsockopt(sock, IPPROTO_IP, IP_MTU_DISCOVER, &value, sizeof(value));
+}
+#endif
+
+/* Platform-specific compatibility macros */
+#if defined(__FreeBSD__) || defined(__APPLE__)
+/* FreeBSD/macOS use different field names for TCP header */
+#define tcp_source th_sport
+#define tcp_dest th_dport
+#define tcp_check th_sum
+/* UDP header fields are the same on FreeBSD/macOS and Linux */
+#else
+/* Linux and other systems */
+#define tcp_source source
+#define tcp_dest dest
+#define tcp_check check
 #define uh_dport dest
 #define uh_ulen len
 #define uh_sum check
@@ -649,9 +900,9 @@ static void send_pkt(struct trtstate *state)
 
 			len= sizeof(*tcphdr);
 
-			tcphdr->seq= htonl((state->index) << 16 | state->seq);
-			tcphdr->doff= len / 4;
-			tcphdr->syn= 1;
+			tcphdr->th_seq= htonl((state->index) << 16 | state->seq);
+			tcphdr->th_off= len / 4;
+			tcphdr->th_flags= TCP_SYN_FLAG;
 
 			if (len+state->curpacksize > sizeof(base->packet))
 			{
@@ -678,14 +929,14 @@ static void send_pkt(struct trtstate *state)
 			v6_ph.dst= state->sin6.sin6_addr;
 			v6_ph.len= htonl(len);
 			v6_ph.nxt= IPPROTO_TCP;
-			tcphdr->source= state->loc_sin6.sin6_port;
-			tcphdr->dest= state->sin6.sin6_port;
-			tcphdr->uh_sum= 0;
+			tcphdr->th_sport= state->loc_sin6.sin6_port;
+			tcphdr->th_dport= state->sin6.sin6_port;
+			tcphdr->th_sum= 0;
 
 			sum= in_cksum_icmp6(&v6_ph, 
 				(unsigned short *)base->packet, len);
 			
-			tcphdr->check= sum;
+			tcphdr->tcp_check= sum;
 
 			/* Set hop count */
 			setsockopt(sock, SOL_IPV6, IPV6_UNICAST_HOPS,
@@ -1119,9 +1370,9 @@ static void send_pkt(struct trtstate *state)
 
 			len= sizeof(*tcphdr);
 
-			tcphdr->seq= htonl((state->index) << 16 | state->seq);
-			tcphdr->doff= len / 4;
-			tcphdr->syn= 1;
+			tcphdr->th_seq= htonl((state->index) << 16 | state->seq);
+			tcphdr->th_off= len / 4;
+			tcphdr->th_flags= TCP_SYN_FLAG;
 
 			if (len+state->curpacksize > sizeof(base->packet))
 			{
@@ -1144,17 +1395,17 @@ static void send_pkt(struct trtstate *state)
 			v4_ph.zero= 0;
 			v4_ph.proto= IPPROTO_TCP;
 			v4_ph.len= htons(len);
-			tcphdr->source=
+			tcphdr->th_sport=
 				((struct sockaddr_in *)&state->loc_sin6)->
 				sin_port;
-			tcphdr->dest= ((struct sockaddr_in *)&state->sin6)->
+			tcphdr->th_dport= ((struct sockaddr_in *)&state->sin6)->
 				sin_port;
-			tcphdr->uh_sum= 0;
+			tcphdr->th_sum= 0;
 
 			sum= in_cksum_udp(&v4_ph, NULL,
 				(unsigned short *)base->packet, len);
 			
-			tcphdr->check= sum;
+			tcphdr->tcp_check= sum;
 
 #if 0
 			if (state->parismod)
@@ -1821,7 +2072,11 @@ static void ready_callback4(int __attribute((unused)) unused,
 			etcp= (struct tcphdr *)((char *)eip+ehlen);
 
 			/* Quick check if the source port is in range */
+#if defined(__FreeBSD__) || defined(__APPLE__)
+			srcport= ntohs(etcp->th_sport);
+#else
 			srcport= ntohs(etcp->source);
+#endif
 			if (srcport < SRC_BASE_PORT ||
 				srcport >= SRC_BASE_PORT+base->tabsiz)
 			{
@@ -2851,14 +3106,14 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	}
 
 	/* Quick check if the port is in range */
-	myport= ntohs(tcphdr->dest);
+	myport= ntohs(tcphdr->th_dport);
 	if (myport < SRC_BASE_PORT || myport >= SRC_BASE_PORT+base->tabsiz)
 	{
 		return;	/* Not for us */
 	}
 
 	/* We store the id in high order 16 bits of the sequence number */
-	ind= ntohl(tcphdr->ack_seq) >> 16;
+	ind= ntohl(tcphdr->th_ack) >> 16;
 
 	if (ind != state->index)
 		state= NULL;
@@ -2889,7 +3144,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 		add_str(state, " }, { ");
 
 	/* Only check if the ack is without 64k of what we expect */
-	seq= ntohl(tcphdr->ack_seq) & 0xffff;
+	seq= ntohl(tcphdr->th_ack) & 0xffff;
 	if (seq-state->seq > 0x2000)
 	{
 		if (seq > state->seq)
@@ -2929,12 +3184,12 @@ static void ready_tcp4(int __attribute((unused)) unused,
 		add_str(state, line);
 	}
 	snprintf(line, sizeof(line), ", " DBQ(flags) ":" DBQ(%s%s%s%s%s%s),
-		(tcphdr->fin ? "F" : ""),
-		(tcphdr->syn ? "S" : ""),
-		(tcphdr->rst ? "R" : ""),
-		(tcphdr->psh ? "P" : ""),
-		(tcphdr->ack ? "A" : ""),
-		(tcphdr->urg ? "U" : ""));
+		((tcphdr->th_flags & TCP_FIN_FLAG) ? "F" : ""),
+		((tcphdr->th_flags & TCP_SYN_FLAG) ? "S" : ""),
+		((tcphdr->th_flags & TCP_RST_FLAG) ? "R" : ""),
+		((tcphdr->th_flags & TCP_PSH_FLAG) ? "P" : ""),
+		((tcphdr->th_flags & TCP_ACK_FLAG) ? "A" : ""),
+		((tcphdr->th_flags & TCP_URG_FLAG) ? "U" : ""));
 	add_str(state, line);
 
 	if (tcp_hlen > sizeof(*tcphdr))
@@ -3128,14 +3383,14 @@ static void ready_tcp6(int __attribute((unused)) unused,
 	}
 
 	/* Quick check if the port is in range */
-	myport= ntohs(tcphdr->dest);
+	myport= ntohs(tcphdr->th_dport);
 	if (myport < SRC_BASE_PORT || myport >= SRC_BASE_PORT+base->tabsiz)
 	{
 		return;	/* Not for us */
 	}
 
 	/* We store the id in high order 16 bits of the sequence number */
-	ind= ntohl(tcphdr->ack_seq) >> 16;
+	ind= ntohl(tcphdr->th_ack) >> 16;
 
 	if (ind != state->index)
 		state= NULL;
@@ -3164,7 +3419,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		add_str(state, " }, { ");
 
 	/* Only check if the ack is within 64k of what we expect */
-	seq= ntohl(tcphdr->ack_seq) & 0xffff;
+	seq= ntohl(tcphdr->th_ack) & 0xffff;
 	if (seq-state->seq > 0x2000)
 	{
 		if (seq > state->seq)
@@ -3205,12 +3460,12 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		add_str(state, line);
 	}
 	snprintf(line, sizeof(line), ", " DBQ(flags) ":" DBQ(%s%s%s%s%s%s),
-		(tcphdr->fin ? "F" : ""),
-		(tcphdr->syn ? "S" : ""),
-		(tcphdr->rst ? "R" : ""),
-		(tcphdr->psh ? "P" : ""),
-		(tcphdr->ack ? "A" : ""),
-		(tcphdr->urg ? "U" : ""));
+		((tcphdr->th_flags & TCP_FIN_FLAG) ? "F" : ""),
+		((tcphdr->th_flags & TCP_SYN_FLAG) ? "S" : ""),
+		((tcphdr->th_flags & TCP_RST_FLAG) ? "R" : ""),
+		((tcphdr->th_flags & TCP_PSH_FLAG) ? "P" : ""),
+		((tcphdr->th_flags & TCP_ACK_FLAG) ? "A" : ""),
+		((tcphdr->th_flags & TCP_URG_FLAG) ? "U" : ""));
 	add_str(state, line);
 
 	if (tcp_hlen > sizeof(*tcphdr))
