@@ -876,7 +876,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	struct ip * ip;
 #ifdef __FreeBSD__
 	struct icmp * icmp;
-#elif __APPLE__
+#elif defined(__APPLE__)
 	struct icmp * icmp;
 #else
 	struct icmphdr * icmp;
@@ -945,7 +945,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* The ICMP portion */
 #ifdef __FreeBSD__
 	icmp = (struct icmp *) (base->packet + hlen);
-#elif __APPLE__
+#elif defined(__APPLE__)
 	icmp = (struct icmp *) (base->packet + hlen);
 #else
 	icmp = (struct icmphdr *) (base->packet + hlen);
@@ -954,7 +954,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* Check the ICMP header to drop unexpected packets due to unrecognized id */
 #ifdef __FreeBSD__
 	if (icmp->icmp_id != (base->pid & 0x0fff))
-#elif __APPLE__
+#elif defined(__APPLE__)
 	if (icmp->icmp_id != (base->pid & 0x0fff))
 #else
 	if (icmp->un.echo.id != (base->pid & 0x0fff))
@@ -964,7 +964,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 #ifdef __FreeBSD__
 		printf("ready_callback4: bad pid: got %d, expect %d\n",
 			icmp->icmp_id, base->pid & 0x0fff);
-#elif __APPLE__
+#elif defined(__APPLE__)
 		printf("ready_callback4: bad pid: got %d, expect %d\n",
 			icmp->icmp_id, base->pid & 0x0fff);
 #else
@@ -1000,7 +1000,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	/* Check for Destination Host Unreachable */
 #ifdef __FreeBSD__
 	if (icmp->icmp_type == ICMP_ECHO)
-#elif __APPLE__
+#elif defined(__APPLE__)
 	if (icmp->icmp_type == ICMP_ECHO)
 #else
 	if (icmp->type == ICMP_ECHO)
@@ -1010,7 +1010,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	}
 #ifdef __FreeBSD__
 	else if (icmp->icmp_type == ICMP_ECHOREPLY)
-#elif __APPLE__
+#elif defined(__APPLE__)
 	else if (icmp->icmp_type == ICMP_ECHOREPLY)
 #else
 	else if (icmp->type == ICMP_ECHOREPLY)
@@ -1041,7 +1041,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	     */
 #ifdef __FreeBSD__
 	    isDup= (ntohs(icmp->icmp_seq) != state->seq);
-#elif __APPLE__
+#elif defined(__APPLE__)
 	    isDup= (ntohs(icmp->icmp_seq) != state->seq);
 #else
 	    isDup= (ntohs(icmp->un.echo.sequence) != state->seq);
@@ -1052,7 +1052,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
 #ifdef __FreeBSD__
 		    ntohs(icmp->icmp_seq), ip->ip_ttl, &elapsed,
-#elif __APPLE__
+#elif defined(__APPLE__)
 		    ntohs(icmp->icmp_seq), ip->ip_ttl, &elapsed,
 #else
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
