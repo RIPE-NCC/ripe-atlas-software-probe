@@ -13,12 +13,12 @@ pedantic-all:
 	$(MAKE) CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
 
 # Add test target to run the testsuite
-test:
+test: all
 	@echo "Running RIPE Atlas Software Probe testsuite..."
 	@cd probe-busybox/testsuite && ./runtest
 
 # Add test-verbose target for detailed test output
-test-verbose:
+test-verbose: all
 	@echo "Running RIPE Atlas Software Probe testsuite (verbose)..."
 	@cd probe-busybox/testsuite && ./runtest -v
 
