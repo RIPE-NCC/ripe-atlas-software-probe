@@ -535,6 +535,8 @@ evbuffer_deferred_callback(struct event_callback *cb, void *arg)
 {
 	struct bufferevent *parent = NULL;
 	struct evbuffer *buffer = arg;
+	
+	(void)cb; /* unused parameter */
 
 	/* XXXX It would be better to run these callbacks without holding the
 	 * lock */
@@ -2467,6 +2469,8 @@ evbuffer_write_sendfile(struct evbuffer *buffer, evutil_socket_t dest_fd,
     ev_ssize_t howmuch)
 {
 	struct evbuffer_chain *chain = buffer->first;
+	
+	(void)howmuch; /* unused parameter */
 	struct evbuffer_chain_file_segment *info =
 	    EVBUFFER_CHAIN_EXTRA(struct evbuffer_chain_file_segment,
 		chain);

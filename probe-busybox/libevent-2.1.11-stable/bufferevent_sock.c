@@ -131,6 +131,8 @@ bufferevent_socket_outbuf_cb(struct evbuffer *buf,
     void *arg)
 {
 	struct bufferevent *bufev = arg;
+	
+	(void)buf; /* unused parameter */
 	struct bufferevent_private *bufev_p = BEV_UPCAST(bufev);
 
 	if (cbinfo->n_added &&
@@ -611,6 +613,9 @@ static int
 be_socket_flush(struct bufferevent *bev, short iotype,
     enum bufferevent_flush_mode mode)
 {
+	(void)bev; /* unused parameter */
+	(void)iotype; /* unused parameter */
+	(void)mode; /* unused parameter */
 	return 0;
 }
 

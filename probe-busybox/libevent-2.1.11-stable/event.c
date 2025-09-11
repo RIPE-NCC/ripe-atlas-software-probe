@@ -295,7 +295,7 @@ static void event_debug_note_add_(const struct event *ev)
 		    "%s: noting an add on a non-setup event %p"
 		    " (events: 0x%x, fd: "EV_SOCK_FMT
 		    ", flags: 0x%x)",
-		    __func__, ev, ev->ev_events,
+		    __func__, (void *)ev, ev->ev_events,
 		    EV_SOCK_ARG(ev->ev_fd), ev->ev_flags);
 	}
 	EVLOCK_UNLOCK(event_debug_map_lock_, 0);

@@ -206,6 +206,8 @@ be_pair_outbuf_cb(struct evbuffer *outbuf,
     const struct evbuffer_cb_info *info, void *arg)
 {
 	struct bufferevent_pair *bev_pair = arg;
+	
+	(void)outbuf; /* unused parameter */
 	struct bufferevent_pair *partner = bev_pair->partner;
 
 	incref_and_lock(downcast(bev_pair));

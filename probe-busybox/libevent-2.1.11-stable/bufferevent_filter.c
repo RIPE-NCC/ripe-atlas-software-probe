@@ -160,6 +160,7 @@ be_null_filter(struct evbuffer *src, struct evbuffer *dst, ev_ssize_t lim,
 	       enum bufferevent_flush_mode state, void *ctx)
 {
 	(void)state;
+	(void)ctx; /* unused parameter */
 	if (evbuffer_remove_buffer(src, dst, lim) >= 0)
 		return BEV_OK;
 	else
@@ -422,6 +423,8 @@ bufferevent_filtered_outbuf_cb(struct evbuffer *buf,
     const struct evbuffer_cb_info *cbinfo, void *arg)
 {
 	struct bufferevent_filtered *bevf = arg;
+	
+	(void)buf; /* unused parameter */
 	struct bufferevent *bev = downcast(bevf);
 
 	if (cbinfo->n_added) {
@@ -484,6 +487,9 @@ bufferevent_filtered_inbuf_cb(struct evbuffer *buf,
     const struct evbuffer_cb_info *cbinfo, void *arg)
 {
 	struct bufferevent_filtered *bevf = arg;
+	
+	(void)buf; /* unused parameter */
+	(void)cbinfo; /* unused parameter */
 	enum bufferevent_flush_mode state;
 	struct bufferevent *bev = downcast(bevf);
 
@@ -528,6 +534,7 @@ be_filter_readcb(struct bufferevent *underlying, void *me_)
 static void
 be_filter_writecb(struct bufferevent *underlying, void *me_)
 {
+	(void)underlying; /* unused parameter */
 	struct bufferevent_filtered *bevf = me_;
 	struct bufferevent *bev = downcast(bevf);
 	struct bufferevent_private *bufev_private = BEV_UPCAST(bev);
@@ -550,6 +557,7 @@ be_filter_writecb(struct bufferevent *underlying, void *me_)
 static void
 be_filter_eventcb(struct bufferevent *underlying, short what, void *me_)
 {
+	(void)underlying; /* unused parameter */
 	struct bufferevent_filtered *bevf = me_;
 	struct bufferevent *bev = downcast(bevf);
 	struct bufferevent_private *bufev_private = BEV_UPCAST(bev);
@@ -613,10 +621,10 @@ be_filter_ctrl(struct bufferevent *bev, enum bufferevent_ctrl_op op,
 			bevf->underlying->be_ops->ctrl) {
 		    return (bevf->underlying->be_ops->ctrl)(bevf->underlying, op, data);
 		}
-		EVUTIL_FALLTHROUGH;
+		/* fall through */
 
 	case BEV_CTRL_CANCEL_ALL:
-		EVUTIL_FALLTHROUGH;
+		/* fall through */
 	default:
 		return -1;
 	}
