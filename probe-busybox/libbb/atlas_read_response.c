@@ -21,22 +21,51 @@ static void convert_linux_sockaddr_to_local(const void *linux_data, size_t linux
 {
 	const struct sockaddr_in *linux_sin = (const struct sockaddr_in *)linux_data;
 	const struct sockaddr_in6 *linux_sin6 = (const struct sockaddr_in6 *)linux_data;
+	struct sockaddr_in *local_sin = (struct sockaddr_in *)local_data;
+	struct sockaddr_in6 *local_sin6 = (struct sockaddr_in6 *)local_data;
+	
+	/* Clear the output buffer */
+	memset(local_data, 0, *local_size);
 	
 	if (linux_size == sizeof(struct sockaddr_in) && 
 	    linux_sin->sin_family == AF_INET) {
-		/* IPv4 address - direct copy should work */
-		memcpy(local_data, linux_data, sizeof(struct sockaddr_in));
+		/* IPv4 address - convert Linux format to local format */
+		local_sin->sin_family = AF_INET;
+		local_sin->sin_port = linux_sin->sin_port;
+		local_sin->sin_addr = linux_sin->sin_addr;
 		*local_size = sizeof(struct sockaddr_in);
 	} else if (linux_size == sizeof(struct sockaddr_in6) && 
 	           linux_sin6->sin6_family == AF_INET6) {
-		/* IPv6 address - direct copy should work */
-		memcpy(local_data, linux_data, sizeof(struct sockaddr_in6));
+		/* IPv6 address - convert Linux format to local format */
+		local_sin6->sin6_family = AF_INET6;
+		local_sin6->sin6_port = linux_sin6->sin6_port;
+		local_sin6->sin6_flowinfo = linux_sin6->sin6_flowinfo;
+		local_sin6->sin6_addr = linux_sin6->sin6_addr;
+		local_sin6->sin6_scope_id = linux_sin6->sin6_scope_id;
 		*local_size = sizeof(struct sockaddr_in6);
 	} else {
-		/* Unknown format, try direct copy */
-		size_t copy_size = (linux_size < *local_size) ? linux_size : *local_size;
-		memcpy(local_data, linux_data, copy_size);
-		*local_size = copy_size;
+		/* Handle Linux AF_INET6 (10) vs FreeBSD AF_INET6 (28) conversion */
+		if (linux_size == sizeof(struct sockaddr_in6)) {
+			/* Check if this is a Linux IPv6 address with wrong family value */
+			if (linux_sin6->sin6_family == 10) { /* Linux AF_INET6 */
+				local_sin6->sin6_family = AF_INET6; /* Convert to local AF_INET6 */
+				local_sin6->sin6_port = linux_sin6->sin6_port;
+				local_sin6->sin6_flowinfo = linux_sin6->sin6_flowinfo;
+				local_sin6->sin6_addr = linux_sin6->sin6_addr;
+				local_sin6->sin6_scope_id = linux_sin6->sin6_scope_id;
+				*local_size = sizeof(struct sockaddr_in6);
+			} else {
+				/* Unknown format, try direct copy */
+				size_t copy_size = (linux_size < *local_size) ? linux_size : *local_size;
+				memcpy(local_data, linux_data, copy_size);
+				*local_size = copy_size;
+			}
+		} else {
+			/* Unknown format, try direct copy */
+			size_t copy_size = (linux_size < *local_size) ? linux_size : *local_size;
+			memcpy(local_data, linux_data, copy_size);
+			*local_size = copy_size;
+		}
 	}
 }
 
