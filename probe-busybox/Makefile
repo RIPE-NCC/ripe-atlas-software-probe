@@ -272,11 +272,7 @@ export quiet Q KBUILD_VERBOSE
 MAKEFLAGS += --include-dir=$(srctree)
 
 # Detect FreeBSD and use appropriate compiler
-ifeq ($(shell uname -s),FreeBSD)
-HOSTCC  	?= cc
-else
-HOSTCC  	?= gcc
-endif
+HOSTCC  	= $(shell uname -s | grep -q FreeBSD && echo cc || echo gcc)
 HOSTCXX  	?= g++
 HOSTCFLAGS	:=
 HOSTCXXFLAGS	:=
@@ -295,11 +291,7 @@ MAKEFLAGS += -rR
 
 AS		= $(CROSS_COMPILE)as
 # Detect FreeBSD and use appropriate compiler
-ifeq ($(shell uname -s),FreeBSD)
-CC		?= $(CROSS_COMPILE)cc
-else
-CC		?= $(CROSS_COMPILE)gcc
-endif
+CC		= $(CROSS_COMPILE)cc
 LD		= $(CC) -nostdlib
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
