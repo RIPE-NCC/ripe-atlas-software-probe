@@ -911,6 +911,7 @@ static void report(struct hgstate *state)
 
 		if (state->socklen != 0)
 		{
+			namebuf[0] = '\0';  // Initialize the buffer
 			getnameinfo((struct sockaddr *)&state->sin6,
 				state->socklen, namebuf, sizeof(namebuf),
 				NULL, 0, NI_NUMERICHOST);

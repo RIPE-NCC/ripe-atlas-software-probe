@@ -2693,6 +2693,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
+	qry->opt_AF = AF_UNSPEC;  // Initialize to unspecified address family
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
 	qry->rcvdttl= -42;
@@ -3976,6 +3977,7 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 	if( qry->ressent && qry->server_name)
 	{  // started to send query
 	   // historic resaons only works with UDP 
+		addrstr[0] = '\0';  // Initialize the buffer
 		switch (qry->ressent->ai_family)
 		{
 			case AF_INET:
@@ -3984,8 +3986,13 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 			case AF_INET6:
 				ptr = &((struct sockaddr_in6 *) qry->ressent->ai_addr)->sin6_addr;
 				break;
+			default:
+				ptr = NULL;  // Ensure ptr is set for unsupported address families
+				break;
 		}
-		inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		if (ptr != NULL) {
+			inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		}
 		if(strcmp(addrstr, qry->server_name)) {
 			JS(name,  qry->server_name);
 		}
@@ -4003,10 +4010,17 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 		JD(af, qry->dst_ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if(qry->server_name) {
-			JS(dst_name,  qry->server_name);
+		JS(dst_name,  qry->server_name);
+		// When using fuzzing files, use opt_AF to determine address family
+		if(qry->opt_AF == AF_INET6) {
+			JD(af, 6);
+		} else if(qry->opt_AF == AF_INET) {
+			JD(af, 4);
+		}
 	}
 	
 	if(qry->loc_sin6.sin6_family) {
+		addrstr[0] = '\0';  // Initialize the buffer
 		getnameinfo((struct sockaddr *)&qry->loc_sin6,
 				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
 				NULL, 0, NI_NUMERICHOST);

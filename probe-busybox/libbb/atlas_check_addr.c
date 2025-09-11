@@ -54,6 +54,9 @@ int atlas_check_addr(const struct sockaddr *sa, socklen_t len)
 		cp= getenv("ATLAS_DISABLE_CHECK_ADDR");
 		if (cp != NULL && strcmp(cp, "yes") == 0)
 			allow_all= 1;
+		/* Also allow all addresses when ATLAS_UNSAFE is set (for testing) */
+		if (atlas_unsafe())
+			allow_all= 1;
 	}
 
 	if (allow_all)
