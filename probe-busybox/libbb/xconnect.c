@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <sys/un.h>
+#include <arpa/inet.h>
 #include "libbb.h"
 
 int FAST_FUNC setsockopt_int(int fd, int level, int optname, int optval)

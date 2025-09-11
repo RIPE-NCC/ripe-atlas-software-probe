@@ -1,8 +1,28 @@
 include $(top_srcdir)/rules.mk
 
 ACLOCAL_AMFLAGS         = -I m4
-AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir)
+AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir) CC=$(CC)
 SUBDIRS = bin config probe-busybox/libevent-2.1.11-stable probe-busybox .
+
+# Add pedantic target for stricter compilation (probe-busybox only)
+pedantic:
+	$(MAKE) -C probe-busybox CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
+
+# Add pedantic-all target for all components (including external libs)
+pedantic-all:
+	$(MAKE) CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
+
+# Add test target to run the testsuite
+test: all
+	@echo "Running RIPE Atlas Software Probe testsuite..."
+	@cd probe-busybox/testsuite && ./runtest
+
+# Add test-verbose target for detailed test output
+test-verbose: all
+	@echo "Running RIPE Atlas Software Probe testsuite (verbose)..."
+	@cd probe-busybox/testsuite && ./runtest -v
+
+.PHONY: pedantic pedantic-all test test-verbose
 
 ATLAS_SPOOL_DIRS = \
 		$(foreach dir,. new oneoff out out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir)) \
@@ -40,7 +60,12 @@ endif
 # Technically this hack belongs in probe-busybox, but it is here
 # because busybox is a different build system.
 install-exec-hook:
-	$(install_sh) $(ATLAS_OWN_SUID_OPTS) $(ATLAS_OWN_MEAS_OPTS) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
 if SETCAP_INSTALL
-	setcap cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
+	@echo "Using capabilities instead of SUID - more secure"
+	$(install_sh) -m 0750 -o root -g $(ripe_atlas_group) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
+	@echo "Setting capabilities for raw socket access and device binding"
+	$(SETCAP) cap_net_raw=ep $(DESTDIR)$(atlas_measurementdir)/busybox
+else
+	@echo "Fall back to SUID root when setcap is not available"
+	$(install_sh) -m 4750 -o root -g $(ripe_atlas_group) $(top_srcdir)/probe-busybox/busybox $(DESTDIR)/$(atlas_measurementdir)/busybox
 endif

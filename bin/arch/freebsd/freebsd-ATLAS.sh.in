@@ -1,0 +1,81 @@
+if [ -n "$ATLAS_BASE" ]
+then
+	BASE_DIR="$ATLAS_BASE"
+	export ATLAS_BASE
+fi
+
+. $ATLAS_SCRIPTS/common-pre.sh
+
+# FreeBSD specific commands
+MANUAL_UPGRADE_CMD=:
+TRY_UPGRADE_CMD=:
+FINDPID_SSH_CMD=findpid_ssh
+KILL_PERDS_CMD=kill_perds
+KILL_SSH_CMD=kill_ssh
+KILL_TELNETD_CMD=kill_telnetd
+MOUNT_FS_CMD=:
+SETUP_NETWORK_CMD=:
+NTPCLIENT_CMD=:
+CHOWN_FOR_MSM=:
+CHMOD_FOR_MSM=:
+SET_HOSTNAME=:
+
+# FreeBSD specific telnetd function
+telnetd()
+{
+	$SU_CMD $ATLAS_MEASUREMENT/telnetd "$@"
+}
+
+# Various files and directories
+: ${HOME:=${ATLAS_SPOOLDIR}}; export HOME	# Set HOME if it isn't set
+RESOLV_CONF=/etc/resolv.conf
+MODE_FILE=$ATLAS_SYSCONFDIR/mode
+
+# Other conf
+DHCP=False
+
+. $ATLAS_SCRIPTS/$DEVICE_NAME-common.sh
+
+# Directories
+STATE_DIR=$ATLAS_DATA; export STATE_DIR
+
+# Files
+REG_SERVERS_SOURCE=$ATLAS_SCRIPTS/reg_servers.sh
+
+# FreeBSD specific functions
+. $ATLAS_SCRIPTS/freebsd-functions.sh
+
+# Get ethernet address
+get_ether_addr
+
+# Create ssh keys if they are not there yet.
+if [ ! -f $ATLAS_SYSCONFDIR/probe_key ]; then
+    name=$(hostname -s)
+    ssh-keygen -t rsa -P '' -C $name -f $ATLAS_SYSCONFDIR/probe_key
+    chown -R @ripe_atlas_user@:@ripe_atlas_group@ $ATLAS_SYSCONFDIR
+fi
+
+# Set SOS_ID to the hash of the public key
+export SOS_ID="H$(hash_ssh_pubkey $ATLAS_SYSCONFDIR/probe_key.pub)"
+
+while :
+do
+	mode=$(cat $MODE_FILE)
+	case X$mode in
+	Xdev|Xtest|Xprod)
+		# Okay
+		if [ ! -f $REG_SERVERS ]
+		then
+			mkdir -p $ATLAS_SCRIPTS
+			cp $REG_SERVERS_SOURCE.$mode $REG_SERVERS
+		fi
+	;;
+	*)
+		echo "Probe is not configured, mode $mode"
+		sos "Imode-$mode"
+		sleep 60
+		continue
+	;;
+	esac
+	break
+done

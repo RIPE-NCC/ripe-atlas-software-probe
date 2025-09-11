@@ -23,7 +23,8 @@
 //config:       default n
 //config:       depends on EVTDIG
 //config:       help
-//config:        extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
+//config:        extra debug info. Also may cause segfault or/and memory leak.
+//config:        Add at your own risk.
 
 //applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_ROOT, BB_SUID_DROP))
 
@@ -178,6 +179,9 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -206,7 +210,7 @@
 #define JSDOT(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s.\" , ",  val), ADDRESULT
 #define JS1(key, fmt, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : "#fmt" , ",  val), ADDRESULT
 #define JD(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d , ",  val), ADDRESULT
-#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d ",  val), ADDRESULT
+#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %zu ",  val), ADDRESULT
 #define JU(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u , ",  val), ADDRESULT
 #define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val), ADDRESULT
 #define JC snprintf(line, DEFAULT_LINE_LENGTH, ","), ADDRESULT
@@ -271,6 +275,143 @@
 
 // seems the following are defined in header files we use
 
+// Basic DNS record types that are missing on macOS
+#ifndef ns_t_a
+#define ns_t_a       1
+#endif
+
+#ifndef T_A
+#define T_A          ns_t_a
+#endif
+
+#ifndef ns_t_aaaa
+#define ns_t_aaaa    28
+#endif
+
+#ifndef T_AAAA
+#define T_AAAA       ns_t_aaaa
+#endif
+
+#ifndef ns_t_any
+#define ns_t_any     255
+#endif
+
+#ifndef T_ANY
+#define T_ANY        ns_t_any
+#endif
+
+#ifndef ns_t_afsdb
+#define ns_t_afsdb   18
+#endif
+
+#ifndef T_AFSDB
+#define T_AFSDB      ns_t_afsdb
+#endif
+
+#ifndef ns_t_axfr
+#define ns_t_axfr    252
+#endif
+
+#ifndef T_AXFR
+#define T_AXFR       ns_t_axfr
+#endif
+
+#ifndef ns_t_cname
+#define ns_t_cname   5
+#endif
+
+#ifndef T_CNAME
+#define T_CNAME      ns_t_cname
+#endif
+
+#ifndef ns_t_key
+#define ns_t_key     25
+#endif
+
+#ifndef T_KEY
+#define T_KEY        ns_t_key
+#endif
+
+#ifndef ns_t_loc
+#define ns_t_loc     29
+#endif
+
+#ifndef T_LOC
+#define T_LOC        ns_t_loc
+#endif
+
+#ifndef ns_t_mx
+#define ns_t_mx      15
+#endif
+
+#ifndef T_MX
+#define T_MX         ns_t_mx
+#endif
+
+#ifndef ns_t_naptr
+#define ns_t_naptr   35
+#endif
+
+#ifndef T_NAPTR
+#define T_NAPTR      ns_t_naptr
+#endif
+
+#ifndef ns_t_ns
+#define ns_t_ns      2
+#endif
+
+#ifndef T_NS
+#define T_NS         ns_t_ns
+#endif
+
+#ifndef ns_t_ptr
+#define ns_t_ptr     12
+#endif
+
+#ifndef T_PTR
+#define T_PTR        ns_t_ptr
+#endif
+
+#ifndef ns_t_rp
+#define ns_t_rp      17
+#endif
+
+#ifndef T_RP
+#define T_RP         ns_t_rp
+#endif
+
+#ifndef ns_t_sig
+#define ns_t_sig     24
+#endif
+
+#ifndef T_SIG
+#define T_SIG        ns_t_sig
+#endif
+
+#ifndef ns_t_srv
+#define ns_t_srv     33
+#endif
+
+#ifndef T_SRV
+#define T_SRV        ns_t_srv
+#endif
+
+#ifndef ns_t_tsig
+#define ns_t_tsig    250
+#endif
+
+#ifndef T_TSIG
+#define T_TSIG       ns_t_tsig
+#endif
+
+#ifndef ns_t_txt
+#define ns_t_txt     16
+#endif
+
+#ifndef T_TXT
+#define T_TXT        ns_t_txt
+#endif
+
 #ifndef ns_t_apl
 #define ns_t_apl   42
 #endif
@@ -293,6 +434,97 @@
 
 #ifndef T_CERT
 #define T_CERT ns_t_cert
+#endif 
+
+// Define missing DNS record type constants for macOS compatibility
+#ifndef T_A
+#define T_A 1
+#endif
+
+#ifndef T_AAAA
+#define T_AAAA 28
+#endif
+
+#ifndef T_ANY
+#define T_ANY 255
+#endif
+
+#ifndef T_AFSDB
+#define T_AFSDB 18
+#endif
+
+#ifndef T_AXFR
+#define T_AXFR 252
+#endif
+
+#ifndef T_CNAME
+#define T_CNAME 5
+#endif
+
+#ifndef T_KEY
+#define T_KEY 25
+#endif
+
+#ifndef T_LOC
+#define T_LOC 29
+#endif
+
+#ifndef T_MX
+#define T_MX 15
+#endif
+
+#ifndef T_NAPTR
+#define T_NAPTR 35
+#endif
+
+#ifndef T_NS
+#define T_NS 2
+#endif
+
+#ifndef T_PTR
+#define T_PTR 12
+#endif
+
+#ifndef T_RP
+#define T_RP 17
+#endif
+
+#ifndef T_SIG
+#define T_SIG 24
+#endif
+
+#ifndef T_SRV
+#define T_SRV 33
+#endif
+
+#ifndef T_TSIG
+#define T_TSIG 250
+#endif
+
+#ifndef T_TXT
+#define T_TXT 16
+#endif
+
+#ifndef T_SOA
+#define T_SOA 6
+#endif
+
+// Define missing DNS class constants
+#ifndef C_IN
+#define C_IN 1
+#endif
+
+#ifndef C_CHAOS
+#define C_CHAOS 3
+#endif
+
+// Define missing IPv6 constants for macOS compatibility
+#ifndef IPV6_RECVHOPLIMIT
+#define IPV6_RECVHOPLIMIT 37
+#endif
+
+#ifndef IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT 47
 #endif 
 
 #ifndef ns_t_dname
@@ -472,7 +704,7 @@ struct query_state {
 	u_int16_t qryid;            /* query id 16 bit */
 	struct event event;         /* Used to detect read events on udp socket   */
 	int udp_fd;		    /* udp_fd */
-	int wire_size;
+	size_t wire_size;
 	struct dns_cookie_state *cookie_state;
 
 	struct bufferevent *bev_tcp;
@@ -767,7 +999,7 @@ static int tdig_delete(void *state);
 static int ChangetoDnsNameFormat(u_char *dns, size_t maxlen, char* qry);
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
 void tdig_start (void *qry);
-void printReply(struct query_state *qry, int wire_size, unsigned char *result);
+void printReply(struct query_state *qry, size_t wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state, int error);
 static void *tdig_init(int argc, char *argv[],
@@ -806,6 +1038,8 @@ int evtdig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int evtdig_main(int argc, char **argv) 
 { 
 	struct query_state *qry;
+
+	INIT_G();
 
 	EventBase=event_base_new();
 	if (!EventBase)
@@ -1126,27 +1360,26 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 			sha256_begin(&sha256_ctx);
 			if (qry->opt_AF == AF_INET)
 			{
+				struct sockaddr_in *sin4;
+				sin4 = (struct sockaddr_in *)&qry->loc_sin6;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in *)&qry->
-					loc_sin6)->sin_addr,
-					sizeof((struct sockaddr_in *)&qry->
-                                        loc_sin6)->sin_addr);
+					&sin4->sin_addr,
+					sizeof(sin4->sin_addr));
+				sin4 = (struct sockaddr_in *)&qry->res->ai_addr;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in *)&qry->
-					res->ai_addr)->sin_addr,
-					sizeof((struct sockaddr_in *)&qry->
-                                        res->ai_addr)->sin_addr);
+					&sin4->sin_addr,
+					sizeof(sin4->sin_addr));
 			}
 			else
 			{
+				struct sockaddr_in6 *sin6;
 				sha256_hash(&sha256_ctx,
 					&qry->loc_sin6.sin6_addr,
 					sizeof(qry->loc_sin6.sin6_addr));
+				sin6 = (struct sockaddr_in6 *)&qry->res->ai_addr;
 				sha256_hash(&sha256_ctx,
-					&((struct sockaddr_in6 *)&qry->res->
-					ai_addr)->sin6_addr,
-					sizeof(((struct sockaddr_in6 *)&qry->
-					res->ai_addr)->sin6_addr));
+					&sin6->sin6_addr,
+					sizeof(sin6->sin6_addr));
 			}
 			sha256_hash(&sha256_ctx,
 				&qry->cookie_state->client_secret,
@@ -1231,7 +1464,7 @@ static int mk_dns_buff(struct query_state *qry,  u_char *packet,
 /* Attempt to transmit a UDP DNS Request to a server. TCP is else where */
 static void tdig_send_query_callback(int unused UNUSED_PARAM, const short event UNUSED_PARAM, void *h)
 {
-	int r, fd, on;
+	int r, fd = -1, on;
 	sa_family_t af;
 	struct query_state *qry = h;
 	struct tdig_base *base = qry->base;
@@ -1762,7 +1995,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
-				" \"red more bytes than expected %d, got %zu\""
+				" \"red more bytes than expected %zu, got %zu\""
 				, qry->err.size ? ", " : ""
 				, qry->wire_size, qry->packet.size);
 		buf_add(&qry->err, line, strlen(line));	
@@ -1819,12 +2052,12 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	} 
 
 	/* We need at least a header */
-	if (qry->wire_size < sizeof(struct DNS_HEADER))
+        if (qry->wire_size < sizeof(struct DNS_HEADER))
 	{
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
 				" \"reply too small, got %zu\""
 				, qry->err.size ? ", " : ""
-				, (size_t)qry->wire_size);
+				, qry->wire_size);
 		buf_add(&qry->err, line, strlen(line));	
 		printReply (qry, 0, NULL);
 		return;
@@ -1857,7 +2090,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		}
 		buf_add(&qry->packet, line, n);
 		// crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
-		if(qry->wire_size == qry->packet.size) {
+                if(qry->wire_size == qry->packet.size) {
 			// crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
 			// crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
 			// crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
@@ -2007,7 +2240,7 @@ static void process_reply(void * arg, int nrecv, struct timespec now,
 		}
 	}
 
-	if (nrecv < sizeof (struct DNS_HEADER)) {
+        if (nrecv < (int)sizeof (struct DNS_HEADER)) {
 		base->shortpkt++;
 		return;
 	}
@@ -2460,6 +2693,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
+	qry->opt_AF = AF_UNSPEC;  // Initialize to unspecified address family
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
 	qry->rcvdttl= -42;
@@ -2644,21 +2878,9 @@ static void *tdig_init(int argc, char *argv[],
 
 			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
-				if ((qry->qtype >= 0 ) && 
-						(qry->qclass < 65536)) {
-
-					if (! qry->qclass ) 
-						qry->qclass = C_IN;
-
-					break;
-				}
-				else {
-					fprintf(stderr, "ERROR unknown Q "
-							"--typae %s ??. 0 - "
-							"65535\n", optarg); 
-					tdig_delete(qry);
-					return (0);
-				}
+				/* Note: No range check needed - qtype is u_int16_t (0-65535) */
+				if (! qry->qclass ) 
+					qry->qclass = C_IN;
 				break;
 
 			case O_AD:
@@ -2671,17 +2893,8 @@ static void *tdig_init(int argc, char *argv[],
 
 			case O_CLASS:
 				qry->qclass = strtoul(optarg, &check, 10);
-				if ((qry->qclass  >= 0 ) && 
-						(qry->qclass < 65536)) {
-					break;
-				}
-				else {
-					fprintf(stderr, "ERROR unknown Q class"
-							" --class %s ??. 0 - "
-							"65535\n", optarg); 
-					tdig_delete(qry);
-					return (0);
-				}
+				/* Note: No range check needed - qclass is u_int16_t (0-65535) */
+				break;
 
 			case O_RETRY :
 				qry->opt_query_arg = 1;
@@ -3247,7 +3460,7 @@ void tdig_start (void *arg)
 
 		if (qry->response_in)
 		{
-			size_t len;
+			size_t resp_len;
 
 			qry->resp_file= fopen(qry->response_in, "r");
 			if (!qry->resp_file)
@@ -3256,11 +3469,11 @@ void tdig_start (void *arg)
 					qry->response_in);
 			}
 
-			len= sizeof(sin6);
+			resp_len= sizeof(sin6);
 			read_response_file(qry->resp_file, RESP_PEERNAME,
-				&len, &sin6);
+				&resp_len, &sin6);
 			tcp_beforeconnect(&qry->tu_env,
-				(struct sockaddr *)&sin6, len);
+				(struct sockaddr *)&sin6, resp_len);
 			tcp_connected(&qry->tu_env, NULL);
 			tcp_writecb(NULL, &qry->tu_env);
 			while(qry->resp_file != NULL)
@@ -3703,7 +3916,7 @@ void printErrorQuick (struct query_state *qry)
 		fclose(fh);
 }
 
-void printReply(struct query_state *qry, int wire_size, unsigned char *result)
+void printReply(struct query_state *qry, size_t wire_size, unsigned char *result)
 {
 	int i, stop=0;
 	struct DNS_HEADER *dnsR = NULL;
@@ -3764,6 +3977,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 	if( qry->ressent && qry->server_name)
 	{  // started to send query
 	   // historic resaons only works with UDP 
+		addrstr[0] = '\0';  // Initialize the buffer
 		switch (qry->ressent->ai_family)
 		{
 			case AF_INET:
@@ -3772,14 +3986,19 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			case AF_INET6:
 				ptr = &((struct sockaddr_in6 *) qry->ressent->ai_addr)->sin6_addr;
 				break;
+			default:
+				ptr = NULL;  // Ensure ptr is set for unsupported address families
+				break;
 		}
-		inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		if (ptr != NULL) {
+			inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		}
 		if(strcmp(addrstr, qry->server_name)) {
 			JS(name,  qry->server_name);
 		}
 		JS(dst_addr, addrstr);
 		JS(dst_port, qry->port_as_char);
-		JD(af, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
+		JD(af, qry->ressent->ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if(qry->dst_ai_family && qry->server_name)
 	{
@@ -3788,13 +4007,20 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 		}
 		JS(dst_addr , qry->dst_addr_str);
 		JS(dst_port, qry->port_as_char);
-		JD(af, qry->dst_ai_family == PF_INET6 ? 6 : 4);
+		JD(af, qry->dst_ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if(qry->server_name) {
-			JS(dst_name,  qry->server_name);
+		JS(dst_name,  qry->server_name);
+		// When using fuzzing files, use opt_AF to determine address family
+		if(qry->opt_AF == AF_INET6) {
+			JD(af, 6);
+		} else if(qry->opt_AF == AF_INET) {
+			JD(af, 4);
+		}
 	}
 	
 	if(qry->loc_sin6.sin6_family) {
+		addrstr[0] = '\0';  // Initialize the buffer
 		getnameinfo((struct sockaddr *)&qry->loc_sin6,
 				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
 				NULL, 0, NI_NUMERICHOST);
@@ -3844,7 +4070,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			buf_add(&qry->result,line, strlen(line));
 		}
 
-		if (wire_size < sizeof(struct DNS_HEADER))
+		if (wire_size < (int)sizeof(struct DNS_HEADER))
 			goto truncated;
 
 		dnsR = (struct DNS_HEADER*) result;
@@ -3871,7 +4097,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 		offset += len + sizeof(struct QUESTION);
 
-		if (offset > wire_size)
+		if (offset > (unsigned int)wire_size)
 			goto truncated;
 
 		stop=0;  
@@ -3892,7 +4118,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				offset += stop;
 
 				if (offset + sizeof(struct R_DATA) > 
-					wire_size)
+					(size_t)wire_size)
 				{
 					/* Report error? */
 					goto truncated;
@@ -3908,7 +4134,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				{
 					data_len = ntohs(answers[i].resource->data_len);
 
-					if (offset+data_len > wire_size)
+					if (offset+data_len > (unsigned int)wire_size)
 						goto truncated;
 
 					if(flagAnswer == 0) {
@@ -3945,7 +4171,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 						goto truncated;
 					}
 					offset += stop;
-					if (offset+5*4 > wire_size)
+					if (offset+5*4 > (unsigned int)wire_size)
 					{
 						free(name1); name1= NULL;
 						free(name2); name2= NULL;
@@ -3980,7 +4206,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					data_len = ntohs(answers[i].
 						resource->data_len);
 
-					if (offset+data_len > wire_size)
+					if (offset+data_len > (unsigned int)wire_size)
 						goto truncated;
 
 					offset += data_len;
@@ -4073,7 +4299,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			if ((len & 0xc0) != 0xc0)
 			{
 				/* Bad format */
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"format-error at %lu: value 0x%x",
 					(unsigned long)offset, len);
 				*count= -1;
@@ -4084,7 +4310,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			noffset= ((len & ~0xc0) << 8) | base[offset+1];
 			if (noffset >= size)
 			{
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"offset-error at %lu: offset %lu",
 					(unsigned long)offset, (unsigned long)noffset);
 				*count= -1;
@@ -4095,7 +4321,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 			if (jump_count > 256)
 			{
 				/* Too many */
-				snprintf((char *)name, sizeof(name),
+				snprintf((char *)name, 256,
 					"too many redirects at %lu",
 						(unsigned long)offset);
 				*count= -1;
@@ -4117,7 +4343,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 		}
 		if (offset+len+1 > size)
 		{
-			snprintf((char *)name, sizeof(name),
+			snprintf((char *)name, 256,
 				"buf-bounds-error at %lu: len %d",
 					(unsigned long)offset, len);
 			*count= -1;
@@ -4127,7 +4353,7 @@ unsigned char* ReadName(unsigned char *base, size_t size, size_t offset,
 
 		if (p+len+1 > 255)
 		{
-			snprintf((char *)name, sizeof(name),
+			snprintf((char *)name, 256,
 					"name-length-error at %lu: len %d",
 					(unsigned long)offset, p+len+1);
 			*count= -1;

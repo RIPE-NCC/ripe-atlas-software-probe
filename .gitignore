@@ -7,6 +7,7 @@ config/common/ripe-atlas.user.conf
 config/common/ripe-atlas.users.conf
 config/common/ripe-atlas.service
 bin/arch/generic/*.sh
+bin/arch/freebsd/*.sh
 bin/config.sh
 bin/common-pre.sh
 bin/common.sh
@@ -155,9 +156,15 @@ cscope.po.out
 
 probe-busybox/include/atlas_path.h
 
+# Build artifacts and generated files
+config.h
+test_makefile
+probe-busybox/.config
+
 .vscode
 
 #
 # Never ignore these
 #
 !.gitignore
+config/freebsd/ripe-atlas.rc.d

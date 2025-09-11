@@ -43,6 +43,15 @@
 
 /* Include generated applet names, pointers to <applet>_main, etc */
 #include "applet_tables.h"
+
+#ifdef __APPLE__
+#ifndef setresgid
+#define setresgid(rgid, egid, sgid) setgid(egid)
+#endif
+#ifndef setresuid
+#define setresuid(ruid, euid, suid) setuid(euid)
+#endif
+#endif
 /* ...and if applet_tables generator says we have only one applet... */
 #ifdef SINGLE_APPLET_MAIN
 # undef ENABLE_FEATURE_INDIVIDUAL
@@ -61,7 +70,7 @@ static const char usage_messages[] ALIGN1 = UNPACKED_USAGE;
 
 #if ENABLE_FEATURE_COMPRESS_USAGE
 
-static const char packed_usage[] ALIGN1 = { PACKED_USAGE };
+static const unsigned char packed_usage[] ALIGN1 = { PACKED_USAGE };
 # include "bb_archive.h"
 static const char *unpack_usage_messages(void)
 {
@@ -77,9 +86,12 @@ static const char *unpack_usage_messages(void)
 	 * end up here with i != 0 on read data errors! Not trivial */
 	if (!i) {
 		/* Cannot use xmalloc: will leak bd in NOFORK case! */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverlength-strings"
 		outbuf = malloc_or_warn(sizeof(UNPACKED_USAGE));
 		if (outbuf)
 			read_bunzip(bd, outbuf, sizeof(UNPACKED_USAGE));
+#pragma GCC diagnostic pop
 	}
 	dealloc_bunzip(bd);
 	return outbuf;

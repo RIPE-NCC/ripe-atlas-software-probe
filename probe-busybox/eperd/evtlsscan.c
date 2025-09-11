@@ -31,6 +31,9 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -324,6 +327,7 @@ static bool tls_inst_start (struct tls_qry *qry, const char *cipher_q)
 
 	{
 		void *ptr = NULL;
+		qry->addrstr[0] = '\0';  // Initialize the buffer
 		if (qry->addr_curr->ai_family == AF_INET) {
 			ptr = &((struct sockaddr_in *) qry->addr_curr->ai_addr)->sin_addr;
 		}
@@ -331,7 +335,9 @@ static bool tls_inst_start (struct tls_qry *qry, const char *cipher_q)
 			ptr = &((struct sockaddr_in6 *)
 					qry->addr_curr->ai_addr)->sin6_addr;
 		}
-		inet_ntop (qry->addr_curr->ai_family, ptr, qry->addrstr, INET6_ADDRSTRLEN);
+		if (ptr != NULL) {
+			inet_ntop (qry->addr_curr->ai_family, ptr, qry->addrstr, INET6_ADDRSTRLEN);
+		}
 		crondlog_aa(LVL7, "connect to %s %s active = %d %s %s",
 				qry->addrstr, qry->ui->host, qry->ui->active, qry->sslv_str, qry->cipher_q);
 	}
@@ -609,7 +615,7 @@ static void fmt_ssl_host(struct tls_qry *qry, bool is_err)
 			if(strlen(addrstr))
 				JS(src_addr, addrstr);
 		}
-		JD_NC(af, qry->addr_curr->ai_family == PF_INET6 ? 6 : 4);
+		JD_NC(af, qry->addr_curr->ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if (qry->ui->host) {
 		JS_NC(dst_name, qry->ui->host);

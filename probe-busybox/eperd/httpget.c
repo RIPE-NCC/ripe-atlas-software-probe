@@ -68,7 +68,7 @@ struct hgbase
 	struct event_base *event_base;
 
 	struct hgstate **table;
-	int tabsiz;
+	size_t tabsiz;
 
 	/* For standalone httpget. Called when a httpget instance is
 	 * done. Just one pointer for all instances. It is up to the caller
@@ -411,11 +411,11 @@ static void timeout_callback(int __attribute((unused)) unused,
 static void *httpget_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state, int error))
 {
-	int c, i, do_combine, do_get, do_head, do_post,
+	int c, do_combine, do_get, do_head, do_post,
 		max_headers, max_body, only_v4, only_v6,
 		do_all, do_http10, do_etim, do_eetim;
 	bool do_tls;
-	size_t newsiz, read_limit;
+	size_t i, newsiz, read_limit;
 	unsigned timeout;
 	char *url, *check;
 	char *host_arg, *post_file, *output_file, *post_footer, *post_header,
@@ -911,12 +911,21 @@ static void report(struct hgstate *state)
 
 		if (state->socklen != 0)
 		{
+			namebuf[0] = '\0';  // Initialize the buffer
 			getnameinfo((struct sockaddr *)&state->sin6,
 				state->socklen, namebuf, sizeof(namebuf),
 				NULL, 0, NI_NUMERICHOST);
 
+					/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
 			snprintf(line, sizeof(line),
-				", " DBQ(dst_addr) ":" DBQ(%s), namebuf);
+				", " DBQ(dst_addr) ":" DBQ(%s), truncated);
+		}
 			add_str(state, line);
 		}
 
@@ -939,8 +948,16 @@ static void report(struct hgstate *state)
 			state->loc_socklen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line), ", " DBQ(src_addr) ":" DBQ(%s),
-			namebuf);
+		/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
+			snprintf(line, sizeof(line), ", " DBQ(src_addr) ":" DBQ(%s),
+				truncated);
+		}
 		add_str(state, line);
 	}
 
@@ -1212,7 +1229,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	for (;;)
 	{
 		if (state->read_limit > 0 &&
-			state->roffset >= state->read_limit)
+			(size_t)state->roffset >= state->read_limit)
 		{
 			state->read_truncated= 1;
 			switch(state->readstate)
@@ -1386,7 +1403,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			state->headers_size += len;
 
 			len= strlen(line);
-			if (state->tot_headers+len+1 <= state->max_headers)
+			if (state->tot_headers+(int)len+1 <= state->max_headers)
 			{
 				if (state->tot_headers != 0)
 					add_str(state, ",");
@@ -1589,10 +1606,10 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			}
 
 			len= state->linelen-state->lineoffset;
-			if (state->content_offset+len > state->tot_chunked)
+			if (state->content_offset+(int)len > state->tot_chunked)
 				len= state->tot_chunked-state->content_offset;
 
-			if (state->content_offset+len <= state->max_body)
+			if (state->content_offset+(int)len <= state->max_body)
 			{
 #if 0
 				printf(
@@ -1703,7 +1720,7 @@ static void readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 			}
 
 			len= state->linelen-state->lineoffset;
-			if (state->content_offset+len <= state->max_body)
+			if (state->content_offset+(int)len <= state->max_body)
 			{
 #if 0
 				printf(
@@ -2078,8 +2095,16 @@ static void reporterr(struct tu_env *env, enum tu_err cause,
 			env->dns_curr->ai_addrlen, namebuf, sizeof(namebuf),
 			NULL, 0, NI_NUMERICHOST);
 
-		snprintf(line, sizeof(line),
-			", " DBQ(dst_addr) ":" DBQ(%s) " }", namebuf);
+		/* Ensure we don't overflow the line buffer */
+		{
+			/* Truncate the address if it's too long */
+			char truncated[sizeof(line) - 50];
+			size_t max_len = sizeof(truncated) - 1;
+			strncpy(truncated, namebuf, max_len);
+			truncated[max_len] = '\0';
+			snprintf(line, sizeof(line),
+				", " DBQ(dst_addr) ":" DBQ(%s) " }", truncated);
+		}
 		add_str(state, line);
 
 		state->dnserr= 1;

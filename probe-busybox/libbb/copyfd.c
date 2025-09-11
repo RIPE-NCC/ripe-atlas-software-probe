@@ -9,7 +9,12 @@
 
 #include "libbb.h"
 #if ENABLE_FEATURE_USE_SENDFILE
-# include <sys/sendfile.h>
+# if defined(__FreeBSD__) || defined(__APPLE__)
+#  include <sys/socket.h>
+#  include <sys/uio.h>
+# else
+#  include <sys/sendfile.h>
+# endif
 #else
 # define sendfile(a,b,c,d) (-1)
 #endif
@@ -61,8 +66,20 @@ static off_t bb_full_fd_action(int src_fd, int dst_fd, off_t size)
 		ssize_t rd;
 
 		if (sendfile_sz) {
+#if defined(__FreeBSD__)
+			/* FreeBSD sendfile() signature: sendfile(fd, s, offset, nbytes, hdtr, sbytes, flags) */
+			off_t offset = 0;
+			rd = sendfile(dst_fd, src_fd, offset,
+				size > sendfile_sz ? sendfile_sz : size, NULL, NULL, 0);
+#elif defined(__APPLE__)
+			/* macOS sendfile() signature: sendfile(fd, s, offset, nbytes, hdtr, flags) */
+			off_t offset = 0;
+			off_t nbytes = size > sendfile_sz ? sendfile_sz : size;
+			rd = sendfile(dst_fd, src_fd, offset, &nbytes, NULL, 0);
+#else
 			rd = sendfile(dst_fd, src_fd, NULL,
 				size > sendfile_sz ? sendfile_sz : size);
+#endif
 			if (rd >= 0)
 				goto read_ok;
 			sendfile_sz = 0; /* do not try sendfile anymore */

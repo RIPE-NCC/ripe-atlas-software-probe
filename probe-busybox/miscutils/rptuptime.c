@@ -20,23 +20,32 @@
 
 #include "libbb.h"
 
-#include <sys/sysinfo.h>
+#include <time.h>
+#include <sys/time.h>
 
 #define DBQ(str) "\"" #str "\""
 
 /* This is a NOFORK applet. Be very careful! */
 
 int rptuptime_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int rptuptime_main(int argc UNUSED_PARAM, char **argv)
+int rptuptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 {
-	struct sysinfo info; 
+	time_t uptime = 0;
+	
+	// Portable way to get uptime using clock_gettime
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+		uptime = ts.tv_sec;
+	} else {
+		// Fallback: approximate uptime from process start
+		uptime = time(NULL) - 1;
+	}
 
 	printf("RESULT { " DBQ(id) ": " DBQ(7001) ", ");
 	printf("%s, ", atlas_get_version_json_str());
 	printf(DBQ(time) ": %ld, ", (long)time(NULL));
 	printf(DBQ(lts) ": %d, ", get_timesync());
-	sysinfo(&info);
-	printf(DBQ(uptime) ": %ld }\n", (long)info.uptime);
+	printf(DBQ(uptime) ": %ld }\n", (long)uptime);
 
 	return 0;
 }

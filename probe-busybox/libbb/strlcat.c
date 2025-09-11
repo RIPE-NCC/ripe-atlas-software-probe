@@ -14,6 +14,10 @@
 
 #include "libbb.h"
 
+#ifdef __APPLE__
+#undef strlcat
+#endif
+
 size_t strlcat(register char *__restrict dst,
 			   register const char *__restrict src,
 			   size_t n)

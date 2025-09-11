@@ -4,6 +4,16 @@
  */
 
 #include "libbb.h"
+#include <netinet/in.h>
+
+#ifdef __APPLE__
+#ifndef IPV6_DSTOPTS
+#define IPV6_DSTOPTS 23
+#endif
+#ifndef IPV6_HOPOPTS
+#define IPV6_HOPOPTS 22
+#endif
+#endif
 
 #define OPT_PAD1 0
 #define OPT_PADN 1
@@ -11,7 +21,8 @@
 int do_ipv6_option(int sock, int hbh_dest,
 	unsigned size)
 {
-	int i, r;
+	size_t i;
+	int r;
 	size_t totsize, ehlen, padlen;
 
 	char packet[4096];	/* Assume we can put the on the stack. And

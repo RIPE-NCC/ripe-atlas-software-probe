@@ -224,6 +224,8 @@ int eooqd_main(int argc, char *argv[])
 	/* Ignore SIGPIPE, broken TCP sessions may trigger them */
 	signal(SIGPIPE, SIG_IGN);
 
+	INIT_G();
+
 	/* Create libevent event base */
 	EventBase= event_base_new();
 	if (!EventBase)
@@ -524,6 +526,7 @@ static int add_line(void)
 	}
 
 	/* find a slot for this command */
+	slot = 0; /* Initialize slot */
 	for (skip= 1; skip <= state->max_busy; skip++)
 	{
 		slot= (state->curr_index+skip) % state->max_busy;

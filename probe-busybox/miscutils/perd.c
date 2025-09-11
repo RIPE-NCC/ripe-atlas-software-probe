@@ -356,57 +356,10 @@ int perd_main(int argc UNUSED_PARAM, char **argv)
 /* We set environment *before* vfork (because we want to use vfork),
  * so we cannot use setenv() - repeated calls to setenv() may leak memory!
  * Using putenv(), and freeing memory after unsetenv() won't leak */
-static void safe_setenv4(char **pvar_val, const char *var, const char *val /*, int len*/)
-{
-	const int len = 4; /* both var names are 4 char long */
-	char *var_val = *pvar_val;
-
-	if (var_val) {
-		var_val[len] = '\0'; /* nuke '=' */
-		unsetenv(var_val);
-		free(var_val);
-	}
-	*pvar_val = xasprintf("%s=%s", var, val);
-	putenv(*pvar_val);
-}
+/* Note: safe_setenv4 function was removed as it was unused */
 #endif
 
-static void SetEnv(struct passwd *pas)
-{
-#if SETENV_LEAKS
-	safe_setenv4(&env_var_user, "USER", pas->pw_name);
-	safe_setenv4(&env_var_home, "HOME", pas->pw_dir);
-	/* if we want to set user's shell instead: */
-	/*safe_setenv(env_var_user, "SHELL", pas->pw_shell, 5);*/
-#else
-	xsetenv("USER", pas->pw_name);
-	xsetenv("HOME", pas->pw_dir);
-#endif
-	/* currently, we use constant one: */
-	/*setenv("SHELL", DEFAULT_SHELL, 1); - done earlier */
-}
-
-static void ChangeUser(struct passwd *pas)
-{
-	/* careful: we're after vfork! */
-	change_identity(pas); /* - initgroups, setgid, setuid */
-	if (chdir(pas->pw_dir) < 0) {
-		crondlog(LVL9 "can't chdir(%s)", pas->pw_dir);
-		if (chdir(TMPDIR) < 0) {
-			crondlog(DIE9 "can't chdir(%s)", TMPDIR); /* exits */
-		}
-	}
-}
-
-static const char DowAry[] ALIGN1 =
-	"sun""mon""tue""wed""thu""fri""sat"
-	/* "Sun""Mon""Tue""Wed""Thu""Fri""Sat" */
-;
-
-static const char MonAry[] ALIGN1 =
-	"jan""feb""mar""apr""may""jun""jul""aug""sep""oct""nov""dec"
-	/* "Jan""Feb""Mar""Apr""May""Jun""Jul""Aug""Sep""Oct""Nov""Dec" */
-;
+/* Note: SetEnv, ChangeUser, DowAry, and MonAry are not used in this build */
 
 
 static void do_distr(CronLine *line)
@@ -967,7 +920,7 @@ static int atlas_run(char *cmdline)
 	char *outfile;
 	char *validated_fn= NULL;
 	FILE *fn;
-	char *reason;
+	const char *reason;
 	char *argv[ATLAS_NARGS];
 	char args[ATLAS_ARGSIZE];
 
@@ -1223,10 +1176,9 @@ error:
 	return 1;
 }
 
-static void RunJob(const char *user, CronLine *line)
+static void RunJob(const char *user UNUSED_PARAM, CronLine *line)
 {
-	struct passwd *pas;
-	pid_t pid;
+	/* Note: user parameter and external command execution are disabled for security */
 
 	if (line->lasttime != 0)
 	{

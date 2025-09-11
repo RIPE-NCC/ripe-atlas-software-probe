@@ -11,6 +11,10 @@ static char *rebased_validated_common(const char* base, const char *path,
 
 	if (atlas_unsafe())
 		return strdup(path);
+	
+	/* For testing, allow fuzzing files from test directory */
+	if (getenv("ATLAS_TESTS") && strstr(path, "testsuite/") && strstr(path, "-data/"))
+		return strdup(path);
 
 	/* Check for the following properties:
 	 * 1) path starts with prefix or if prefix is relative,

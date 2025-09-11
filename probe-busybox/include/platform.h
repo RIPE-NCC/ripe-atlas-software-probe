@@ -141,13 +141,18 @@
 #include <limits.h>
 #if defined(__digital__) && defined(__unix__)
 # include <sex.h>
-#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
-   || defined(__APPLE__)
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
 # include <sys/resource.h>  /* rlimit */
 # include <machine/endian.h>
 # define bswap_64 __bswap64
 # define bswap_32 __bswap32
 # define bswap_16 __bswap16
+#elif defined(__APPLE__)
+# include <sys/resource.h>  /* rlimit */
+# include <machine/endian.h>
+# define bswap_64 __builtin_bswap64
+# define bswap_32 __builtin_bswap32
+# define bswap_16 __builtin_bswap16
 #else
 # include <byteswap.h>
 # include <endian.h>

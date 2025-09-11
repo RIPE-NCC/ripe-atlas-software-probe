@@ -122,7 +122,7 @@ static int get_line_with_continuation(parser_t *parser)
 		if (nlen <= 0)
 			break;
 
-		if (parser->line_alloc < len + nlen + 1) {
+		if (parser->line_alloc < (size_t)(len + nlen + 1)) {
 			parser->line_alloc = len + nlen + 1;
 			line = parser->line = xrealloc(line, parser->line_alloc);
 		}

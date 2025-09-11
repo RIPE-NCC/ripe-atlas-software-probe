@@ -20,8 +20,6 @@
 
 #include "libbb.h"
 
-#include <sys/sysinfo.h>
-
 /* This is a NOFORK applet. Be very careful! */
 
 int rchoose_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;

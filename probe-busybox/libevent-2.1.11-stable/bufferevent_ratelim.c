@@ -394,6 +394,9 @@ static void
 bev_refill_callback_(evutil_socket_t fd, short what, void *arg)
 {
 	unsigned tick;
+	
+	(void)fd; /* unused parameter */
+	(void)what; /* unused parameter */
 	struct timeval now;
 	struct bufferevent_private *bev = arg;
 	int again = 0;
@@ -529,6 +532,9 @@ static void
 bev_group_refill_callback_(evutil_socket_t fd, short what, void *arg)
 {
 	struct bufferevent_rate_limit_group *g = arg;
+	
+	(void)fd; /* unused parameter */
+	(void)what; /* unused parameter */
 	unsigned tick;
 	struct timeval now;
 

@@ -41,7 +41,12 @@ get_sub_arch()
 	local VERSION_ID='unknown'
 	local ARCH=$(uname -m)
 
-	if [ -r '/etc/os-release' ]; then
+	# Detect FreeBSD
+	if [ "$(uname -s)" = "FreeBSD" ]; then
+		ID='freebsd'
+		VERSION_ID=$(uname -r | cut -d'-' -f1)
+		ARCH=$(uname -m)
+	elif [ -r '/etc/os-release' ]; then
 		. /etc/os-release
 	fi
 	echo "${ID}/${VERSION_ID}/${ARCH}"

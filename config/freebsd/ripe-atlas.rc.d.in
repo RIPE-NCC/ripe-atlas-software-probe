@@ -1,0 +1,153 @@
+#!/bin/sh
+#
+# RIPE Atlas Probe FreeBSD rc.d script
+# This script manages the RIPE Atlas probe as a FreeBSD service
+#
+
+. /etc/rc.subr
+
+name="ripe_atlas"
+rcvar="ripe_atlas_enable"
+command="/usr/local/sbin/ripe-atlas"
+pidfile="/var/run/ripe-atlas/ripe-atlas.pid"
+command_args="&"
+
+# Default values (will be substituted by configure)
+ripe_atlas_user="@ripe_atlas_user@"
+ripe_atlas_group="@ripe_atlas_group@"
+ripe_atlas_config="/etc/ripe-atlas"
+ripe_atlas_data="/var/spool/ripe-atlas"
+
+# Required directories
+required_dirs="${ripe_atlas_config} ${ripe_atlas_data}"
+
+# Start command
+start_cmd="ripe_atlas_start"
+stop_cmd="ripe_atlas_stop"
+status_cmd="ripe_atlas_status"
+extra_commands="status"
+
+# Check if the probe is configured
+ripe_atlas_check_config()
+{
+	if [ ! -f "${ripe_atlas_config}/mode" ]; then
+		echo "ERROR: RIPE Atlas probe is not configured."
+		echo "Please set the probe mode:"
+		echo "  echo 'dev' > ${ripe_atlas_config}/mode"
+		echo "  echo 'test' > ${ripe_atlas_config}/mode"
+		echo "  echo 'prod' > ${ripe_atlas_config}/mode"
+		return 1
+	fi
+	
+	# Check if mode is valid
+	mode=$(cat "${ripe_atlas_config}/mode" 2>/dev/null)
+	case "${mode}" in
+		dev|test|prod)
+			# Valid mode
+			;;
+		*)
+			echo "ERROR: Invalid probe mode '${mode}' in ${ripe_atlas_config}/mode"
+			echo "Valid modes are: dev, test, prod"
+			return 1
+			;;
+	esac
+	
+	return 0
+}
+
+# Start the probe
+ripe_atlas_start()
+{
+	if ! ripe_atlas_check_config; then
+		return 1
+	fi
+	
+	# Create required directories
+	mkdir -p /var/run/ripe-atlas/status
+	mkdir -p /var/run/ripe-atlas/pids
+	mkdir -p "${ripe_atlas_data}/data/new"
+	mkdir -p "${ripe_atlas_data}/data/out"
+	
+	# Set proper ownership
+	chown -R "${ripe_atlas_user}:${ripe_atlas_group}" /var/run/ripe-atlas
+	chown -R "${ripe_atlas_user}:${ripe_atlas_group}" "${ripe_atlas_data}"
+	
+	# Start the probe
+	echo "Starting RIPE Atlas probe (mode: $(cat ${ripe_atlas_config}/mode))"
+	su -m "${ripe_atlas_user}" -c "${command}" > /dev/null 2>&1 &
+	
+	# Store PID
+	echo $! > "${pidfile}"
+	
+	# Wait a moment and check if it's still running
+	sleep 2
+	if ! kill -0 $(cat "${pidfile}") 2>/dev/null; then
+		echo "ERROR: Failed to start RIPE Atlas probe"
+		rm -f "${pidfile}"
+		return 1
+	fi
+	
+	echo "RIPE Atlas probe started (PID: $(cat ${pidfile}))"
+}
+
+# Stop the probe
+ripe_atlas_stop()
+{
+	if [ -f "${pidfile}" ]; then
+		pid=$(cat "${pidfile}")
+		if kill -0 "${pid}" 2>/dev/null; then
+			echo "Stopping RIPE Atlas probe (PID: ${pid})"
+			
+			# Send TERM signal first
+			kill -TERM "${pid}" 2>/dev/null
+			
+			# Wait for graceful shutdown
+			count=0
+			while kill -0 "${pid}" 2>/dev/null && [ ${count} -lt 30 ]; do
+				sleep 1
+				count=$((count + 1))
+			done
+			
+			# Force kill if still running
+			if kill -0 "${pid}" 2>/dev/null; then
+				echo "Force stopping RIPE Atlas probe"
+				kill -KILL "${pid}" 2>/dev/null
+			fi
+		fi
+		rm -f "${pidfile}"
+	fi
+	
+	# Kill any remaining atlas processes
+	pkill -f "ripe-atlas" 2>/dev/null || true
+	pkill -f "perd" 2>/dev/null || true
+	pkill -f "eperd" 2>/dev/null || true
+	pkill -f "eooqd" 2>/dev/null || true
+	pkill -f "telnetd.*2023" 2>/dev/null || true
+	
+	echo "RIPE Atlas probe stopped"
+}
+
+# Check status
+ripe_atlas_status()
+{
+	if [ -f "${pidfile}" ]; then
+		pid=$(cat "${pidfile}")
+		if kill -0 "${pid}" 2>/dev/null; then
+			echo "RIPE Atlas probe is running (PID: ${pid})"
+			return 0
+		else
+			echo "RIPE Atlas probe is not running (stale PID file)"
+			rm -f "${pidfile}"
+			return 1
+		fi
+	else
+		echo "RIPE Atlas probe is not running"
+		return 1
+	fi
+}
+
+# Load configuration
+load_rc_config "${name}"
+
+# Run the command
+run_rc_command "$1"

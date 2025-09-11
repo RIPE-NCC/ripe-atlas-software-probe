@@ -391,9 +391,9 @@ enum {	/* cp.c, mv.c, install.c depend on these values. CAREFUL when changing th
 	 * they should not affect remove_file()/copy_file()
 	 */
 #if ENABLE_SELINUX
-	FILEUTILS_SET_SECURITY_CONTEXT = 1 << 30,
+	FILEUTILS_SET_SECURITY_CONTEXT = 1 << 16, /* -c */
 #endif
-	FILEUTILS_IGNORE_CHMOD_ERR = 1 << 31,
+	FILEUTILS_IGNORE_CHMOD_ERR = 1 << 17,
 };
 #define FILEUTILS_CP_OPTSTR "pdRfilsLHarPvu" IF_SELINUX("c")
 extern int remove_file(const char *path, int flags) FAST_FUNC;
@@ -504,10 +504,13 @@ char *xrealloc_getcwd_or_warn(char *cwd) FAST_FUNC;
 
 char *xmalloc_follow_symlinks(const char *path) FAST_FUNC RETURNS_MALLOC;
 
+/* strlcat and strlcpy are already available on macOS/Darwin */
+#if !defined(__APPLE__) && !defined(__DARWIN__)
 extern size_t strlcat(char *__restrict dst, const char *__restrict src,
 	size_t n);
 extern size_t strlcpy(char *__restrict dst, const char *__restrict src,
 	size_t n);
+#endif
 
 enum {
 	/* bb_signals(BB_FATAL_SIGS, handler) catches all signals which
@@ -597,7 +600,7 @@ void xpipe(int filedes[2]) FAST_FUNC;
 /* In this form code with pipes is much more readable */
 struct fd_pair { int rd; int wr; };
 #define piped_pair(pair)  pipe(&((pair).rd))
-#define xpiped_pair(pair) xpipe(&((pair).rd))
+#define xpiped_pair(pair) do { int _pipe[2]; xpipe(_pipe); (pair).rd = _pipe[0]; (pair).wr = _pipe[1]; } while (0)
 
 /* Useful for having small structure members/global variables */
 typedef int8_t socktype_t;
@@ -1079,13 +1082,6 @@ void exec_prog_or_SHELL(char **argv) NORETURN FAST_FUNC;
 
 /* xvfork() can't be a _function_, return after vfork in child mangles stack
  * in the parent. It must be a macro. */
-#define xvfork() \
-({ \
-	pid_t bb__xvfork_pid = vfork(); \
-	if (bb__xvfork_pid < 0) \
-		bb_perror_msg_and_die("vfork"); \
-	bb__xvfork_pid; \
-})
 #if BB_MMU
 pid_t xfork(void) FAST_FUNC;
 #endif
@@ -1233,6 +1229,16 @@ extern void bb_perror_msg(const char *s, ...) __attribute__ ((format (printf, 1,
 extern void bb_simple_perror_msg(const char *s) FAST_FUNC;
 extern void bb_perror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2))) FAST_FUNC;
 extern void bb_simple_perror_msg_and_die(const char *s) NORETURN FAST_FUNC;
+
+/* xvfork() implementation as function for pedantic compliance */
+static __attribute__((unused)) pid_t xvfork_func(void)
+{
+	pid_t bb__xvfork_pid = vfork();
+	if (bb__xvfork_pid < 0)
+		bb_perror_msg_and_die("vfork");
+	return bb__xvfork_pid;
+}
+#define xvfork() xvfork_func()
 extern void bb_herror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2))) FAST_FUNC;
 extern void bb_herror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2))) FAST_FUNC;
 extern void bb_perror_nomsg_and_die(void) NORETURN FAST_FUNC;
@@ -2122,12 +2128,25 @@ extern const char bb_default_login_shell[] ALIGN1;
 #define isupper(a) ((unsigned char)((a) - 'A') <= ('Z' - 'A'))
 #define islower(a) ((unsigned char)((a) - 'a') <= ('z' - 'a'))
 #define isalpha(a) ((unsigned char)(((a)|0x20) - 'a') <= ('z' - 'a'))
-#define isblank(a) ({ unsigned char bb__isblank = (a); bb__isblank == ' ' || bb__isblank == '\t'; })
-#define iscntrl(a) ({ unsigned char bb__iscntrl = (a); bb__iscntrl < ' ' || bb__iscntrl == 0x7f; })
+static ALWAYS_INLINE int bb_ascii_isblank(unsigned char a)
+{
+	return a == ' ' || a == '\t';
+}
+static ALWAYS_INLINE int bb_ascii_iscntrl(unsigned char a)
+{
+	return a < ' ' || a == 0x7f;
+}
+#define isblank(a) bb_ascii_isblank(a)
+#define iscntrl(a) bb_ascii_iscntrl(a)
 /* In POSIX/C locale isspace is only these chars: "\t\n\v\f\r" and space.
  * "\t\n\v\f\r" happen to have ASCII codes 9,10,11,12,13.
  */
-#define isspace(a) ({ unsigned char bb__isspace = (a) - 9; bb__isspace == (' ' - 9) || bb__isspace <= (13 - 9); })
+static ALWAYS_INLINE int bb_ascii_isspace(unsigned char a)
+{
+	unsigned char bb__isspace = a - 9;
+	return bb__isspace == (' ' - 9) || bb__isspace <= (13 - 9);
+}
+#define isspace(a) bb_ascii_isspace(a)
 // Unsafe wrt NUL: #define ispunct(a) (strchr("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a)) != NULL)
 #define ispunct(a) (strchrnul("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a))[0])
 // Bigger code: #define isalnum(a) ({ unsigned char bb__isalnum = (a) - '0'; bb__isalnum <= 9 || ((bb__isalnum - ('A' - '0')) & 0xdf) <= 25; })

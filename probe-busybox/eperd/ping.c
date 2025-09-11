@@ -14,6 +14,24 @@
 
 #include <assert.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__
+#include <netinet/ip.h>
+#endif
+#ifdef __APPLE__
+#include <netinet/ip.h>
+#ifndef IPV6_PKTINFO
+#define IPV6_PKTINFO 46
+#endif
+#ifndef IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT 47
+#endif
+#ifndef IPV6_RECVPKTINFO
+#define IPV6_RECVPKTINFO 36
+#endif
+#ifndef IPV6_RECVHOPLIMIT
+#define IPV6_RECVHOPLIMIT 37
+#endif
+#endif
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
@@ -325,7 +343,7 @@ static void report(struct pingstate *state)
 
 }
 
-static void ping_cb(int result, int bytes, int psize,
+static void ping_cb(int result, unsigned bytes, int psize,
 	struct sockaddr *sa, socklen_t socklen,
 	struct sockaddr *loc_sa, socklen_t loc_socklen,
 	int seq, int ttl,
@@ -389,11 +407,11 @@ static void ping_cb(int result, int bytes, int psize,
 		if (pingstate->size != bytes)
 		{
 			snprintf(line, sizeof(line),
-				", " DBQ(size) ":%d", bytes);
+				", " DBQ(size) ":%u", bytes);
 			add_str(pingstate, line);
 			pingstate->size= bytes;
 		}
-		if (pingstate->psize != psize && psize != -1)
+		if (pingstate->psize != (unsigned)psize && psize != -1)
 		{
 #if DO_PSIZE
 			snprintf(line, sizeof(line),
@@ -423,8 +441,16 @@ static void ping_cb(int result, int bytes, int psize,
 
 			printf("loc_sa: %s\n", namebuf2);
 
-			snprintf(line, sizeof(line),
-				", " DBQ(src_addr) ":" DBQ(%s), namebuf2);
+			/* Ensure we don't overflow the line buffer */
+			{
+				/* Truncate the address if it's too long */
+				char truncated[sizeof(line) - 50];
+				size_t max_len = sizeof(truncated) - 1;
+				strncpy(truncated, namebuf2, max_len);
+				truncated[max_len] = '\0';
+				snprintf(line, sizeof(line),
+					", " DBQ(src_addr) ":" DBQ(%s), truncated);
+			}
 			add_str(pingstate, line);
 		}
 
@@ -673,7 +699,7 @@ static void ping_xmit(struct pingstate *host)
 	int nsent;
 	struct timeval tv_interval;
 
-	if (host->sentpkts >= host->maxpkts)
+	if (host->sentpkts >= (counter_t)host->maxpkts)
 	{
 		/* Done. */
 		ping_cb(PING_ERR_DONE, host->cursize, host->psize,
@@ -729,10 +755,16 @@ static void ping_xmit(struct pingstate *host)
 		}
 		else
 		{
+#ifdef __FreeBSD__
+			/* On FreeBSD, if socket is connected, use send() instead of sendto() */
+			nsent = send(host->socket, base->packet,
+				host->cursize+ICMP6_HDRSIZE, MSG_DONTWAIT);
+#else
 			nsent = sendto(host->socket, base->packet,
 				host->cursize+ICMP6_HDRSIZE,
 				MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 				host->socklen);
+#endif
 		}
 
 	}
@@ -754,10 +786,16 @@ static void ping_xmit(struct pingstate *host)
 		}
 		else
 		{
+#ifdef __FreeBSD__
+			/* On FreeBSD, if socket is connected, use send() instead of sendto() */
+			nsent = send(host->socket, base->packet,
+				host->cursize+ICMP_MINLEN, MSG_DONTWAIT);
+#else
 			nsent = sendto(host->socket, base->packet,
 				host->cursize+ICMP_MINLEN,
 				MSG_DONTWAIT, (struct sockaddr *)&host->sin6,
 				host->socklen);
+#endif
 		}
 	}
 
@@ -836,7 +874,13 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	struct sockaddr_in *sin4p;
 	struct sockaddr_in loc_sin4;
 	struct ip * ip;
+#ifdef __FreeBSD__
+	struct icmp * icmp;
+#elif defined(__APPLE__)
+	struct icmp * icmp;
+#else
 	struct icmphdr * icmp;
+#endif
 	struct evdata * data;
 	int hlen = 0;
 	struct timespec now;
@@ -891,7 +935,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	hlen = ip->ip_hl * 4;
 
 	/* Check the IP header */
-	if (nrecv < hlen + ICMP_MINLEN + sizeof (struct evdata) ||
+	if (nrecv < (int)(hlen + ICMP_MINLEN + sizeof (struct evdata)) ||
 		ip->ip_hl < 5)
 	  {
 	    /* One more too short packet */
@@ -899,21 +943,41 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	  }
 
 	/* The ICMP portion */
+#ifdef __FreeBSD__
+	icmp = (struct icmp *) (base->packet + hlen);
+#elif defined(__APPLE__)
+	icmp = (struct icmp *) (base->packet + hlen);
+#else
 	icmp = (struct icmphdr *) (base->packet + hlen);
+#endif
 
 	/* Check the ICMP header to drop unexpected packets due to unrecognized id */
+#ifdef __FreeBSD__
+	if (icmp->icmp_id != (base->pid & 0x0fff))
+#elif defined(__APPLE__)
+	if (icmp->icmp_id != (base->pid & 0x0fff))
+#else
 	if (icmp->un.echo.id != (base->pid & 0x0fff))
+#endif
 	  {
 #if 0
+#ifdef __FreeBSD__
+		printf("ready_callback4: bad pid: got %d, expect %d\n",
+			icmp->icmp_id, base->pid & 0x0fff);
+#elif defined(__APPLE__)
+		printf("ready_callback4: bad pid: got %d, expect %d\n",
+			icmp->icmp_id, base->pid & 0x0fff);
+#else
 		printf("ready_callback4: bad pid: got %d, expect %d\n",
 			icmp->un.echo.id, base->pid & 0x0fff);
+#endif
 #endif
 	    goto done;
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
 	data = (struct evdata *) (base->packet + hlen + ICMP_MINLEN);
-	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
+	if (data->index >= (uint32_t)base->tabsiz || base->table[data->index] == NULL)
 	{
 #if 0
 		printf("ready_callback4: bad index: got %d\n",
@@ -934,11 +998,23 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	}
 
 	/* Check for Destination Host Unreachable */
+#ifdef __FreeBSD__
+	if (icmp->icmp_type == ICMP_ECHO)
+#elif defined(__APPLE__)
+	if (icmp->icmp_type == ICMP_ECHO)
+#else
 	if (icmp->type == ICMP_ECHO)
+#endif
 	{
 		/* Completely ignore ECHO requests */
 	}
+#ifdef __FreeBSD__
+	else if (icmp->icmp_type == ICMP_ECHOREPLY)
+#elif defined(__APPLE__)
+	else if (icmp->icmp_type == ICMP_ECHOREPLY)
+#else
 	else if (icmp->type == ICMP_ECHOREPLY)
+#endif
 	  {
 	    /* Use the User Data to relate Echo Request/Reply and evaluate the Round Trip Time */
 	    struct timespec elapsed;             /* response time */
@@ -963,12 +1039,24 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	     * This is not quite right, it could be a late packet. Do we
 	     * care?
 	     */
+#ifdef __FreeBSD__
+	    isDup= (ntohs(icmp->icmp_seq) != state->seq);
+#elif defined(__APPLE__)
+	    isDup= (ntohs(icmp->icmp_seq) != state->seq);
+#else
 	    isDup= (ntohs(icmp->un.echo.sequence) != state->seq);
+#endif
 	    ping_cb(isDup ? PING_ERR_DUP : PING_ERR_NONE,
 		    nrecv - IPHDR - ICMP_MINLEN, nrecv,
 		    (struct sockaddr *)&state->sin6, state->socklen,
 		    (struct sockaddr *)&loc_sin4, sizeof(loc_sin4),
+#ifdef __FreeBSD__
+		    ntohs(icmp->icmp_seq), ip->ip_ttl, &elapsed,
+#elif defined(__APPLE__)
+		    ntohs(icmp->icmp_seq), ip->ip_ttl, &elapsed,
+#else
 		    ntohs(icmp->un.echo.sequence), ip->ip_ttl, &elapsed,
+#endif
 		    state);
 
             if (!isDup)
@@ -1078,7 +1166,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 				RESP_PEERNAME, sizeof(remote), &remote);
 	}
 
-	if (nrecv < icmp_len+sizeof(struct evdata))
+	if (nrecv < (int)(icmp_len+sizeof(struct evdata)))
 	{
 		// printf("ready_callback6: short packet\n");
 		goto done;
@@ -1093,7 +1181,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
-	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
+	if (data->index >= (uint32_t)base->tabsiz || base->table[data->index] == NULL)
 	  {
 	    goto done;
 	  }
@@ -1461,7 +1549,7 @@ err:
 
 static void ping_start2(void *state)
 {
-	int p_proto, on, fd;
+	int p_proto, on;
 	struct pingstate *pingstate;
 	char line[80];
 
@@ -1483,6 +1571,7 @@ static void ping_start2(void *state)
 
 		if (!pingstate->response_in)
 		{
+			int fd;
 			if ((fd = socket(AF_INET, SOCK_RAW, p_proto)) == -1) {
 				/* Create an endpoint for communication
 				 * using raw socket for ICMP calls */
@@ -1513,6 +1602,7 @@ static void ping_start2(void *state)
 
 		if (!pingstate->response_in)
 		{
+			int fd;
 			if ((fd = socket(AF_INET6, SOCK_RAW, p_proto)) == -1) {
 				snprintf(line, sizeof(line),
 					"{ " DBQ(error) ":"
@@ -1526,15 +1616,14 @@ static void ping_start2(void *state)
 			}
 			pingstate->socket= fd;
 
+			on = 1;
+			setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+				sizeof(on));
+
+			on = 1;
+			setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+				sizeof(on));
 		}
-
-		on = 1;
-		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
-			sizeof(on));
-
-		on = 1;
-		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
-			sizeof(on));
 
 		if (!pingstate->response_in)
 		{

@@ -8,6 +8,9 @@
 #include "eperd.h"
 #include <assert.h>
 #include <event2/bufferevent.h>
+#ifdef HAVE_OPENSSL_SSL_H
+#include <event2/bufferevent_ssl.h>
+#endif
 #include <event2/dns.h>
 #include <event2/event.h>
 
@@ -208,13 +211,15 @@ void tu_cleanup(struct tu_env *env)
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
 	int r, count;
-	long err;
 	struct tu_env *env;
 	struct bufferevent *bev;
 	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
-	char errbuf[128];
+#ifdef HAVE_OPENSSL_SSL_H
+	unsigned long err;
+	char errbuf[256];
+#endif
 
 	env= ctx;
 
@@ -304,6 +309,7 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 			return;
 		}
 
+#ifdef HAVE_OPENSSL_SSL_H
 		err= bufferevent_get_openssl_error(bev);
 		if (err)
 		{
@@ -314,6 +320,9 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 		{
 			env->reporterr(env, TU_CONNECT_ERR, strerror(errno));
 		}
+#else
+		env->reporterr(env, TU_CONNECT_ERR, strerror(errno));
+#endif
 
 		/* Check again... */
 		if (!env->dns_curr)
@@ -443,6 +452,7 @@ static int create_bev(struct tu_env *env)
 				return -1;
 			}
 		}
+#ifdef HAVE_OPENSSL_SSL_H
 		bev = bufferevent_openssl_socket_new(EventBase, -1, tls,
 				BUFFEREVENT_SSL_CONNECTING,
 				BEV_OPT_CLOSE_ON_FREE);
@@ -450,8 +460,13 @@ static int create_bev(struct tu_env *env)
 		{
 			env->reporterr(env, TU_SSL_INIT_ERR,
 				"bufferevent_openssl_socket_new call failed");
-				return -1;
+			return -1;
 		}
+#else
+		env->reporterr(env, TU_SSL_INIT_ERR,
+			"OpenSSL support not available");
+		return -1;
+#endif
 	} 
 	else if 
 #else 
@@ -505,9 +520,13 @@ static int create_bev(struct tu_env *env)
 
 static void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
-	long err;
 	struct tu_env *env;
-	char errbuf[80];
+#ifdef HAVE_OPENSSL_SSL_H
+	unsigned long err;
+	char errbuf[256];
+	const unsigned char *data;
+	unsigned int len;
+#endif
 
 	env= ptr;
 
@@ -515,6 +534,7 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	{
 		if (env->connecting)
 		{
+#ifdef HAVE_OPENSSL_SSL_H
 			err= bufferevent_get_openssl_error(bev);
 			if (err)
 			{
@@ -526,6 +546,9 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 				env->reporterr(env, TU_CONNECT_ERR,
 					strerror(errno));
 			}
+#else
+			env->reporterr(env, TU_CONNECT_ERR, strerror(errno));
+#endif
 			return;
 		}
 		events &= ~BEV_EVENT_ERROR;
@@ -538,14 +561,12 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	}
 	if (events & BEV_EVENT_CONNECTED)
 	{
-		const unsigned char *data;
-		unsigned int len;
-
 		events &= ~BEV_EVENT_CONNECTED;
 		env->connecting= 0;
 
 		if (env->do_http2)
 		{
+#ifdef HAVE_OPENSSL_SSL_H
 			/* Check if the server accepted the h2 ALPN */
 			SSL_get0_alpn_selected(	
 				bufferevent_openssl_get_ssl(bev),
@@ -562,6 +583,11 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 					"server offers wrong ALPN");
 				return;
 			}
+#else
+			env->reporterr(env, TU_CONNECT_ERR,
+				"HTTP/2 ALPN not available without OpenSSL");
+			return;
+#endif
 		}
 
 		bufferevent_enable(bev, EV_READ);

@@ -20,7 +20,7 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 #endif
 
 		/* HH:MM */
-		if (sscanf(date_str, "%u:%u%c",
+		if (sscanf(date_str, "%d:%d%c",
 					&ptm->tm_hour,
 					&ptm->tm_min,
 					&end) >= 2
@@ -28,7 +28,7 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 			/* no adjustments needed */
 		} else
 		/* mm.dd-HH:MM */
-		if (sscanf(date_str, "%u.%u-%u:%u%c",
+		if (sscanf(date_str, "%d.%d-%d:%d%c",
 					&ptm->tm_mon, &ptm->tm_mday,
 					&ptm->tm_hour, &ptm->tm_min,
 					&end) >= 4
@@ -37,12 +37,12 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 			ptm->tm_mon -= 1;
 		} else
 		/* yyyy.mm.dd-HH:MM */
-		if (sscanf(date_str, "%u.%u.%u-%u:%u%c", &ptm->tm_year,
+		if (sscanf(date_str, "%d.%d.%d-%d:%d%c", &ptm->tm_year,
 					&ptm->tm_mon, &ptm->tm_mday,
 					&ptm->tm_hour, &ptm->tm_min,
 					&end) >= 5
 		/* yyyy-mm-dd HH:MM */
-		 || sscanf(date_str, "%u-%u-%u %u:%u%c", &ptm->tm_year,
+		 || sscanf(date_str, "%d-%d-%d %d:%d%c", &ptm->tm_year,
 					&ptm->tm_mon, &ptm->tm_mday,
 					&ptm->tm_hour, &ptm->tm_min,
 					&end) >= 5
@@ -63,7 +63,7 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 		}
 		if (end == ':') {
 			/* xxx:SS */
-			if (sscanf(last_colon + 1, "%u%c", &ptm->tm_sec, &end) == 1)
+			if (sscanf(last_colon + 1, "%d%c", &ptm->tm_sec, &end) == 1)
 				end = '\0';
 			/* else end != NUL and we error out */
 		}
@@ -76,12 +76,12 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 	     * only if we saw a dash in parse_str.
 	     */
 		/* yyyy-mm-dd HH */
-	 && (sscanf(date_str, "%u-%u-%u %u%c", &ptm->tm_year,
+	 && (sscanf(date_str, "%d-%d-%d %d%c", &ptm->tm_year,
 				&ptm->tm_mon, &ptm->tm_mday,
 				&ptm->tm_hour,
 				&end) >= 4
 		/* yyyy-mm-dd */
-	     || sscanf(date_str, "%u-%u-%u%c", &ptm->tm_year,
+	     || sscanf(date_str, "%d-%d-%d%c", &ptm->tm_year,
 				&ptm->tm_mon, &ptm->tm_mday,
 				&end) >= 3
 	    )
@@ -92,9 +92,8 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 	if (date_str[0] == '@') {
 		time_t t = bb_strtol(date_str + 1, NULL, 10);
 		if (!errno) {
-			struct tm *lt = localtime(&t);
+			struct tm *lt = localtime_r(&t, ptm);
 			if (lt) {
-				*ptm = *lt;
 				return;
 			}
 		}
@@ -124,25 +123,25 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 		int len = strchrnul(date_str, '.') - date_str;
 
 		/* MM[.SS] */
-		if (len == 2 && sscanf(date_str, "%2u%2u%2u%2u""%2u%c" + 12,
+		if (len == 2 && sscanf(date_str, "%2d%2d%2d%2d""%2d%c" + 12,
 					&ptm->tm_min,
 					&end) >= 1) {
 		} else
 		/* HHMM[.SS] */
-		if (len == 4 && sscanf(date_str, "%2u%2u%2u""%2u%2u%c" + 9,
+		if (len == 4 && sscanf(date_str, "%2d%2d%2d""%2d%2d%c" + 9,
 					&ptm->tm_hour,
 					&ptm->tm_min,
 					&end) >= 2) {
 		} else
 		/* ddHHMM[.SS] */
-		if (len == 6 && sscanf(date_str, "%2u%2u""%2u%2u%2u%c" + 6,
+		if (len == 6 && sscanf(date_str, "%2d%2d""%2d%2d%2d%c" + 6,
 					&ptm->tm_mday,
 					&ptm->tm_hour,
 					&ptm->tm_min,
 					&end) >= 3) {
 		} else
 		/* mmddHHMM[.SS] */
-		if (len == 8 && sscanf(date_str, "%2u""%2u%2u%2u%2u%c" + 3,
+		if (len == 8 && sscanf(date_str, "%2d""%2d%2d%2d%2d%c" + 3,
 					&ptm->tm_mon,
 					&ptm->tm_mday,
 					&ptm->tm_hour,
@@ -152,7 +151,7 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 			ptm->tm_mon -= 1;
 		} else
 		/* yymmddHHMM[.SS] */
-		if (len == 10 && sscanf(date_str, "%2u%2u%2u%2u%2u%c",
+		if (len == 10 && sscanf(date_str, "%2d%2d%2d%2d%2d%c",
 					&ptm->tm_year,
 					&ptm->tm_mon,
 					&ptm->tm_mday,
@@ -166,15 +165,15 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 				/* 1. Put it in the current century */
 				ptm->tm_year += (cur_year / 100) * 100;
 				/* 2. If too far in the past, +100 years */
-				if (ptm->tm_year < cur_year - 50)
+				if (ptm->tm_year < (int)(cur_year - 50))
 					ptm->tm_year += 100;
 				/* 3. If too far in the future, -100 years */
-				if (ptm->tm_year > cur_year + 50)
+				if (ptm->tm_year > (int)(cur_year + 50))
 					ptm->tm_year -= 100;
 			}
 		} else
 		/* ccyymmddHHMM[.SS] */
-		if (len == 12 && sscanf(date_str, "%4u%2u%2u%2u%2u%c",
+		if (len == 12 && sscanf(date_str, "%4d%2d%2d%2d%2d%c",
 					&ptm->tm_year,
 					&ptm->tm_mon,
 					&ptm->tm_mday,
@@ -189,7 +188,7 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 		ptm->tm_sec = 0; /* assume zero if [.SS] is not given */
 		if (end == '.') {
 			/* xxx.SS */
-			if (sscanf(strchr(date_str, '.') + 1, "%u%c",
+			if (sscanf(strchr(date_str, '.') + 1, "%d%c",
 					&ptm->tm_sec, &end) == 1)
 				end = '\0';
 			/* else end != NUL and we error out */
@@ -212,12 +211,13 @@ time_t FAST_FUNC validate_tm_time(const char *date_str, struct tm *ptm)
 static char* strftime_fmt(char *buf, unsigned len, time_t *tp, const char *fmt)
 {
 	time_t t;
+	struct tm tm_result;
 	if (!tp) {
 		tp = &t;
 		time(tp);
 	}
 	/* Returns pointer to NUL */
-	return buf + strftime(buf, len, fmt, localtime(tp));
+	return buf + strftime(buf, len, fmt, localtime_r(tp, &tm_result));
 }
 
 char* FAST_FUNC strftime_HHMMSS(char *buf, unsigned len, time_t *tp)

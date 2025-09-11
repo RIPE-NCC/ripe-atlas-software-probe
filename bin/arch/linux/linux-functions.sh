@@ -15,7 +15,15 @@ rchoose()
 }
 check_pid()
 {
-	[ -d "/proc/$@" ]
+	# Portable PID checking method
+	if [ -d "/proc/$@" ]; then
+		# Linux: check /proc directory
+		return 0
+	else
+		# Portable: use kill -0 to check if process exists
+		kill -0 "$@" 2>/dev/null
+		return $?
+	fi
 }
 condmv()
 {

@@ -47,7 +47,7 @@ struct hgbase
 	struct event_base *event_base;
 
 	struct state **table;
-	int tabsiz;
+	size_t tabsiz;
 
 	/* For standalone sslgetcert. Called when a sslgetcert instance is
 	 * done. Just one pointer for all instances. It is up to the caller
@@ -213,7 +213,7 @@ static void buf_add_b64(struct buf *buf, void *data, size_t len)
 		"QRSTUVWXYZabcdef"
 		"ghijklmnopqrstuv"
 		"wxyz0123456789+/";
-	int i;
+	size_t i;
 	uint8_t *p;
 	uint32_t v;
 	char str[4];
@@ -356,7 +356,7 @@ static int buf_write(struct buf *buf)
 			continue;
 		}
 		fprintf(stderr, "write to %p failed: %s\n",
-			buf->bev, r == 0 ? "eof" : strerror(errno));
+			(void *)buf->bev, r == 0 ? "eof" : strerror(errno));
 		return -1;
 	}
 	return 0;
@@ -752,7 +752,15 @@ static void timeout_callback(int __attribute((unused)) unused,
 	getnameinfo((struct sockaddr *)&state->loc_sin6,
 		state->loc_socklen, hostbuf, sizeof(hostbuf), NULL, 0,
 		NI_NUMERICHOST);
-	snprintf(line, sizeof(line), DBQ(src_addr) ":" DBQ(%s) ", " , hostbuf);
+	/* Ensure we don't overflow the line buffer */
+	{
+		/* Truncate the address if it's too long */
+		char truncated[sizeof(line) - 50];
+		size_t max_len = sizeof(truncated) - 1;
+		strncpy(truncated, hostbuf, max_len);
+		truncated[max_len] = '\0';
+		snprintf(line, sizeof(line), DBQ(src_addr) ":" DBQ(%s) ", " , truncated);
+	}
 	add_str(state, line);
 
 	resptime= (state->t_connect.tv_sec- state->start.tv_sec)*1e3 +
@@ -779,7 +787,8 @@ static void timeout_callback(int __attribute((unused)) unused,
 static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state, int error))
 {
-	int c, i, only_v4, only_v6, major, minor;
+	int c, only_v4, only_v6, major, minor;
+	size_t i;
 	size_t newsiz;
 	char *hostname, *str_port, *infname, *version_str;
 	char *output_file, *A_arg, *B_arg, *h_arg;
@@ -1460,7 +1469,9 @@ static int eat_server_hello(struct state *state)
 
 static int eat_certificate(struct state *state)
 {
-	int i, n, r, first, slen, need_nl, type;
+	int r, first, slen, need_nl, type;
+	size_t i;
+	size_t n;
 	size_t o, len;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
@@ -1685,11 +1696,10 @@ static void err_reading(struct state *state)
 	}
 }
 
-static void dnscount(struct tu_env *env, int count)
+static void dnscount(struct tu_env *env UNUSED_PARAM, int count UNUSED_PARAM)
 {
-	struct state *state;
-
-	state= ENV2STATE(env);
+	/* Function called when DNS resolution completes */
+	/* Currently not implemented */
 }
 
 static void beforeconnect(struct tu_env *env,
@@ -1906,7 +1916,7 @@ static int sslgetcert_delete(void *vstate)
 	state= vstate;
 
 	printf("sslgetcert_delete: state %p, index %d, busy %d\n",
-		state, state->index, state->busy);
+		(void *)state, state->index, state->busy);
 
 	if (state->busy)
 		return 0;

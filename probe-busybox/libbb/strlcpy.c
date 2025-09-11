@@ -7,6 +7,10 @@
 
 #include "libbb.h"
 
+#ifdef __APPLE__
+#undef strlcpy
+#endif
+
 #ifdef WANT_WIDE
 # define Wstrlcpy __wcslcpy
 # define Wstrxfrm wcsxfrm

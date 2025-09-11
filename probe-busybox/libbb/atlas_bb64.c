@@ -4,16 +4,8 @@
  */
 
 #include "libbb.h"
+#include "atlas_bb64.h"
 #define BUF_CHUNK       256
-
-struct buf
-{
-	size_t offset;
-	size_t size;
-	size_t maxsize;
-	unsigned char *buf;
-	int fd;
-};
 
 void buf_init(struct buf *buf, int fd)
 {
@@ -74,7 +66,7 @@ int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 		"QRSTUVWXYZabcdef"
 		"ghijklmnopqrstuv"
 		"wxyz0123456789+/";
-	int i;
+	size_t i;
 	uint8_t *p;
 	uint32_t v;
 	char str[4];
@@ -114,7 +106,9 @@ int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 			break;
 		default:
 			fprintf(stderr, "bad state in buf_add_b64");
+			return -1;
 	}
+	return 0;
 }
 
 void buf_cleanup(struct buf *buf)

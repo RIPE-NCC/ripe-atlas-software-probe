@@ -21,6 +21,10 @@
  * Vladimir Oleynik <dzo@simtreas.ru> 2001
  * Set process group corrections, initial busybox port
  */
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 //config:config TELNETD
 //config:	bool "telnetd"
 //config:	default y
@@ -117,10 +121,15 @@
 #define DEBUG 0
 
 #include "libbb.h"
+
+#ifdef __APPLE__
+#ifndef MS_REMOUNT
+#define MS_REMOUNT 0x20
+#endif
+#endif
 #include "common_bufsiz.h"
 #include <syslog.h>
 #include <sys/mount.h>
-#include <sys/reboot.h>
 #include "atlas_path.h"
 
 #if DEBUG
@@ -134,7 +143,14 @@
 #ifdef ATLAS
 #include <string.h>
 #include <unistd.h>
+#include "../config.h"
+#include <sys/reboot.h>  /* for reboot() function */
+#ifdef HAVE_LINUX_REBOOT_H
 #include <linux/reboot.h>
+#endif
+#ifdef __FreeBSD__
+#include <sys/mount.h>   /* for MNT_UPDATE */
+#endif
 
 #define LOGIN_PREFIX	"Atlas probe, see http://atlas.ripe.net/\r\n\r\n"
 #define LOGIN_PROMPT	" login: "
@@ -254,7 +270,7 @@ static struct tsession *atlas_ts;	/* Allow only one 'atlas' connection
 static ssize_t
 safe_write_to_pty_decode_iac(struct tsession *ts)
 {
-	unsigned wr;
+	int wr;
 	ssize_t rc;
 	unsigned char *buf;
 	unsigned char *found;
@@ -447,7 +463,7 @@ static size_t safe_write_double_iac(int fd, const char *buf, size_t count)
 		if (count == 0)
 			return total;
 		if (*buf == (char)IAC) {
-			static const char IACIAC[] ALIGN1 = { IAC, IAC };
+			static const unsigned char IACIAC[] ALIGN1 = { IAC, IAC };
 			rc = safe_write(fd, IACIAC, 2);
 /* BUG: if partial write was only 1 byte long, we end up emitting just one IAC */
 			if (rc != 2)
@@ -551,7 +567,7 @@ make_new_session(
 	 * because we want to handle line editing and tab completion and other
 	 * stuff that requires char-by-char support. */
 	{
-		static const char iacs_to_send[] ALIGN1 = {
+		static const unsigned char iacs_to_send[] ALIGN1 = {
 			IAC, DO, TELOPT_ECHO,
 			IAC, DO, TELOPT_NAWS,
 			/* This requires telnetd.ctrlSQ.patch (incomplete) */
@@ -846,7 +862,7 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 		}
 
 		if (write_pidfile(PidFileName) < 0) {
-			syslog(LOG_ERR, "unable to open '%s': %m", PidFileName);
+			syslog(LOG_ERR, "unable to open '%s': %s", PidFileName, strerror(errno));
 			return 1;
 		}
 	}
@@ -950,7 +966,6 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
 	{
 		struct timeval *tv_ptr = NULL;
 #if ENABLE_FEATURE_TELNETD_INETD_WAIT
-		struct timeval tv;
 		if ((opt & OPT_WAIT) && !G.sessions) {
 			tv.tv_sec = sec_linger;
 			tv.tv_usec = 0;
@@ -1179,7 +1194,11 @@ do_cmd:
 			if (strcmp(line, CMD_REBOOT) == 0)
 			{
 				sync();
+#ifdef HAVE_LINUX_REBOOT_H
 				reboot(LINUX_REBOOT_CMD_RESTART);
+#else
+				reboot(RB_AUTOBOOT);
+#endif
 				free(line); line= NULL;
 
 				goto skip3;
@@ -1188,7 +1207,12 @@ do_cmd:
 			{
 				free(line); line= NULL;
 
+#if defined(__FreeBSD__) || defined(__APPLE__)
+				/* FreeBSD/macOS mount() signature: mount(type, dir, flags, data) */
+				r= mount("ufs", "/", MNT_UPDATE, NULL);
+#else
 				r= mount(NULL, "/", NULL, MS_REMOUNT, NULL);
+#endif
 				if (r == -1)
 				{
 					add_2sock(ts, BAD_REMOUNT);
@@ -1206,7 +1230,11 @@ do_cmd:
 				fclose(file); file= NULL;
 
 				sync();
+#ifdef HAVE_LINUX_REBOOT_H
 				reboot(LINUX_REBOOT_CMD_RESTART);
+#else
+				reboot(RB_AUTOBOOT);
+#endif
 				goto skip3;
 			}
 			if (strlen(line) == 0)
@@ -1332,7 +1360,7 @@ static int equal_sessionid(char *passwd)
 	file= fopen(fn, "r");
 	if (file == NULL)
 	{
-		syslog(LOG_ERR, "unable to open '%s': %m", fn);
+		syslog(LOG_ERR, "unable to open '%s': %s", fn, strerror(errno));
 		free(fn); fn= NULL;
 		return 0;
 	}
@@ -1340,7 +1368,7 @@ static int equal_sessionid(char *passwd)
 	fgets(line, sizeof(line), file);	/* Skip first empty line */
 	if (fgets(line, sizeof(line), file) == NULL)
 	{
-		syslog(LOG_ERR, "unable to read from '%s': %m", fn);
+		syslog(LOG_ERR, "unable to read from '%s': %s", fn, strerror(errno));
 		fclose(file);
 		free(fn); fn= NULL;
 		return 0;
@@ -1433,7 +1461,7 @@ static char *getline_2pty(struct tsession *ts)
 	 * line. Otherwise, delete the \r.
 	 */
 	cp= strchr(line, '\r');
-	if (cp == NULL || cp-line != strlen(line)-1)
+	if (cp == NULL || (size_t)(cp-line) != strlen(line)-1)
 	{
 		bb_error_msg("bad line '%s', cp %p, cp-line %ld, |line| %ld",
 			line, cp, (long)(cp-line), (long)strlen(line));
@@ -1587,7 +1615,7 @@ static void end_crontab(struct tsession *ts)
 	while (fd= open(filename1, O_WRONLY|O_CREAT|O_TRUNC, 0644), fd >= 0)
 	{
 		len= strlen(UPDATELINE);
-		if (write(fd, UPDATELINE, len) != len)
+		if (write(fd, UPDATELINE, len) != (ssize_t)len)
 		{
 			close(fd);
 			add_2sock(ts, IO_ERROR);

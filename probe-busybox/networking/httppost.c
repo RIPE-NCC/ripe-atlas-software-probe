@@ -213,13 +213,14 @@ int httppost_main(int argc, char *argv[])
 	tolerance= 0;
 	if (time_tolerance)
 	{
-		tolerance= strtoul(time_tolerance, &p, 10);
-		if (p[0] != '\0')
+		unsigned long temp = strtoul(time_tolerance, &p, 10);
+		if (p[0] != '\0' || temp == ULONG_MAX)
 		{
 			fprintf(stderr, "unable to parse tolerance '%s'\n",
 				time_tolerance);
 			return 1;
 		}
+		tolerance = (time_t)temp;
 	}
 
 	if (parse_url(url, &host, &port, &hostport, &path) == -1)
@@ -796,9 +797,8 @@ error:
 
 static int check_result(FILE *tcp_file)
 {
-	int major, minor;
 	size_t len;
-	char *cp, *check, *line;
+	char *cp, *line;
 	const char *prefix;
 	char buffer[1024];
 	
@@ -841,22 +841,11 @@ static int check_result(FILE *tcp_file)
 		return 0;
 	}
 	cp= line+len;
-	major= strtoul(cp, &check, 10);
-	if (check == cp || check[0] != '.')
-	{
-		fprintf(stderr, "bad major version in response '%s'\n", line);
-		return 0;
-	}
-	cp= check+1;
-	minor= strtoul(cp, &check, 10);
-	if (check == cp || check[0] == '\0' ||
-		!isspace(*(unsigned char *)check))
-	{
-		fprintf(stderr, "bad major version in response '%s'\n", line);
-		return 0;
-	}
-
-	skip_spaces(check, &cp);
+	
+	/* Skip version number (we don't need to parse it) */
+	while (*cp && *cp != ' ' && *cp != '\t') cp++;
+	
+	skip_spaces(cp, &cp);
 
 	if (!isdigit(*(unsigned char *)cp))
 	{
@@ -1152,7 +1141,7 @@ char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 
 static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 {
-	int i;
+	size_t i;
 	size_t len, offset, size;
 	char *cp, *line, *check;
 	const char *okp;
@@ -1278,7 +1267,7 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 {
-	int i;
+	size_t i;
 	size_t offset, size;
 	const char *okp;
 	char buffer[1024];

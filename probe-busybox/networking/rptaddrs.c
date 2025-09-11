@@ -23,13 +23,27 @@
 #include <string.h>
 #include <net/route.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include "../eperd/eperd.h"
 #include "../eperd/readresolv.h"
 
 #include "libbb.h"
+
+#ifdef __APPLE__
+#ifndef RTF_ADDRCONF
+#define RTF_ADDRCONF 0x4000
+#endif
+#ifndef RTF_CACHE
+#define RTF_CACHE 0x8000
+#endif
+#ifndef RTF_DEFAULT
+#define RTF_DEFAULT 0x2000
+#endif
+#endif
 #include "atlas_path.h"
 
 #include <inet_common.h>
+#include "portable_networking.h"
 
 #define IPV4_ROUTE_FILE	"/proc/net/route"
 #define IF_INET6_FILE	"/proc/net/if_inet6"
@@ -48,6 +62,19 @@
 #define DBQ(str) "\"" #str "\""
 #define JS(key, val) fprintf(fh, "\"" #key"\" : \"%s\" , ",  val);
 #define JS1(key, fmt, val) fprintf(fh, "\"" #key"\" : "#fmt" , ",  val);
+
+#ifdef __FreeBSD__
+/* FreeBSD route flags - define missing ones */
+#ifndef RTF_DEFAULT
+#define RTF_DEFAULT 0x0002
+#endif
+#ifndef RTF_ADDRCONF
+#define RTF_ADDRCONF 0x0004
+#endif
+#ifndef RTF_CACHE
+#define RTF_CACHE 0x0001
+#endif
+#endif
 
 #ifndef IPV6_MASK
 #define IPV6_MASK (RTF_GATEWAY|RTF_HOST|RTF_DEFAULT|RTF_ADDRCONF|RTF_CACHE)
@@ -219,7 +246,8 @@ static FILE *setup_cache(char *cache_name)
 
 static int setup_ipv4_rpt(FILE *of)
 {
-	int i, r, s, first;
+	size_t i;
+	int r, s, first;
 	unsigned dest, gateway, flags, refcnt, use, metric, mask;
 	FILE *in_file;
 	struct in_addr in_addr;
@@ -287,7 +315,7 @@ static int setup_ipv4_rpt(FILE *of)
 
 	while (fgets(line, sizeof(line), in_file) != NULL)
 	{
-		sscanf(line, "%16s %x %x %x %d %d %d %x",
+		sscanf(line, "%16s %x %x %x %u %u %u %x",
 			infname, &dest, &gateway, &flags, &refcnt, &use, 
 			&metric, &mask);
 		in_addr.s_addr= dest;
@@ -365,7 +393,8 @@ static int setup_dhcpv4(FILE *of)
 
 static int setup_ipv6_rpt(FILE *of, char *filename)
 {
-	int r, n;
+	int r;
+	int n;
 	char dst6in[INET6_ADDRSTRLEN];
 	char nh6in[INET6_ADDRSTRLEN]; /* next hop */
 	char *dst6out = NULL;
@@ -374,8 +403,8 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	char nh6p[8][5];
 	char iface[16], flags[16];
 	char Scope[32];
-	int scope, dad_status, if_idx;
-	int iflags, metric, refcnt, use, prefix_len, slen;
+	unsigned int scope, dad_status, if_idx;
+	unsigned int iflags, metric, refcnt, use, prefix_len, slen;
 	struct sockaddr_in6 sdst6, snh6;
 	char buf2[1024];
 
@@ -442,7 +471,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 			dst6out=NULL;
 		}
 		n++;
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -458,7 +487,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}	
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -563,7 +592,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 			nh6out=NULL;
 		}
 
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -573,7 +602,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -682,7 +711,8 @@ static int report_line(FILE *of, const char *fn)
 
 static int check_cache(char *cache_name)
 {
-	int r, need_report;
+	size_t r;
+	int need_report;
 	struct stat sb;
 	char filename[80];
 
@@ -849,4 +879,117 @@ static void report_err(const char *fmt, ...)
 	fprintf(stderr, ": %s\n", strerror(t_errno));
 
 	va_end(ap);
+}
+
+// Portable interface enumeration using getifaddrs()
+static int get_portable_interfaces(portable_if_info_t **interfaces, size_t *count)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	size_t max_count = 64; // Reasonable limit
+	size_t current_count = 0;
+	portable_if_info_t *info;
+	
+	*interfaces = malloc(max_count * sizeof(portable_if_info_t));
+	if (!*interfaces) {
+		return -1;
+	}
+	
+	if (getifaddrs(&ifaddr) == -1) {
+		free(*interfaces);
+		*interfaces = NULL;
+		return -1;
+	}
+	
+	for (ifa = ifaddr; ifa != NULL && current_count < max_count; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL) continue;
+		
+		info = &(*interfaces)[current_count];
+		memset(info, 0, sizeof(portable_if_info_t));
+		
+		strncpy(info->name, ifa->ifa_name, IF_NAMESIZE - 1);
+		info->flags = ifa->ifa_flags;
+		
+		if (ifa->ifa_addr->sa_family == AF_INET) {
+			struct sockaddr_in *addr_in = (struct sockaddr_in *)ifa->ifa_addr;
+			info->addr = addr_in->sin_addr;
+			
+			if (ifa->ifa_netmask) {
+				struct sockaddr_in *netmask_in = (struct sockaddr_in *)ifa->ifa_netmask;
+				info->netmask = netmask_in->sin_addr;
+			}
+			
+			if (ifa->ifa_broadaddr) {
+				struct sockaddr_in *broadcast_in = (struct sockaddr_in *)ifa->ifa_broadaddr;
+				info->broadcast = broadcast_in->sin_addr;
+			}
+		} else if (ifa->ifa_addr->sa_family == AF_INET6) {
+			struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+			info->addr6 = addr_in6->sin6_addr;
+			
+			if (ifa->ifa_netmask) {
+				struct sockaddr_in6 *netmask_in6 = (struct sockaddr_in6 *)ifa->ifa_netmask;
+				// Calculate prefix length from netmask
+				info->prefix_len = 0;
+				for (int i = 0; i < 16; i++) {
+					unsigned char byte = netmask_in6->sin6_addr.s6_addr[i];
+					while (byte & 0x80) {
+						info->prefix_len++;
+						byte <<= 1;
+					}
+				}
+			}
+		}
+		
+		current_count++;
+	}
+	
+	freeifaddrs(ifaddr);
+	*count = current_count;
+	return 0;
+}
+
+static void free_portable_interfaces(portable_if_info_t *interfaces)
+{
+	if (interfaces) {
+		free(interfaces);
+	}
+}
+
+// Portable routing information (basic implementation)
+static int __attribute__((unused)) get_portable_routing_info(FILE *of)
+{
+	portable_if_info_t *interfaces = NULL;
+	size_t count = 0;
+	int result = 0;
+	
+	if (get_portable_interfaces(&interfaces, &count) == 0) {
+		fprintf(of, "\"interfaces\": [");
+		for (size_t i = 0; i < count; i++) {
+			if (i > 0) fprintf(of, ",");
+			fprintf(of, "{\"name\":\"%s\",\"flags\":%d", 
+				interfaces[i].name, interfaces[i].flags);
+			
+			if (interfaces[i].addr.s_addr != 0) {
+				char addr_str[INET_ADDRSTRLEN];
+				inet_ntop(AF_INET, &interfaces[i].addr, addr_str, sizeof(addr_str));
+				fprintf(of, ",\"ipv4\":\"%s\"", addr_str);
+			}
+			
+			if (interfaces[i].addr6.s6_addr[0] != 0) {
+				char addr6_str[INET6_ADDRSTRLEN];
+				inet_ntop(AF_INET6, &interfaces[i].addr6, addr6_str, sizeof(addr6_str));
+				fprintf(of, ",\"ipv6\":\"%s\"", addr6_str);
+			}
+			
+			fprintf(of, "}");
+		}
+		fprintf(of, "]");
+		
+		free_portable_interfaces(interfaces);
+	} else {
+		fprintf(of, "\"error\":\"Failed to get interface information\"");
+		result = -1;
+	}
+	
+	return result;
 }

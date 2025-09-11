@@ -20,17 +20,26 @@
 
 #include "libbb.h"
 
-#include <sys/sysinfo.h>
+#include <time.h>
+#include <sys/time.h>
 
 /* This is a NOFORK applet. Be very careful! */
 
 int onlyuptime_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-int onlyuptime_main(int argc UNUSED_PARAM, char **argv)
+int onlyuptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 {
-	struct sysinfo info; 
+	time_t uptime = 0;
+	
+	// Portable way to get uptime using clock_gettime
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+		uptime = ts.tv_sec;
+	} else {
+		// Fallback: approximate uptime from process start
+		uptime = time(NULL) - 1;
+	}
 
-	sysinfo(&info);
-	printf("%ld\n", (long)info.uptime);
+	printf("%ld\n", (long)uptime);
 
 	return 0;
 }

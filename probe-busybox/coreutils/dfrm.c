@@ -25,7 +25,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../../config.h"
+#ifdef HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#elif defined(HAVE_SYS_VFS_H)
 #include <sys/vfs.h>
+#endif
 
 #include "libbb.h"
 
@@ -36,7 +41,6 @@ int dfrm_main(int argc, char *argv[])
 {
 	int i;
 	size_t len;
-	uint32_t opt;
 	unsigned long limit, avail;
 	char *opt_atlas;
 	char *dev, *limit_str, *dir_str, *check, *path;
@@ -46,7 +50,7 @@ int dfrm_main(int argc, char *argv[])
 
 	opt_atlas= NULL;
 	opt_complementary= NULL;        /* Just in case */
-	opt= getopt32(argv, "A:", &opt_atlas);
+	getopt32(argv, "A:", &opt_atlas);
 
 	if (argc < optind+3)
 	{

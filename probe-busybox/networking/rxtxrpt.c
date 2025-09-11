@@ -27,6 +27,7 @@ table if it has changed.
 #include <string.h>
 
 #include "libbb.h"
+#include "portable_networking.h"
 
 #define NEW_FORMAT
 
@@ -242,4 +243,132 @@ static void report_err(const char *fmt, ...)
 	fprintf(stderr, ": %s\n", strerror(t_errno));
 
 	va_end(ap);
+}
+
+// Linux-specific interface statistics using /proc/net/dev
+static int __attribute__((unused)) get_linux_interface_stats(void)
+{
+	int i;
+	unsigned long long bytes_recv, pkt_recv, errors_recv, dropped_recv,
+		fifo_recv, framing_recv, compressed_recv, multicast_recv,
+		bytes_sent, pkt_sent, errors_sent, dropped_sent,
+		fifo_sent, collisions_sent, carr_lost_sent, compressed_sent;
+	char *cp, *infname;
+	FILE *file;
+	char buf[256];
+
+	file= fopen(DEV_FILE, "r");
+	if (!file)
+	{
+		report_err("unable to open '%s'", DEV_FILE);
+		return 1;
+	}
+
+	/* Skip two lines */
+	if (fgets(buf, sizeof(buf), file) == NULL ||
+		fgets(buf, sizeof(buf), file) == NULL)
+	{
+		report_err("unable to read from '%s'", DEV_FILE);
+		fclose(file);
+		return 1;
+	}
+
+	for (i= 0; i<100; i++)
+	{
+		if (fgets(buf, sizeof(buf), file) == NULL)
+		{
+			if (feof(file))
+				break;
+			report_err("unable to read from '%s'", DEV_FILE);
+			fclose(file);
+			return 1;
+		}
+
+		cp= buf;
+
+		/* Skip leading white space */
+		while (*cp == ' ')
+			cp++;
+		infname= cp;
+		cp= strchr(cp, ':');
+		if (cp == NULL)
+		{
+			report_err("format error in '%s'", DEV_FILE);
+			fclose(file);
+			return 1;
+		}
+
+		/* Get all the values */
+		if (sscanf(cp+1, "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+			&bytes_recv, &pkt_recv, &errors_recv, &dropped_recv,
+			&fifo_recv, &framing_recv, &compressed_recv,
+			&multicast_recv,
+			&bytes_sent, &pkt_sent, &errors_sent, &dropped_sent,
+			&fifo_sent, &collisions_sent, &carr_lost_sent,
+			&compressed_sent) != 16)
+		{
+			report_err("format error in '%s'", DEV_FILE);
+			fclose(file);
+			return 1;
+		}
+
+		*cp= '\0';
+
+		printf("%s { " DBQ(name) ": " DBQ(%s) ", ",
+			i == 0 ? "" : ",", infname);
+	
+		printf(DBQ(bytes_recv) ": %llu, ", bytes_recv);
+		printf(DBQ(pkt_recv) ": %llu, ", pkt_recv);
+		printf(DBQ(errors_recv) ": %llu, ", errors_recv);
+		printf(DBQ(dropped_recv) ": %llu, ", dropped_recv);
+		printf(DBQ(fifo_recv) ": %llu, ", fifo_recv);
+		printf(DBQ(framing_recv) ": %llu, ", framing_recv);
+		printf(DBQ(compressed_recv) ": %llu, ", compressed_recv);
+		printf(DBQ(multicast_recv) ": %llu, ", multicast_recv);
+		printf(DBQ(bytes_sent) ": %llu, ", bytes_sent);
+		printf(DBQ(pkt_sent) ": %llu, ", pkt_sent);
+		printf(DBQ(errors_sent) ": %llu, ", errors_sent);
+		printf(DBQ(dropped_sent) ": %llu, ", dropped_sent);
+		printf(DBQ(fifo_sent) ": %llu, ", fifo_sent);
+		printf(DBQ(collisions_sent) ": %llu, ", collisions_sent);
+		printf(DBQ(carr_lost_sent) ": %llu, ", carr_lost_sent);
+		printf(DBQ(compressed_sent) ": %llu", compressed_sent);
+		printf(" }");
+	}
+	fclose(file);
+
+	return 0;
+}
+
+// Portable interface statistics using getifaddrs() + platform-specific APIs
+static int __attribute__((unused)) get_portable_interface_stats(void)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	int first = 1;
+	
+	if (getifaddrs(&ifaddr) == -1) {
+		report_err("getifaddrs failed");
+		return 1;
+	}
+	
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr != NULL) {
+			// Only show interfaces that are UP
+			if (ifa->ifa_flags & IFF_UP) {
+				printf("%s { " DBQ(name) ": " DBQ(%s) ", ",
+					first ? "" : ",", ifa->ifa_name);
+				
+				// For now, provide basic interface info
+				// Full statistics would require platform-specific sysctl calls
+				printf(DBQ(status) ": " DBQ(UP) ", ");
+				printf(DBQ(family) ": %d", ifa->ifa_addr->sa_family);
+				printf(" }");
+				
+				first = 0;
+			}
+		}
+	}
+	
+	freeifaddrs(ifaddr);
+	return 0;
 }

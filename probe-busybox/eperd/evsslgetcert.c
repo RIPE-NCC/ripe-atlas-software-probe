@@ -48,6 +48,8 @@ int evsslgetcert_main(int argc UNUSED_PARAM, char **argv)
 	int r;
 	void *state;
 
+	INIT_G();
+
 	/* Create libevent event base */
 	EventBase= event_base_new();
 	if (!EventBase)
