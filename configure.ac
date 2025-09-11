@@ -262,8 +262,27 @@ fi
 # Detect the host system
 AC_CANONICAL_HOST
 
-# Better compiler detection for macOS
-AC_PROG_CC
+# Better compiler detection for macOS and FreeBSD
+# On FreeBSD, prefer the system's default compiler (cc) over gcc
+if echo "$host_os" | grep -q "freebsd"; then
+    AC_MSG_CHECKING([for system compiler on FreeBSD])
+    if test -n "$CC"; then
+        # CC already set, use it
+        AC_MSG_RESULT([using pre-set CC: $CC])
+    else
+        # Try cc first, then gcc
+        AC_PATH_PROG([CC], [cc])
+        if test -z "$CC"; then
+            AC_PATH_PROG([CC], [gcc])
+        fi
+        if test -z "$CC"; then
+            AC_MSG_ERROR([No C compiler found])
+        fi
+        AC_MSG_RESULT([$CC])
+    fi
+else
+    AC_PROG_CC
+fi
 AC_PROG_CC_C_O
 
 # Basic platform detection

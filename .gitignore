@@ -158,8 +158,6 @@ probe-busybox/include/atlas_path.h
 
 # Build artifacts and generated files
 config.h
-freebsd-disk.qcow2
-qemu-run.sh
 test_makefile
 probe-busybox/.config
 
