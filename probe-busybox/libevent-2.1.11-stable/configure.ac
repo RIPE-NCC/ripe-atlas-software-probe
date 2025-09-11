@@ -54,10 +54,7 @@ ifdef([AC_PROG_SED], [AC_PROG_SED], [
 AC_CHECK_PROGS(SED, [gsed sed])
 ])
 
-m4_warn([obsolete],
-[AC_PROG_GCC_TRADITIONAL is obsolete; use AC_PROG_CC
-])dnl
-AC_REQUIRE(AC_PROG_CC)
+AC_PROG_CC
 
 # We need to test for at least gcc 2.95 here, because older versions don't
 # have -fno-strict-aliasing
@@ -341,19 +338,8 @@ fi
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE
-m4_warn([obsolete],
-[Update your code to rely only on HAVE_SYS_TIME_H,
-then remove this warning and the obsolete code below it.
-All current systems provide time.h; it need not be checked for.
-Not all systems provide sys/time.h, but those that do, all allow
-you to include it and time.h simultaneously.])dnl
+# Modern systems always have time.h, no need to check
 AC_CHECK_HEADERS_ONCE([sys/time.h])
-# Obsolete code to be removed.
-if test $ac_cv_header_sys_time_h = yes; then
-  AC_DEFINE([TIME_WITH_SYS_TIME],[1],[Define to 1 if you can safely include both <sys/time.h>
-	     and <time.h>.  This macro is obsolete.])
-fi
-# End of obsolete code.
 
 
 dnl Checks for library functions.
@@ -458,14 +444,14 @@ AC_CHECK_FUNC(gethostbyname_r, [
         [Define this if gethostbyname_r takes 5 arguments])
       AC_MSG_RESULT(5)
    ],[
-      _au_m4_changequote([,])AC_TRY_COMPILE([
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 #include <netdb.h>
      ], [
        char *cp1;
        struct hostent *h1;
        struct hostent_data hd;
        (void) gethostbyname_r(cp1,h1,&hd);
-     ], [
+     ])], [
        AC_DEFINE(HAVE_GETHOSTBYNAME_R)
        AC_DEFINE(HAVE_GETHOSTBYNAME_R_3_ARG, 1,
          [Define this if gethostbyname_r takes 3 arguments])
