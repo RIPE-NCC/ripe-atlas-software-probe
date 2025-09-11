@@ -365,4 +365,4 @@ if test "x${probe_type}" = 'xfreebsd'; then
 fi
 
 AC_CONFIG_SUBDIRS([probe-busybox/libevent-2.1.11-stable])
-AC_OUTPUT
+AC_OUTPUT()
