@@ -3991,7 +3991,7 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 		}
 		JS(dst_addr, addrstr);
 		JS(dst_port, qry->port_as_char);
-		JD(af, qry->ressent->ai_family == PF_INET6 ? 6 : 4);
+		JD(af, qry->ressent->ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if(qry->dst_ai_family && qry->server_name)
 	{
@@ -4000,7 +4000,7 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 		}
 		JS(dst_addr , qry->dst_addr_str);
 		JS(dst_port, qry->port_as_char);
-		JD(af, qry->dst_ai_family == PF_INET6 ? 6 : 4);
+		JD(af, qry->dst_ai_family == AF_INET6 ? 6 : 4);
 	}
 	else if(qry->server_name) {
 			JS(dst_name,  qry->server_name);
