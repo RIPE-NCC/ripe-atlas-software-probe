@@ -1039,6 +1039,8 @@ int evtdig_main(int argc, char **argv)
 { 
 	struct query_state *qry;
 
+	INIT_G();
+
 	EventBase=event_base_new();
 	if (!EventBase)
 	{

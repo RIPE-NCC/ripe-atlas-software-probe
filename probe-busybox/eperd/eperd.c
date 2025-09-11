@@ -145,12 +145,6 @@ enum {
 
 
 struct globals G;
-#define INIT_G() do { \
-	LogLevel = 8; \
-	CDir = CRONTABS; \
-	EventBase = NULL; \
-	DnsBase = NULL; \
-} while (0)
 
 static int do_kick_watchdog;
 static char *out_filename= NULL;

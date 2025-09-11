@@ -4,6 +4,10 @@
  * eperd.h
  */
 
+#ifndef CRONTABS
+#define CRONTABS        "/var/spool/cron/crontabs"
+#endif
+
 typedef struct CronLine CronLine;
 
 struct globals {
@@ -26,6 +30,13 @@ extern struct globals G;
 #define instance_id        (G.instance_id            )
 #define EventBase          (G.EventBase              )
 #define DnsBase            (G.DnsBase                )
+
+#define INIT_G() do { \
+	LogLevel = 8; \
+	CDir = CRONTABS; \
+	EventBase = NULL; \
+	DnsBase = NULL; \
+} while (0)
 
 #define TRT_ICMP4_INSTANCE_ID_SHIFT	    12
 #define TRT_ICMP4_INSTANCE_ID_MASK	0xf000
