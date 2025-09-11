@@ -224,6 +224,8 @@ int eooqd_main(int argc, char *argv[])
 	/* Ignore SIGPIPE, broken TCP sessions may trigger them */
 	signal(SIGPIPE, SIG_IGN);
 
+	INIT_G();
+
 	/* Create libevent event base */
 	EventBase= event_base_new();
 	if (!EventBase)

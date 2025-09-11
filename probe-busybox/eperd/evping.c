@@ -70,7 +70,6 @@ int evping_main(int argc UNUSED_PARAM, char **argv)
 		exit(1);
 	}
 
-
 	state= ping_ops.init(argc, argv, done);
 	if (!state)
 	{
