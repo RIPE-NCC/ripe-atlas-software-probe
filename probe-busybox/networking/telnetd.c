@@ -270,7 +270,7 @@ static struct tsession *atlas_ts;	/* Allow only one 'atlas' connection
 static ssize_t
 safe_write_to_pty_decode_iac(struct tsession *ts)
 {
-	unsigned wr;
+	int wr;
 	ssize_t rc;
 	unsigned char *buf;
 	unsigned char *found;
@@ -463,7 +463,7 @@ static size_t safe_write_double_iac(int fd, const char *buf, size_t count)
 		if (count == 0)
 			return total;
 		if (*buf == (char)IAC) {
-			static const char IACIAC[] ALIGN1 = { IAC, IAC };
+			static const unsigned char IACIAC[] ALIGN1 = { IAC, IAC };
 			rc = safe_write(fd, IACIAC, 2);
 /* BUG: if partial write was only 1 byte long, we end up emitting just one IAC */
 			if (rc != 2)
@@ -567,7 +567,7 @@ make_new_session(
 	 * because we want to handle line editing and tab completion and other
 	 * stuff that requires char-by-char support. */
 	{
-		static const char iacs_to_send[] ALIGN1 = {
+		static const unsigned char iacs_to_send[] ALIGN1 = {
 			IAC, DO, TELOPT_ECHO,
 			IAC, DO, TELOPT_NAWS,
 			/* This requires telnetd.ctrlSQ.patch (incomplete) */
@@ -1461,7 +1461,7 @@ static char *getline_2pty(struct tsession *ts)
 	 * line. Otherwise, delete the \r.
 	 */
 	cp= strchr(line, '\r');
-	if (cp == NULL || cp-line != strlen(line)-1)
+	if (cp == NULL || (size_t)(cp-line) != strlen(line)-1)
 	{
 		bb_error_msg("bad line '%s', cp %p, cp-line %ld, |line| %ld",
 			line, cp, (long)(cp-line), (long)strlen(line));
@@ -1615,7 +1615,7 @@ static void end_crontab(struct tsession *ts)
 	while (fd= open(filename1, O_WRONLY|O_CREAT|O_TRUNC, 0644), fd >= 0)
 	{
 		len= strlen(UPDATELINE);
-		if (write(fd, UPDATELINE, len) != len)
+		if (write(fd, UPDATELINE, len) != (ssize_t)len)
 		{
 			close(fd);
 			add_2sock(ts, IO_ERROR);
