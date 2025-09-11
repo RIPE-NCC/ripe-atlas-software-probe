@@ -169,3 +169,4 @@ probe-busybox/.config
 # Never ignore these
 #
 !.gitignore
+config/freebsd/ripe-atlas.rc.d
