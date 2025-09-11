@@ -2693,6 +2693,7 @@ static void *tdig_init(int argc, char *argv[],
 	qry->dst_ai_family = 0;
 	qry->loc_ai_family = 0;
 	qry->loc_sin6.sin6_family = 0;
+	qry->opt_AF = AF_UNSPEC;  // Initialize to unspecified address family
 	qry->result.offset = qry->result.size = qry->result.maxsize= 0;
 	qry->result.buf = NULL;
 	qry->rcvdttl= -42;
