@@ -3976,6 +3976,7 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 	if( qry->ressent && qry->server_name)
 	{  // started to send query
 	   // historic resaons only works with UDP 
+		addrstr[0] = '\0';  // Initialize the buffer
 		switch (qry->ressent->ai_family)
 		{
 			case AF_INET:
@@ -3984,8 +3985,13 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 			case AF_INET6:
 				ptr = &((struct sockaddr_in6 *) qry->ressent->ai_addr)->sin6_addr;
 				break;
+			default:
+				ptr = NULL;  // Ensure ptr is set for unsupported address families
+				break;
 		}
-		inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		if (ptr != NULL) {
+			inet_ntop (qry->ressent->ai_family, ptr, addrstr, INET6_ADDRSTRLEN);
+		}
 		if(strcmp(addrstr, qry->server_name)) {
 			JS(name,  qry->server_name);
 		}
@@ -4007,6 +4013,7 @@ void printReply(struct query_state *qry, size_t wire_size, unsigned char *result
 	}
 	
 	if(qry->loc_sin6.sin6_family) {
+		addrstr[0] = '\0';  // Initialize the buffer
 		getnameinfo((struct sockaddr *)&qry->loc_sin6,
 				qry->loc_socklen, addrstr, INET6_ADDRSTRLEN,
 				NULL, 0, NI_NUMERICHOST);
