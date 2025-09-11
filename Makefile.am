@@ -12,7 +12,17 @@ pedantic:
 pedantic-all:
 	$(MAKE) CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
 
-.PHONY: pedantic pedantic-all
+# Add test target to run the testsuite
+test:
+	@echo "Running RIPE Atlas Software Probe testsuite..."
+	@cd probe-busybox/testsuite && ./runtest
+
+# Add test-verbose target for detailed test output
+test-verbose:
+	@echo "Running RIPE Atlas Software Probe testsuite (verbose)..."
+	@cd probe-busybox/testsuite && ./runtest -v
+
+.PHONY: pedantic pedantic-all test test-verbose
 
 ATLAS_SPOOL_DIRS = \
 		$(foreach dir,. new oneoff out out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir)) \
