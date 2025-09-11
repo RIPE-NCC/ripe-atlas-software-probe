@@ -4,6 +4,16 @@ ACLOCAL_AMFLAGS         = -I m4
 AM_MAKEFLAGS=CONFIG_PREFIX:=$(DESTDIR)$(atlas_measurementdir) CC=$(CC)
 SUBDIRS = bin config probe-busybox/libevent-2.1.11-stable probe-busybox .
 
+# Add pedantic target for stricter compilation (probe-busybox only)
+pedantic:
+	$(MAKE) -C probe-busybox CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
+
+# Add pedantic-all target for all components (including external libs)
+pedantic-all:
+	$(MAKE) CFLAGS="$(CFLAGS) -pedantic -Wpedantic -Wextra -Wall -Werror" all
+
+.PHONY: pedantic pedantic-all
+
 ATLAS_SPOOL_DIRS = \
 		$(foreach dir,. new oneoff out out/ooq out/ooq10,$(DESTDIR)$(atlas_spooldir)/data/$(dir)) \
 		$(foreach dir,. main 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20,$(DESTDIR)$(atlas_spooldir)/crons/$(dir))

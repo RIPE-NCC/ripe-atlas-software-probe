@@ -86,7 +86,7 @@ int buddyinfo_main(int argc UNUSED_PARAM, char **argv)
 	if (fp) {
 		char aa[256];
 		int i, j;
-		int memBlock = 4; // Start with 4KB
+		unsigned memBlock = 4; // Start with 4KB
 		int jMax = 11;    // Maximum number of buddy zones
 		
 		fscanf(fp, "%s", aa); 
