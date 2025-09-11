@@ -163,8 +163,6 @@ static struct globals G;
 #define INIT_G() do { \
 	LogLevel = 8; \
 	CDir = CRONTABS; \
-	EventBase = NULL; \
-	DnsBase = NULL; \
 } while (0)
 
 #ifdef ATLAS
