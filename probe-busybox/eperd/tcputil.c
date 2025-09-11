@@ -216,6 +216,10 @@ static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
+#ifdef HAVE_OPENSSL_SSL_H
+	unsigned long err;
+	char errbuf[256];
+#endif
 
 	env= ctx;
 
@@ -517,6 +521,12 @@ static int create_bev(struct tu_env *env)
 static void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
 	struct tu_env *env;
+#ifdef HAVE_OPENSSL_SSL_H
+	unsigned long err;
+	char errbuf[256];
+	const unsigned char *data;
+	unsigned int len;
+#endif
 
 	env= ptr;
 

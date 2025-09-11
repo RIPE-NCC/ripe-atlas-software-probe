@@ -92,7 +92,7 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 	time_t *dnsexpires)
 {
 	int i, olen, n_dns;
-	size_t o;
+	ssize_t o;
 	uint32_t lifetime;
 	struct nd_router_advert *ra;
 	struct nd_opt_hdr *oh;
@@ -109,7 +109,7 @@ static void do_resolv(char *str_resolv, char *str_resolv_new,
 			
 	for (o= sizeof(*ra); o<nrecv;)
 	{
-		if (o+sizeof(*oh) > nrecv)
+		if (o+(ssize_t)sizeof(*oh) > nrecv)
 		{
 			printf("partial option\n");
 			break;
@@ -223,7 +223,7 @@ static void log_ra(char *out_name, char *new_name,
 {
 	int i, r, first, rcvd_ttl = 255, olen;
 	uint8_t flags_reserved;
-	size_t o;
+	ssize_t o;
 	FILE *of;
 	struct cmsghdr *cmsgptr;
 	struct sockaddr_in6 *sin6p;
@@ -316,7 +316,7 @@ static void log_ra(char *out_name, char *new_name,
 		else
 			first= 0;
 
-		if (o+sizeof(*oh) > nrecv)
+		if (o+(ssize_t)sizeof(*oh) > nrecv)
 		{
 			printf("partial option\n");
 			break;
@@ -344,7 +344,7 @@ static void log_ra(char *out_name, char *new_name,
 			fprintf(of, "\" }");
 			break;
 		case ND_OPT_PREFIX_INFORMATION:	/* 3 */
-			if (olen < sizeof(*pi))
+			if ((size_t)olen < sizeof(*pi))
 			{
 				printf(
 			"bad option length (%d) for prefix info\n",

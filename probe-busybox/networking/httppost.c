@@ -1141,7 +1141,7 @@ char *do_dir(char *dir_name, off_t curr_tot_size, off_t max_size, off_t *lenp)
 
 static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 {
-	int i;
+	size_t i;
 	size_t len, offset, size;
 	char *cp, *line, *check;
 	const char *okp;
@@ -1267,7 +1267,7 @@ static int copy_chunked(FILE *in_file, FILE *out_file, int *found_okp)
 
 static int copy_bytes(FILE *in_file, FILE *out_file, size_t len, int *found_okp)
 {
-	int i;
+	size_t i;
 	size_t offset, size;
 	const char *okp;
 	char buffer[1024];

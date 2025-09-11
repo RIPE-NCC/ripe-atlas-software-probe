@@ -955,9 +955,9 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				regserver_time= strtoul(cp, &check, 10);
+				regserver_time= (time_t)strtoul(cp, &check, 10);
 				if (regserver_time == 0 ||
-					regserver_time == ULONG_MAX ||
+					regserver_time == (time_t)ULONG_MAX ||
 					check[0] != '\0')
 				{
 					atlas_log( ERROR,

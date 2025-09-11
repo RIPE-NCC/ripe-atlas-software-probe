@@ -246,7 +246,8 @@ static FILE *setup_cache(char *cache_name)
 
 static int setup_ipv4_rpt(FILE *of)
 {
-	int i, r, s, first;
+	size_t i;
+	int r, s, first;
 	unsigned dest, gateway, flags, refcnt, use, metric, mask;
 	FILE *in_file;
 	struct in_addr in_addr;
@@ -392,7 +393,8 @@ static int setup_dhcpv4(FILE *of)
 
 static int setup_ipv6_rpt(FILE *of, char *filename)
 {
-	int r, n;
+	int r;
+	int n;
 	char dst6in[INET6_ADDRSTRLEN];
 	char nh6in[INET6_ADDRSTRLEN]; /* next hop */
 	char *dst6out = NULL;
@@ -469,7 +471,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 			dst6out=NULL;
 		}
 		n++;
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -485,7 +487,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}	
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -590,7 +592,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 			nh6out=NULL;
 		}
 
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -600,7 +602,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	}
 	if ( n > 0 ) {
 		r = snprintf(buf2, 2, "]");
-		if (fwrite(buf2, 1, r, of) != r)
+		if (fwrite(buf2, 1, r, of) != (size_t)r)
 		{
 			report_err("error writing to '%s'", filename);
 			fclose(in_file);
@@ -709,7 +711,8 @@ static int report_line(FILE *of, const char *fn)
 
 static int check_cache(char *cache_name)
 {
-	int r, need_report;
+	size_t r;
+	int need_report;
 	struct stat sb;
 	char filename[80];
 
