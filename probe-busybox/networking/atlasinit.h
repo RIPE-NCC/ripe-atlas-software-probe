@@ -6,6 +6,8 @@
 #ifndef _ATLASINIT_H
 #define _ATLASINIT_H
 
+#include <time.h>
+
 #define ATLAS_BUF_SIZE 1024 
 #define MAX_READ ATLAS_BUF_SIZE-2  /* should be enough to read controller keys */
 
@@ -20,9 +22,9 @@ extern const char atlas_contr_known_hosts[];
 extern const char atlas_rereg_timestamp[];
 
 extern const int max_lines; /* maximum lines we'll process */
-extern const int min_rereg_time; /* 12h */
-extern const int max_rereg_time; /* 28d */
-extern const int default_rereg_time; /* 7d */
+extern const time_t min_rereg_time; /* 12h */
+extern const time_t max_rereg_time; /* 28d */
+extern const time_t default_rereg_time; /* 7d */
 
 /*********************************************************************/
 

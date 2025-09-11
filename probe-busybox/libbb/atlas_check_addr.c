@@ -9,8 +9,8 @@ struct ipv4_prefix
 {
 	uint32_t addr;
 	unsigned len;
-}
-static bad_ipv4[] =
+};
+static struct ipv4_prefix bad_ipv4[] =
 {
 	{ 0x7F000000,  8 },	/*   127.0.0.0/8 localhost */
 	{ 0x0A000000,  8 },	/*    10.0.0.0/8 (RFC-1918) */
@@ -24,8 +24,8 @@ struct ipv6_prefix
 {
 	uint16_t addr[8];
 	unsigned len;
-}
-static bad_ipv6[] =
+};
+static struct ipv6_prefix bad_ipv6[] =
 {
 	{ { 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0001 },
 					128 },	/* ::1 loopback */
@@ -38,7 +38,8 @@ static bad_ipv6[] =
 int atlas_check_addr(const struct sockaddr *sa, socklen_t len)
 {
 	uint16_t addr2, mask2;
-	int i, j, prefix_len;
+	size_t i;
+	int j, prefix_len;
 	uint32_t addr4, mask4;
 	uint16_t *addr2p;
 	const struct sockaddr_in *sin4p;

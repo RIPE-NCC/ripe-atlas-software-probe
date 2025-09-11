@@ -66,7 +66,7 @@ int buf_add_b64(struct buf *buf, void *data, size_t len, int mime_nl)
 		"QRSTUVWXYZabcdef"
 		"ghijklmnopqrstuv"
 		"wxyz0123456789+/";
-	int i;
+	size_t i;
 	uint8_t *p;
 	uint32_t v;
 	char str[4];

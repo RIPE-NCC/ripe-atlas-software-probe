@@ -61,7 +61,7 @@ int buddyinfo_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	printf("RESULT { " DBQ(id) ": " DBQ(9001) ", " DBQ(time) ": %lld",
-		(long long)time(0));
+		(long long)time(NULL));
 	if (my_mac != NULL)
 		printf(", " DBQ(macaddr) ": " DBQ(%s), my_mac);
 

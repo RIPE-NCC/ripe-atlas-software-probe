@@ -329,7 +329,7 @@ struct trtbase
 	int my_pid;
 
 	struct trtstate **table;
-	int tabsiz;
+	size_t tabsiz;
 
 	/* For standalone traceroute. Called when a traceroute instance is
 	 * done. Just one pointer for all instances. It is up to the caller
@@ -376,7 +376,7 @@ struct trtstate
 
 	/* Base and index in table */
 	struct trtbase *base;
-	int index;
+	size_t index;
 
 	struct sockaddr_in6 sin6;
 	socklen_t socklen;
@@ -387,7 +387,7 @@ struct trtstate
 	uint8_t hop;
 	uint16_t paris;
 	uint16_t seq;
-	unsigned short curpacksize;
+	size_t curpacksize;
 	
 	int socket_icmp;		/* Socket for sending and receiving
 					 * ICMPs */
@@ -752,7 +752,8 @@ static int set_tos(struct trtstate *state, int sock, int af, int inner)
 
 static void send_pkt(struct trtstate *state)
 {
-	int r, hop, len, on, sock, serrno;
+	int r, hop, on, sock, serrno;
+	size_t len;
 	uint16_t sum, val;
 	unsigned usum;
 	struct trtbase *base;
@@ -1828,7 +1829,8 @@ static void send_pkt(struct trtstate *state)
 static void do_mpls(struct trtstate *state, unsigned char *packet,
 	size_t size)
 {
-	int o, exp, s, ttl;
+	int exp, s, ttl;
+	size_t o;
 	uint32_t v, label;
 	char line[256];
 
@@ -1855,7 +1857,7 @@ static void do_mpls(struct trtstate *state, unsigned char *packet,
 static void do_icmp_multi(struct trtstate *state,
 	unsigned char *packet, size_t size, int pre_rfc4884)
 {
-	int o, len;
+	size_t o, len;
 	uint16_t cksum;
 	uint8_t class, ctype, version;
 	char line[256];
@@ -1922,7 +1924,9 @@ static void ready_callback4(int __attribute((unused)) unused,
 {
 	struct trtbase *base;
 	struct trtstate *state;
-	int hlen, ehlen, ind, nextmtu, late, isDup, icmp_prefixlen, offset;
+	int hlen, ehlen, late, isDup, icmp_prefixlen, offset;
+	size_t ind;
+	size_t nextmtu;
 	unsigned seq, srcport;
 	ssize_t nrecv;
 	socklen_t slen;
@@ -2103,7 +2107,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 				/* Nothing here */
 				printf(
-				"ready_callback4: no state for ind %d\n",
+				"ready_callback4: no state for ind %zu\n",
 					ind);
 				return;
 			}
@@ -2120,7 +2124,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 #if 0
 				printf(
-			"ready_callback4: index (%d) is not busy\n",
+			"ready_callback4: index (%zu) is not busy\n",
 					ind);
 #endif
 				return;
@@ -2256,7 +2260,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", " DBQ(mtu) ":%d",
+						", " DBQ(mtu) ":%zu",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip)+
@@ -2292,7 +2296,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			/* Now check if there is also a UDP header in the
 			 * packet
 			 */
-			if (nrecv < hlen + ICMP_MINLEN + ehlen + sizeof(*eudp))
+			if (nrecv < (ssize_t)(hlen + ICMP_MINLEN + ehlen + sizeof(*eudp)))
 			{
 				printf("ready_callback4: too short %d\n",
 					(int)nrecv);
@@ -2331,7 +2335,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 			{
 #if 0
 				printf(
-			"ready_callback4: index (%d) is not busy\n",
+			"ready_callback4: index (%zu) is not busy\n",
 					ind);
 #endif
 				return;
@@ -2479,7 +2483,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", " DBQ(mtu) ":%d", nextmtu);
+						", " DBQ(mtu) ":%zu", nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip)+
 						sizeof(*eudp))
@@ -2514,8 +2518,8 @@ static void ready_callback4(int __attribute((unused)) unused,
 			/* Now check if there is also an ICMP header in the
 			 * packet
 			 */
-			if (nrecv < hlen + ICMP_MINLEN + ehlen +
-				offsetof(struct icmp, icmp_data[0]))
+		if (nrecv < (ssize_t)(hlen + ICMP_MINLEN + ehlen +
+			offsetof(struct icmp, icmp_data[0])))
 			{
 				printf("ready_callback4: too short %d\n",
 					(int)nrecv);
@@ -2570,14 +2574,14 @@ static void ready_callback4(int __attribute((unused)) unused,
 			if (!state->do_icmp)
 			{
 				printf(
-			"ready_callback4: index (%d) is not doing ICMP\n",
+			"ready_callback4: index (%zu) is not doing ICMP\n",
 					ind);
 				return;
 			}
 			if (!state->busy)
 			{
 				printf(
-			"ready_callback4: index (%d) is not busy\n",
+			"ready_callback4: index (%zu) is not busy\n",
 					ind);
 				return;
 			}
@@ -2719,7 +2723,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 				case ICMP_UNREACH_NEEDFRAG:
 					nextmtu= ntohs(icmp->icmp_nextmtu);
 					snprintf(line, sizeof(line),
-						", " DBQ(mtu) ":%d",
+						", " DBQ(mtu) ":%zu",
 						nextmtu);
 					add_str(state, line);
 					if (!late && nextmtu >= sizeof(*ip) +
@@ -2867,7 +2871,7 @@ static void ready_callback4(int __attribute((unused)) unused,
 		if (!state->busy)
 		{
 			printf(
-		"ready_callback4: index (%d) is not busy\n",
+		"ready_callback4: index (%zu) is not busy\n",
 				ind);
 			return;
 		}
@@ -3088,7 +3092,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	ip= (struct ip *)base->packet;
 	hlen= ip->ip_hl*4;
 
-	if (nrecv < hlen + sizeof(*tcphdr) || ip->ip_hl < 5)
+	if (nrecv < (ssize_t)(hlen + sizeof(*tcphdr)) || ip->ip_hl < 5)
 	{
 		/* Short packet */
 		printf("ready_tcp4: too short %d\n", (int)nrecv);
@@ -3132,7 +3136,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 	if (!state->busy)
 	{
 		printf(
-	"ready_callback4: index (%d) is not busy\n",
+	"ready_tcp4: index (%u) is not busy\n",
 			ind);
 		return;
 	}
@@ -3192,7 +3196,7 @@ static void ready_tcp4(int __attribute((unused)) unused,
 		((tcphdr->th_flags & TCP_URG_FLAG) ? "U" : ""));
 	add_str(state, line);
 
-	if (tcp_hlen > sizeof(*tcphdr))
+	if (tcp_hlen > (int)sizeof(*tcphdr))
 	{
 		p= (unsigned char *)&tcphdr[1];
 		e= ((unsigned char *)tcphdr) + tcp_hlen;
@@ -3468,7 +3472,7 @@ static void ready_tcp6(int __attribute((unused)) unused,
 		((tcphdr->th_flags & TCP_URG_FLAG) ? "U" : ""));
 	add_str(state, line);
 
-	if (tcp_hlen > sizeof(*tcphdr))
+	if (tcp_hlen > (int)sizeof(*tcphdr))
 	{
 		p= (unsigned char *)&tcphdr[1];
 		e= ((unsigned char *)tcphdr) + tcp_hlen;
@@ -3516,8 +3520,10 @@ static void ready_callback6(int __attribute((unused)) unused,
 	const short __attribute((unused)) event, void *s)
 {
 	ssize_t nrecv;
-	int ind, rcvdttl, late, isDup, nxt, icmp_prefixlen, offset, rcvdtclass;
-	unsigned nextmtu, seq, optlen, hbhoptsize, dstoptsize;
+	int rcvdttl, late, isDup, nxt, icmp_prefixlen, offset, rcvdtclass;
+	size_t ind;
+	unsigned seq, optlen, hbhoptsize, dstoptsize;
+	size_t nextmtu;
 	size_t v6info_siz, siz;
 	struct trtbase *base;
 	struct trtstate *state;
@@ -3704,7 +3710,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			sizeof(rcvdtclass), &rcvdtclass);
 	}
 
-	if (nrecv < sizeof(*icmp))
+	if (nrecv < (ssize_t)sizeof(*icmp))
 	{
 		/* Short packet */
 #if 0
@@ -3725,7 +3731,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 		eip= (struct ip6_hdr *)&icmp[1];
 
 		/* Make sure the packet we have is big enough */
-		if (nrecv < sizeof(*icmp) + sizeof(*eip))
+		if (nrecv < (ssize_t)(sizeof(*icmp) + sizeof(*eip)))
 		{
 #if 0
 			fprintf(stderr,
@@ -3753,7 +3759,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 				 * there.
 				 */
 				offset= (u_char *)ptr - base->packet;
-				if (offset + sizeof(*opthdr) > nrecv)
+				if (offset + sizeof(*opthdr) > (size_t)nrecv)
 				{
 #if 0
 					fprintf(stderr,
@@ -3779,7 +3785,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 				 * there.
 				 */
 				offset= (u_char *)ptr - base->packet;
-				if (offset + sizeof(*frag) > nrecv)
+				if (offset + sizeof(*frag) > (size_t)nrecv)
 				{
 #if 0
 					fprintf(stderr,
@@ -3812,7 +3818,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 				 * there.
 				 */
 				offset= (u_char *)ptr - base->packet;
-				if (offset + sizeof(*opthdr) > nrecv)
+				if (offset + sizeof(*opthdr) > (size_t)nrecv)
 				{
 #if 0
 					printf(
@@ -3853,7 +3859,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			 * packet.
 			 */
 			offset= (u_char *)ptr - base->packet;
-			if (offset + siz + v6info_siz > nrecv)
+			if (offset + siz + v6info_siz > (size_t)nrecv)
 			{
 #if 0
 				printf(
@@ -3903,7 +3909,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			}
 			else
 			{
-				if (ntohl(v6info->pid) != base->my_pid)
+				if (ntohl(v6info->pid) != (unsigned)base->my_pid)
 				{
 					/* From a different process */
 					return;
@@ -3946,7 +3952,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			if (!state->busy)
 			{
 				printf(
-			"ready_callback6: index (%d) is not busy\n",
+			"ready_callback6: index (%zu) is not busy\n",
 					ind);
 				return;
 			}
@@ -4097,7 +4103,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 			{
 				nextmtu= ntohl(icmp->icmp6_mtu);
 				snprintf(line, sizeof(line),
-					", " DBQ(mtu) ":%d", nextmtu);
+					", " DBQ(mtu) ":%zu", nextmtu);
 				add_str(state, line);
 				siz= sizeof(*eip);
 				if (eudp)
@@ -4226,7 +4232,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 		eip= NULL;
 
 		/* Now check if there is also a header in the packet */
-		if (nrecv < sizeof(*icmp) + sizeof(*v6info))
+		if (nrecv < (ssize_t)(sizeof(*icmp) + sizeof(*v6info)))
 		{
 #if 0
 			printf("ready_callback6: too short %d (echo reply)\n",
@@ -4240,7 +4246,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 
 		v6info= (struct v6info *)&icmp[1];
 
-		if (ntohl(v6info->pid) != base->my_pid)
+		if (ntohl(v6info->pid) != (unsigned)base->my_pid)
 		{
 			/* From a different process */
 			return;
@@ -4276,7 +4282,7 @@ static void ready_callback6(int __attribute((unused)) unused,
 		if (!state->busy)
 		{
 			printf(
-		"ready_callback6: index (%d) is not busy\n",
+		"ready_callback6: index (%zu) is not busy\n",
 				ind);
 			return;
 		}
@@ -4460,7 +4466,8 @@ static void *traceroute_init(int __attribute((unused)) argc, char *argv[],
 {
 	uint16_t destport;
 	uint32_t opt;
-	int i, do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
+	int do_icmp, do_v6, dont_fragment, delay_name_res, do_tcp, do_udp;
+	size_t i;
 	int tos;
 	unsigned count, duptimeout, firsthop, gaplimit, maxhops, maxpacksize,
 		hbhoptsize, destoptsize, parismod, parisbase, timeout;
@@ -5229,13 +5236,13 @@ static void traceroute_start(void *state)
 
 static int traceroute_delete(void *state)
 {
-	int ind;
+	size_t ind;
 	struct trtstate *trtstate;
 	struct trtbase *base;
 
 	trtstate= state;
 
-	printf("traceroute_delete: state %p, index %d, busy %d\n",
+	printf("traceroute_delete: state %p, index %zu, busy %d\n",
 		state, trtstate->index, trtstate->busy);
 
 	if (trtstate->busy)

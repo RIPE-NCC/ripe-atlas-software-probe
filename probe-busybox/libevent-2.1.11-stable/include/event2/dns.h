@@ -288,6 +288,7 @@ void evdns_base_clear_host_addresses(struct evdns_base *base);
   @param base the evdns base to modify
   @param interface_name the name of the interface to be used
  */
+EVENT2_EXPORT_SYMBOL
 int evdns_base_set_interface(struct evdns_base *base, char *interface_name);
 
 /**

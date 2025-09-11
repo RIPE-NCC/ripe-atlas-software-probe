@@ -21,7 +21,8 @@
 int do_ipv6_option(int sock, int hbh_dest,
 	unsigned size)
 {
-	int i, r;
+	size_t i;
+	int r;
 	size_t totsize, ehlen, padlen;
 
 	char packet[4096];	/* Assume we can put the on the stack. And

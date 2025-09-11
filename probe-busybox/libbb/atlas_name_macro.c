@@ -7,7 +7,8 @@ static char hex_chars[]= "0123456789abcdef";
 char *atlas_name_macro(char *str)
 {
 	unsigned char c;
-	int i, fd;
+	size_t i;
+	int fd;
 	size_t len;
 	char *p, *in, *out;
 	char buf[256];
@@ -32,7 +33,7 @@ char *atlas_name_macro(char *str)
 		{
 			len= p-in;
 
-			if (len+1 > buf+sizeof(buf)-out)
+			if (len+1 > (size_t)(buf+sizeof(buf)-out))
 				return NULL;
 			memcpy(out, in, len);
 			out[len]= '\0';
@@ -52,7 +53,7 @@ char *atlas_name_macro(char *str)
 			break;
 		case 'r':
 			/* We need to hex digits per byte in random_buf */
-			if (sizeof(random_buf)*2+1 > buf+sizeof(buf)-out)
+			if (sizeof(random_buf)*2+1 > (size_t)(buf+sizeof(buf)-out))
 				return NULL;
 
 			fd= open(URANDOM_DEV, O_RDONLY);

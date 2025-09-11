@@ -556,7 +556,7 @@ struct http2_env *http2_init(void)
 
 void http2_free(struct http2_env *env)
 {
-	int i;
+	size_t i;
 
 	free(env->http2_headers);
 	env->http2_headers= NULL;
@@ -1397,7 +1397,7 @@ static int Xreceive_ping2(struct http2_env *env,
 		return -1;
 	}
 	fprintf(stderr, "receive_ping2: value: ");
-	for (i= 0; i<length; i++)
+	for (i= 0; (uint32_t)i<length; i++)
 		fprintf(stderr, "%02x", data[i]);
 	fprintf(stderr, "\n");
 	return 0;
@@ -1432,7 +1432,7 @@ static int Xreceive_goaway2(struct http2_env *env,
 	fprintf(stderr, "receive_goaway2: error: %u\n", value);
 
 	fprintf(stderr, "receive_goaway2: debug 0x%x: ", length-8);
-	for (i= 8; i<length; i++)
+	for (i= 8; (uint32_t)i<length; i++)
 		fprintf(stderr, "%c", data[i]);
 	fprintf(stderr, "\n");
 
@@ -1841,7 +1841,8 @@ static size_t Xdecode_int2(struct http2_env *env, uint8_t *buf, size_t len,
 {
 	uint8_t byte;
 	uint32_t v, new_bits, new_value;
-	int o, bits, mask, max_value, shift;
+	int bits, mask, max_value, shift;
+	size_t o;
 
 	assert(prefix_len < 8);
 	bits= 8-prefix_len;
@@ -1880,7 +1881,7 @@ static size_t Xdecode_int2(struct http2_env *env, uint8_t *buf, size_t len,
 
 		/* This is the last byte. Add max_value */
 		v += max_value;
-		if (v < max_value)
+		if (v < (uint32_t)max_value)
 		{
 			send_goaway2(env->outbuf, HTTP2_COMPRESSION_ERROR,
 				0, "overflow in multi-byte integer");
@@ -3074,7 +3075,8 @@ static int Xreport_header(struct http2_env *env, int verbose,
 static int Xparse_status_code2(struct http2_env *env, 
 	const char *value, size_t valuelen, int *statusp)
 {
-	int i, status;
+	int status;
+	size_t i;
 	char *check;
 	char buf[4];
 
@@ -3112,7 +3114,8 @@ static int Xparse_status_code2(struct http2_env *env,
 static int memcasecmp(const void *p1, const void *p2, size_t len)
 {
 	const u_char *cp1, *cp2;
-	int c1, c2, i;
+	int c1, c2;
+	size_t i;
 
 	cp1= p1;
 	cp2= p2;

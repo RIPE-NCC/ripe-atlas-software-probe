@@ -343,7 +343,7 @@ static void report(struct pingstate *state)
 
 }
 
-static void ping_cb(int result, int bytes, int psize,
+static void ping_cb(int result, unsigned bytes, int psize,
 	struct sockaddr *sa, socklen_t socklen,
 	struct sockaddr *loc_sa, socklen_t loc_socklen,
 	int seq, int ttl,
@@ -407,11 +407,11 @@ static void ping_cb(int result, int bytes, int psize,
 		if (pingstate->size != bytes)
 		{
 			snprintf(line, sizeof(line),
-				", " DBQ(size) ":%d", bytes);
+				", " DBQ(size) ":%u", bytes);
 			add_str(pingstate, line);
 			pingstate->size= bytes;
 		}
-		if (pingstate->psize != psize && psize != -1)
+		if (pingstate->psize != (unsigned)psize && psize != -1)
 		{
 #if DO_PSIZE
 			snprintf(line, sizeof(line),
@@ -699,7 +699,7 @@ static void ping_xmit(struct pingstate *host)
 	int nsent;
 	struct timeval tv_interval;
 
-	if (host->sentpkts >= host->maxpkts)
+	if (host->sentpkts >= (counter_t)host->maxpkts)
 	{
 		/* Done. */
 		ping_cb(PING_ERR_DONE, host->cursize, host->psize,
@@ -935,7 +935,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 	hlen = ip->ip_hl * 4;
 
 	/* Check the IP header */
-	if (nrecv < hlen + ICMP_MINLEN + sizeof (struct evdata) ||
+	if (nrecv < (int)(hlen + ICMP_MINLEN + sizeof (struct evdata)) ||
 		ip->ip_hl < 5)
 	  {
 	    /* One more too short packet */
@@ -977,7 +977,7 @@ static void ready_callback4 (int __attribute((unused)) unused,
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
 	data = (struct evdata *) (base->packet + hlen + ICMP_MINLEN);
-	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
+	if (data->index >= (uint32_t)base->tabsiz || base->table[data->index] == NULL)
 	{
 #if 0
 		printf("ready_callback4: bad index: got %d\n",
@@ -1166,7 +1166,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 				RESP_PEERNAME, sizeof(remote), &remote);
 	}
 
-	if (nrecv < icmp_len+sizeof(struct evdata))
+	if (nrecv < (int)(icmp_len+sizeof(struct evdata)))
 	{
 		// printf("ready_callback6: short packet\n");
 		goto done;
@@ -1181,7 +1181,7 @@ static void ready_callback6 (int __attribute((unused)) unused,
 	  }
 
 	/* Check the ICMP payload for legal values of the 'index' portion */
-	if (data->index >= base->tabsiz || base->table[data->index] == NULL)
+	if (data->index >= (uint32_t)base->tabsiz || base->table[data->index] == NULL)
 	  {
 	    goto done;
 	  }

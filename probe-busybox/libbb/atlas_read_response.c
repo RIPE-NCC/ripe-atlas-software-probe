@@ -73,7 +73,7 @@ void read_response(int fd, int type, size_t *sizep, void *data)
 		exit(1);
 	}
 	*sizep= tmp_size;
-	if (read(fd, data, tmp_size) != tmp_size)
+	if (read(fd, data, tmp_size) != (ssize_t)tmp_size)
 	{
 		fprintf(stderr, "read_response: error reading\n");
 		exit(1);

@@ -53,7 +53,7 @@ enum
 /*********************************************************************
  * Set these constants to your liking
  */
-static int process_wait (const char *type, int delay);
+static int process_wait (const char *type, time_t delay);
 static int reg_init_main( int argc, char *argv[] );
 static int con_init_main( int argc, char *argv[] );
 static void print_token_ver (FILE * write_to, int flag_rereg);
@@ -80,9 +80,9 @@ const char atlas_resolv_conf[] = "./resolv.conf.vol";
 #define FIRMWARE_APPS_VERSION_REL "FIRMWARE_APPS_VERSION"
 
 const int max_lines = 16; /* maximum lines we'll process */
-const int min_rereg_time = 100; 
-const int max_rereg_time = 28*24*3600; /* 28d */
-const int default_rereg_time = 7*24*3600; /* 7d */
+const time_t min_rereg_time = 100; 
+const time_t max_rereg_time = 28*24*3600; /* 28d */
+const time_t default_rereg_time = 7*24*3600; /* 7d */
 char *str_reason;
 const char *str_device;
 
@@ -233,7 +233,7 @@ static int con_init_main( int argc, char *argv[] )
 {
 	int ret = 0;
 	size_t len;
-	unsigned long seconds;
+	time_t seconds;
 	FILE *read_from = stdin;
 	char *cp, *ecp, *check;
 
@@ -380,9 +380,9 @@ static int con_init_main( int argc, char *argv[] )
 			goto fail;
 		}
 
-		seconds= strtoul(cp, &check, 10);
-		if (seconds == 0 || seconds == ULONG_MAX ||
-			check[0] != '\0')
+		seconds= (time_t)strtoul(cp, &check, 10);
+		if (seconds == 0 || seconds == (time_t)ULONG_MAX ||
+			check[0] != '\0' || seconds < 0)
 		{
 			atlas_log( ERROR,
 				"bad seconds value\n");
@@ -432,16 +432,16 @@ fail:
 
 } 
 
-static int process_wait (const char *type, int delay)
+static int process_wait (const char *type, time_t delay)
 {
-	time_t mytime = time(0);
-	mytime = time(0);
+	time_t mytime = time(NULL);
+	mytime = time(NULL);
 	if(delay >  max_rereg_time ) {
-               	atlas_log( ERROR, "Reregister time %d is too high\n", delay );
+               	atlas_log( ERROR, "Reregister time %ld is too high\n", (long)delay );
                	delay = max_rereg_time;
         }
 	if(delay <  min_rereg_time ) {
-               	atlas_log( ERROR, "Reregister time %d is too low\n", delay );
+               	atlas_log( ERROR, "Reregister time %ld is too low\n", (long)delay );
                	delay = min_rereg_time;
         }
 	printf ("%s %u\n", type, (uint)(mytime + delay));
@@ -866,14 +866,14 @@ static int reg_init_main( int argc, char *argv[] )
 
 	time_t mytime;
 	size_t len;
-	unsigned long seconds;
+	time_t seconds;
 	FILE *read_from = stdin;
 	char *cp, *ecp, *check, *path;
 
 	int ret = 0;
 	int first;
 
-	int reregister_time = default_rereg_time;
+	time_t reregister_time = default_rereg_time;
 	mytime = time(NULL);
 
 	if (!str_device)
@@ -944,7 +944,7 @@ static int reg_init_main( int argc, char *argv[] )
 			}
 
 			if( strcmp(cp, "REGSERVER_TIMESTAMP")==0 ) {
-				unsigned long regserver_time;
+				time_t regserver_time;
 
 				cp= skip_spaces(ecp+1);
 				ecp= skip_timestamp(cp);
@@ -965,14 +965,14 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				if (mytime < regserver_time-2 ||
-					mytime > regserver_time+2)
+				if (mytime < (regserver_time-2) ||
+					mytime > (regserver_time+2))
 				{
 					struct timeval tval;
 
 					atlas_log( INFO,
-			"Time difference is %d seconds, setting time\n",
-						(int)(mytime-regserver_time) );
+			"Time difference is %ld seconds, setting time\n",
+						(long)(mytime-regserver_time) );
 
 					tval.tv_sec = regserver_time;
 					tval.tv_usec = 0;
@@ -1214,9 +1214,9 @@ static int reg_init_main( int argc, char *argv[] )
 					goto fail;
 				}
 
-				reregister_time= strtoul(cp, &check, 10);
+				reregister_time= (time_t)strtoul(cp, &check, 10);
 				if (reregister_time == 0 ||
-					reregister_time == ULONG_MAX ||
+					reregister_time == (time_t)ULONG_MAX ||
 					check[0] != '\0')
 				{
 					atlas_log( ERROR,
@@ -1723,9 +1723,9 @@ dhcpv6_end:
 			goto fail;
 		}
 
-		seconds= strtoul(cp, &check, 10);
-		if (seconds == 0 || seconds == ULONG_MAX ||
-			check[0] != '\0')
+		seconds= (time_t)strtoul(cp, &check, 10);
+		if (seconds == 0 || seconds == (time_t)ULONG_MAX ||
+			check[0] != '\0' || seconds < 0)
 		{
 			atlas_log( ERROR,
 				"bad seconds value\n");
@@ -1773,7 +1773,7 @@ void atlas_log( int level UNUSED_PARAM, const char *msg UNUSED_PARAM, ... )
 		if( lf==NULL )
 			return; // not much we can do
 
-		fprintf( lf, "%d\t%d\t", (int)time(NULL), level );
+		fprintf( lf, "%ld\t%d\t", (long)time(NULL), level );
 		vfprintf( lf, msg, arg );
 		fclose(lf);
 

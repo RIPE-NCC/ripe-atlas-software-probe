@@ -109,7 +109,10 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
 				break;
 #endif
 			case 'd':
-				strftime(buf, sizeof(buf), fmtstr_d, localtime(&t));
+				{
+					struct tm tm_result;
+					strftime(buf, sizeof(buf), fmtstr_d, localtime_r(&t, &tm_result));
+				}
 				break;
 			case 't':
 				strftime_HHMMSS(buf, sizeof(buf), &t);

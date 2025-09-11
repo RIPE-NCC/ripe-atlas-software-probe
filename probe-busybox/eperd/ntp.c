@@ -66,7 +66,7 @@ struct ntpbase
 	int my_pid;
 
 	struct ntpstate **table;
-	int tabsiz;
+	size_t tabsiz;
 
 	/* For standalone ntp. Called when a ntp instance is
 	 * done. Just one pointer for all instances. It is up to the caller
@@ -331,7 +331,7 @@ static void format_ref_id(char *line, size_t size, uint32_t value,
 	{
 		line2[0]= '\0';
 		for (i= 0, p= (unsigned char *)&value;
-			i<sizeof(value) && *p != '\0'; i++, p++)
+			(size_t)i<sizeof(value) && *p != '\0'; i++, p++)
 		{
 			offset= strlen(line2);
 			if (*p < 32 || *p == '"' || *p == '\\' ||
@@ -732,7 +732,7 @@ static void ready_callback(int __attribute((unused)) unused,
 	}
 
 
-	if (nrecv < sizeof(*ntphdr))
+	if (nrecv < (ssize_t)sizeof(*ntphdr))
 	{
 		/* Short packet */
 		printf("ready_callback: too short %d\n", (int)nrecv);
@@ -964,7 +964,8 @@ static void *ntp_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state, int error))
 {
 	uint32_t opt;
-	int i, do_v6;
+	int do_v6;
+	size_t i;
 	unsigned count, timeout, size;
 		/* must be int-sized */
 	size_t newsiz;

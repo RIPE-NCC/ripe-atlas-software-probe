@@ -213,13 +213,14 @@ int httppost_main(int argc, char *argv[])
 	tolerance= 0;
 	if (time_tolerance)
 	{
-		tolerance= strtoul(time_tolerance, &p, 10);
-		if (p[0] != '\0')
+		unsigned long temp = strtoul(time_tolerance, &p, 10);
+		if (p[0] != '\0' || temp == ULONG_MAX)
 		{
 			fprintf(stderr, "unable to parse tolerance '%s'\n",
 				time_tolerance);
 			return 1;
 		}
+		tolerance = (time_t)temp;
 	}
 
 	if (parse_url(url, &host, &port, &hostport, &path) == -1)

@@ -511,6 +511,7 @@ ifneq ($(wildcard libevent-2.1.11-stable/.libs/libevent_openssl.a),)
 libs-y += libevent-2.1.11-stable/.libs/libevent_openssl.a
 endif
 
+
 endif # KBUILD_EXTMOD
 
 ifeq ($(dot-config),1)
@@ -753,7 +754,11 @@ endif
 
 # The actual objects are generated when descending,
 # make sure no implicit rule kicks in
-$(sort $(busybox-all)): $(busybox-dirs) ;
+$(filter-out libevent-2.1.11-stable/.libs/libevent.a,$(sort $(busybox-all))): $(busybox-dirs) ;
+
+# Special rule for libevent static library
+libevent-2.1.11-stable/.libs/libevent.a: FORCE
+	$(Q)cd libevent-2.1.11-stable && $(MAKE) libevent.la
 
 # Handle descending into subdirectories listed in $(busybox-dirs)
 # Preset locale variables to speed up the build process. Limit locale
@@ -838,7 +843,7 @@ endif
 # prepare2 creates a makefile if using a separate output directory
 prepare2: prepare3 outputmakefile
 
-prepare1: prepare2 include/config/MARKER
+prepare1: prepare2 include/config/MARKER include/atlas_path.h
 ifneq ($(KBUILD_MODULES),)
 	$(Q)mkdir -p $(MODVERDIR)
 	$(Q)rm -f $(MODVERDIR)/*
@@ -871,6 +876,17 @@ quiet_cmd_gen_bbconfigopts = GEN     include/bbconfigopts.h
       cmd_gen_bbconfigopts = $(srctree)/scripts/mkconfigs include/bbconfigopts.h include/bbconfigopts_bz2.h
 quiet_cmd_gen_common_bufsiz = GEN     include/common_bufsiz.h
       cmd_gen_common_bufsiz = $(srctree)/scripts/generate_BUFSIZ.sh include/common_bufsiz.h
+quiet_cmd_gen_atlas_path_h = GEN     include/atlas_path.h
+      cmd_gen_atlas_path_h = sed -e 's|@atlas_datadir[@]|$(atlas_datadir)|g' \
+				-e 's|@atlas_execprefix[@]|$(atlas_execprefix)|g' \
+				-e 's|@atlas_libexecdir[@]|$(atlas_libexecdir)|g' \
+				-e 's|@atlas_measurementdir[@]|$(atlas_measurementdir)|g' \
+				-e 's|@atlas_scriptsdir[@]|$(atlas_scriptsdir)|g' \
+				-e 's|@atlas_rundir[@]|$(atlas_rundir)|g' \
+				-e 's|@atlas_spooldir[@]|$(atlas_spooldir)|g' \
+				-e 's|@atlas_sysconfdir[@]|$(atlas_sysconfdir)|g' \
+				-e 's|@tmpdir[@]|$(tmpdir)|g' \
+				$(srctree)/include/atlas_path.h.in > include/atlas_path.h
 quiet_cmd_split_autoconf   = SPLIT   include/autoconf.h -> include/config/*
       cmd_split_autoconf   = scripts/basic/split-include include/autoconf.h include/config
 #bbox# piggybacked generation of few .h files
@@ -879,6 +895,10 @@ include/config/MARKER: scripts/basic/split-include include/autoconf.h
 	$(call cmd,gen_bbconfigopts)
 	$(call cmd,gen_common_bufsiz)
 	@touch $@
+
+# Generate atlas_path.h from template
+include/atlas_path.h: $(srctree)/include/atlas_path.h.in
+	$(call cmd,gen_atlas_path_h)
 
 # Generate some files
 # ---------------------------------------------------------------------------

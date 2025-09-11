@@ -210,7 +210,7 @@
 #define JSDOT(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : \"%s.\" , ",  val), ADDRESULT
 #define JS1(key, fmt, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : "#fmt" , ",  val), ADDRESULT
 #define JD(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d , ",  val), ADDRESULT
-#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %d ",  val), ADDRESULT
+#define JD_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %zu ",  val), ADDRESULT
 #define JU(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u , ",  val), ADDRESULT
 #define JU_NC(key, val) snprintf(line, DEFAULT_LINE_LENGTH, "\"" #key"\" : %u",  val), ADDRESULT
 #define JC snprintf(line, DEFAULT_LINE_LENGTH, ","), ADDRESULT
@@ -704,7 +704,7 @@ struct query_state {
 	u_int16_t qryid;            /* query id 16 bit */
 	struct event event;         /* Used to detect read events on udp socket   */
 	int udp_fd;		    /* udp_fd */
-	int wire_size;
+	size_t wire_size;
 	struct dns_cookie_state *cookie_state;
 
 	struct bufferevent *bev_tcp;
@@ -999,7 +999,7 @@ static int tdig_delete(void *state);
 static int ChangetoDnsNameFormat(u_char *dns, size_t maxlen, char* qry);
 struct tdig_base *tdig_base_new(struct event_base *event_base); 
 void tdig_start (void *qry);
-void printReply(struct query_state *qry, int wire_size, unsigned char *result);
+void printReply(struct query_state *qry, size_t wire_size, unsigned char *result);
 void printErrorQuick (struct query_state *qry);
 static void local_exit(void *state, int error);
 static void *tdig_init(int argc, char *argv[],
@@ -1993,7 +1993,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 
 	if( qry->packet.size && (qry->packet.size >= qry->wire_size)) {
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
-				" \"red more bytes than expected %d, got %zu\""
+				" \"red more bytes than expected %zu, got %zu\""
 				, qry->err.size ? ", " : ""
 				, qry->wire_size, qry->packet.size);
 		buf_add(&qry->err, line, strlen(line));	
@@ -2050,12 +2050,12 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 	} 
 
 	/* We need at least a header */
-	if (qry->wire_size < sizeof(struct DNS_HEADER))
+        if (qry->wire_size < sizeof(struct DNS_HEADER))
 	{
 		snprintf(line, DEFAULT_LINE_LENGTH, "%s \"TCPREADSIZE\" : "
 				" \"reply too small, got %zu\""
 				, qry->err.size ? ", " : ""
-				, (size_t)qry->wire_size);
+				, qry->wire_size);
 		buf_add(&qry->err, line, strlen(line));	
 		printReply (qry, 0, NULL);
 		return;
@@ -2088,7 +2088,7 @@ static void tcp_readcb(struct bufferevent *bev UNUSED_PARAM, void *ptr)
 		}
 		buf_add(&qry->packet, line, n);
 		// crondlog(LVL5 "in readcb %s %s got %d bytes, need %d", qry->str_Atlas, qry->server_name,  qry->packet.size, qry->wire_size);
-		if(qry->wire_size == qry->packet.size) {
+                if(qry->wire_size == qry->packet.size) {
 			// crondlog(LVL5 "in readcb %s %s red %d bytes ", qry->str_Atlas, qry->server_name,  qry->wire_size);
 			// crondlog(LVL5 "qry pointer address readcb %p qry.id, %d", qry->qryid);
 			// crondlog(LVL5 "DBG: base pointer address readcb %p",  qry->base );
@@ -2238,7 +2238,7 @@ static void process_reply(void * arg, int nrecv, struct timespec now,
 		}
 	}
 
-	if (nrecv < sizeof (struct DNS_HEADER)) {
+        if (nrecv < (int)sizeof (struct DNS_HEADER)) {
 		base->shortpkt++;
 		return;
 	}
@@ -2875,21 +2875,9 @@ static void *tdig_init(int argc, char *argv[],
 
 			case O_TYPE:
 				qry->qtype = strtoul(optarg, &check, 10);
-				if ((qry->qtype >= 0 ) && 
-						(qry->qclass < 65536)) {
-
-					if (! qry->qclass ) 
-						qry->qclass = C_IN;
-
-					break;
-				}
-				else {
-					fprintf(stderr, "ERROR unknown Q "
-							"--typae %s ??. 0 - "
-							"65535\n", optarg); 
-					tdig_delete(qry);
-					return (0);
-				}
+				/* Note: No range check needed - qtype is u_int16_t (0-65535) */
+				if (! qry->qclass ) 
+					qry->qclass = C_IN;
 				break;
 
 			case O_AD:
@@ -2902,17 +2890,8 @@ static void *tdig_init(int argc, char *argv[],
 
 			case O_CLASS:
 				qry->qclass = strtoul(optarg, &check, 10);
-				if ((qry->qclass  >= 0 ) && 
-						(qry->qclass < 65536)) {
-					break;
-				}
-				else {
-					fprintf(stderr, "ERROR unknown Q class"
-							" --class %s ??. 0 - "
-							"65535\n", optarg); 
-					tdig_delete(qry);
-					return (0);
-				}
+				/* Note: No range check needed - qclass is u_int16_t (0-65535) */
+				break;
 
 			case O_RETRY :
 				qry->opt_query_arg = 1;
@@ -3934,7 +3913,7 @@ void printErrorQuick (struct query_state *qry)
 		fclose(fh);
 }
 
-void printReply(struct query_state *qry, int wire_size, unsigned char *result)
+void printReply(struct query_state *qry, size_t wire_size, unsigned char *result)
 {
 	int i, stop=0;
 	struct DNS_HEADER *dnsR = NULL;
@@ -4075,7 +4054,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 			buf_add(&qry->result,line, strlen(line));
 		}
 
-		if (wire_size < sizeof(struct DNS_HEADER))
+		if (wire_size < (int)sizeof(struct DNS_HEADER))
 			goto truncated;
 
 		dnsR = (struct DNS_HEADER*) result;
@@ -4102,7 +4081,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 
 		offset += len + sizeof(struct QUESTION);
 
-		if (offset > wire_size)
+		if (offset > (unsigned int)wire_size)
 			goto truncated;
 
 		stop=0;  
@@ -4123,7 +4102,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				offset += stop;
 
 				if (offset + sizeof(struct R_DATA) > 
-					wire_size)
+					(size_t)wire_size)
 				{
 					/* Report error? */
 					goto truncated;
@@ -4139,7 +4118,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 				{
 					data_len = ntohs(answers[i].resource->data_len);
 
-					if (offset+data_len > wire_size)
+					if (offset+data_len > (unsigned int)wire_size)
 						goto truncated;
 
 					if(flagAnswer == 0) {
@@ -4176,7 +4155,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 						goto truncated;
 					}
 					offset += stop;
-					if (offset+5*4 > wire_size)
+					if (offset+5*4 > (unsigned int)wire_size)
 					{
 						free(name1); name1= NULL;
 						free(name2); name2= NULL;
@@ -4211,7 +4190,7 @@ void printReply(struct query_state *qry, int wire_size, unsigned char *result)
 					data_len = ntohs(answers[i].
 						resource->data_len);
 
-					if (offset+data_len > wire_size)
+					if (offset+data_len > (unsigned int)wire_size)
 						goto truncated;
 
 					offset += data_len;

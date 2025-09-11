@@ -1269,9 +1269,9 @@ static void RunJob(evutil_socket_t __attribute__ ((unused)) fd,
 			fprintf(fn, "%s, " DBQ(time) ":%ld, ",
 				atlas_get_version_json_str(), (long)time(NULL));
 			fprintf(fn, DBQ(reason) ": "
-		DBQ(inconsistent time; now %d; nexttime %d; waittime %d; cycle %d; generated %d) ", ",
-				(int)now.tv_sec, (int)line->nexttime,
-				(int)line->waittime, (int)line->debug_cycle,
+		DBQ(inconsistent time; now %ld; nexttime %ld; waittime %ld; cycle %d; generated %d) ", ",
+				(long)now.tv_sec, (long)line->nexttime,
+				(long)line->waittime, (int)line->debug_cycle,
 				(int)line->debug_generated);
 
 			fprintf(fn, DBQ(cmd) ": \"");

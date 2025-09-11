@@ -265,7 +265,9 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 #endif
 	} else {
 #if ENABLE_FEATURE_DATE_NANO
-		clock_gettime(CLOCK_REALTIME, &ts);
+		if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+			bb_error_msg_and_die("clock_gettime(REALTIME) failed");
+		}
 #else
 		time(&ts.tv_sec);
 #endif
@@ -290,7 +292,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 			}
 
 			/* Fill in tm_time */
-			tm_time= *localtime(&ts.tv_sec);
+			localtime_r(&ts.tv_sec, &tm_time);
 		}
 		else if (ENABLE_FEATURE_DATE_ISOFMT && (opt & OPT_HINT)) {
 			if (strptime(date_str, fmt_str2dt, &tm_time) == NULL)

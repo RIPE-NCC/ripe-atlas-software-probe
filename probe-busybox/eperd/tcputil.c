@@ -211,13 +211,11 @@ void tu_cleanup(struct tu_env *env)
 static void dns_cb(int result, struct evutil_addrinfo *res, void *ctx)
 {
 	int r, count;
-	long err;
 	struct tu_env *env;
 	struct bufferevent *bev;
 	struct evutil_addrinfo *cur;
 	double nsecs;
 	struct timespec now, elapsed;
-	char errbuf[128];
 
 	env= ctx;
 
@@ -518,9 +516,7 @@ static int create_bev(struct tu_env *env)
 
 static void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
-	long err;
 	struct tu_env *env;
-	char errbuf[80];
 
 	env= ptr;
 
@@ -555,9 +551,6 @@ static void eventcb(struct bufferevent *bev, short events, void *ptr)
 	}
 	if (events & BEV_EVENT_CONNECTED)
 	{
-		const unsigned char *data;
-		unsigned int len;
-
 		events &= ~BEV_EVENT_CONNECTED;
 		env->connecting= 0;
 

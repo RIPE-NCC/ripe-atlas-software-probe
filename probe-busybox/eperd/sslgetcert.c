@@ -47,7 +47,7 @@ struct hgbase
 	struct event_base *event_base;
 
 	struct state **table;
-	int tabsiz;
+	size_t tabsiz;
 
 	/* For standalone sslgetcert. Called when a sslgetcert instance is
 	 * done. Just one pointer for all instances. It is up to the caller
@@ -213,7 +213,7 @@ static void buf_add_b64(struct buf *buf, void *data, size_t len)
 		"QRSTUVWXYZabcdef"
 		"ghijklmnopqrstuv"
 		"wxyz0123456789+/";
-	int i;
+	size_t i;
 	uint8_t *p;
 	uint32_t v;
 	char str[4];
@@ -787,7 +787,8 @@ static void timeout_callback(int __attribute((unused)) unused,
 static void *sslgetcert_init(int __attribute((unused)) argc, char *argv[],
 	void (*done)(void *state, int error))
 {
-	int c, i, only_v4, only_v6, major, minor;
+	int c, only_v4, only_v6, major, minor;
+	size_t i;
 	size_t newsiz;
 	char *hostname, *str_port, *infname, *version_str;
 	char *output_file, *A_arg, *B_arg, *h_arg;
@@ -1468,7 +1469,9 @@ static int eat_server_hello(struct state *state)
 
 static int eat_certificate(struct state *state)
 {
-	int i, n, r, first, slen, need_nl, type;
+	int r, first, slen, need_nl, type;
+	size_t i;
+	size_t n;
 	size_t o, len;
 	uint8_t *p;
 	struct msgbuf *msgbuf;
@@ -1913,7 +1916,7 @@ static int sslgetcert_delete(void *vstate)
 	state= vstate;
 
 	printf("sslgetcert_delete: state %p, index %d, busy %d\n",
-		state, state->index, state->busy);
+		(void *)state, state->index, state->busy);
 
 	if (state->busy)
 		return 0;

@@ -92,9 +92,8 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 	if (date_str[0] == '@') {
 		time_t t = bb_strtol(date_str + 1, NULL, 10);
 		if (!errno) {
-			struct tm *lt = localtime(&t);
+			struct tm *lt = localtime_r(&t, ptm);
 			if (lt) {
-				*ptm = *lt;
 				return;
 			}
 		}
@@ -166,10 +165,10 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
 				/* 1. Put it in the current century */
 				ptm->tm_year += (cur_year / 100) * 100;
 				/* 2. If too far in the past, +100 years */
-				if (ptm->tm_year < cur_year - 50)
+				if (ptm->tm_year < (int)(cur_year - 50))
 					ptm->tm_year += 100;
 				/* 3. If too far in the future, -100 years */
-				if (ptm->tm_year > cur_year + 50)
+				if (ptm->tm_year > (int)(cur_year + 50))
 					ptm->tm_year -= 100;
 			}
 		} else
@@ -212,12 +211,13 @@ time_t FAST_FUNC validate_tm_time(const char *date_str, struct tm *ptm)
 static char* strftime_fmt(char *buf, unsigned len, time_t *tp, const char *fmt)
 {
 	time_t t;
+	struct tm tm_result;
 	if (!tp) {
 		tp = &t;
 		time(tp);
 	}
 	/* Returns pointer to NUL */
-	return buf + strftime(buf, len, fmt, localtime(tp));
+	return buf + strftime(buf, len, fmt, localtime_r(tp, &tm_result));
 }
 
 char* FAST_FUNC strftime_HHMMSS(char *buf, unsigned len, time_t *tp)
