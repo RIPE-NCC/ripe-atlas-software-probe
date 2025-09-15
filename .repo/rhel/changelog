@@ -1,4 +1,7 @@
 %changelog
+* Mon Sep 15 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-4
+- Add EL10 support
+
 * Wed Mar 26 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-3
 - Remove deprecated signing key for RHEL packages
 
