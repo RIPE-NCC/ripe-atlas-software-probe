@@ -885,7 +885,7 @@ printf("%s, %d: sin6_family = %d\n", __FILE__, __LINE__, state->sin6.sin6_family
 
 	final_ts.ntp_seconds= now.tv_sec + NTP_1970;
 	d= now.tv_usec / 1e6;
-	d *= 4294967296.0;
+	d *= NTP_4G;
 	final_ts.ntp_fraction= d;
 
 	d= final_ts.ntp_seconds + final_ts.ntp_fraction/NTP_4G;
