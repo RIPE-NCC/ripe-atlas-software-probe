@@ -142,7 +142,7 @@ lint-ci-rhel:
   stage: prepare
   image: ${DOCKER_IMAGE_PREP}
   script:
-    - 'eval ${PREPARE}'
+    - eval "${PREPARE}"
     - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
   artifacts:
     name: "${OS_VERSION}-deployable"
@@ -201,7 +201,7 @@ approve-ci:
     TARGET: ${OS_DISTRIBUTION}/${DEBIAN_ONLY}${OS_VERSION}
   image: ${DOCKER_IMAGE_PREP}
   script:
-    - 'eval ${DEPLOY}'
+    - eval "${DEPLOY}"
   parallel:
     matrix:
       - OS_DISTRIBUTION: rhel
