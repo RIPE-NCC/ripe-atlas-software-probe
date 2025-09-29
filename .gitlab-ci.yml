@@ -175,7 +175,7 @@ prepare-ci-devel:
 prepare-ci-testing:
     stage: prepare
     only:
-      - /^testing$/
+      - /^testing.*/
     extends: .prepare-ci
     environment:
       name: testing
@@ -192,7 +192,7 @@ approve-ci:
   stage: deploy
   only:
     - /^devel.*/
-    - /^testing$/
+    - /^testing.*/
     - /^master$/
   script: ':'
   when: manual
@@ -237,7 +237,7 @@ deploy-ci-testing:
           artifacts: true
         - job: approve-ci
     only:
-      - /^testing$/
+      - /^testing.*/
     extends: .deploy-ci
     environment:
       name: testing
