@@ -149,6 +149,9 @@ lint-ci-rhel:
     paths:
       - ./${OS_VERSION}-deployable
     expire_in: never
+  needs: # skips waiting on lint + only downloads build-ci artifacts
+    - job: build-ci-debian
+    - job: build-ci-rhel
   parallel:
     matrix:
       - OS_DISTRIBUTION: rhel
