@@ -143,8 +143,10 @@ lint-ci-rhel:
   stage: prepare
   image: ${DOCKER_IMAGE_PREP}
   script:
-    - eval "${PREPARE}"
-    - cp -a ${OS_VERSION} ${OS_VERSION}-deployable
+    - git clone ${HELPER_REPO} helper/
+    - source helper/ci/ci.sh
+    - init "${OS_VERSION}"
+    - prepare
   artifacts:
     name: "${OS_VERSION}-deployable"
     paths:
@@ -205,7 +207,9 @@ approve-ci:
     TARGET: ${OS_DISTRIBUTION}/${DEBIAN_ONLY}${OS_VERSION}
   image: ${DOCKER_IMAGE_PREP}
   script:
-    - eval "${DEPLOY}"
+    - git clone ${HELPER_REPO} helper/
+    - source helper/ci/ci.sh
+    - commit "${OS_VERSION}-deployable"
   parallel:
     matrix:
       - OS_DISTRIBUTION: rhel
