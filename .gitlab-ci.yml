@@ -46,6 +46,7 @@ build-ci-debian:
     - popd
     - mv {..,.}/ripe-atlas-*.deb ${OS_VERSION}/main/binary-${ARCH}
     - mv VERSION ${OS_VERSION}
+    - ls ${OS_VERSION}/main/binary-${ARCH}/*repo* | sed -E 's/.*repo_(.*)_.*\.deb/\1/' > ${OS_VERSION}/VERSION_REPO
   artifacts:
     name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
     paths: # dynamic variables (exported from script) cannot be used
@@ -95,6 +96,7 @@ build-ci-rhel:
     - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
     - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
     - cp rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${OS_VERSION}
+    - ls ${OS_VERSION}/noarch/*repo* | sed -E "s/.*repo-(.*)\..*\..*\.rpm*/\1/" > ${OS_VERSION}/VERSION_REPO
 
     # build anchor rpm
     - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-anchor.spec
