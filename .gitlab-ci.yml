@@ -176,18 +176,16 @@ prepare-ci-devel:
       name: devel
 
 prepare-ci-testing:
-    stage: prepare
+    extends: .prepare-ci
     only:
       - /^testing.*/
-    extends: .prepare-ci
     environment:
       name: testing
 
 prepare-ci-master:
-    stage: prepare
+    extends: .prepare-ci
     only:
       - /^master$/
-    extends: .prepare-ci
     environment:
       name: master
 
