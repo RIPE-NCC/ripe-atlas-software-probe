@@ -3,7 +3,7 @@ stages:
   - build
   - lint
   - prepare
-  - deploy
+  - commit
 
 variables:
   DOCKER_IMAGE_PREP: ${CI_REGISTRY_IMAGE}/prep:${CI_COMMIT_REF_SLUG}
@@ -190,7 +190,7 @@ prepare-ci-master:
       name: master
 
 approve-ci:
-  stage: deploy
+  stage: commit
   only:
     - /^devel.*/
     - /^testing.*/
@@ -198,8 +198,8 @@ approve-ci:
   script: ':'
   when: manual
 
-.deploy-ci:
-  stage: deploy
+.commit-ci:
+  stage: commit
   image: ${DOCKER_IMAGE_PREP}
   script:
     - git clone ${HELPER_REPO} helper/
@@ -218,38 +218,38 @@ approve-ci:
           - bullseye
           - bookworm
           - trixie
-  resource_group: deploy
+  resource_group: commit
 
-deploy-ci-devel:
+commit-ci-devel:
     needs:
         - job: prepare-ci-devel
           artifacts: true
         - job: approve-ci
     only:
       - /^devel.*/
-    extends: .deploy-ci
+    extends: .commit-ci
     environment:
       name: devel
 
-deploy-ci-testing:
+commit-ci-testing:
     needs:
         - job: prepare-ci-testing
           artifacts: true
         - job: approve-ci
     only:
       - /^testing.*/
-    extends: .deploy-ci
+    extends: .commit-ci
     environment:
       name: testing
 
-deploy-ci-master:
+commit-ci-master:
     needs:
         - job: prepare-ci-master
           artifacts: true
         - job: approve-ci
     only:
       - /^master$/
-    extends: .deploy-ci
+    extends: .commit-ci
     environment:
       name: master
 
