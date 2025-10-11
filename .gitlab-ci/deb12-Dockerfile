@@ -1,6 +1,21 @@
 FROM debian:12
 
-MAINTAINER mstam@ripe.net
+MAINTAINER ttaiclet@ripe.net
 
-RUN apt-get update && \
-    apt-get install -y libssl-dev build-essential autoconf debhelper gpg lsb-release systemd
+RUN dpkg --add-architecture arm64 && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get -y --no-install-recommends install \
+        # Native build dependencies from INSTALL.rst
+        git build-essential debhelper libssl-dev autotools-dev psmisc net-tools \
+        # cross-build dependencies
+        build-essential crossbuild-essential-arm64 libssl-dev libssl-dev:arm64 \
+        # hidden dependency: required by ./test/rpcgen_wrapper.sh
+        python3 python3-dev \
+        # hidden dependency for .repo
+        gpg \
+        # .service file (from initial .in file) is not found otherwise
+        systemd \
+	# .repo uses it to determine distribution (.in file)
+	lsb-release && \
+    rm -rf /var/lib/apt/lists/*

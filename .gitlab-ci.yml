@@ -27,7 +27,6 @@ build_image:
       - OS:
           - deb11
           - deb12
-          - deb12-arm64
           - deb13
           - ol8
           - ol9
@@ -64,7 +63,7 @@ build-ci-debian:
           - deb13
       - ARCH: arm64
         OS:
-          - deb12-arm64
+          - deb12
           - deb13
         CROSS_COMPILE: aarch64-linux-gnu-
         CROSS_ARGS: -aarm64 -Pcross,nocheck
