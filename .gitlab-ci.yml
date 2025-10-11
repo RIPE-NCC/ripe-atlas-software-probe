@@ -6,7 +6,7 @@ stages:
   - commit
 
 variables:
-  DOCKER_IMAGE_PREP: ${CI_REGISTRY_IMAGE}/prep:${CI_COMMIT_REF_SLUG}
+  DOCKER_IMAGE_HELPER: ${DOCKER_IMAGE_HELPER_TAGLESS}:v0.0.1
 
 build_image:
   stage: docker_image
@@ -141,10 +141,9 @@ lint-ci-rhel:
 
 .prepare-ci:
   stage: prepare
-  image: ${DOCKER_IMAGE_PREP}
+  image: ${DOCKER_IMAGE_HELPER}
   script:
-    - git clone ${HELPER_REPO} helper/
-    - source helper/ci/ci.sh
+    - source /helper/ci/ci.sh
     - init "${OS_VERSION}"
     - prepare
   artifacts:
@@ -200,10 +199,9 @@ approve-ci:
 
 .commit-ci:
   stage: commit
-  image: ${DOCKER_IMAGE_PREP}
+  image: ${DOCKER_IMAGE_HELPER}
   script:
-    - git clone ${HELPER_REPO} helper/
-    - source helper/ci/ci.sh
+    - source /helper/ci/ci.sh
     - commit "${OS_VERSION}-deployable"
   parallel:
     matrix:
