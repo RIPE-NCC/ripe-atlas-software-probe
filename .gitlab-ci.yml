@@ -200,9 +200,6 @@ approve-ci:
 
 .deploy-ci:
   stage: deploy
-  variables:
-    REPO_GIT_SOURCE: https://${DEPLOY_USER}:${DEPLOY_TOKEN}@${URL}
-    TARGET: ${OS_DISTRIBUTION}/${DEBIAN_ONLY}${OS_VERSION}
   image: ${DOCKER_IMAGE_PREP}
   script:
     - git clone ${HELPER_REPO} helper/
