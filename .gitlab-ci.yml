@@ -28,10 +28,10 @@ build_image:
           - deb11
           - deb12
           - deb13
-          - ol8
-          - ol9
-          - ol10
-          - ol10-rpmlint
+          - el8
+          - el9
+          - el10
+          - el10-rpmlint
           - prep
 
 build-ci-debian:
@@ -61,27 +61,25 @@ build-ci-debian:
         CROSS_ARM64: "true"
 
 
-build-ci-rhel:
+build-ci-el:
   stage: build
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
     - .gitlab-ci/build-el.sh
   artifacts:
     name: "swprobe-${OS}-${CI_COMMIT_REF_NAME}"
-    paths: # dynamic variables (exported from script) cannot be used
-      - ./el8
-      - ./el9
-      - ./el10
+    paths:
+      - ./${OS}
     expire_in: never
   dependencies: [] # Don't download any artifacts
   parallel:
     matrix:
       - OS:
-        - ol8
-        - ol9
-        - ol10
+        - el8
+        - el9
+        - el10
 
-lint-ci-rhel:
+lint-ci-el:
   stage: lint
   only:
     - branches
@@ -94,13 +92,13 @@ lint-ci-rhel:
       - ./lint_report
     expire_in: never
   dependencies:
-    - build-ci-rhel # Only download artifacts for RHEL
+    - build-ci-el # Only download artifacts for EL
   parallel:
     matrix:
       - OS:
-        - ol8
-        - ol9
-        - ol10-rpmlint
+        - el8
+        - el9
+        - el10-rpmlint
 
 .prepare-ci:
   stage: prepare
@@ -116,10 +114,10 @@ lint-ci-rhel:
     expire_in: never
   needs: # skips waiting on lint + only downloads build-ci artifacts
     - job: build-ci-debian
-    - job: build-ci-rhel
+    - job: build-ci-el
   parallel:
     matrix:
-      - OS_DISTRIBUTION: rhel
+      - OS_DISTRIBUTION: el
         OS_VERSION:
           - el8
           - el9
@@ -168,7 +166,7 @@ approve-ci:
     - commit "${OS_VERSION}-deployable"
   parallel:
     matrix:
-      - OS_DISTRIBUTION: rhel
+      - OS_DISTRIBUTION: el
         OS_VERSION:
           - el8
           - el9
