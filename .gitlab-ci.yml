@@ -105,7 +105,7 @@ lint-ci-el:
     - init "${distcode}"
     - prepare
   artifacts:
-    name: "${distcode}-deployable"
+    name: "${distcode}-deployable-${CI_COMMIT_REF_NAME}"
     paths:
       - ./${distcode}-deployable
   needs: # skips waiting on lint + only downloads build-ci artifacts
@@ -212,6 +212,7 @@ commit-ci-master:
     - git clone ${CHANGELOG_REPO}
     - $CHANGELOG
   artifacts:
+    name: changelog-${CI_COMMIT_REF_NAME}
     paths:
       - $CHANGELOG_FILE
     when: always # artifacts get produced when job fails
