@@ -105,25 +105,23 @@ lint-ci-el:
   image: ${DOCKER_IMAGE_HELPER}
   script:
     - source /helper/ci/ci.sh
-    - init "${OS_VERSION}"
+    - init "${distcode}"
     - prepare
   artifacts:
-    name: "${OS_VERSION}-deployable"
+    name: "${distcode}-deployable"
     paths:
-      - ./${OS_VERSION}-deployable
+      - ./${distcode}-deployable
     expire_in: never
   needs: # skips waiting on lint + only downloads build-ci artifacts
     - job: build-ci-debian
     - job: build-ci-el
   parallel:
     matrix:
-      - OS_DISTRIBUTION: el
-        OS_VERSION:
+      - distcode:
           - el8
           - el9
           - el10
-      - OS_DISTRIBUTION: debian
-        OS_VERSION:
+      - distcode:
           - bullseye
           - bookworm
           - trixie
@@ -163,17 +161,14 @@ approve-ci:
   image: ${DOCKER_IMAGE_HELPER}
   script:
     - source /helper/ci/ci.sh
-    - commit "${OS_VERSION}-deployable"
+    - commit "${distcode}-deployable"
   parallel:
     matrix:
-      - OS_DISTRIBUTION: el
-        OS_VERSION:
+      - distcode:
           - el8
           - el9
           - el10
-      - OS_DISTRIBUTION: debian
-        DEBIAN_ONLY: dists/
-        OS_VERSION:
+      - distcode:
           - bullseye
           - bookworm
           - trixie
