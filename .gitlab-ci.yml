@@ -87,11 +87,9 @@ lint-ci-rhel:
     - branches
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
-    - export OS_VERSION="$( . /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2 )" # extract el release (e.g. el9)
-    - mkdir lint_report
-    - for RPM in $(find ${OS_VERSION} -type f); do rpmlint $RPM > lint_report/$(echo $RPM | sed -n "s/^.*\/\s*\(\S*\)-.*$/\1.log/p") ; done || true
+    - .gitlab-ci/lint-el.sh
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}-lint-report"
+    name: "swprobe-${OS}-${CI_COMMIT_REF_NAME}-lint-report"
     paths:
       - ./lint_report
     expire_in: never
