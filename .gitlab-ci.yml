@@ -38,17 +38,9 @@ build-ci-debian:
   stage: build
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
   script:
-    - export OS_VERSION="$( . /etc/os-release && echo $VERSION_CODENAME )" # extract debian release codename (e.g. bookworm)
-    - mkdir -p ${OS_VERSION}/main/binary-${ARCH}   # create a repo with same structure as prod
-    - dpkg-buildpackage -b ${CROSS_ARGS} -us -uc
-    - pushd .repo
-    - dpkg-buildpackage -b ${CROSS_ARGS} -us -uc
-    - popd
-    - mv {..,.}/ripe-atlas-*.deb ${OS_VERSION}/main/binary-${ARCH}
-    - mv VERSION ${OS_VERSION}
-    - ls ${OS_VERSION}/main/binary-${ARCH}/*repo* | sed -E 's/.*repo_(.*)_.*\.deb/\1/' > ${OS_VERSION}/VERSION_REPO
+    - .gitlab-ci/build-debian.sh
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
+    name: "swprobe-${OS}-${ARCH}-${CI_COMMIT_REF_NAME}"
     paths: # dynamic variables (exported from script) cannot be used
       - ./bookworm
       - ./bullseye
@@ -66,8 +58,7 @@ build-ci-debian:
         OS:
           - deb12
           - deb13
-        CROSS_COMPILE: aarch64-linux-gnu-
-        CROSS_ARGS: -aarm64 -Pcross,nocheck
+        CROSS_ARM64: "true"
 
 
 build-ci-rhel:
