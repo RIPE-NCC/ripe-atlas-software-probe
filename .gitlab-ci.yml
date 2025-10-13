@@ -64,36 +64,10 @@ build-ci-debian:
 build-ci-rhel:
   stage: build
   image: ${CI_REGISTRY_IMAGE}/${OS}:${CI_COMMIT_REF_SLUG}
-  variables:
-    RPMS_DIR: rpmbuild/RPMS
-    REPO_RPM_PATH: ${RPMS_DIR}/noarch/*.rpm
-    X86_RPM_PATH: ${RPMS_DIR}/x86_64/*.rpm
-    REPO_GIT_SOURCE: https://${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD}@${URL}
   script:
-    - export OS_VERSION="$( . /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2 )" # extract el release (e.g. el9)
-    - export HOME="${PWD}" # rpmbuild seems to use HOME for some folders
-    # build define list
-    - export REPO_GIT_TAG="${CI_COMMIT_TAG:-${CI_COMMIT_BRANCH}}"
-    - mkdir -p ${OS_VERSION}/{noarch,x86_64}   # create a repo with same structure as prod
-
-    # build repo rpm
-    - pushd .repo
-    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-repo.spec
-    - popd
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
-
-    # build x86_64 rpm
-    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-probe.spec
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
-    - cp -a ${X86_RPM_PATH} ${OS_VERSION}/x86_64
-    - cp rpmbuild/BUILD/ripe-atlas-software-probe/VERSION ${OS_VERSION}
-    - ls ${OS_VERSION}/noarch/*repo* | sed -E "s/.*repo-(.*)\..*\..*\.rpm*/\1/" > ${OS_VERSION}/VERSION_REPO
-
-    # build anchor rpm
-    - rpmbuild -bb --define "git_source ${REPO_GIT_SOURCE}" --define "git_tag ${REPO_GIT_TAG}" rhel/ripe-atlas-anchor.spec
-    - cp -a ${REPO_RPM_PATH} ${OS_VERSION}/noarch
+    - .gitlab-ci/build-el.sh
   artifacts:
-    name: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}"
+    name: "swprobe-${OS}-${CI_COMMIT_REF_NAME}"
     paths: # dynamic variables (exported from script) cannot be used
       - ./el8
       - ./el9
