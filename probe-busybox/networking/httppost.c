@@ -53,6 +53,7 @@ struct option longopts[]=
 	{ "post-footer", required_argument, NULL, 'f' },
 	{ "set-time", required_argument, NULL, 's' },
 	{ "timeout", required_argument, NULL, 't' },
+	{"local-time", no_argument, NULL, 'l'},
 	{ NULL, }
 };
 
@@ -87,6 +88,7 @@ int httppost_main(int argc, char *argv[])
 {
 	int c,  r, fd, fdF, fdH, fdS, chunked, content_length, result;
 	int opt_delete_file, found_ok;
+	int send_local_time;
 	char *url, *host, *port, *hostport, *path, *filelist, *p, *check;
 	char *post_dir, *post_file, *atlas_id, *output_file,
 		*post_footer, *post_header, *maxpostsizestr, *timeoutstr;
@@ -109,6 +111,7 @@ int httppost_main(int argc, char *argv[])
 	opt_delete_file = 0;
 	time_tolerance = NULL;
 	maxpostsizestr= NULL;
+	send_local_time= 0;
 	timeoutstr= NULL;
 
 	fd= -1;
@@ -160,6 +163,9 @@ int httppost_main(int argc, char *argv[])
 			break;
 		case 't':				/* --timeout */
 			timeoutstr= optarg;
+			break;
+		case 'l':				/* --local-time */
+			send_local_time= 1;
 			break;
 		case '?':
 			fprintf(stderr, "bad option\n");
@@ -400,7 +406,11 @@ int httppost_main(int argc, char *argv[])
 	fprintf(tcp_file, "User-Agent: httppost for atlas.ripe.net\r\n");
 	fprintf(tcp_file,
 			"Content-Type: application/x-www-form-urlencoded\r\n");
-
+	if (send_local_time == 1)
+	{
+			time_t local_time = time(0);
+			fprintf(tcp_file, "Unix-Date: %ld\r\n", local_time);
+	}
 	cLength= 0;
 	if( post_header != NULL )
 		cLength  +=  sbH.st_size;
