@@ -39,21 +39,32 @@ cd %{_builddir}/%{base_name}
 %{?git_commit:git checkout %{git_commit}}
 
 %build
-RELEASE='%{git_tag}'
-RELEASE="${RELEASE%%%.*}"
-case "${RELEASE}" in
-	([0-9]*)
-		RELEASE='master'
-		;;
-
-	master)
-		;;
-
-	*)
-		sed -i -e "s/baseurl.*\$/&.${RELEASE}\//" %{repo_path}
-		;;
+case %{git_tag} in
+	# incl. release tags (e.g. 5120)
+	[0-9]*|master)
+        RELEASE='master'
+        ;;
+    testing*)
+        RELEASE='testing'
+        ;;
+    devel*|*)
+        RELEASE='devel'
 esac
 
+# Append release channel to repo url if needed
+case "${RELEASE}" in
+	master)
+		;;
+	testing|devel)
+		# (...)/software-probe/.testing/ and (...)/software-probe/.devel/ for testing/devel releases
+		sed -i -e "s/baseurl.*\$/&.${RELEASE}\//" %{repo_path}
+		;;
+	*)
+		echo "Unknown release" >&2
+		exit 1
+esac
+
+# Add /rhel/ to URL
 sed -i -e "s/baseurl.*\$/&rhel\//" %{repo_path}
 
 STRIPPED_DIST="$(echo %{?dist} | sed -r 's/^\.//')"
@@ -63,19 +74,23 @@ if [ -z "${STRIPPED_DIST}" ] ; then
 fi
 
 echo "OS Distro detected as: ${STRIPPED_DIST}"
+# Add /el[:digit:]/ to URL
 sed -i -e "s/baseurl.*\$/&${STRIPPED_DIST}\//" %{repo_path}
 
 %install
-RELEASE='%{git_tag}'
-RELEASE="${RELEASE%%%.*}"
-case "${RELEASE}" in
-	([0-9]*)
-		RELEASE='master'
-		;;
 
-	*)
-		;;
+case %{git_tag} in
+	# incl. release tags (e.g. 5120)
+	[0-9]*|master)
+        RELEASE='master'
+        ;;
+    testing*)
+        RELEASE='testing'
+        ;;
+    devel*|*)
+        RELEASE='devel'
 esac
+
 mkdir -p %{buildroot}/{%{repo_dir},%{key_dir}}
 install -m 0644 %{repo_path} %{buildroot}%{repo_dir}
 install -m 0644 "%{source_path}/%{newkey_file}.${RELEASE}" %{buildroot}%{key_dir}/%{newkey_file}
