@@ -129,8 +129,9 @@ sos()
 	## sos
 	UPTIME=`sed 's/\..*//' < /proc/uptime`
 	INFO="$1"
+	CLOCK="$(date '+%s')"
 	if [ -n "$INFO" ]; then INFO="$INFO".; fi
-	evping -e -c 2 "${INFO}U$UPTIME.M$ETHER_SCANNED.sos.atlas.ripe.net"
+	evping -e -c 2 "${INFO}C${CLOCK}.U$UPTIME.M$ETHER_SCANNED.sos.atlas.ripe.net"
 }
 ssh()
 {
