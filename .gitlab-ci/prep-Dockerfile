@@ -1,6 +1,0 @@
-FROM debian:11
-
-MAINTAINER gmeyer@ripe.net
-
-RUN apt-get update && \
-    apt-get install -y file libgfshare-bin binutils apt-utils debsigs openssl rpm gpg git createrepo-c cpio

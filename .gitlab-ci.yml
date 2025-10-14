@@ -32,7 +32,6 @@ build_image:
           - el9
           - el10
           - el10-rpmlint
-          - prep
 
 build-ci-debian:
   stage: build
