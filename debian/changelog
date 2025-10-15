@@ -1,8 +1,8 @@
-ripe-atlas-software-probe (5111) bookworm bullseye; urgency=medium
+ripe-atlas-software-probe (5112) trixie bookworm bullseye; urgency=medium
 
-  * Development version
+  * Development version - planned to be testing
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 2 Apr 2025 00:00:00 +0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Wed, 15 Oct 2025 00:00:00 +0000
 
 ripe-atlas-software-probe (5110) bookworm bullseye; urgency=medium
 
