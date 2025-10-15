@@ -221,12 +221,17 @@ changelog-manual:
   extends: .changelog
   except:
     - master
-    - testing
+    - /^testing.*/
   allow_failure: true
   when: manual
 
-changelog-automatic:
+changelog-automatic-testing:
+  extends: .changelog
+  only:
+    - /^testing.*/
+  allow_failure: true
+
+changelog-automatic-master:
   extends: .changelog
   only:
     - master
-    - testing
