@@ -1,6 +1,35 @@
 Release History
 ===============
 
+5120 (released 2025-10-27)
+--------------------------
+- All platforms
+  * Add local timestamp to HTTP POST header
+  * Add local clock value to SOS message
+  * Set Atlas-specific ref-id in probes' NTP client packets (authored by Joachim Kross <kross@kaffeeschluerfer.com>)
+  * ``NTP_4G`` instead of ``4294967296.0`` (authored by Marco Davids <marco.davids@sidn.nl>)
+  * Fix NTP offset calculations (reported by Marco Davids <marco.davids@sidn.nl> and Giovane Moura <giovane.moura@sidn.nl>)
+  * Replace ``hostname -s`` with more generic ``uname -n``, allowing for usage with standard OpenWrt busybox
+- Software Probes
+  * Add packages for Debian 13
+  * Add packages for Enterprise Linux 10
+  * Fix broken org name in RHEL repo specfile, causing failure in build
+  * Update maintainers across package files
+  * Add missing dependencies to Debian package files (``libcap2-bin``, ``ca-certificates``)
+  * Improve repo package building (``rules.mk``/``.spec`` file) for clarity and Git tag support
+- Other
+  * Fix error in build instructions regarding OpenWrt feeds
+  * Fix casing of OpenWrt (authored by Goetz Goerisch <ggoerisch@gmail.com>)
+- CI
+  * Add changelog generation
+  * Add jobs for Debian 13
+  * Add jobs for Oracle Linux 10
+  * Combine amd64/arm64 container images for Debian 12
+  * Replace prepare/deploy environment variables by a versioned helper container image for easier maintainability
+  * Add non-CI support to helper container image for easier testing and debugging
+  * Move build jobs to scripts that can be ran manually
+  * Improve artifact names (downloaded as zip files)
+
 5110 (released 2025-03-26)
 --------------------------
 - All platforms

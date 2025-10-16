@@ -2,13 +2,13 @@ ripe-atlas-repo (1.5-5) trixie bookworm bullseye; urgency=medium
 
   * Improve branch/tag handling and add comments in rules.mk
 
- -- RIPE Atlas Team <atlas@ripe.net>  Wed, 15 Sep 2025 00:00:00 +0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 27 Oct 2025 00:00:00 +0000
 
 ripe-atlas-repo (1.5-4) trixie bookworm bullseye; urgency=medium
 
   * Add Debian 13 support
 
- -- RIPE Atlas Team <atlas@ripe.net>  Mon, 15 Sep 2025 00:00:00 +0000
+ -- RIPE Atlas Team <atlas@ripe.net>  Mon, 27 Oct 2025 00:00:00 +0000
 
 ripe-atlas-repo (1.5-3) bookworm bullseye; urgency=medium
 

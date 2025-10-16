@@ -1,8 +1,8 @@
 %changelog
-* Wed Oct 15 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-5
+* Mon Oct 27 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-5
 - Improve branch/tag handling and add comments in ripe-atlas-repo.spec
 
-* Mon Sep 15 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-4
+* Mon Oct 27 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-4
 - Add EL10 support
 
 * Wed Mar 26 2025 RIPE Atlas Team <atlas@ripe.net> - 1.5-3
