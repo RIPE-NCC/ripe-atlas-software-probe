@@ -235,3 +235,4 @@ changelog-automatic-master:
   extends: .changelog
   only:
     - master
+  allow_failure: true
