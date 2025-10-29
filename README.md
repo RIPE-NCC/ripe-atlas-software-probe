@@ -37,7 +37,7 @@ wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/mai
 grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || ( printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG" )
 
 # Install: Debian 11 & Debian 12 & Raspberry Pi OS 12
-sudo dpkg -i "$REPO_PKG"
+sudo dpkg -i "$REPO_PKG" && rm "$REPO_PKG"
 sudo apt update
 sudo apt-get install ripe-atlas-probe
 ```
@@ -52,7 +52,7 @@ curl -fO -LfO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$
 grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || ( printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG" )
 
 # Install: Enterprise Linux 8 & Enterprise Linux 9
-sudo rpm -Uvh "$REPO_PKG"
+sudo rpm -Uvh "$REPO_PKG" && rm "$REPO_PKG"
 sudo dnf install ripe-atlas-probe
 ```
 
