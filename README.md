@@ -21,7 +21,7 @@
 
 This project contains the probe code that powers software probes.
 
-We release binary packages for the `amd64` variants of Debian 11 & 12, (Oracle) Enterprise Linux 8 & 9, and `arm64` variant of Raspberry Pi OS 12.
+We release binary packages for the `amd64` variants of Debian 11 / 12 / 13, (Oracle) Enterprise Linux 8 / 9 / 10, and `arm64` variant of Raspberry Pi OS 12 / 13.<br>
 The source code also allows for building of an OpenWrt 22.03 package.
 
 ## Installation
@@ -29,14 +29,14 @@ The source code also allows for building of an OpenWrt 22.03 package.
 ### Debian & Raspberry Pi OS
 
 ```sh
-# Download: Debian 11 & Debian 12 & Raspberry Pi OS 12
+# Download: Debian 11 / 12 / 13 & Raspberry Pi OS 12 / 13
 ARCH=$(dpkg --print-architecture)
 CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
 REPO_PKG=ripe-atlas-repo_1.5-5_all.deb
 wget https://ftp.ripe.net/ripe/atlas/software-probe/debian/dists/"$CODENAME"/main/binary-"$ARCH"/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
 grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || ( printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG" )
 
-# Install: Debian 11 & Debian 12 & Raspberry Pi OS 12
+# Install: Debian 11 / 12 / 13 & Raspberry Pi OS 12 / 13
 sudo dpkg -i "$REPO_PKG" && rm "$REPO_PKG"
 sudo apt update
 sudo apt-get install ripe-atlas-probe
@@ -45,13 +45,13 @@ sudo apt-get install ripe-atlas-probe
 ### Enterprise Linux
 
 ```sh
-# Download: Enterprise Linux 8 & Enterprise Linux 9
+# Download: Enterprise Linux 8 / 9 / 10
 EL_VER=$(. /etc/os-release && echo $PLATFORM_ID | cut -d':' -f2)
 REPO_PKG=ripe-atlas-repo-1.5-5."$EL_VER".noarch.rpm
 curl -fO -LfO https://ftp.ripe.net/ripe/atlas/software-probe/"$EL_VER"/noarch/"$REPO_PKG" https://github.com/RIPE-NCC/ripe-atlas-software-probe/releases/latest/download/CHECKSUMS
 grep -q "$(sha256sum "$REPO_PKG")" CHECKSUMS && echo "Success: checksum matches" || ( printf "\n\033[1;31mError: checksum does not match\033[0m\n\n"; rm "$REPO_PKG" )
 
-# Install: Enterprise Linux 8 & Enterprise Linux 9
+# Install: Enterprise Linux 8 / 9 / 10
 sudo rpm -Uvh "$REPO_PKG" && rm "$REPO_PKG"
 sudo dnf install ripe-atlas-probe
 ```
