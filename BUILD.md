@@ -28,18 +28,16 @@ We provide DEBs for `amd64` Debian 11 / 12 / 13 and `arm64` for Raspberry Pi OS 
 sudo apt-get update && sudo apt-get -y install git build-essential debhelper libssl-dev autotools-dev psmisc net-tools systemd
 git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 pushd ripe-atlas-software-probe
-git checkout master
+    # Building the packages
+    dpkg-buildpackage -b -us -uc
+    cp ../ripe-atlas-*.deb .
+    pushd .repo
+        dpkg-buildpackage -b -us -uc
+    popd
 
-# Building the packages
-dpkg-buildpackage -b -us -uc
-cp ../ripe-atlas-*.deb .
-pushd .repo
-dpkg-buildpackage -b -us -uc
-popd
-
-# Installing the probe package
-sudo dpkg -i ripe-atlas-common*.deb ripe-atlas-probe*.deb
-# Follow the instructions printed after installation to start and register and your probe
+    # Installing the probe package
+    sudo dpkg -i ripe-atlas-common*.deb ripe-atlas-probe*.deb
+    # Follow the instructions printed after installation to start and register and your probe
 popd
 ```
 
@@ -66,19 +64,18 @@ We provide RPMs for `amd64` Enterprise Linux 8 / 9 / 10, as shown in [README.md]
 sudo dnf update && sudo dnf install git tar rpm-build systemd openssl-devel autoconf automake libtool make
 git clone https://github.com/RIPE-NCC/ripe-atlas-software-probe.git
 pushd ripe-atlas-software-probe
-
-# Building the packages
-rpmbuild --bb rhel/ripe-atlas-probe.spec
-rpmbuild --bb rhel/ripe-atlas-anchor.spec
-pushd .repo
-rpmbuild --bb rhel/ripe-atlas-repo.spec
-popd
+    # Building the packages
+    rpmbuild --bb rhel/ripe-atlas-probe.spec
+    rpmbuild --bb rhel/ripe-atlas-anchor.spec
+    pushd .repo
+        rpmbuild --bb rhel/ripe-atlas-repo.spec
+    popd
 popd
 
 # Installing the probe package
 pushd ~/rpmbuild/RPMS
-sudo dnf -y install */ripe-atlas-common*.rpm noarch/ripe-atlas-probe*.rpm
-# Follow the instructions printed after installation to start and register and your probe
+    sudo dnf -y install */ripe-atlas-common*.rpm noarch/ripe-atlas-probe*.rpm
+    # Follow the instructions printed after installation to start and register and your probe
 popd
 ```
 
