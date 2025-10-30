@@ -1,0 +1,56 @@
+name: Run tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+  pull_request_target:
+    branches:
+      - master
+
+jobs:
+  Native-Deb-packaging:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          path: "ripe-atlas-software-probe"
+      - name: Set up necessary dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y  git tar fakeroot libssl-dev libcap2-bin autoconf automake libtool build-essential
+      - name: Build the software probe deb package
+        run: |
+          ./ripe-atlas-software-probe/build-config/debian/bin/make-deb
+  Docker-Deb-packaging:
+    strategy:
+      matrix:
+        docker-image: ["debian:bullseye", "debian:buster", "debian:bookworm", "ubuntu:23.10", "ubuntu:24.04"]
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ matrix.docker-image }}
+    steps:
+      - name: Install necessary dependencies
+        run: |
+          apt-get update
+          apt-get install -y  git tar fakeroot libssl-dev libcap2-bin autoconf automake libtool build-essential
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: "ripe-atlas-software-probe"
+      - name: Checkout submodules
+        run: |
+          cd ripe-atlas-software-probe
+          git submodule update --init --recursive
+      - name: Build the software probe deb package
+        run: |
+          ./ripe-atlas-software-probe/build-config/debian/bin/make-deb
