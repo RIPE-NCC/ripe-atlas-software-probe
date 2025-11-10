@@ -69,7 +69,7 @@ To use them, create the file `/etc/ripe-atlas/config.txt` and add a line per des
 | --- | --- | --- |
 | `RXTXRPT` | Sending interface traffic statistics as Atlas measurement results | `RXTXRPT=no` |
 | `TELNETD_PORT` | TCP port used for telnetd | `TELNETD_PORT=2023` |
-| `HTTP_POST_PORT` | TCP port used for httppost | `HTTPD_PORT=8080` |
+| `HTTP_POST_PORT` | TCP port used for httppost | `HTTP_POST_PORT=8080` |
 
 ## Upgrading
 
