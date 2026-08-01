@@ -23,7 +23,8 @@
 //config:       default n
 //config:       depends on EVTDIG
 //config:       help
-//config:        extra debug info. Also may cause segfault or/and memory leak. Add at your own risk.
+//config:        extra debug info. Also may cause segfault or/and memory
+//config:        leak. Add at your own risk.
 
 //applet:IF_EVTDIG(APPLET(evtdig, BB_DIR_ROOT, BB_SUID_DROP))
 
