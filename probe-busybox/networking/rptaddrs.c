@@ -220,7 +220,7 @@ static FILE *setup_cache(char *cache_name)
 static int setup_ipv4_rpt(FILE *of)
 {
 	int i, r, s, first;
-	unsigned dest, gateway, flags, refcnt, use, metric, mask;
+	unsigned dest, gateway, flags_ip4, refcnt, use, metric, mask;
 	FILE *in_file;
 	struct in_addr in_addr;
 	struct ifconf ifconf;
@@ -228,6 +228,7 @@ static int setup_ipv4_rpt(FILE *of)
 	struct ifreq ifreq[MAX_INF];
 	char infname[20];
 	char line[256];
+	char flagstr_ip4[16];
 
 	s= socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 	if (s == -1)
@@ -288,8 +289,9 @@ static int setup_ipv4_rpt(FILE *of)
 	while (fgets(line, sizeof(line), in_file) != NULL)
 	{
 		sscanf(line, "%16s %x %x %x %d %d %d %x",
-			infname, &dest, &gateway, &flags, &refcnt, &use, 
+			infname, &dest, &gateway, &flags_ip4, &refcnt, &use,
 			&metric, &mask);
+		route_set_flags(flagstr_ip4, flags_ip4);
 		in_addr.s_addr= dest;
 		fprintf(of, "%s{ " DBQ(destination) ": " DBQ(%s) ", ",
 			first ? "" : ", ", inet_ntoa(in_addr));
@@ -298,8 +300,9 @@ static int setup_ipv4_rpt(FILE *of)
 			inet_ntoa(in_addr));
 		in_addr.s_addr= gateway;
 		fprintf(of, DBQ(next-hop) ": " DBQ(%s) ", "
+			DBQ(flags) ": " DBQ(%s) ", "
 			DBQ(interface) ": " DBQ(%s) " }",
-			inet_ntoa(in_addr), infname);
+			inet_ntoa(in_addr), flagstr_ip4, infname);
 		first= 0;
 	}
 
@@ -372,10 +375,10 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 	char *nh6out = NULL;
 	char dst6p[8][5];
 	char nh6p[8][5];
-	char iface[16], flags[16];
+	char iface[16], flagstr_ip6[16];
 	char Scope[32];
 	int scope, dad_status, if_idx;
-	int iflags, metric, refcnt, use, prefix_len, slen;
+	int flags_ip6, metric, refcnt, use, prefix_len, slen;
 	struct sockaddr_in6 sdst6, snh6;
 	char buf2[1024];
 
@@ -481,7 +484,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 				dst6p[0], dst6p[1], dst6p[2], dst6p[3], dst6p[4],
 				dst6p[5], dst6p[6], dst6p[7], &prefix_len, &slen, 
 				nh6p[0], nh6p[1], nh6p[2], nh6p[3], nh6p[4],
-				nh6p[5], nh6p[6], nh6p[7], &metric, &use, &refcnt, &iflags, iface)) != EOF) {
+				nh6p[5], nh6p[6], nh6p[7], &metric, &use, &refcnt, &flags_ip6, iface)) != EOF) {
 
 		if (r != 23) {
 			if ((r < 0) && feof(in_file)) { /* EOF with no (nonspace) chars read. */
@@ -493,10 +496,10 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 		}
 
 		/* skip some the stuff we don't want to report */
-		if (!(iflags & RTF_UP)) { /* Skip interfaces that are down. */
+		if (!(flags_ip6 & RTF_UP)) { /* Skip interfaces that are down. */
 			continue;
 		}
-		if ((iflags & RTF_ADDRCONF) && (iflags & RTF_CACHE)) { /* Skip cache entry */
+		if ((flags_ip6 & RTF_ADDRCONF) && (flags_ip6 & RTF_CACHE)) { /* Skip cache entry */
 			continue;
 		}
 
@@ -519,7 +522,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 				 nh6p[4], nh6p[5], nh6p[6], nh6p[7]);
 
 		
-		route_set_flags(flags, (iflags & IPV6_MASK));
+		route_set_flags(flagstr_ip6, (flags_ip6 & IPV6_MASK));
 		memset(&sdst6, '\0', sizeof(sdst6));
 		inet_pton(AF_INET6, dst6in, (struct sockaddr *) &sdst6.sin6_addr);
 		sdst6.sin6_family = AF_INET6;
@@ -537,7 +540,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 				" : " DBQ(%s) ", " DBQ(metric) " : %d , "
 				DBQ(interface) " : " DBQ(%s) "}",
 				n ? "" : ", \"inet6-routes\" : [", n ? ", " : ""
-				, dst6out, prefix_len, nh6out, flags, metric
+				, dst6out, prefix_len, nh6out, flagstr_ip6, metric
 				, iface);
 
 		/*
@@ -548,7 +551,7 @@ static int setup_ipv6_rpt(FILE *of, char *filename)
 				DBQ(interface) " : " DBQ(%s) "}",
 				n ? " " : '"inet6-routes" ['
 				, n ? ", " : ""
-				, dst6out, prefix_len, nh6out, flags, metric
+				, dst6out, prefix_len, nh6out, flagstr_ip6, metric
 				, iface); 
 				*/
 
