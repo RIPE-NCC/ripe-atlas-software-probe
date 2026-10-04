@@ -22,6 +22,15 @@ NETCONFIG_V4_DEST=$ATLAS_SYSCONFDIR/netconfig_v4.sh
 NETCONFIG_V6_DEST=$ATLAS_SYSCONFDIR/netconfig_v6.sh
 P_TO_R_INIT_IN=$ATLAS_STATUS/p_to_r_init.in.vol
 
+# The generic arch only uses these files to compare the next
+# registration reply. Keep them in ATLAS_STATUS if the probe
+# cannot write ATLAS_SYSCONFDIR.
+if [ "$DEVICE_NAME" = generic ] && [ ! -w "$ATLAS_SYSCONFDIR" ]; then
+	NETCONFIG_V4_DEST=$ATLAS_STATUS/netconfig_v4.sh
+	NETCONFIG_V6_DEST=$ATLAS_STATUS/netconfig_v6.sh
+	RESOLV_CONF_STATIC=$ATLAS_STATUS/resolv.conf.static
+fi
+
 if [ -z "$STATE_FILE" ] ; then
 	STATE_FILE=$ATLAS_STATUS/reginit.vol
 	echo "Warning: STATE_FILE unset. Setting to -> $STATE_FILE"
