@@ -227,7 +227,7 @@ do_buddyinfo()
 }
 hash_ssh_pubkey()
 {
-	hash=$(sed < "$1" 's/^ssh-rsa *\([^ ]*\).*/\1/' |
+	hash=$(sed < "$1" 's/^[^ ]* *\([^ ]*\).*/\1/' |
 		tr -d '\n' | sha256sum)
 	expr "$hash" : "\(.\{16\}\)"
 }
